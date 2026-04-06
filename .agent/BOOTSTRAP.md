@@ -1,0 +1,226 @@
+# Bootstrap — Configuracao Inicial do Projeto
+
+> **Este ficheiro e usado UMA VEZ pela AI para customizar o template ao novo projeto.**
+> Apos customizacao, pode ser apagado ou mantido como referencia historica.
+>
+> Funciona com qualquer agente AI: Claude Code, Gemini, Cursor, Copilot, etc.
+
+---
+
+## Instrucoes para a AI
+
+Le este ficheiro completo. Depois, faz as perguntas da Fase 1 ao utilizador.
+Com as respostas, gera/customiza todos os ficheiros indicados na Fase 2.
+No final, apresenta o resumo da Fase 3.
+
+---
+
+## Fase 1 — Perguntas ao Utilizador
+
+Faz estas perguntas **uma a uma** ou em bloco (conforme preferencia do utilizador).
+Guarda as respostas — vais precisar delas para preencher todos os placeholders.
+
+### Obrigatorias
+
+1. **Nome do projeto** (ex: "MyShop", "HealthTracker", "TaskFlow")
+   → Substitui `{{PROJECT_NAME}}` em todos os ficheiros
+
+2. **Slug do projeto** (kebab-case, ex: "my-shop", "health-tracker")
+   → Substitui `{{PROJECT_SLUG}}`
+
+3. **Descricao curta** (1-2 frases sobre o que o projeto faz)
+   → Substitui `{{PROJECT_DESCRIPTION}}`
+
+4. **Descricao do dominio** (paragrafo detalhado sobre o dominio de negocio, utilizadores-alvo, e contexto)
+   → Substitui `{{DOMAIN_DESCRIPTION}}`, base para gerar `business-logic.md`
+
+5. **Stack tecnica**:
+   - Framework frontend (ex: "Next.js 16 App Router", "Vite + React", "Nuxt 3")
+   - Backend/BaaS (ex: "Supabase", "Firebase", "Express + PostgreSQL")
+   - Styling (ex: "Tailwind CSS + Shadcn UI", "Chakra UI", "Styled Components")
+   - State management (ex: "SWR", "React Query", "Zustand", "Pinia")
+   - Bibliotecas chave (ex: "date-fns, jsPDF, recharts, sonner")
+   - Framework de testes (ex: "Playwright", "Cypress", "Vitest")
+   → Substitui `{{FRAMEWORK}}`, `{{BACKEND}}`, `{{STYLING}}`, `{{STATE_MANAGEMENT}}`, `{{KEY_LIBRARIES}}`, `{{TEST_FRAMEWORK}}`, `{{STACK}}`
+
+6. **Linguagem da UI** (ex: "Portugues de Portugal (PT-PT)", "English (EN)", "Espanol (ES)")
+   → Substitui `{{UI_LANGUAGE}}`
+
+7. **Hosting/Deploy** (ex: "Vercel", "Netlify", "AWS Amplify", "Docker + VPS")
+   → Substitui `{{HOSTING}}`
+
+### Opcionais (perguntar se relevante)
+
+8. **Ficheiro de tipos principal** (ex: `src/lib/types.ts`, `src/types/index.ts`)
+   → Substitui `{{TYPES_FILE}}`
+
+9. **Paginas principais** (lista das rotas/paginas da app, ex: "Dashboard (/), Products (/products), Settings (/settings)")
+   → Base para gerar `pages-architecture.md` e `TARGETS` no bundle checker
+
+10. **Sistema de subscricao/paywall?** (Free vs PRO, roles, permissoes)
+    → Se sim: adaptar review.md, plan.md e pages-architecture.md com seccoes de gating
+
+11. **Variaveis de ambiente** (lista das env vars necessarias para dev)
+    → Substitui `{{ENV_VARS_TEMPLATE}}` e `{{TEST_ENV_VARS}}`
+
+12. **Estrutura de diretorios** (se ja existir codigo, a AI pode ler automaticamente)
+    → Substitui `{{PROJECT_STRUCTURE}}`
+
+13. **Regras de negocio conhecidas** (formulas, limites, calculos, workflows do dominio)
+    → Base para gerar `business-logic.md`
+
+14. **Items iniciais de backlog** (bugs conhecidos, melhorias planeadas, features futuras)
+    → Popular o `backlog.md`
+
+---
+
+## Fase 2 — Ficheiros a Gerar/Customizar
+
+Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
+
+### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
+
+Percorrer todos os `.md` e `.mjs` e substituir:
+
+| Placeholder | Fonte |
+|-------------|-------|
+| `{{PROJECT_NAME}}` | Pergunta 1 |
+| `{{PROJECT_SLUG}}` | Pergunta 2 |
+| `{{PROJECT_DESCRIPTION}}` | Pergunta 3 |
+| `{{DOMAIN_DESCRIPTION}}` | Pergunta 4 |
+| `{{FRAMEWORK}}` | Pergunta 5 |
+| `{{BACKEND}}` | Pergunta 5 |
+| `{{STYLING}}` | Pergunta 5 |
+| `{{STATE_MANAGEMENT}}` | Pergunta 5 |
+| `{{KEY_LIBRARIES}}` | Pergunta 5 |
+| `{{TEST_FRAMEWORK}}` | Pergunta 5 |
+| `{{STACK}}` | Combinacao da pergunta 5 (ex: "Next.js 16, Supabase, Tailwind CSS, Shadcn UI, TypeScript, Playwright") |
+| `{{UI_LANGUAGE}}` | Pergunta 6 |
+| `{{HOSTING}}` | Pergunta 7 |
+| `{{TYPES_FILE}}` | Pergunta 8 (default: `src/lib/types.ts`) |
+| `{{ENV_VARS_TEMPLATE}}` | Pergunta 11 |
+| `{{TEST_ENV_VARS}}` | Pergunta 11 |
+| `{{PROJECT_STRUCTURE}}` | Pergunta 12 (ou gerar automaticamente) |
+| `{{DATE}}` | Data atual (YYYY-MM-DD) |
+| `{{AGENT_NAME}}` | Nome do agente AI a usar |
+| `{{SPRINT_DESCRIPTION}}` | "A definir" (placeholder inicial) |
+
+### 2.2 Ficheiros a GERAR do zero
+
+Estes ficheiros nao existem no template — devem ser criados pela AI com base nas respostas:
+
+| Ficheiro | Base | Conteudo |
+|----------|------|----------|
+| `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. |
+| `.agent/rules/pages-architecture.md` | Perguntas 9, 10 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. |
+
+**Formato sugerido para `business-logic.md`:**
+
+```markdown
+# Business Logic ({{PROJECT_NAME}})
+
+## 1. [Conceito de Dominio A]
+- Regra X: ...
+- Regra Y: ...
+
+## 2. [Conceito de Dominio B]
+- Formula: `resultado = valor_a * taxa + valor_b`
+- Limites: min X, max Y
+
+## 3. [Validacoes]
+- Campo Z: 0-100, step 0.01
+- Regra: validacao dupla (HTML min/max + clamp programatico no handler)
+```
+
+**Formato sugerido para `pages-architecture.md`:**
+
+```markdown
+# Pages Architecture & UI UX ({{PROJECT_NAME}})
+
+## 1. Home / Dashboard (`/`)
+- Dados exibidos: ...
+- Interacoes: ...
+- Free vs PRO: (se aplicavel)
+
+## 2. [Pagina B] (`/path`)
+- Dados exibidos: ...
+- Interacoes: ...
+```
+
+### 2.3 Adaptar o Bundle Checker
+
+No ficheiro `.agent/scripts/check-bundle-sizes.mjs`, descomentar e adaptar o objeto `TARGETS` com as paginas reais do projeto (pergunta 9):
+
+```javascript
+const TARGETS = {
+  "/":          { name: "Home",       target: 160, alarm: 180 },
+  "/products":  { name: "Products",   target: 160, alarm: 180 },
+  "/settings":  { name: "Settings",   target: 155, alarm: 175 },
+};
+```
+
+**Nota:** Este script so funciona com Next.js App Router. Para outros frameworks, indicar ao utilizador que deve ser adaptado ou removido.
+
+### 2.4 Adaptar core-rules.md a stack
+
+Dependendo da stack (pergunta 5), ajustar seccoes especificas:
+
+- **Se NAO e Next.js**: remover referencias a `next/dynamic`, `next/image`, `NEXT_PUBLIC_*`
+- **Se NAO e React**: adaptar padroes de componentes e hooks
+- **Se NAO usa SWR**: adaptar seccao "Data Fetching" ao state management escolhido
+- **Se NAO usa Tailwind**: remover padroes mobile especificos de Tailwind
+- **Se NAO tem PWA**: remover seccoes de PWA/Service Worker
+
+### 2.5 Adaptar workflows a stack
+
+- **setup.md**: Adaptar env vars, scripts de build, estrutura de diretorios
+- **deploy.md**: Adaptar ao hosting (Vercel vs Netlify vs Docker, etc.) e backend (migracoes)
+- **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
+- **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
+
+---
+
+## Fase 3 — Verificacao Final
+
+Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
+
+### Checklist
+
+- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (grep para verificar)
+- [ ] `business-logic.md` gerado com regras do dominio?
+- [ ] `pages-architecture.md` gerado com paginas e interacoes?
+- [ ] `TARGETS` no bundle checker atualizados?
+- [ ] `core-rules.md` adaptado a stack?
+- [ ] Workflows adaptados a stack e hosting?
+- [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
+
+### Resumo de ficheiros
+
+```
+Ficheiros com placeholders substituidos:  ~20
+Ficheiros gerados do zero:               2 (business-logic.md, pages-architecture.md)
+Ficheiros adaptados a stack:             ~5 (core-rules, setup, deploy, review, debug)
+```
+
+### Proximo passo
+
+Sugerir ao utilizador:
+
+```bash
+# Verificar que nao ficou nenhum placeholder
+grep -r "{{" .agent/ CLAUDE.md GEMINI.md src/docs/
+
+# Primeiro commit
+git add .
+git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
+```
+
+---
+
+## Notas para a AI
+
+- **Nao inventar regras de negocio** que o utilizador nao mencionou. Se nao ha informacao suficiente, criar seccoes com placeholders e comentarios `<!-- A preencher -->`.
+- **Nao remover seccoes** dos workflows — apenas adaptar ou marcar como N/A.
+- **Manter o formato** das tabelas markdown exatamente como esta no template.
+- **Perguntar ao utilizador** se tem duvidas em vez de assumir.
+- Este bootstrap e pensado para ser executado **uma unica vez** no inicio do projeto.
