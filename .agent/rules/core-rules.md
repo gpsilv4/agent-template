@@ -106,6 +106,8 @@
 - **`.editorconfig`**: Garante formatacao consistente (2 spaces, UTF-8, LF) entre IDEs.
 - **`.github/CODEOWNERS`**: Define reviewers automaticos por ficheiro/pasta.
 - **`LICENSE`**: MIT (ou outra licenca adequada ao projeto).
+- **Branch Protection**: Branch protection rules (require status checks, bloquear force push) requerem GitHub Pro em repos privados. O CI funciona como **semaforo informativo**. Se disponivel, ativar em GitHub Settings > Branches > Branch protection rules.
+- **Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Tags sao criadas apos merge de sprints/releases para main. Visiveis em GitHub > Releases.
 
 ### Docs & Knowledge Sync
 

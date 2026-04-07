@@ -37,6 +37,10 @@ Ficheiros de governance e configuracao na raiz:
 | `CODE_OF_CONDUCT.md` | Codigo de conduta (Contributor Covenant) |
 | `LICENSE` | Licenca do projeto (MIT por defeito) |
 
+**Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Apos cada sprint/release mergeado para main, criar tag: `git tag vX.Y.Z -m "Descricao"` + `git push origin --tags`. Visiveis em GitHub > Code > Tags.
+
+**Branch Protection**: Requer GitHub Pro em repos privados. O CI funciona como semaforo informativo (mostra verde/vermelho no PR). Se disponivel, ativar: require status checks + bloquear force push.
+
 > **A diferenca**: `.agent/` e para o Agente IA entender o projeto. `.github/` e para a governance do repositorio (CI/CD automatico). Os ficheiros raiz (CONTRIBUTING, SECURITY, etc.) sao para humanos e para o GitHub os reconhecer automaticamente.
 
 ---

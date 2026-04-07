@@ -123,6 +123,10 @@ git push origin main
 
 # 2. Aplicar migracoes em prod (se houver)
 # (adaptar ao backend do projeto)
+
+# 3. Criar tag da versao
+git tag vX.Y.Z -m "Descricao da release"
+git push origin --tags
 ```
 
 ## 8. Verificacao Pos-Deploy

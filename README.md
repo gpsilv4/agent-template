@@ -197,6 +197,14 @@ git commit -m "chore: bootstrap agent config"
 | `.editorconfig` | 2 spaces, UTF-8, LF — cross-IDE consistency |
 | `LICENSE` | MIT by default (customizable in bootstrap) |
 
+### Tags & Releases
+
+Each version (vX.Y.Z) has an annotated git tag. Tags are created after each sprint/release is merged to main. Visible at **GitHub > Code > Tags**.
+
+### Branch Protection
+
+Branch protection rules (require status checks, block force push) require **GitHub Pro** for private repos. The CI works as an **informational semaphore** — shows green/red on PRs and the developer decides. If Pro becomes available, enable in GitHub Settings > Branches.
+
 > **Note**: CI jobs include `if: hashFiles('package.json') != ''` to skip gracefully on the template repo (which has no code). On repos created from the template, they run normally.
 
 ## Placeholders

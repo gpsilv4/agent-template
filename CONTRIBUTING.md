@@ -70,6 +70,7 @@ ci(actions): add Playwright browser caching
 3. Update documentation if needed (see sync docs checklist in `process-rules.md`)
 4. Request review from CODEOWNERS
 5. Squash and merge after approval
+6. After sprint/release merge: create version tag (`git tag vX.Y.Z -m "Description"` + `git push origin --tags`)
 
 ## Testing
 

@@ -160,6 +160,8 @@ Exemplos: `feat(dashboard): add monthly export`, `fix(auth): prevent redirect lo
 - Apos merge de PRs, **perguntar ao utilizador** se deve eliminar o branch ou mante-lo.
 - **CI Gate**: Antes de mergear para main, confirmar que **todos os CI checks passaram** (TypeScript, lint, build, tests, audit). Nunca mergear com checks vermelhos.
 - **PRs**: Usar o template de PR (`.github/pull_request_template.md`) que impoe checklist alinhada com o workflow `/review`.
+- **Tags**: Apos cada release/sprint concluido e mergeado para main, criar tag anotada: `git tag vX.Y.Z <commit> -m "Descricao da release"` + `git push origin --tags`. Tags marcam releases oficiais no GitHub.
+- **Branch Protection**: Branch protection rules (require status checks, bloquear force push) requerem GitHub Pro em repos privados. O CI funciona como **semaforo informativo**. Se disponivel no futuro, ativar em GitHub Settings > Branches > Branch protection rules.
 
 ### Regra de Branch (Agente de IA)
 

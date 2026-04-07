@@ -40,3 +40,15 @@ Stack: {{STACK}}.
 | Testes de Seguranca       | @[.agent/workflows/security-tests.md]  |
 | Debugging estruturado     | @[.agent/workflows/debug.md]           |
 | Deploy para producao      | @[.agent/workflows/deploy.md]          |
+
+---
+
+## CI/CD & Governance
+
+- **CI Pipeline**: `.github/workflows/ci.yml` — corre em cada PR/push (TypeScript, lint, build, tests, audit)
+- **E2E Pipeline**: `.github/workflows/e2e.yml` — trigger manual para testes E2E e seguranca
+- **PR Template**: `.github/pull_request_template.md` — checklist alinhada com `/review`
+- **Dependabot**: `.github/dependabot.yml` — updates automaticos semanais
+- **Conventional Commits**: Formato obrigatorio — ver `CONTRIBUTING.md`
+- **Seguranca**: `SECURITY.md` — politica de disclosure
+- **Tags & Releases**: Cada versao (vX.Y.Z) tem tag anotada — criar apos cada sprint/release
