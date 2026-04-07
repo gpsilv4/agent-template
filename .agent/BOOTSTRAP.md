@@ -9,15 +9,132 @@
 
 ## Instrucoes para a AI
 
-Le este ficheiro completo. Depois, faz as perguntas da Fase 1 ao utilizador.
-Com as respostas, gera/customiza todos os ficheiros indicados na Fase 2.
-No final, apresenta o resumo da Fase 3.
+Le este ficheiro completo. Antes de avancar, pergunta ao utilizador:
+
+> _"Ja sabes que stack, backend e arquitetura queres usar, ou preferes que te ajude a decidir?"_
+
+- **Se ja sabe**: saltar para a Fase 1 (Perguntas ao Utilizador).
+- **Se nao sabe ou tem duvidas**: comecar pela Fase 0 (Analise e Decisoes). No final da Fase 0, as respostas da Fase 1 sao preenchidas automaticamente com base no que foi decidido — o utilizador so confirma.
+
+---
+
+## Fase 0 — Analise e Decisoes (opcional)
+
+> **Quando usar:** O utilizador descreve o projeto mas nao sabe que tecnologias, arquitetura ou plataformas escolher. A AI analisa e propoe — o utilizador valida.
+>
+> **Regra critica:** Para no fim de **cada passo** e espera confirmacao do utilizador antes de avancar para o proximo. Nunca saltar passos.
+
+### Passo 1 — Compreender o Projeto
+
+Pedir ao utilizador que descreva o projeto em 3-5 frases:
+- O que faz?
+- Para quem e?
+- Que problema resolve?
+
+Se a descricao for vaga, fazer perguntas de clarificacao antes de avancar.
+
+→ **PARA AQUI.** Confirma que compreendeste o projeto antes de avancar.
+
+---
+
+### Passo 2 — Plataformas
+
+Com base na descricao do projeto, analisar e recomendar:
+
+- Que plataformas fazem sentido? (Web SPA, SSR/SSG, PWA, Mobile nativo, Desktop)
+- Qual e a prioridade para o MVP e porque?
+- O que fica de fora do MVP e porque?
+
+Apresentar uma recomendacao clara com justificacao.
+
+→ **PARA AQUI.** Espera que o utilizador confirme antes de avancar.
+
+---
+
+### Passo 3 — Stack Tecnica
+
+Com base no projeto e nas plataformas confirmadas, recomendar a stack completa.
+Para **cada peca**, responder: o que e, porque foi escolhida, pros, contras e alternativa valida.
+
+Cobrir obrigatoriamente:
+- Linguagem principal
+- Framework frontend
+- Backend / BaaS
+- Base de dados
+- Autenticacao
+- Hosting / Deploy
+- Framework de styling
+- Gestao de estado / data fetching
+- Bibliotecas principais (incluindo integracoes externas)
+- Framework de testes
+
+No fim, apresentar a stack numa linha resumida:
+> ex: Next.js 16 + Supabase + Tailwind + SWR + Playwright → Vercel
+
+→ **PARA AQUI.** Espera que o utilizador confirme antes de avancar.
+
+---
+
+### Passo 4 — Arquitetura
+
+Com base na stack confirmada, desenhar a arquitetura em texto:
+
+- Listar os componentes principais do sistema
+- Mostrar como comunicam entre si (setas simples: `→`)
+- Explicar cada ligacao em 1 frase
+- Identificar integracoes externas necessarias
+- Distinguir o que e critico vs opcional no MVP
+
+Formato esperado:
+```
+[Browser] → [Frontend Next.js] → [API Routes] → [Supabase DB]
+                                → [Servico Externo X]
+[Admin]  → [Dashboard]        → [Relatorios PDF]
+```
+
+→ **PARA AQUI.** Espera que o utilizador confirme antes de avancar.
+
+---
+
+### Passo 5 — Riscos e Incognitas
+
+Antes de avancar para a configuracao, analisar:
+
+- O que pode correr mal neste projeto? (riscos tecnicos, dependencias externas, complexidade)
+- Que decisoes tecnicas sao dificeis de reverter depois?
+- Ha algo no projeto que nao esta claro e deve ser clarificado agora?
+- Alguma pergunta aberta que condicione as escolhas feitas?
+
+→ **PARA AQUI.** Espera que o utilizador confirme antes de avancar.
+
+---
+
+### Transicao para Fase 1
+
+Quando todos os passos estiverem confirmados, apresentar um resumo:
+
+```
+RESUMO DA FASE 0
+=================
+Projeto:       [nome e descricao]
+Plataforma:    [plataforma escolhida]
+Stack:         [stack numa linha]
+Arquitetura:   [diagrama simplificado]
+Riscos:        [riscos principais]
+```
+
+Depois, preencher automaticamente as respostas da Fase 1 com base no que foi decidido. Apresentar os campos preenchidos ao utilizador para validacao antes de executar a Fase 2.
+
+Se algum campo nao foi discutido na Fase 0, assinalar com `[a confirmar]` e perguntar ao utilizador.
 
 ---
 
 ## Fase 1 — Perguntas ao Utilizador
 
-Faz estas perguntas **uma a uma** ou em bloco (conforme preferencia do utilizador).
+> **Se veio da Fase 0:** Os campos abaixo ja foram preenchidos automaticamente. Apresentar ao utilizador para validacao — so pedir input nos campos marcados `[a confirmar]`.
+>
+> **Se saltou a Fase 0:** Fazer estas perguntas **uma a uma** ou em bloco (conforme preferencia do utilizador).
+
 Guarda as respostas — vais precisar delas para preencher todos os placeholders.
 
 ### Obrigatorias

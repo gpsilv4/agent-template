@@ -41,6 +41,22 @@ Ficheiros de governance e configuracao na raiz:
 
 ---
 
+## 1.6 Bootstrap com Fase 0 — Analise e Decisoes
+
+O ficheiro `.agent/BOOTSTRAP.md` contem o processo de configuracao inicial do projeto. Inclui uma **Fase 0 opcional** para utilizadores que nao sabem que stack ou arquitetura usar:
+
+1. **Passo 1** — Compreender o projeto (descricao em 3-5 frases)
+2. **Passo 2** — Plataformas (Web, PWA, Mobile — prioridade para MVP)
+3. **Passo 3** — Stack tecnica (recomendacao completa com pros/contras)
+4. **Passo 4** — Arquitetura (diagrama em texto dos componentes)
+5. **Passo 5** — Riscos e incognitas (decisoes dificeis de reverter)
+
+Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os campos da Fase 1 (perguntas) com base no que foi decidido.
+
+> Se o utilizador ja sabe as respostas, a Fase 0 e saltada e vai direto para as perguntas.
+
+---
+
 ## 2. Regras de Inteligencia (`.agent/rules/`)
 
 As regras sao diretivas que o Agente consulta antes de cada acao.

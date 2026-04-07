@@ -121,10 +121,13 @@ claude
 ```
 
 The AI will:
-1. Ask questions about your project (name, stack, domain, pages)
-2. Replace all `{{PLACEHOLDER}}` values across files
-3. Generate `business-logic.md` and `pages-architecture.md` from scratch
-4. Adapt workflows, CI/CD, and scripts to your stack
+1. **Phase 0 (if needed)** — If you don't know what stack/architecture to use, the AI analyzes your project description and recommends platforms, stack, architecture, and flags risks — step by step, waiting for your confirmation at each step
+2. Ask questions about your project (or auto-fill from Phase 0 decisions)
+3. Replace all `{{PLACEHOLDER}}` values across files
+4. Generate `business-logic.md` and `pages-architecture.md` from scratch
+5. Adapt workflows, CI/CD, and scripts to your stack
+
+> **Don't know what tech to use?** Just describe your project in 3-5 sentences. The AI will guide you through every technical decision before touching any files.
 
 ### 3. Verify and commit
 
