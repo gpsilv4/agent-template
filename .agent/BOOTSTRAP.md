@@ -209,7 +209,7 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
-Percorrer todos os `.md` e `.mjs` e substituir:
+Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
 
 | Placeholder | Fonte |
 |-------------|-------|
@@ -351,7 +351,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 
 ### Checklist
 
-- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (`grep -r "{{" .agent/ .github/ CLAUDE.md GEMINI.md src/docs/`)
+- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (`grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/`)
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
 - [ ] `TARGETS` no bundle checker atualizados?
@@ -380,7 +380,7 @@ Sugerir ao utilizador:
 
 ```bash
 # Verificar que nao ficou nenhum placeholder
-grep -r "{{" .agent/ CLAUDE.md GEMINI.md src/docs/
+grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/
 
 # Primeiro commit
 git add .

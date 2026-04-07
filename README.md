@@ -49,7 +49,7 @@ When you open a new AI session in any project using this template, the agent **a
 
 ```
 .agent/                         <- AI knowledge management
-├── BOOTSTRAP.md                <- Prompt que a AI segue para customizar (usar 1x)
+├── BOOTSTRAP.md                <- Setup guide: Phase 0 (analysis) + Phase 1 (config) — run once
 ├── rules/
 │   ├── core-rules.md           <- Code standards, CI/CD, security
 │   └── process-rules.md        <- Git, branches, sprints, backlog, docs sync
@@ -134,7 +134,7 @@ The AI will:
 
 ```bash
 # Verify no placeholders remain
-grep -r "{{" .agent/ .github/ CLAUDE.md GEMINI.md src/docs/
+grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/
 
 # Initial commit
 git add .
@@ -165,7 +165,7 @@ git commit -m "chore: bootstrap agent config"
 | Build | `npm run build` — verify bundle |
 | Unit Tests | `npm run test:unit` |
 | Security Audit | `npm audit --audit-level=high` |
-| Doc Versions | `node .agent/scripts/check-doc-versions.mjs` — warns if docs are outdated |
+| Doc Versions | `node .agent/scripts/check-doc-versions.mjs` — warns if docs are outdated (opt-in, uncomment in ci.yml) |
 
 > CI uses `pull_request_target` for Dependabot PRs (filtered to `dependabot[bot]` only) so they can access repository secrets. Normal PRs use `pull_request` as usual.
 
