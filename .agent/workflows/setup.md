@@ -130,7 +130,7 @@ Antes de tocar no codigo, ler:
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit. **Todos os checks devem estar verdes antes de mergear.**
+- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, doc version check. **Todos os checks devem estar verdes antes de mergear.** Inclui `pull_request_target` para Dependabot (acesso a secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:

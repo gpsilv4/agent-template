@@ -70,7 +70,8 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── e2e-tests.md            <- /e2e-tests — E2E tests (Playwright)
 │   └── security-tests.md       <- /security-tests — Security tests
 └── scripts/
-    └── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
+    ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
+    └── check-doc-versions.mjs  <- Doc version drift checker
 
 .github/                        <- DevOps & governance
 ├── workflows/
@@ -164,6 +165,9 @@ git commit -m "chore: bootstrap agent config"
 | Build | `npm run build` — verify bundle |
 | Unit Tests | `npm run test:unit` |
 | Security Audit | `npm audit --audit-level=high` |
+| Doc Versions | `node .agent/scripts/check-doc-versions.mjs` — warns if docs are outdated |
+
+> CI uses `pull_request_target` for Dependabot PRs (filtered to `dependabot[bot]` only) so they can access repository secrets. Normal PRs use `pull_request` as usual.
 
 ### `e2e.yml` — Manual trigger (workflow_dispatch)
 

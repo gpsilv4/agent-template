@@ -19,7 +19,7 @@ A pasta `.agent` funciona como o "cerebro" da assistencia de IA no projeto. Ela 
 A pasta `.github/` complementa o `.agent/` com automacao e governance do repositorio:
 
 - **`workflows/`**: Pipelines automaticos de CI/CD
-  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit)
+  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit, doc versions). Inclui `pull_request_target` para Dependabot.
   - `e2e.yml`: Testes E2E e seguranca (trigger manual ou em PRs)
 - **`pull_request_template.md`**: Checklist que sincroniza com o workflow `/review`
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
@@ -61,8 +61,8 @@ Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os
 
 As regras sao diretivas que o Agente consulta antes de cada acao.
 
-- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, performance, seguranca.
-- **[process-rules.md]**: Regras de processo: sessao, backlog, sprints, fluxos de trabalho por tipo, Git, branches.
+- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, performance, seguranca, CI/CD pipeline, doc version checker.
+- **[process-rules.md]**: Regras de processo: sessao, backlog, sprints, fluxos de trabalho por tipo, Conventional Commits, CI Gate, Git, branches.
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
 

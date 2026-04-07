@@ -108,6 +108,7 @@ O `backlog.md` e o documento central de trabalho pendente. Qualquer agente deve 
 20. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 21. [ ] `SECURITY.md` — politica de disclosure atualizada
 22. [ ] `.nvmrc` — versao Node alinhada com CI (`ci.yml` node-version)
+23. [ ] **Versoes na documentacao** — apos merge de Dependabot PRs, correr `node .agent/scripts/check-doc-versions.mjs` e atualizar referencias desatualizadas
 
 ---
 

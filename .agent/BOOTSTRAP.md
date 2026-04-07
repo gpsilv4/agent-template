@@ -293,7 +293,25 @@ const TARGETS = {
 
 **Nota:** Este script so funciona com Next.js App Router. Para outros frameworks, indicar ao utilizador que deve ser adaptado ou removido.
 
-### 2.4 Adaptar core-rules.md a stack
+### 2.4 Configurar o Doc Version Checker
+
+No ficheiro `.agent/scripts/check-doc-versions.mjs`, descomentar e adaptar o array `CHECKS` com as dependencias que tem versoes referenciadas na documentacao:
+
+```javascript
+const CHECKS = [
+  {
+    name: "Next.js",
+    pkg: "next",
+    pattern: /Next\.js\s+(\d+(?:\.\d+(?:\.\d+)?)?)/g,
+    files: [".agent/rules/core-rules.md"],
+  },
+  // Adicionar mais dependencias conforme necessario
+];
+```
+
+Este script corre no CI e avisa quando as versoes na documentacao estao desatualizadas (ex: apos merge de PRs do Dependabot).
+
+### 2.5 Adaptar core-rules.md a stack
 
 Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
@@ -303,14 +321,14 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **Se NAO usa Tailwind**: remover padroes mobile especificos de Tailwind
 - **Se NAO tem PWA**: remover seccoes de PWA/Service Worker
 
-### 2.5 Adaptar workflows a stack
+### 2.6 Adaptar workflows a stack
 
 - **setup.md**: Adaptar env vars, scripts de build, estrutura de diretorios
 - **deploy.md**: Adaptar ao hosting (Vercel vs Netlify vs Docker, etc.) e backend (migracoes)
 - **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
 
-### 2.6 Customizar GitHub CI/CD e Governance
+### 2.7 Customizar GitHub CI/CD e Governance
 
 - **`.github/workflows/ci.yml`**: Verificar node version, descomentar bundle size check se necessario, ajustar scripts de teste ao projeto
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets

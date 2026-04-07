@@ -3,11 +3,14 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize]
   push:
     branches: [main]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -15,9 +18,18 @@ jobs:
     name: Code Quality
     runs-on: ubuntu-latest
     # Skip on template repo (no package.json yet)
-    if: hashFiles('package.json') != ''
+    # For dependabot: use pull_request_target (has secrets access)
+    # For normal PRs: use pull_request
+    if: >
+      hashFiles('package.json') != '' && (
+        github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
+        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
+      )
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -39,12 +51,23 @@ jobs:
       # - name: Bundle Sizes
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
+      # Uncomment after configuring version checks in .agent/scripts/check-doc-versions.mjs
+      # - name: Doc Versions
+      #   run: node .agent/scripts/check-doc-versions.mjs
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    if: hashFiles('package.json') != ''
+    if: >
+      hashFiles('package.json') != '' && (
+        github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
+        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
+      )
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -59,9 +82,16 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    if: hashFiles('package.json') != ''
+    if: >
+      hashFiles('package.json') != '' && (
+        github.event_name == 'push' ||
+        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
+        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
+      )
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:

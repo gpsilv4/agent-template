@@ -96,9 +96,10 @@
 - **`ci.yml`** corre em cada push e PR para main: TypeScript, lint, build, unit tests, security audit.
 - **`e2e.yml`** e trigger manual (`workflow_dispatch`) para testes E2E e seguranca.
 - **Nenhum merge para main** deve acontecer com checks vermelhos no CI.
-- **Dependabot** (`.github/dependabot.yml`) gere updates automaticos de dependencias npm e GitHub Actions.
+- **Dependabot** (`.github/dependabot.yml`) gere updates automaticos de dependencias npm e GitHub Actions. PRs do Dependabot usam `pull_request_target` no CI para aceder a secrets (filtrado apenas para `dependabot[bot]`).
 - **PR Template** (`.github/pull_request_template.md`) impoe checklist obrigatoria alinhada com o workflow `/review`.
 - **Issue Templates** (`.github/ISSUE_TEMPLATE/`) estruturam bug reports e feature requests alinhados com o backlog.
+- **Doc Version Checker** (`.agent/scripts/check-doc-versions.mjs`): Corre no CI e avisa se versoes na documentacao estao desatualizadas apos merge de Dependabot PRs.
 
 ### Code Quality Config
 
