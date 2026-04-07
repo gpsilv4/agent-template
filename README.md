@@ -104,7 +104,8 @@ src/docs/
 
 ```bash
 # Via GitHub CLI
-gh repo create my-project --template gpsilv4/agent-template --clone
+gh repo create my-project --template gpsilv4/agent-template --clone --public
+# or --private / --internal
 cd my-project
 
 # Or via GitHub UI: "Use this template" -> "Create a new repository"
