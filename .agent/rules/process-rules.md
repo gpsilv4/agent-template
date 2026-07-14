@@ -11,7 +11,7 @@
 - Reconhecer linguagem natural como sinal de fim de sessao: **"acabei"**, **"commit"**, **"vamos parar"**, **"fechar"**, **"terminei"**.
 - Ficheiros **substituidos** a cada feature (refletem estado atual): `session.md`, `task.md`, `walkthrough.md`, `implementation_plan.md`
 - Ficheiro **acumulado**: `decisions.md` — novas entradas no topo. Quando uma decisao se torna padrao recorrente, propor migracao para `.agent/rules/`.
-- Ficheiro **permanente**: `backlog.md` — ver regras detalhadas abaixo.
+- Ficheiros **permanentes**: `backlog.md` (trabalho ativo, importado no contexto) e `backlog-archive.md` (historico + sprints fechados, **nao** importado) — ver regras detalhadas abaixo.
 
 ---
 
@@ -19,23 +19,32 @@
 
 O `backlog.md` e o documento central de trabalho pendente. Qualquer agente deve seguir estas regras:
 
+**Layout e arquivo (ordem das seccoes).** O backlog divide-se em dois ficheiros, por frequencia de leitura:
+- **`backlog.md`** (importado em `CLAUDE.md`/`GEMINI.md` — entra no contexto a cada sessao): so trabalho **ativo**, ordenado do acionavel para o topo:
+  1. **Zona Ativa**: `Progresso Geral` + `Proximo:`, `Resumo` (contadores) e o cabecalho `🎯 Trabalho Ativo` (sprints ativos + `Pendentes sem Sprint`).
+  2. **Zona de Referencia**: cabecalho `📚 Tickets Abertos por Tipo (Referencia)` com as quatro tabelas por tipo (Bugs, UX, Divida Tecnica, Features) — apenas items **abertos** (Pendente, A Fazer).
+- **`backlog-archive.md`** (**nao** importado — nunca esta permanentemente no contexto): `Historico (Fechados)` (Concluido/Cancelado) e o indice de sprints fechados. O agente le-o **on-demand** (via `Read`/grep), sobretudo para confirmar unicidade de IDs.
+
+O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao — e mantem esta ordem. **Um item vive num so ficheiro**: ao fechar (Concluido/Cancelado), a linha **move-se** de `backlog.md` para `backlog-archive.md`, mantendo o ficheiro ativo enxuto no contexto do agente.
+
 **Ao concluir um item:**
-1. Na tabela da seccao (1-4), mudar `Estado` de `A Fazer` para `Concluido`
-2. Na tabela "Historico (Concluido)" no fundo, adicionar uma linha com o ID, descricao, sprint (ex: `S3`), versao e data
-3. No sprint correspondente, remover a linha do item concluido
+1. **Remover** a linha do item da tabela da seccao por tipo (1-4) em `backlog.md` — items fechados nao ficam no ficheiro ativo
+2. **Adicionar** uma linha a tabela "Historico (Fechados)" em **`backlog-archive.md`** (append) com `ID`, `Tipo` (Bug/UX/Tecnica/Feature), descricao, `Estado` = `Concluido`, sprint (ex: `S3`), versao e data
+3. No sprint correspondente (Zona Ativa), remover a linha do item concluido
 4. Atualizar os contadores na tabela "Resumo" (A Fazer -1, Concluido +1)
-5. Atualizar a barra de progresso: blocos por cada 5% concluido (20 blocos = 100%). Formula: `concluidos / total x 20` blocos preenchidos, resto vazios
+5. Atualizar a barra de progresso: 20 blocos = 100%. Formula: `concluidos / contavel x 20` blocos preenchidos (onde `contavel = total - cancelados`; cancelados nao contam). **Contadores e barra sao dados derivados — validar com `node .agent/scripts/check-backlog.mjs` antes de commit.**
 6. Atualizar a linha **Proximo:** com o proximo item do sprint (por ordem + dependencias)
 
 **Ao cancelar um item:**
-1. Na tabela da seccao, mudar `Estado` para `Cancelado`
-2. Atualizar contadores no "Resumo" (Pendente ou A Fazer -1, Cancelado +1)
-3. No sprint correspondente, remover a linha do item cancelado
-4. Items cancelados nao contam para o progresso (barra de progresso ignora-os)
+1. **Remover** a linha do item da tabela da seccao em `backlog.md`
+2. **Adicionar** ao "Historico (Fechados)" em `backlog-archive.md` com `Estado` = `Cancelado` (mais `Tipo`, descricao, etc.)
+3. Atualizar contadores no "Resumo" (Pendente ou A Fazer -1, Cancelado +1)
+4. No sprint correspondente, remover a linha do item cancelado
+5. Items cancelados nao contam para o progresso (barra de progresso ignora-os)
 
 **Ao adicionar um novo item:**
 1. Usar o proximo ID disponivel na seccao (ex: se B6 e o ultimo bug, o novo e B7)
-2. Nunca reutilizar um ID de um item concluido ou cancelado
+2. Nunca reutilizar um ID de um item concluido ou cancelado — verificar tanto `backlog.md` como `backlog-archive.md` (grep/Read) antes de escolher o ID
 3. Adicionar a tabela da seccao correta (Bug, UX, Tecnica, Feature)
 4. Decidir com o utilizador em que sprint colocar (ou no backlog do Sprint 4+)
 5. Atualizar os contadores na tabela "Resumo" (Total +1, Pendente +1)
@@ -69,7 +78,7 @@ O `backlog.md` e o documento central de trabalho pendente. Qualquer agente deve 
   6. **Trabalho nao planeado**: listar qualquer trabalho feito que NAO estava no sprint (hotfixes, testes adicionais, refactors de oportunidade) e criar tickets no backlog com IDs antes de pedir commit
 - So depois perguntar: _"Queres que atualize a documentacao, faca commit e crie o PR?"_
 - Ao concluir, perguntar: _"Sprint X concluido. Queres avancar para o Sprint Y?"_
-- Remover a seccao do sprint concluido (os items ja estao no Historico)
+- Remover a seccao do sprint concluido de `backlog.md` (os items ja estao no Historico) e adicionar uma linha ao "Sprints Fechados (Indice)" em `backlog-archive.md`
 
 **Quando o utilizador reporta um novo bug ou pede uma melhoria:**
 - Propor criacao de item no backlog com ID, descricao, esforco e sprint sugerido
@@ -77,38 +86,31 @@ O `backlog.md` e o documento central de trabalho pendente. Qualquer agente deve 
 
 ---
 
-### Checklist de Sync Docs (correr AUTOMATICAMENTE antes de commit)
+### Regra de Arquivamento (Agente de IA)
 
-> **Regra Obrigatoria**: Esta checklist DEVE ser corrida **automaticamente** pelo agente antes de dizer "Estou pronto para commit". Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e obrigatorio verificar e atualizar **TODOS os pontos** abaixo. O agente NAO deve esperar que o utilizador peca "sync docs" — deve faze-lo proativamente.
+Ficheiros de contexto sempre-carregados que crescem sem limite incham o contexto do agente. Aplicar o mesmo
+principio do backlog (ativo vs arquivo) a todo o historico inerte:
 
-1. [ ] `README.md` — contagens de testes, stack, scripts atualizados
-2. [ ] `CLAUDE.md` — referencias a `.agent/` files corretas
-3. [ ] `GEMINI.md` — mesma estrutura que CLAUDE.md
-4. [ ] `.agent/rules/` — todas as regras refletem o estado atual do codigo
-5. [ ] `.agent/context/session.md` — estado da sessao atual
-6. [ ] `.agent/context/task.md` — tarefas atualizadas
-7. [ ] `.agent/context/backlog.md`:
-   - [ ] Trabalho feito fora do sprint esta registado com ID?
-   - [ ] Contadores (Total, Pendente, A Fazer, Concluido, Cancelado) corretos?
-   - [ ] Barra de progresso correta?
-   - [ ] Linha **Proximo:** atualizada?
-   - [ ] Historico tem todos os items concluidos (com coluna Sprint)?
-8. [ ] `.agent/context/decisions.md` — novas decisoes registadas
-9. [ ] `.agent/context/walkthrough.md` — se houve feature/fix user-facing
-10. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
-11. [ ] `.agent/workflows/` — workflows refletem processos atuais
-12. [ ] `.agent/scripts/` — scripts e targets atualizados
-13. [ ] `src/docs/CHANGELOG.md` — versao atual registada
-14. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
-15. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
-16. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
-17. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
-18. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
-19. [ ] `.github/dependabot.yml` — schedule e labels corretos
-20. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
-21. [ ] `SECURITY.md` — politica de disclosure atualizada
-22. [ ] `.nvmrc` — versao Node alinhada com CI (`ci.yml` node-version)
-23. [ ] **Versoes na documentacao** — apos merge de Dependabot PRs, correr `node .agent/scripts/check-doc-versions.mjs` e atualizar referencias desatualizadas
+- **`decisions.md`** > ~150 linhas -> propor mover as entradas mais antigas para `decisions-archive.md`.
+- **`walkthrough.md`** > ~200 linhas -> propor mover releases antigas para `walkthrough-archive.md`.
+- Os ficheiros `*-archive.md` **nao sao importados** em `CLAUDE.md`/`GEMINI.md` — sao historico inerte, lidos on-demand.
+- O agente **propoe** o arquivamento e aguarda aprovacao; nunca apaga historico, so o move.
+
+---
+
+### Checklist de Sync Docs
+
+> A checklist completa (23 pontos) vive em **`.agent/rules/sync-docs.md`** — **nao carregada automaticamente**,
+> para manter o contexto enxuto. O agente deve **abri-la e corre-la** antes de dizer "Estou pronto para commit"
+> (proativamente, sem esperar que o utilizador peca), e sempre nos workflows `/review` e `/deploy`.
+
+---
+
+### Regra de Testes (Agente de IA)
+
+- O agente **cria testes proativamente** — nao espera que o utilizador peca. Ao concluir trabalho, avalia e propoe.
+- **Triagem por tipo**: **unit** (funcoes puras, regras de negocio), **E2E** (fluxos de utilizador), **security** (novas rotas, inputs ou headers).
+- Alteracoes **so visuais** normalmente nao exigem testes novos; **restruturas de UI** obrigam a corrigir os seletores afetados (`data-testid`) no mesmo PR.
 
 ---
 
@@ -131,25 +133,10 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 
 ### Conventional Commits (Obrigatorio)
 
-Todas as mensagens de commit seguem o formato [Conventional Commits](https://www.conventionalcommits.org/):
+Todas as mensagens de commit seguem o formato [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <description>`.
 
-```
-<type>(<scope>): <description>
-```
-
-| Type | Quando usar |
-|------|-------------|
-| `feat` | Nova funcionalidade |
-| `fix` | Correcao de bug |
-| `docs` | Apenas documentacao |
-| `style` | Formatacao (sem alteracao de logica) |
-| `refactor` | Reestruturacao de codigo |
-| `perf` | Melhoria de performance |
-| `test` | Adicionar ou atualizar testes |
-| `chore` | Manutencao (deps, configs, CI) |
-| `ci` | Alteracoes ao CI/CD pipeline |
-
-Exemplos: `feat(dashboard): add monthly export`, `fix(auth): prevent redirect loop`, `test(e2e): add profile persistence test`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci` — tabela completa e exemplos em `CONTRIBUTING.md`.
+- Exemplo: `feat(dashboard): add monthly export`
 
 ### Regra de Git (Agente de IA)
 

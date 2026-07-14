@@ -7,7 +7,7 @@
 
 <!-- Formato para novas decisoes:
 
-## {{DATE}} — {{TITULO_DA_DECISAO}}
+## YYYY-MM-DD — <titulo-da-decisao>
 
 **Contexto:** (qual era o problema ou necessidade)
 **Decisao:** (o que foi decidido e como)
