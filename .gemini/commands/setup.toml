@@ -1,0 +1,2 @@
+description = "Onboarding de developer / setup do ambiente"
+prompt = "Le e segue .agent/workflows/setup.md para guiar o setup do ambiente de desenvolvimento."

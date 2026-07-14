@@ -1,0 +1,2 @@
+description = "Checklist de deploy para producao (com CI gate)"
+prompt = "Le e segue .agent/workflows/deploy.md. NUNCA fazer git commit/push sem autorizacao explicita do utilizador."

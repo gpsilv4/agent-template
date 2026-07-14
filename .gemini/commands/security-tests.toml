@@ -1,0 +1,2 @@
+description = "Correr e manter os testes de seguranca"
+prompt = "Le e segue .agent/workflows/security-tests.md para os testes de seguranca."

@@ -3,37 +3,36 @@ name: CI
 on:
   pull_request:
     branches: [main]
-  pull_request_target:
-    branches: [main]
-    types: [opened, synchronize]
   push:
     branches: [main]
+
+# NOTE: Dependabot PRs run on `pull_request` with a read-only token and NO repo
+# secrets (GitHub's safe default). That is fine here because no CI step below needs
+# secrets. If a project's build genuinely needs secrets on Dependabot PRs, add a
+# separate, carefully-scoped `pull_request_target` job at bootstrap — do not make it
+# the default (it runs untrusted PR code with a privileged token).
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.ref || github.ref }}
   cancel-in-progress: true
 
+# Least privilege: no job here writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
-    # Skip on template repo (no package.json yet)
-    # For dependabot: use pull_request_target (has secrets access)
-    # For normal PRs: use pull_request
-    if: >
-      hashFiles('package.json') != '' && (
-        github.event_name == 'push' ||
-        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
-        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
-      )
+    timeout-minutes: 15
+    # Skip on the bare template repo (no package.json yet); runs on real projects.
+    if: hashFiles('package.json') != ''
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -51,27 +50,26 @@ jobs:
       # - name: Bundle Sizes
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
-      # Uncomment after configuring version checks in .agent/scripts/check-doc-versions.mjs
-      # - name: Doc Versions
+      # Uncomment to run doc guards: rules byte-budget, CLAUDE/GEMINI parity,
+      # CHANGELOG/package.json version, banned terms, and (opt-in) dependency versions
+      # - name: Doc Guards
       #   run: node .agent/scripts/check-doc-versions.mjs
+
+      # Uncomment to validate backlog counters/progress bar and detect duplicate IDs
+      # - name: Backlog Check
+      #   run: node .agent/scripts/check-backlog.mjs
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    if: >
-      hashFiles('package.json') != '' && (
-        github.event_name == 'push' ||
-        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
-        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
-      )
+    timeout-minutes: 15
+    if: hashFiles('package.json') != ''
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -82,23 +80,35 @@ jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
-    if: >
-      hashFiles('package.json') != '' && (
-        github.event_name == 'push' ||
-        (github.event_name == 'pull_request' && github.actor != 'dependabot[bot]') ||
-        (github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]')
-      )
+    timeout-minutes: 10
+    if: hashFiles('package.json') != ''
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
 
       - name: Audit
         run: npm audit --audit-level=high
+
+  # Runs on every push/PR, including the bare template (no package.json guard):
+  # scans the full history for committed secrets/keys.
+  secret-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Organizations (not personal repos) need a free GITLEAKS_LICENSE:
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

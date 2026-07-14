@@ -1,0 +1,2 @@
+description = "Refactoring seguro sem regressoes"
+prompt = "Le e segue .agent/workflows/refactor.md (baseline, extrair, verificar tsc/build/testes). Alvo: {{args}}"

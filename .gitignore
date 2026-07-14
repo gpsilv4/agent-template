@@ -1,7 +1,27 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 .next/
+dist/
+build/
+*.tsbuildinfo
+
+# Test artifacts (Playwright / coverage)
+playwright-report/
+test-results/
+coverage/
+
+# Env / secrets
 .env
 .env.local
 .env.*.local
+
+# Tooling / local overrides
+.vercel
+.turbo
+.claude/settings.local.json
+
+# OS / logs
 .DS_Store
 *.log
