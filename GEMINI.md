@@ -12,6 +12,7 @@ Stack: {{STACK}}.
 
 @[.agent/rules/core-rules.md]
 @[.agent/rules/process-rules.md]
+@[.agent/rules/anti-patterns.md]
 @[.agent/rules/business-logic.md]
 @[.agent/rules/pages-architecture.md]
 
@@ -26,20 +27,25 @@ Stack: {{STACK}}.
 @[.agent/context/implementation_plan.md]
 @[.agent/context/backlog.md]
 
+> Nota: `.agent/context/backlog-archive.md` (items fechados + sprints fechados) e **deliberadamente NAO importado** aqui, para manter o contexto enxuto. Ler on-demand quando necessario (ex: confirmar unicidade de IDs).
+
 ---
 
 ## Workflows disponiveis
 
-| Workflow                  | Ficheiro                               |
+> Referencias (NAO importadas — carregar on-demand para manter o contexto enxuto).
+> Quando o utilizador invoca um comando, **ler** o ficheiro correspondente e seguir os passos.
+
+| Workflow                  | Ficheiro (ler on-demand)               |
 | ------------------------- | -------------------------------------- |
-| Setup / Onboarding        | @[.agent/workflows/setup.md]           |
-| Planear funcionalidade    | @[.agent/workflows/plan.md]            |
-| Review antes de commit    | @[.agent/workflows/review.md]          |
-| Refactoring seguro        | @[.agent/workflows/refactor.md]        |
-| Testes E2E (Funcionais)   | @[.agent/workflows/e2e-tests.md]       |
-| Testes de Seguranca       | @[.agent/workflows/security-tests.md]  |
-| Debugging estruturado     | @[.agent/workflows/debug.md]           |
-| Deploy para producao      | @[.agent/workflows/deploy.md]          |
+| Setup / Onboarding        | `.agent/workflows/setup.md`            |
+| Planear funcionalidade    | `.agent/workflows/plan.md`             |
+| Review antes de commit    | `.agent/workflows/review.md`           |
+| Refactoring seguro        | `.agent/workflows/refactor.md`         |
+| Testes E2E (Funcionais)   | `.agent/workflows/e2e-tests.md`        |
+| Testes de Seguranca       | `.agent/workflows/security-tests.md`   |
+| Debugging estruturado     | `.agent/workflows/debug.md`            |
+| Deploy para producao      | `.agent/workflows/deploy.md`           |
 
 ---
 

@@ -51,15 +51,20 @@ When you open a new AI session in any project using this template, the agent **a
 .agent/                         <- AI knowledge management
 ├── BOOTSTRAP.md                <- Setup guide: Phase 0 (analysis) + Phase 1 (config) — run once
 ├── rules/
-│   ├── core-rules.md           <- Code standards, CI/CD, security
-│   └── process-rules.md        <- Git, branches, sprints, backlog, docs sync
+│   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
+│   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
+│   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
+│   └── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 ├── context/
 │   ├── session.md              <- Current session state
 │   ├── task.md                 <- Tasks in progress
 │   ├── decisions.md            <- Architectural decisions (append-only)
 │   ├── walkthrough.md          <- Release summaries
 │   ├── implementation_plan.md  <- Implementation plan
-│   └── backlog.md              <- Backlog (4 sections + sprints + history)
+│   ├── backlog.md              <- Backlog: active work (imported into context)
+│   ├── backlog-archive.md      <- Closed items + closed sprints (NOT imported)
+│   ├── decisions-archive.md    <- Archived old decisions (NOT imported)
+│   └── walkthrough-archive.md  <- Archived old releases (NOT imported)
 ├── workflows/
 │   ├── setup.md                <- /setup — Developer onboarding
 │   ├── plan.md                 <- /plan — Plan new feature
@@ -71,7 +76,8 @@ When you open a new AI session in any project using this template, the agent **a
 │   └── security-tests.md       <- /security-tests — Security tests
 └── scripts/
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
-    └── check-doc-versions.mjs  <- Doc version drift checker
+    ├── check-doc-versions.mjs  <- Doc guards: rules byte-budget, CLAUDE/GEMINI parity, CHANGELOG, versions
+    └── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
 
 .github/                        <- DevOps & governance
 ├── workflows/
@@ -84,8 +90,17 @@ When you open a new AI session in any project using this template, the agent **a
 ├── dependabot.yml              <- Updates automaticos de dependencias
 └── CODEOWNERS                  <- Reviewers automaticos por ficheiro
 
+.claude/                        <- Native Claude Code layer (optional; other tools ignore it)
+├── settings.json              <- Project permissions (deny secrets, allow safe scripts)
+├── commands/                  <- Real slash commands (/plan, /review, ...) wrapping .agent/workflows/
+└── agents/                    <- Subagents: code-reviewer (read-only), debugger
+
+.gemini/                        <- Native Gemini CLI layer
+└── commands/                  <- Same slash commands as .claude/, in TOML (wrap .agent/workflows/)
+
 .editorconfig                   <- Formatting config (2-space indent, LF)
 .nvmrc                          <- Node version pinning (matches CI)
+AGENTS.md                       <- Cross-tool entry point (Cursor, Windsurf, Copilot, ...)
 CLAUDE.md                       <- Entry point for Claude Code / Cursor
 CODE_OF_CONDUCT.md              <- Contributor Covenant
 CONTRIBUTING.md                 <- Dev workflow, commit format, PR process
@@ -135,7 +150,7 @@ The AI will:
 
 ```bash
 # Verify no placeholders remain
-grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/
+grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/
 
 # Initial commit
 git add .
@@ -166,9 +181,11 @@ git commit -m "chore: bootstrap agent config"
 | Build | `npm run build` — verify bundle |
 | Unit Tests | `npm run test:unit` |
 | Security Audit | `npm audit --audit-level=high` |
-| Doc Versions | `node .agent/scripts/check-doc-versions.mjs` — warns if docs are outdated (opt-in, uncomment in ci.yml) |
+| Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
+| Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms (opt-in, uncomment in ci.yml) |
+| Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs (opt-in, uncomment in ci.yml) |
 
-> CI uses `pull_request_target` for Dependabot PRs (filtered to `dependabot[bot]` only) so they can access repository secrets. Normal PRs use `pull_request` as usual.
+> CI runs on `pull_request` + `push` with a least-privilege `permissions: contents: read` block. Dependabot PRs ride the normal `pull_request` path (GitHub's safe default: read-only token, no secrets) — no `pull_request_target` needed, since no CI step requires secrets. A separate `secret-scan` (gitleaks) job runs on every push, even on the bare template.
 
 ### `e2e.yml` — Manual trigger (workflow_dispatch)
 
@@ -232,6 +249,9 @@ Branch protection rules (require status checks, block force push) require **GitH
 | `{{SECURITY_EMAIL}}` | Security disclosure email |
 | `{{COPYRIGHT_HOLDER}}` | License copyright holder |
 | `{{YEAR}}` | Current year |
+| `{{DATE}}` | Current date (auto-filled in context files) |
+| `{{AGENT_NAME}}` | Name of the AI agent running bootstrap (auto) |
+| `{{SPRINT_DESCRIPTION}}` | First sprint description (auto/placeholder) |
 
 ## Files generated by AI (not in template)
 
@@ -242,12 +262,22 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 | Agent | Entry File | Reference Syntax | Status |
 |-------|-----------|-----------------|--------|
-| Claude Code | `CLAUDE.md` | `@file` (direct) | Tested |
+| Claude Code | `CLAUDE.md` (+ native `.claude/`) | `@file` (direct) | Tested |
 | Google Gemini | `GEMINI.md` | `@[file]` (bracket) | Tested |
-| Cursor | `CLAUDE.md` | `@file` (direct) | Tested |
-| GitHub Copilot | `CLAUDE.md` | `@file` (direct) | Tested |
+| Cursor | `CLAUDE.md` / `AGENTS.md` | `@file` (direct) | Tested |
+| GitHub Copilot | `CLAUDE.md` / `AGENTS.md` | `@file` (direct) | Tested |
+| Other (Windsurf, Zed, ...) | `AGENTS.md` | — | Community |
 
-> **Why two syntax styles?** Claude Code and Cursor parse `@file` natively. Gemini requires `@[file]` bracket syntax. Both files have identical structure — only the reference syntax differs.
+> **Why multiple entry files?** Claude Code parses `@file`, Gemini needs `@[file]` brackets, and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
+
+### The `.claude/` layer works with other agents too
+
+`.claude/` (slash commands, subagents, `settings.json`) is read **only by Claude Code** — other tools ignore it. But **no logic lives there**: each command is a thin wrapper that says *"read and follow `.agent/workflows/<name>.md`"*. The workflows, rules, and context all live in `.agent/`, which **every agent reads**.
+
+- **Claude Code**: `/plan`, `/review`, etc. are real typed slash commands; permissions and subagents apply.
+- **Any other agent** (Gemini, Cursor, Copilot, ...): invoke the same workflow by asking *"run /plan"* or *"follow `.agent/workflows/plan.md`"* — it reads the identical file. `settings.json` and subagents are simply ignored (each tool has its own equivalents). Nothing essential is lost.
+
+Native slash commands ship for **both** Claude Code (`.claude/commands/`) and Gemini CLI (`.gemini/commands/*.toml`) — same commands, thin wrappers over `.agent/workflows/`. For heavy Cursor use, a `.cursor/commands/` adapter can be added at bootstrap, but `AGENTS.md` + the workflow table already make it work.
 
 ## Commit Convention
 

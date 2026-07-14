@@ -10,7 +10,7 @@
 ## [v0.1.0] - Setup Inicial
 
 ### Features
-- Setup inicial do projeto com {{STACK}}
+- Setup inicial do projeto com <stack>
 - Configuracao de `.agent/` com regras, workflows e contexto
 
 -->

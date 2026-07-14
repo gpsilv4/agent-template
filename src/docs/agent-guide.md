@@ -19,8 +19,8 @@ A pasta `.agent` funciona como o "cerebro" da assistencia de IA no projeto. Ela 
 A pasta `.github/` complementa o `.agent/` com automacao e governance do repositorio:
 
 - **`workflows/`**: Pipelines automaticos de CI/CD
-  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit). Bundle sizes e doc versions sao opt-in (descomentar no ficheiro). Inclui `pull_request_target` para Dependabot.
-  - `e2e.yml`: Testes E2E e seguranca (trigger manual ou em PRs)
+  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). `permissions: contents: read`; Dependabot no `pull_request` normal.
+  - `e2e.yml`: Testes E2E e seguranca (trigger manual; trigger em PRs e opt-in, descomentar no ficheiro)
 - **`pull_request_template.md`**: Checklist que sincroniza com o workflow `/review`
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
 - **`dependabot.yml`**: Updates automaticos de dependencias
@@ -65,10 +65,12 @@ Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os
 
 As regras sao diretivas que o Agente consulta antes de cada acao.
 
-- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, performance, seguranca, CI/CD pipeline, scripts de automacao (bundle sizes, doc versions — opt-in).
-- **[process-rules.md]**: Regras de processo: sessao, backlog, sprints, fluxos de trabalho por tipo, Conventional Commits, CI Gate, Git, branches.
+- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, DRY/reutilizacao, performance, seguranca, CI/CD pipeline, scripts de automacao (bundle sizes, doc guards — opt-in).
+- **[process-rules.md]**: Regras de processo: sessao, backlog, arquivamento, sprints, fluxos de trabalho por tipo, testes proativos, Conventional Commits, CI Gate, Git, branches.
+- **[anti-patterns.md]**: Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente).
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
+- **sync-docs.md**: Checklist de sincronizacao de docs (23 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
 
 ---
 
@@ -86,6 +88,8 @@ Os workflows sao sequencias de passos que o Agente executa para tarefas especifi
 | **`/e2e-tests`**      | Testes E2E         | Para correr testes funcionais Playwright.               |
 | **`/security-tests`** | Testes Seguranca   | Para correr testes de seguranca.                        |
 | **`/deploy`**         | Deploy Producao    | Passos finais para enviar para producao.                |
+
+> **Como sao invocados:** os workflows vivem em `.agent/workflows/` e sao lidos **on-demand** (nao carregam sempre no contexto). No **Claude Code** existem tambem como slash commands nativos em `.claude/commands/` (wrappers finos). Com **outro agente** (Gemini, Cursor, Copilot), dizes _"corre o /plan"_ ou _"segue `.agent/workflows/plan.md`"_ — le o mesmo ficheiro. O `.claude/` (commands, `agents/` subagentes read-only, `settings.json` de permissions) e so-Claude; os outros ignoram-no sem perder a logica. Entry cross-tool: `AGENTS.md`.
 
 ---
 

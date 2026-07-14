@@ -130,7 +130,7 @@ Antes de tocar no codigo, ler:
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit. Bundle sizes e doc version check sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear.** Inclui `pull_request_target` para Dependabot (acesso a secrets).
+- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear.** Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:

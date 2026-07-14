@@ -11,7 +11,7 @@ Workflow para refactoring que garante seguranca e nao introduz regressoes no {{P
 
 - Consultar `.agent/context/backlog.md` seccao 3 (Divida Tecnica) — o refactor pode ja estar registado
 - Se existir: referenciar o ID e seguir dependencias do sprint
-- Se nao existir: apos refactor, propor criacao de item no Historico (ja concluido)
+- Se nao existir: apos refactor, propor registo do item no Historico (ja concluido) em `backlog-archive.md`
 
 ## 3. Identificar Alvos
 
@@ -70,8 +70,8 @@ Seguir o checklist estrito:
 
 ## 8. Backlog
 
-- [ ] O refactor corresponde a um item do `backlog.md`? Se sim, marcar como `Concluido` e mover para Historico.
-- [ ] Atualizar contadores, barra de progresso e **Proximo:** no `backlog.md`.
+- [ ] O refactor corresponde a um item do `backlog.md`? Se sim, **remover** das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
+- [ ] Atualizar contadores, barra de progresso e **Proximo:** no `backlog.md` (validar com `node .agent/scripts/check-backlog.mjs`).
 - [ ] O refactor revelou novos items de divida tecnica? Propor ao utilizador.
 
 ## 9. Sessao (Handoff)

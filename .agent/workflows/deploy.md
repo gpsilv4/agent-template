@@ -20,17 +20,10 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 1. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **src/docs/CHANGELOG.md** atualizado?
-- [ ] **Regras do Agente** (`.agent/rules/`) verificadas?
-- [ ] **Workflows do Agente** (`.agent/workflows/`) verificados?
-- [ ] **Scripts de Automacao** (`.agent/scripts/`) verificados?
-- [ ] **Manuais Tecnicos** (`src/docs/`) verificados?
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos)
+- [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` — sem WARN
 - [ ] **`.agent/context/session.md`** limpo — tarefas concluidas e proximos passos atualizados?
-- [ ] **`.agent/context/decisions.md`** com decisoes desta release?
-- [ ] **`.agent/context/backlog.md`** — items concluidos marcados, contadores atualizados?
-- [ ] **`README.md`** atualizado se funcionalidades ou stack mudaram?
-- [ ] **`.github/workflows/`** — CI/CD pipelines refletem comandos e targets atuais?
-- [ ] **`.github/pull_request_template.md`** — checklist alinhada com estado atual?
+- [ ] **`.agent/context/backlog.md`** + **`backlog-archive.md`** — items concluidos movidos para o Historico, contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - Se a documentacao nao foi atualizada, fazer **ANTES** de continuar o deploy.
 
 ## 2. CI Pipeline Status
