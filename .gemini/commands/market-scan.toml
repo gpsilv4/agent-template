@@ -1,0 +1,2 @@
+description = "Analise de mercado/concorrencia e ideacao de features (web-grounded)"
+prompt = "Le e segue .agent/workflows/market-scan.md: scan de concorrentes (web, verificado vs assuncao), gap analysis, ideias a adotar, sugestoes priorizadas. Nao implementar — propor items de backlog. Perguntar primeiro concorrentes e alvo."

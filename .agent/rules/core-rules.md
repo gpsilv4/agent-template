@@ -73,6 +73,12 @@
 - Componentes duplicados devem ser unificados com generics.
 - One-time form init com guard `initialized` para evitar resets de revalidation.
 
+### Reutilizacao & DRY
+
+- **Procurar antes de criar**: `grep`/pesquisa pelo que ja existe (util, hook, componente) antes de escrever codigo novo.
+- **Rule of three**: abstrair cedo demais tambem e divida — a abstracao errada custa mais do que uma duplicacao. A partir da **segunda repeticao**, extrair. Logica de negocio/estado **nunca** se duplica.
+- **Duplicacao nova e flag no `/review`**: ou se extrai, ou se justifica por escrito.
+
 ### Seguranca
 
 <!-- Adaptar ao backend do projeto -->
@@ -86,6 +92,17 @@
 - Popovers: `w-[min(300px,calc(100vw-2rem))]`.
 - Sheets/Modals: `w-full` e `overflow-x-hidden`.
 
+### Qualidade & Design (Barra: {{QUALITY_TIER}})
+
+> So para projetos com UI. Tier definido no bootstrap: **{{QUALITY_TIER}}** (MVP < Polido < Elite). Rubrica completa em `/design-review` (correr antes de dar UI por concluida — complementa o `/review`).
+
+- **Consistencia**: usar design tokens (cor/espacamento/tipografia); uma escala de espacamento e uma de tipografia; nº limitado de tamanhos de fonte. Zero valores hardcoded soltos.
+- **Estados obrigatorios** em toda a UI: loading (skeleton, sem layout shift), empty (com orientacao), error (mensagem accionavel), success; e hover/focus/active/disabled nos interativos.
+- **Acessibilidade** (Polido: AA basico; Elite: AA completo): contraste AA, foco visivel, navegacao por teclado, semantica correta, respeitar `prefers-reduced-motion`.
+- **Responsividade**: mobile-first, alvos de toque >= 44px, sem overflow horizontal.
+- **Premium** [Polido/Elite]: transicoes subtis (150-300ms) com proposito, microcopy humano, atencao ao detalhe (alinhamento/ritmo).
+- **SEO/metadata** [so web publico]: `<title>`/description por pagina, Open Graph, sitemap.
+
 ### Testagem E2E
 
 - Usar `data-testid` em componentes interativos criticos (toggles, botoes de acao em listas) para garantir seletores resilientes que sobrevivam a mudancas de texto ou animacoes de UI.
@@ -96,10 +113,11 @@
 - **`ci.yml`** corre em cada push e PR para main: TypeScript, lint, build, unit tests, security audit.
 - **`e2e.yml`** e trigger manual (`workflow_dispatch`) para testes E2E e seguranca.
 - **Nenhum merge para main** deve acontecer com checks vermelhos no CI.
-- **Dependabot** (`.github/dependabot.yml`) gere updates automaticos de dependencias npm e GitHub Actions. PRs do Dependabot usam `pull_request_target` no CI para aceder a secrets (filtrado apenas para `dependabot[bot]`).
+- **Dependabot** (`.github/dependabot.yml`) gere updates automaticos de dependencias npm e GitHub Actions, com commits em formato Conventional Commits. PRs do Dependabot correm no `pull_request` normal (token read-only, sem secrets — default seguro do GitHub); o CI usa `permissions: contents: read` e nao precisa de `pull_request_target`.
 - **PR Template** (`.github/pull_request_template.md`) impoe checklist obrigatoria alinhada com o workflow `/review`.
 - **Issue Templates** (`.github/ISSUE_TEMPLATE/`) estruturam bug reports e feature requests alinhados com o backlog.
-- **Doc Version Checker** (`.agent/scripts/check-doc-versions.mjs`): Configuravel para correr no CI (descomentar em `ci.yml`). Avisa se versoes na documentacao estao desatualizadas apos merge de Dependabot PRs.
+- **Doc Guards** (`.agent/scripts/check-doc-versions.mjs`): Guards que correm sem config — orcamento de bytes das rules (WARN 11.5k / MAX 12k), paridade `CLAUDE.md`≡`GEMINI.md`, paridade workflows↔wrappers (`.claude/`+`.gemini/`), versao `package.json`≡`CHANGELOG`, termos obsoletos — mais versoes de deps (configuravel). Sai `!= 0` em warning (serve de gate). Opt-in no CI; correr antes de commit e apos Dependabot PRs.
+- **Backlog Checker** (`.agent/scripts/check-backlog.mjs`): Trata os contadores do Resumo e a barra de progresso do backlog como dados derivados — recalcula-os a partir das tabelas (items abertos em `backlog.md` + fechados em `backlog-archive.md`) e avisa se divergirem; deteta tambem IDs duplicados. Correr antes de commit; opt-in no CI (descomentar em `ci.yml`).
 
 ### Code Quality Config
 
@@ -107,7 +125,7 @@
 - **`.github/CODEOWNERS`**: Define reviewers automaticos por ficheiro/pasta.
 - **`LICENSE`**: MIT (ou outra licenca adequada ao projeto).
 - **Branch Protection**: Branch protection rules (require status checks, bloquear force push) requerem GitHub Pro em repos privados. O CI funciona como **semaforo informativo**. Se disponivel, ativar em GitHub Settings > Branches > Branch protection rules.
-- **Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Tags sao criadas apos merge de sprints/releases para main. Visiveis em GitHub > Releases.
+- **Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Tags sao criadas apos merge de sprints/releases para main. Visiveis em GitHub > Code > Tags.
 
 ### Docs & Knowledge Sync
 
@@ -116,6 +134,9 @@
   > O `src/docs/CHANGELOG.md` segue o formato `## [vX.Y.Z] - Descricao` e deve ser atualizado ANTES de cada commit.
   > **Sync Proativo**: O Agente **NAO deve esperar** que o utilizador peca para atualizar a documentacao. Antes de dizer "Estou pronto para commit", verificar e atualizar automaticamente: `.agent/context/`, `.agent/rules/`, `.agent/scripts/`, `.agent/workflows/`, `.github/`, `src/docs/`, `CLAUDE.md`, `GEMINI.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`.
 - **Conventional Commits**: Todas as mensagens de commit seguem o formato definido em `CONTRIBUTING.md` e `.agent/rules/process-rules.md`.
-- **Versao Node**: `.nvmrc` deve estar alinhado com `node-version` em `.github/workflows/ci.yml`.
+- **Versao Node**: `.nvmrc` e a fonte unica da versao Node — o CI le-a via `node-version-file: .nvmrc` (`ci.yml`/`e2e.yml`).
+- **Anti-padroes**: sempre que um bug revele um padrao evitavel, registar uma entrada em `.agent/rules/anti-patterns.md` (com `grep` de detecao para o `/review`).
+- **Comandos multi-agente (fonte unica)**: a logica dos workflows vive SO em `.agent/workflows/*.md`. Os `.claude/commands/*` e `.gemini/commands/*` sao **ponteiros finos** ("ler e seguir `.agent/workflows/<x>.md`") — **nunca duplicar logica neles**. Mudar a logica = editar so o workflow (os wrappers apanham automaticamente). Ao **adicionar/renomear/remover** um comando, atualizar ambas as pastas de wrappers + a tabela de workflows em `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`.
 
 > Regras de processo (sessao, backlog, git, branches, fluxos) estao em `process-rules.md`.
+> Checklist completa de sync docs + **matriz de propagacao** (o que replicar ao adicionar workflow/rule/script/context) em `sync-docs.md` (nao carregada — consultar antes de commit).

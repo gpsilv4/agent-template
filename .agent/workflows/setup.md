@@ -109,10 +109,13 @@ Antes de tocar no codigo, ler:
 | `/plan`     | Antes de comecar uma feature nova    |
 | `/debug`    | Para resolver bugs de forma metodica |
 | `/review`   | Antes de fazer commit                |
+| `/design-review` | Qualidade de UI/UX antes de concluir feature |
 | `/deploy`   | Antes de ir para producao            |
 | `/refactor` | Ao reorganizar codigo existente      |
 | `/e2e-tests` | Para correr testes E2E funcionais  |
 | `/security-tests` | Para correr testes de seguranca |
+| `/audit`    | Auditoria completa (milestone/estado da app) |
+| `/market-scan` | Analise de mercado e ideacao de features |
 | `/setup`    | Este guia (onboarding)               |
 
 ## 10. Convencoes Importantes
@@ -130,7 +133,7 @@ Antes de tocar no codigo, ler:
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit. Bundle sizes e doc version check sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear.** Inclui `pull_request_target` para Dependabot (acesso a secrets).
+- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear.** Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:

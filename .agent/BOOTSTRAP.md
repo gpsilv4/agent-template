@@ -201,6 +201,12 @@ Guarda as respostas — vais precisar delas para preencher todos os placeholders
 18. **Copyright holder** (nome ou organizacao para a licenca)
     → Substitui `{{COPYRIGHT_HOLDER}}` e `{{YEAR}}` em `LICENSE`
 
+19. **Tier de qualidade da UI** — *so perguntar se o projeto tem UI* (saltar para APIs/CLI/libs):
+    - `MVP` — funcional; estados basicos; sem polish obrigatorio
+    - `Polido` — estados completos, a11y AA basico, responsivo, microcopy cuidado
+    - `Elite` — tudo no maximo: a11y AA completo, motion com proposito, perf budget (Core Web Vitals), atencao ao detalhe
+    → Substitui `{{QUALITY_TIER}}` em `core-rules.md` e `design-review.md`. Se nao houver UI, usar `N/A` e o `/design-review` fica inativo.
+
 ---
 
 ## Fase 2 — Ficheiros a Gerar/Customizar
@@ -209,7 +215,7 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
-Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
+Percorrer todos os `.md`, `.mjs`, `LICENSE` e `.github/CODEOWNERS` e substituir:
 
 | Placeholder | Fonte |
 |-------------|-------|
@@ -236,6 +242,8 @@ Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
 | `{{COPYRIGHT_HOLDER}}` | Pergunta 18 (nome ou organizacao para LICENSE) |
 | `{{YEAR}}` | Ano atual (ex: 2026) |
 | `{{SPRINT_DESCRIPTION}}` | "A definir" (placeholder inicial) |
+| `{{QUALITY_TIER}}` | Pergunta 19 (MVP/Polido/Elite; `N/A` se sem UI) |
+| `{{GITHUB_OWNER}}` | Username/team GitHub do projeto (para `.github/CODEOWNERS`) |
 
 ### 2.2 Ficheiros a GERAR do zero
 
@@ -244,7 +252,7 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 | Ficheiro | Base | Conteudo |
 |----------|------|----------|
 | `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. |
-| `.agent/rules/pages-architecture.md` | Perguntas 9, 10 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. |
+| `.agent/rules/pages-architecture.md` | Perguntas 9, 10, 19 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. **Incluir uma seccao "Design System / Barra de Qualidade"** com os tokens/escala concretos da UI lib escolhida (cores, espacamento, tipografia, radius/sombras) e os criterios do tier `{{QUALITY_TIER}}` (estados obrigatorios, a11y, motion, SEO se web publico). Se o projeto usa error tracking/observabilidade (ex: Sentry), notar aqui como capturar erros de UI — senao, omitir (nao assumir vendor). |
 
 **Formato sugerido para `business-logic.md`:**
 
@@ -293,23 +301,29 @@ const TARGETS = {
 
 **Nota:** Este script so funciona com Next.js App Router. Para outros frameworks, indicar ao utilizador que deve ser adaptado ou removido.
 
-### 2.4 Configurar o Doc Version Checker
+### 2.4 Configurar os Doc Guards
 
-No ficheiro `.agent/scripts/check-doc-versions.mjs`, descomentar e adaptar o array `CHECKS` com as dependencias que tem versoes referenciadas na documentacao:
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** os guards genericos: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, paridade workflows↔wrappers + workflows nas tabelas, versao `package.json`≡`CHANGELOG`, `.nvmrc`, e scanner de termos obsoletos. **Opcionalmente**, adaptar dois arrays:
+
+- `CHECKS` — dependencias com versoes referenciadas na documentacao:
 
 ```javascript
 const CHECKS = [
-  {
-    name: "Next.js",
-    pkg: "next",
-    pattern: /Next\.js\s+(\d+(?:\.\d+(?:\.\d+)?)?)/g,
-    files: [".agent/rules/core-rules.md"],
-  },
-  // Adicionar mais dependencias conforme necessario
+  { name: "Next.js", pkg: "next", pattern: /Next\.js\s+(\d+(?:\.\d+(?:\.\d+)?)?)/g, files: [".agent/rules/core-rules.md"] },
 ];
 ```
 
-Este script corre no CI e avisa quando as versoes na documentacao estao desatualizadas (ex: apos merge de PRs do Dependabot).
+- `BANNED` — termos/ficheiros renomeados que nao devem reaparecer nos docs vivos:
+
+```javascript
+const BANNED = [
+  // { re: /nome-antigo/g, msg: "renomeado para nome-novo" },
+];
+```
+
+Correr antes de commit e apos merge de PRs do Dependabot. Opt-in no CI (descomentar em `ci.yml`).
+
+> O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; opt-in no CI.
 
 ### 2.5 Adaptar core-rules.md a stack
 
@@ -326,7 +340,10 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **setup.md**: Adaptar env vars, scripts de build, estrutura de diretorios
 - **deploy.md**: Adaptar ao hosting (Vercel vs Netlify vs Docker, etc.) e backend (migracoes)
 - **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
+- **design-review.md**: Substituir `{{QUALITY_TIER}}`; ajustar criterios a UI lib e ao tier escolhido. Se o projeto nao tem UI, o workflow fica inativo (documentar).
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
+
+> **Modo minimo (opcional).** O template traz 11 workflows — e muito para um projeto pequeno. Um projeto pode ficar so com o essencial (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>` e `.gemini/commands/<x>`). O Guard 6/7 continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
 
 ### 2.7 Customizar GitHub CI/CD e Governance
 
@@ -335,13 +352,29 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
 - **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario
-- **`.github/CODEOWNERS`**: Substituir usernames com os do team real
+- **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
+- **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)
 - **`LICENSE`**: Substituir `{{COPYRIGHT_HOLDER}}` e `{{YEAR}}`; verificar tipo de licenca (MIT por defeito)
 - **`SECURITY.md`**: Substituir `{{SECURITY_EMAIL}}`; adaptar politica de disclosure se necessario
 - **`CONTRIBUTING.md`**: Adaptar workflow, commit format e scripts de teste ao projeto
 - **`CODE_OF_CONDUCT.md`**: Manter Contributor Covenant ou adaptar
 - **`.nvmrc`**: Verificar que versao Node corresponde a `ci.yml` e `setup.md`
+
+### 2.8 Ficheiros de regras/contexto adicionais e lingua
+
+- **`.agent/rules/anti-patterns.md`**: apagar o exemplo `AP1` comentado (e ilustrativo); manter o cabecalho, o preambulo "como fazer crescer" e a linha "sem anti-padroes registados ainda".
+- **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em `CLAUDE.md`/`GEMINI.md`.
+- **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
+
+### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)
+
+- **`AGENTS.md`**: entry point cross-tool (Cursor, Windsurf, Copilot). O sweep de placeholders (2.1) preenche-o; verificar que reflete a stack e a descricao.
+- **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
+- **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
+- **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
+- **`.claude/agents/*.md`** (`code-reviewer`, `debugger`): subagentes read-only/investigacao. Ajustar se o processo mudar.
+- **`.claude/settings.json`**: permissions do projeto (nega leitura de `.env*`, permite scripts seguros). Ajustar `allow`/`deny` a stack. `settings.local.json` e pessoal (gitignored) — nao versionar.
 
 ---
 
@@ -351,26 +384,32 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 
 ### Checklist
 
-- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (`grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/`)
+- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (`grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/` — deve devolver **zero** linhas)
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
+- [ ] `anti-patterns.md`: exemplo `AP1` comentado removido, so cabecalho + linha "sem entradas"?
+- [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` no bundle checker atualizados?
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
+- [ ] **`README.md` substituido** pelo README do projeto (nao a capa do template nem o badge do repo do template)?
+- [ ] **`.github/CODEOWNERS`** sem `{{GITHUB_OWNER}}` (`grep "{{" .github/CODEOWNERS` -> zero linhas)?
 - [ ] `.github/workflows/ci.yml` configurado com triggers e scripts corretos?
 - [ ] `.github/workflows/e2e.yml` triggers e env vars configurados?
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
-- [ ] `.github/CODEOWNERS` tem usernames corretos?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
+- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs` e `node .agent/scripts/check-backlog.mjs` (ambos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`). Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 
 ```
-Ficheiros com placeholders substituidos:  ~25
+Ficheiros com placeholders substituidos:  ~30
 Ficheiros gerados do zero:               2 (business-logic.md, pages-architecture.md)
-Ficheiros adaptados a stack:             ~8 (core-rules, setup, deploy, review, debug, ci.yml, e2e.yml, editorconfig)
+Ficheiros adaptados a stack:             ~10 (core-rules, setup, deploy, review, design-review, debug, ci.yml, e2e.yml, editorconfig, anti-patterns)
 Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue templates, dependabot)
 ```
 
@@ -380,7 +419,7 @@ Sugerir ao utilizador:
 
 ```bash
 # Verificar que nao ficou nenhum placeholder
-grep -r "{{" .agent/ CLAUDE.md GEMINI.md LICENSE SECURITY.md src/docs/
+grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/
 
 # Primeiro commit
 git add .

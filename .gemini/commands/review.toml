@@ -1,0 +1,2 @@
+description = "Code review antes de commit (checklist + guards)"
+prompt = "Le e segue .agent/workflows/review.md no diff atual. Corre os guards: node .agent/scripts/check-doc-versions.mjs e node .agent/scripts/check-backlog.mjs."

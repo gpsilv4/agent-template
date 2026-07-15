@@ -2,6 +2,8 @@
 
 Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
+> Para alteracoes com **UI**, correr tambem `/design-review` (qualidade visual, UX, a11y, estados) — este `/review` cobre codigo/seguranca.
+
 ## 1. Build & CI Check
 
 - `npx tsc --noEmit` — 0 erros
@@ -66,19 +68,13 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 9. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **src/docs/CHANGELOG.md** reflete todas as alteracoes?
-- [ ] **Regras do Agente** (`.agent/rules/`) estao atualizadas?
-- [ ] **Workflows do Agente** (`.agent/workflows/`) estao atualizados?
-- [ ] **Scripts de Automacao** (`.agent/scripts/`) estao atualizados?
-- [ ] **Manuais Tecnicos** (`src/docs/`) estao em sintonia com a UI e logica final?
-- [ ] **`README.md`** atualizado se funcionalidades ou stack mudaram?
-- [ ] **`.github/workflows/`** — CI/CD pipelines atualizados se comandos/targets mudaram?
-- [ ] **`.github/pull_request_template.md`** — checklist alinhada com este review?
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
+- [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 
 ## 10. Backlog
 
-- [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, marcar como `Concluido` e mover para Historico.
-- [ ] Atualizar contadores da tabela "Resumo" no `backlog.md`.
+- [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, **remover** a linha das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
+- [ ] Atualizar contadores da tabela "Resumo" e validar com `node .agent/scripts/check-backlog.mjs` (0 divergencias).
 - [ ] Atualizar a barra de progresso e a linha **Proximo:** no `backlog.md`.
 - [ ] O trabalho revelou novos bugs ou melhorias? Propor novos items ao utilizador.
 

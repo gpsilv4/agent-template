@@ -1,7 +1,9 @@
 # Backlog — {{PROJECT_NAME}}
 
-> Documento vivo com todos os items de trabalho pendentes.
-> IDs sao unicos e permanentes — nunca reutilizar um ID mesmo apos conclusao.
+> Documento vivo com os items de trabalho **ativos**.
+> IDs sao unicos e permanentes — nunca reutilizar um ID (verificar tambem `backlog-archive.md`).
+> **Estrutura**: ZONA ATIVA (topo, uso diario) -> ZONA DE REFERENCIA (fundo, consulta).
+> Historico de concluidos e sprints fechados vivem em `backlog-archive.md` (NAO carregado no contexto).
 > Atualizado: {{DATE}}
 
 **Legenda de Esforco**: S = < 30 min | M = 1-2h | L = meio dia+
@@ -24,37 +26,9 @@
 
 ---
 
-## 1. Bugs / Violacoes de Regras do Projeto
+# 🎯 Trabalho Ativo
 
-| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina afetada |
-|----|--------|---------|-------------|------------|---------|----------------|
-| | | | | | | |
-
----
-
-## 2. Melhorias UX (impacto direto no utilizador)
-
-| ID | Estado | Melhoria | Detalhe | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| | | | | | |
-
----
-
-## 3. Divida Tecnica / Code Quality
-
-| ID | Estado | Issue | Detalhe | Esforco | Ficheiro(s) |
-|----|--------|-------|---------|---------|-------------|
-| | | | | | |
-
----
-
-## 4. Features Futuras (valor para o utilizador)
-
-| ID | Estado | Feature | Impacto | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| | | | | | |
-
----
+> O que esta a ser feito agora e a seguir. Consultar diariamente.
 
 ## Plano de Sprints
 
@@ -65,10 +39,41 @@
 |-------|-----|-----------|---------|------------|
 | | | | | |
 
+## Pendentes sem Sprint
+
+> Items aprovados no backlog mas ainda nao atribuidos a um sprint.
+
+| ID | Descricao | Esforco |
+|----|-----------|---------|
+| | | |
+
 ---
 
-## Historico (Concluido)
+# 📚 Tickets Abertos por Tipo (Referencia)
 
-| ID | Descricao | Sprint | Versao | Data |
-|----|-----------|--------|--------|------|
-| | | | | |
+> Catalogo dos items **abertos** (Pendente, A Fazer) agrupados por tipo. Consultar ao triar ou adicionar.
+> Ao fechar um item (Concluido/Cancelado) a linha **sai** daqui e vai para `backlog-archive.md`.
+
+## 1. Bugs / Violacoes de Regras do Projeto
+
+| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina afetada |
+|----|--------|---------|-------------|------------|---------|----------------|
+| | | | | | | |
+
+## 2. Melhorias UX (impacto direto no utilizador)
+
+| ID | Estado | Melhoria | Detalhe | Esforco | Pagina afetada |
+|----|--------|---------|---------|---------|----------------|
+| | | | | | |
+
+## 3. Divida Tecnica / Code Quality
+
+| ID | Estado | Issue | Detalhe | Esforco | Ficheiro(s) |
+|----|--------|-------|---------|---------|-------------|
+| | | | | | |
+
+## 4. Features Futuras (valor para o utilizador)
+
+| ID | Estado | Feature | Impacto | Esforco | Pagina afetada |
+|----|--------|---------|---------|---------|----------------|
+| | | | | | |

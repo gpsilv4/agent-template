@@ -14,13 +14,13 @@ A pasta `.agent` funciona como o "cerebro" da assistencia de IA no projeto. Ela 
 
 ---
 
-## 1.5 A pasta `.github/` — CI/CD & Governance
+## 2. A pasta `.github/` — CI/CD & Governance
 
 A pasta `.github/` complementa o `.agent/` com automacao e governance do repositorio:
 
 - **`workflows/`**: Pipelines automaticos de CI/CD
-  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit). Bundle sizes e doc versions sao opt-in (descomentar no ficheiro). Inclui `pull_request_target` para Dependabot.
-  - `e2e.yml`: Testes E2E e seguranca (trigger manual ou em PRs)
+  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). `permissions: contents: read`; Dependabot no `pull_request` normal.
+  - `e2e.yml`: Testes E2E e seguranca (trigger manual; trigger em PRs e opt-in, descomentar no ficheiro)
 - **`pull_request_template.md`**: Checklist que sincroniza com o workflow `/review`
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
 - **`dependabot.yml`**: Updates automaticos de dependencias
@@ -45,7 +45,7 @@ Ficheiros de governance e configuracao na raiz:
 
 ---
 
-## 1.6 Bootstrap com Fase 0 — Analise e Decisoes
+## 3. Bootstrap com Fase 0 — Analise e Decisoes
 
 O ficheiro `.agent/BOOTSTRAP.md` contem o processo de configuracao inicial do projeto. Inclui uma **Fase 0 opcional** para utilizadores que nao sabem que stack ou arquitetura usar:
 
@@ -61,18 +61,20 @@ Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os
 
 ---
 
-## 2. Regras de Inteligencia (`.agent/rules/`)
+## 4. Regras de Inteligencia (`.agent/rules/`)
 
 As regras sao diretivas que o Agente consulta antes de cada acao.
 
-- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, performance, seguranca, CI/CD pipeline, scripts de automacao (bundle sizes, doc versions — opt-in).
-- **[process-rules.md]**: Regras de processo: sessao, backlog, sprints, fluxos de trabalho por tipo, Conventional Commits, CI Gate, Git, branches.
+- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, DRY/reutilizacao, performance, seguranca, CI/CD pipeline, scripts de automacao (bundle sizes, doc guards — opt-in).
+- **[process-rules.md]**: Regras de processo: sessao, backlog, arquivamento, sprints, fluxos de trabalho por tipo, testes proativos, Conventional Commits, CI Gate, Git, branches.
+- **[anti-patterns.md]**: Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente).
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
+- **sync-docs.md**: Checklist de sincronizacao de docs (23 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
 
 ---
 
-## 3. Workflows e Slash Commands (`.agent/workflows/`)
+## 5. Workflows e Slash Commands (`.agent/workflows/`)
 
 Os workflows sao sequencias de passos que o Agente executa para tarefas especificas:
 
@@ -83,13 +85,18 @@ Os workflows sao sequencias de passos que o Agente executa para tarefas especifi
 | **`/debug`**          | Debug Estruturado  | Quando encontras um erro inesperado.                    |
 | **`/refactor`**       | Refactoring Seguro | Para limpar codigo sem mudar o comportamento.           |
 | **`/review`**         | Code Review        | Antes de fazer commit final.                            |
+| **`/design-review`**  | Review de UI/UX    | Antes de dar uma feature de UI por concluida (qualidade/a11y). |
 | **`/e2e-tests`**      | Testes E2E         | Para correr testes funcionais Playwright.               |
 | **`/security-tests`** | Testes Seguranca   | Para correr testes de seguranca.                        |
 | **`/deploy`**         | Deploy Producao    | Passos finais para enviar para producao.                |
+| **`/audit`**          | Auditoria Completa | Estado holistico do projeto/app (milestone; multi-lente).|
+| **`/market-scan`**    | Analise de Mercado | Concorrencia + gaps + ideacao de features (web).        |
+
+> **Como sao invocados:** os workflows vivem em `.agent/workflows/` e sao lidos **on-demand** (nao carregam sempre no contexto). No **Claude Code** existem tambem como slash commands nativos em `.claude/commands/` (wrappers finos). Com **outro agente** (Gemini, Cursor, Copilot), dizes _"corre o /plan"_ ou _"segue `.agent/workflows/plan.md`"_ — le o mesmo ficheiro. O `.claude/` (commands, `agents/` subagentes read-only, `settings.json` de permissions) e so-Claude; os outros ignoram-no sem perder a logica. Entry cross-tool: `AGENTS.md`.
 
 ---
 
-## 4. Backlog (`.agent/context/backlog.md`)
+## 6. Backlog (`.agent/context/backlog.md`)
 
 O backlog e o documento central de trabalho pendente, organizado por prioridade:
 
@@ -102,13 +109,13 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 
 **Como funciona:**
 - IDs sao unicos e permanentes (nunca reutilizar)
-- Items concluidos passam para a seccao "Historico" com sprint, versao e data
+- Items concluidos saem das tabelas ativas e passam para o "Historico" em `backlog-archive.md` (nao carregado no contexto)
 - Sprints organizam a ordem de execucao com dependencias entre items
 - O Agente consulta o backlog antes de planear (`/plan`), corrigir (`/debug`) ou refatorar (`/refactor`)
 
 ---
 
-## 5. Ordem dos Workflows por Tipo de Trabalho
+## 7. Ordem dos Workflows por Tipo de Trabalho
 
 ### Nova Feature
 
@@ -148,7 +155,7 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 
 ---
 
-## 6. Como tirar partido disto?
+## 8. Como tirar partido disto?
 
 Como programador, podes confiar nestas instrucoes para delegar tarefas ao Agente com seguranca:
 

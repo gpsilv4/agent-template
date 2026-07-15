@@ -13,18 +13,41 @@ on:
   # pull_request:
   #   branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  # Manual/on-demand runs (workflow_dispatch): NAO cancelar — dois dispatches com base_url
+  # diferente na mesma ref nao se devem matar mutuamente.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
+  cancel-in-progress: false
+
 jobs:
+  # Detects package.json AFTER checkout (job-level hashFiles is unreliable — runs pre-checkout).
+  detect:
+    name: Detect Project
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      has_pkg: ${{ steps.check.outputs.has_pkg }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f package.json ]; then echo "has_pkg=true" >> "$GITHUB_OUTPUT"; else echo "has_pkg=false" >> "$GITHUB_OUTPUT"; fi
+
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
-    if: hashFiles('package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci
@@ -51,14 +74,15 @@ jobs:
   security:
     name: Security Tests
     runs-on: ubuntu-latest
-    if: hashFiles('package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
           cache: npm
 
       - run: npm ci

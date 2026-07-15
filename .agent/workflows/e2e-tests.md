@@ -42,6 +42,11 @@ Os testes dependem de um ficheiro de global setup que gera o estado de autentica
 3. Codigos/IDs unicos para dados de teste (evitar colisoes com dados reais).
 4. Limpeza de dados no final do teste (manter conta de teste limpa).
 
+### Principio: testes herméticos e gratuitos
+
+- Os E2E **nao devem gastar quota** de APIs pagas/limitadas nem depender de servicos externos vivos. Preferir arrancar o servidor de teste com as keys pagas **em branco** e **asserir o caminho degradado** (ex: resposta 503) em vez de fazer a chamada real.
+- Isolar o servidor de teste do dev do dia-a-dia: **porta dedicada** e `reuseExistingServer: false`; se o framework o permitir, **build dir separado** (ex: `.next-test`) para correr testes em paralelo com um dev server vivo.
+
 ## 6. Testes em Preview URL
 
 ```bash

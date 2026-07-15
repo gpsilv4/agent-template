@@ -1,0 +1,2 @@
+description = "Correr e manter a suite de testes E2E (Playwright)"
+prompt = "Le e segue .agent/workflows/e2e-tests.md para correr/manter os testes E2E."

@@ -8,6 +8,11 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
     groups:
       minor-and-patch:
         update-types:
@@ -22,3 +27,6 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - ci
+    commit-message:
+      prefix: ci
+      include: scope

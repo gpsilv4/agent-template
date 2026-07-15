@@ -6,7 +6,7 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 
 - Consultar `.agent/context/backlog.md` — o bug pode ja estar registado (seccao 1: Bugs)
 - Se existir: referenciar o ID e seguir o sprint sugerido
-- Se nao existir: apos correcao, propor criacao de item no Historico (ja concluido)
+- Se nao existir: apos correcao, propor registo do item no Historico (ja concluido) em `backlog-archive.md`
 
 ## 1. Reproduzir
 
@@ -68,7 +68,8 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 
 - [ ] **src/docs/CHANGELOG.md** atualizado com a correcao?
 - [ ] **Regras do Agente** (`.agent/rules/business-logic.md`) atualizadas se a causa foi uma regra mal interpretada?
+- [ ] **`.agent/rules/anti-patterns.md`** — o bug revelou um padrao evitavel? Registar entrada (origem, anti-padrao, correto, `grep` de detecao)
 - [ ] **Workflows do Agente** (`.agent/workflows/`) atualizados se o processo de debug revelou melhoria?
 - [ ] **`.agent/context/decisions.md`** atualizado se a causa raiz revelou decisao importante?
-- [ ] **`.agent/context/backlog.md`** — bug marcado `Concluido`, movido para Historico, contadores atualizados?
+- [ ] **`.agent/context/backlog.md`** — bug removido das tabelas ativas e movido para o Historico em `backlog-archive.md`; contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - [ ] **`.agent/context/session.md`** atualizado?
