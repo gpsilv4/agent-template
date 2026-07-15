@@ -114,6 +114,8 @@ Antes de tocar no codigo, ler:
 | `/refactor` | Ao reorganizar codigo existente      |
 | `/e2e-tests` | Para correr testes E2E funcionais  |
 | `/security-tests` | Para correr testes de seguranca |
+| `/audit`    | Auditoria completa (milestone/estado da app) |
+| `/market-scan` | Analise de mercado e ideacao de features |
 | `/setup`    | Este guia (onboarding)               |
 
 ## 10. Convencoes Importantes

@@ -47,6 +47,8 @@ Stack: {{STACK}}.
 | Testes de Seguranca       | `.agent/workflows/security-tests.md`   |
 | Debugging estruturado     | `.agent/workflows/debug.md`            |
 | Deploy para producao      | `.agent/workflows/deploy.md`           |
+| Auditoria completa        | `.agent/workflows/audit.md`            |
+| Analise de mercado        | `.agent/workflows/market-scan.md`      |
 
 ---
 

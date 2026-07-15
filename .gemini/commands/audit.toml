@@ -1,0 +1,2 @@
+description = "Auditoria completa do projeto/app (multi-lente, milestone)"
+prompt = "Le e segue .agent/workflows/audit.md: corre os guards deterministicos e as lentes de auditoria, verifica e faz dedup dos achados, sintetiza um relatorio por severidade x esforco e propoe items de backlog. Workflow caro — confirmar com o utilizador antes."

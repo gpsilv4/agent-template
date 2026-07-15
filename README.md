@@ -74,7 +74,9 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── deploy.md               <- /deploy — Deploy with CI gate
 │   ├── debug.md                <- /debug — Structured debugging
 │   ├── e2e-tests.md            <- /e2e-tests — E2E tests (Playwright)
-│   └── security-tests.md       <- /security-tests — Security tests
+│   ├── security-tests.md       <- /security-tests — Security tests
+│   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
+│   └── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 └── scripts/
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
     ├── check-doc-versions.mjs  <- Doc guards: rules byte-budget, CLAUDE/GEMINI parity, CHANGELOG, versions
