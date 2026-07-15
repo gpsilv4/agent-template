@@ -49,10 +49,11 @@ No **Claude Code**: fan-out de subagentes, um por lente (reutilizar o subagente 
 3. **Delta** vs auditoria anterior, se existir (novos / resolvidos por severidade)
 4. **Proposta de backlog** — cada achado por resolver vira item candidato (ID, seccao, esforco); aguardar aprovacao antes de adicionar
 5. **Anti-padroes** — achados recorrentes -> propor entrada em `anti-patterns.md`
+6. **Guardar o relatorio datado** (resumo por lente + severidades) — por defeito, para servir de **baseline** ao delta da proxima auditoria (ex: em `.agent/context/session.md` ou nota dedicada). Sem isto, o passo 3 nunca tem com que comparar.
 
 ## Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 
-- [ ] Guardar o relatorio datado (para o delta da proxima auditoria) e atualizar `.agent/context/session.md`?
+- [ ] `.agent/context/session.md` atualizado com o estado da auditoria?
 - [ ] Items aprovados adicionados ao `backlog.md`?

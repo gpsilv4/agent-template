@@ -11,6 +11,7 @@
  *   5. .nvmrc existe.
  *   6. Paridade workflows <-> wrappers (.claude/commands + .gemini/commands): cada workflow
  *      tem os dois wrappers e vice-versa — apanha "adicionei um workflow e esqueci o wrapper".
+ *   7. Cada workflow esta listado na tabela de CLAUDE.md/GEMINI.md — apanha drift da lista.
  *
  * E guards CONFIGURAVEIS (opcional): versoes de dependencias documentadas vs package.json (config em CHECKS).
  *
@@ -173,6 +174,15 @@ if (workflows && (claudeCmds || geminiCmds)) {
   if (claudeCmds && geminiCmds && claudeCmds.join() === geminiCmds.join() && claudeCmds.join() === workflows.join()) {
     ok(`workflows <-> wrappers em paridade (${workflows.length})`);
   }
+}
+
+// --- Guard 7: cada workflow esta listado na tabela de CLAUDE.md (== GEMINI.md via Guard 2) ---
+// Fecha o drift da lista de workflows: o Guard 6 apanha wrappers em falta, este apanha
+// um workflow adicionado mas esquecido na tabela dos ficheiros de entrada.
+if (workflows && claude) {
+  let missing = 0;
+  for (const w of workflows) if (!claude.includes(`${w}.md`)) { warn(`Workflow "${w}" nao listado na tabela de CLAUDE.md/GEMINI.md`); missing++; }
+  if (missing === 0) ok(`workflows listados nas tabelas de entrada (${workflows.length})`);
 }
 
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---

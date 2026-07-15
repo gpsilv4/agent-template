@@ -342,6 +342,8 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **design-review.md**: Substituir `{{QUALITY_TIER}}`; ajustar criterios a UI lib e ao tier escolhido. Se o projeto nao tem UI, o workflow fica inativo (documentar).
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
 
+> **Modo minimo (opcional).** O template traz 11 workflows — e muito para um projeto pequeno. Um projeto pode ficar so com o essencial (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>` e `.gemini/commands/<x>`). O Guard 6/7 continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
+
 ### 2.7 Customizar GitHub CI/CD e Governance
 
 - **`.github/workflows/ci.yml`**: Verificar node version, descomentar bundle size check se necessario, ajustar scripts de teste ao projeto

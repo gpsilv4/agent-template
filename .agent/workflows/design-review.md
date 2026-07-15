@@ -5,6 +5,7 @@ Rubrica de qualidade visual e de experiencia do {{PROJECT_NAME}}. Correr **antes
 **Tier do projeto (bootstrap): {{QUALITY_TIER}}** — MVP < Polido < Elite. Quanto mais alto o tier, mais criterios sao obrigatorios (marcados `[Polido]` / `[Elite]`).
 
 > **Sem notas numericas.** Cada criterio e **passa / falha / N/A**, com um problema concreto e uma correcao. So aplicavel a alteracoes com **UI** — para APIs/CLI/libs, saltar. Ler tambem `.agent/rules/pages-architecture.md` (design system do projeto) e a "Barra de Qualidade" em `core-rules.md`.
+> **Verificacao:** a11y (AA) e performance (Core Web Vitals) — sobretudo no tier Elite — **nao tem harness automatico** neste template; verificar com **ferramentas/manualmente** (ex: axe DevTools, Lighthouse, leitor de ecra, navegacao por teclado). Um projeto pode adicionar um check opt-in (axe/Lighthouse CI) — nao assumido por defeito.
 
 ## 1. Design & Consistencia
 - [ ] Usa os **design tokens** do projeto (cor, espacamento, tipografia) — zero valores hardcoded soltos
