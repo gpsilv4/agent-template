@@ -1,0 +1,48 @@
+# Dependabot auto-merge — OPT-IN, desligado por defeito.
+#
+# O que faz (quando ligado): auto-mergeia PRs do Dependabot que sejam PATCH/MINOR,
+# DEPOIS do CI passar. Majors NUNCA sao auto-merged (ficam para review humano).
+#
+# Para LIGAR (os 3 sao necessarios):
+#   1. Repo variable: Settings > Secrets and variables > Actions > Variables >
+#      criar `DEPENDABOT_AUTOMERGE` = `true`  (sem isto, este workflow nao faz nada)
+#   2. Settings > General > ativar "Allow auto-merge" (e "Allow squash merging",
+#      usado pelo `--squash` abaixo)
+#   3. Branch protection em `main` com "Require status checks to pass before merging"
+#      (os checks do CI). E ISTO que garante que so mergeia com o CI verde.
+#      (Nota: se exigires tambem "required reviewers", o auto-merge nao avanca — o
+#      GITHUB_TOKEN nao aprova PRs; usa required *status checks*, nao reviews.)
+#
+# ⚠️ REPOS PRIVADOS: branch protection / required checks exige plano PAGO
+# (Pro/Team/Enterprise) em repos privados — e GRATIS em repos publicos. Num repo
+# PRIVADO no plano free, o passo 3 nao esta disponivel: sem required checks o
+# auto-merge NAO e travado pelo CI e os PRs entrariam sem validacao. Nesse caso,
+# NAO ligar isto — manter os PRs do Dependabot em merge manual.
+
+name: Dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    # Opt-in: so corre para PRs do Dependabot E se a repo variable estiver ligada.
+    if: github.actor == 'dependabot[bot]' && vars.DEPENDABOT_AUTOMERGE == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-merge patch/minor (majors ficam para review)
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

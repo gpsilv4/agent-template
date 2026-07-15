@@ -141,6 +141,7 @@ Outros ficheiros `.github/`:
 - **`pull_request_template.md`**: Checklist obrigatoria em cada PR (alinhada com `/review`)
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
 - **`dependabot.yml`**: Updates automaticos semanais de dependencias npm e GitHub Actions
+- **`dependabot-auto-merge.yml`**: auto-merge de PRs patch/minor do Dependabot — **opt-in** (desligado; ver cabecalho do ficheiro). Majors ficam sempre para review manual
 - **`CODEOWNERS`**: Define reviewers automaticos por ficheiro
 
 Para correr o CI localmente (mesmos comandos do pipeline):

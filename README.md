@@ -84,8 +84,9 @@ When you open a new AI session in any project using this template, the agent **a
 
 .github/                        <- DevOps & governance
 ├── workflows/
-│   ├── ci.yml                  <- CI: TypeScript, lint, build, tests, audit
-│   └── e2e.yml                 <- E2E + security tests (manual trigger)
+│   ├── ci.yml                  <- CI: TypeScript, lint, build, tests, audit, secret-scan
+│   ├── e2e.yml                 <- E2E + security tests (manual trigger)
+│   └── dependabot-auto-merge.yml <- Auto-merge patch/minor Dependabot PRs (OPT-IN, off by default)
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.md           <- Template para reportar bugs
 │   └── feature_request.md      <- Template para pedir features

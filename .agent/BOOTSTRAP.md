@@ -352,6 +352,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
 - **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario
+- **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Ligar so se o projeto tiver branch protection (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
 - **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
 - **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)
