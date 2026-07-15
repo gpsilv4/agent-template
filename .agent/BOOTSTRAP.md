@@ -243,6 +243,7 @@ Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
 | `{{YEAR}}` | Ano atual (ex: 2026) |
 | `{{SPRINT_DESCRIPTION}}` | "A definir" (placeholder inicial) |
 | `{{QUALITY_TIER}}` | Pergunta 19 (MVP/Polido/Elite; `N/A` se sem UI) |
+| `{{GITHUB_OWNER}}` | Username/team GitHub do projeto (para `.github/CODEOWNERS`) |
 
 ### 2.2 Ficheiros a GERAR do zero
 
@@ -351,7 +352,8 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
 - **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario
-- **`.github/CODEOWNERS`**: Substituir usernames com os do team real
+- **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
+- **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)
 - **`LICENSE`**: Substituir `{{COPYRIGHT_HOLDER}}` e `{{YEAR}}`; verificar tipo de licenca (MIT por defeito)
 - **`SECURITY.md`**: Substituir `{{SECURITY_EMAIL}}`; adaptar politica de disclosure se necessario
@@ -391,12 +393,16 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
+- [ ] **`README.md` substituido** pelo README do projeto (nao a capa do template nem o badge do repo do template)?
+- [ ] **`.github/CODEOWNERS`** sem `{{GITHUB_OWNER}}` (`grep "{{" .github/CODEOWNERS` -> zero linhas)?
 - [ ] `.github/workflows/ci.yml` configurado com triggers e scripts corretos?
 - [ ] `.github/workflows/e2e.yml` triggers e env vars configurados?
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
-- [ ] `.github/CODEOWNERS` tem usernames corretos?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
+- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs` e `node .agent/scripts/check-backlog.mjs` (ambos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`). Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 
