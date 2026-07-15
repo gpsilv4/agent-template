@@ -118,6 +118,12 @@ jobs:
     name: Secret Scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # gitleaks-action v3 lista os commits do PR (evento pull_request) via API -> precisa
+    # de pull-requests: read. Permissions de job SUBSTITUEM as do topo, por isso repor
+    # contents: read (checkout). (write so se quiseres comentarios inline nos achados.)
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
