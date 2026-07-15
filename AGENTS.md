@@ -31,4 +31,4 @@ Stack: {{STACK}}.
 - **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
 - **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
 
-> Prosa nao e garantia — para enforcement real, um projeto pode adicionar hooks em `.claude/settings.json` (Claude Code). Os guards + CI sao a rede atual.
+> Prosa nao e garantia — para enforcement real, um projeto pode adicionar hooks em `.claude/settings.json` (Claude Code). Os guards em `.agent/scripts/` + CI sao a rede atual.

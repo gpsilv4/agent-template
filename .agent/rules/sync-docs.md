@@ -38,7 +38,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 20. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 21. [ ] `SECURITY.md` — politica de disclosure atualizada
 22. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
-23. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (versoes de deps, orcamento de bytes das rules, paridade CLAUDE/GEMINI, versao CHANGELOG, termos obsoletos). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+23. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
 

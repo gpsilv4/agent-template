@@ -69,7 +69,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 9. Sincronizacao de Conhecimento (Docs Sync)
 
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
-- [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, versao CHANGELOG, termos banidos) — sem WARN
+- [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 
 ## 10. Backlog
 

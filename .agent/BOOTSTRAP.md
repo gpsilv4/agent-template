@@ -215,7 +215,7 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
-Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
+Percorrer todos os `.md`, `.mjs`, `LICENSE` e `.github/CODEOWNERS` e substituir:
 
 | Placeholder | Fonte |
 |-------------|-------|
@@ -303,7 +303,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** os guards genericos: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG` e scanner de termos obsoletos. **Opcionalmente**, adaptar dois arrays:
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** os guards genericos: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, paridade workflows↔wrappers + workflows nas tabelas, versao `package.json`≡`CHANGELOG`, `.nvmrc`, e scanner de termos obsoletos. **Opcionalmente**, adaptar dois arrays:
 
 - `CHECKS` — dependencias com versoes referenciadas na documentacao:
 
@@ -409,7 +409,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 ```
 Ficheiros com placeholders substituidos:  ~30
 Ficheiros gerados do zero:               2 (business-logic.md, pages-architecture.md)
-Ficheiros adaptados a stack:             ~9 (core-rules, setup, deploy, review, debug, ci.yml, e2e.yml, editorconfig, anti-patterns)
+Ficheiros adaptados a stack:             ~10 (core-rules, setup, deploy, review, design-review, debug, ci.yml, e2e.yml, editorconfig, anti-patterns)
 Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue templates, dependabot)
 ```
 

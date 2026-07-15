@@ -65,7 +65,8 @@ jobs:
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
       # Uncomment to run doc guards: rules byte-budget, CLAUDE/GEMINI parity,
-      # CHANGELOG/package.json version, banned terms, and (opt-in) dependency versions
+      # workflow<->wrapper + workflow-list parity, CHANGELOG/package.json version,
+      # banned terms, and (opt-in) dependency versions
       # - name: Doc Guards
       #   run: node .agent/scripts/check-doc-versions.mjs
 
