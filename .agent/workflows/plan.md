@@ -8,11 +8,21 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 - Se existir: referenciar o ID (ex: "Implementa UX3") e seguir o sprint sugerido
 - Se nao existir: criar novo item no backlog apos aprovacao do utilizador
 
-## 1. Contexto do Dominio
+## 1. Contexto & Abordagem (analise funcional — ANTES de desenhar)
+
+**Contexto do dominio:**
 
 - Identificar que paginas/componentes sao afetados
 - Verificar se existem regras de negocio relevantes (ver `.agent/rules/business-logic.md`)
 - Consultar a documentacao em `src/docs/`
+
+**Reutilizacao & abordagem** (pensar como engenheiro senior antes de escrever codigo — nao saltar):
+
+- **Ja foi feito?** `grep`/pesquisar o codebase por funcionalidade/util/hook/componente semelhante. Preferir **reutilizar ou estender** o existente a criar de novo (ver regra DRY em `core-rules.md`).
+- **E o melhor caminho?** Considerar 1-2 **abordagens alternativas**; escolher com justificacao (custo, complexidade, manutencao, impacto no utilizador) — nao a primeira que vem a cabeca.
+- **Melhorar vs recriar**: se ja existe algo parecido, decidir explicitamente **estender/refatorar** vs **substituir**, e porque.
+- **Menor mudanca que resolve**: preferir a solucao mais simples que cumpre o objetivo; evitar over-engineering e abstracoes prematuras.
+- Apresentar ao utilizador a abordagem escolhida + alternativas rejeitadas antes de implementar.
 
 ## 2. Base de Dados
 
