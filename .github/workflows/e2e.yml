@@ -31,7 +31,7 @@ jobs:
     outputs:
       has_pkg: ${{ steps.check.outputs.has_pkg }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: check
         run: |
           if [ -f package.json ]; then echo "has_pkg=true" >> "$GITHUB_OUTPUT"; else echo "has_pkg=false" >> "$GITHUB_OUTPUT"; fi
@@ -43,7 +43,7 @@ jobs:
     if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -78,7 +78,7 @@ jobs:
     if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
