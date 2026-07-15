@@ -24,6 +24,12 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 - **Menor mudanca que resolve**: preferir a solucao mais simples que cumpre o objetivo; evitar over-engineering e abstracoes prematuras.
 - Apresentar ao utilizador a abordagem escolhida + alternativas rejeitadas antes de implementar.
 
+**Definicao de Pronto (criterios de aceitacao):**
+
+- Definir, em bullets **testaveis**, o que significa a feature estar concluida (comportamento observavel, nao tarefas). Ex: "utilizador sem sessao e redirecionado para /login"; "export gera PDF com as colunas X, Y, Z".
+- Incluir edge cases e estados (vazio, erro, loading) que contam como "pronto".
+- Estes criterios sao a base do `/review` e dos testes E2E — se nao for testavel, nao e criterio.
+
 ## 2. Base de Dados
 
 - Verificar se sao necessarias novas tabelas/colunas

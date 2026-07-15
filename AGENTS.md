@@ -25,9 +25,10 @@ Stack: {{STACK}}.
 `setup` · `plan` · `review` · `design-review` · `refactor` · `deploy` · `debug` · `e2e-tests` · `security-tests` · `audit` · `market-scan`
 → ficheiros em `.agent/workflows/<nome>.md`. No Claude Code sao tambem slash commands (`.claude/commands/`).
 
-## Regras de ouro
+## Fronteiras (prioridade maxima)
 
-- UI em {{UI_LANGUAGE}}; codigo, variaveis e commits em ingles (Conventional Commits).
-- TypeScript estrito, `any` proibido. Ficheiros ~400 linhas (flag > 500).
-- Nunca expor secrets. NUNCA `git commit`/`push` sem autorizacao explicita do utilizador.
-- Antes de commit, correr a checklist de `.agent/rules/sync-docs.md` e os guards (`.agent/scripts/`).
+- **Sempre**: TypeScript estrito (`any` proibido, ficheiros ~400 linhas); UI em {{UI_LANGUAGE}}, codigo/commits em ingles (Conventional Commits); antes de commit, correr `.agent/rules/sync-docs.md` + os guards (`.agent/scripts/`).
+- **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
+- **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
+
+> Prosa nao e garantia — para enforcement real, um projeto pode adicionar hooks em `.claude/settings.json` (Claude Code). Os guards + CI sao a rede atual.

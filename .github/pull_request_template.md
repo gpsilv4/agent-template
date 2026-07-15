@@ -15,7 +15,7 @@
 - [ ] `npx tsc --noEmit` passes (0 errors)
 - [ ] `npm run lint` passes
 - [ ] `npm run build` succeeds
-- [ ] Bundle sizes within targets
+- [ ] Bundle sizes within targets (if configured — `check-bundle-sizes.mjs`)
 - [ ] Unit tests pass (`npm run test:unit`)
 - [ ] E2E tests pass (`npm run test`)
 - [ ] Security tests pass (`npm run test:security`)

@@ -8,6 +8,16 @@ Stack: {{STACK}}.
 
 ---
 
+## Fronteiras (prioridade maxima)
+
+- **Sempre**: TypeScript estrito; UI em {{UI_LANGUAGE}}, codigo/commits em ingles (Conventional Commits); correr os guards antes de commit.
+- **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
+- **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; usar `any`; commitar dados sensiveis.
+
+> Prosa nao e garantia — para enforcement real, um projeto pode adicionar hooks em `.claude/settings.json` (Claude Code). Os guards em `.agent/scripts/` + CI sao a rede atual.
+
+---
+
 ## Regras (carregar sempre)
 
 @.agent/rules/core-rules.md
