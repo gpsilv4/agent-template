@@ -21,12 +21,26 @@ permissions:
   contents: read
 
 jobs:
+  # Detects package.json AFTER checkout (job-level hashFiles runs before checkout and
+  # is unreliable). Other jobs skip on the bare template and run on real projects.
+  detect:
+    name: Detect Project
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      has_pkg: ${{ steps.check.outputs.has_pkg }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          if [ -f package.json ]; then echo "has_pkg=true" >> "$GITHUB_OUTPUT"; else echo "has_pkg=false" >> "$GITHUB_OUTPUT"; fi
+
   quality:
     name: Code Quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Skip on the bare template repo (no package.json yet); runs on real projects.
-    if: hashFiles('package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +77,8 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: hashFiles('package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v4
 
@@ -81,7 +96,8 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: hashFiles('package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v4
 
