@@ -85,6 +85,7 @@ Os workflows sao sequencias de passos que o Agente executa para tarefas especifi
 | **`/debug`**          | Debug Estruturado  | Quando encontras um erro inesperado.                    |
 | **`/refactor`**       | Refactoring Seguro | Para limpar codigo sem mudar o comportamento.           |
 | **`/review`**         | Code Review        | Antes de fazer commit final.                            |
+| **`/design-review`**  | Review de UI/UX    | Antes de dar uma feature de UI por concluida (qualidade/a11y). |
 | **`/e2e-tests`**      | Testes E2E         | Para correr testes funcionais Playwright.               |
 | **`/security-tests`** | Testes Seguranca   | Para correr testes de seguranca.                        |
 | **`/deploy`**         | Deploy Producao    | Passos finais para enviar para producao.                |

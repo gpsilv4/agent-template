@@ -109,6 +109,7 @@ Antes de tocar no codigo, ler:
 | `/plan`     | Antes de comecar uma feature nova    |
 | `/debug`    | Para resolver bugs de forma metodica |
 | `/review`   | Antes de fazer commit                |
+| `/design-review` | Qualidade de UI/UX antes de concluir feature |
 | `/deploy`   | Antes de ir para producao            |
 | `/refactor` | Ao reorganizar codigo existente      |
 | `/e2e-tests` | Para correr testes E2E funcionais  |

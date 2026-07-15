@@ -92,6 +92,17 @@
 - Popovers: `w-[min(300px,calc(100vw-2rem))]`.
 - Sheets/Modals: `w-full` e `overflow-x-hidden`.
 
+### Qualidade & Design (Barra: {{QUALITY_TIER}})
+
+> So para projetos com UI. Tier definido no bootstrap: **{{QUALITY_TIER}}** (MVP < Polido < Elite). Rubrica completa em `/design-review` (correr antes de dar UI por concluida — complementa o `/review`).
+
+- **Consistencia**: usar design tokens (cor/espacamento/tipografia); uma escala de espacamento e uma de tipografia; nº limitado de tamanhos de fonte. Zero valores hardcoded soltos.
+- **Estados obrigatorios** em toda a UI: loading (skeleton, sem layout shift), empty (com orientacao), error (mensagem accionavel), success; e hover/focus/active/disabled nos interativos.
+- **Acessibilidade** (Polido: AA basico; Elite: AA completo): contraste AA, foco visivel, navegacao por teclado, semantica correta, respeitar `prefers-reduced-motion`.
+- **Responsividade**: mobile-first, alvos de toque >= 44px, sem overflow horizontal.
+- **Premium** [Polido/Elite]: transicoes subtis (150-300ms) com proposito, microcopy humano, atencao ao detalhe (alinhamento/ritmo).
+- **SEO/metadata** [so web publico]: `<title>`/description por pagina, Open Graph, sitemap.
+
 ### Testagem E2E
 
 - Usar `data-testid` em componentes interativos criticos (toggles, botoes de acao em listas) para garantir seletores resilientes que sobrevivam a mudancas de texto ou animacoes de UI.

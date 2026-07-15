@@ -22,7 +22,7 @@ Stack: {{STACK}}.
 
 ## Workflows (ler on-demand quando invocados)
 
-`setup` · `plan` · `review` · `refactor` · `deploy` · `debug` · `e2e-tests` · `security-tests`
+`setup` · `plan` · `review` · `design-review` · `refactor` · `deploy` · `debug` · `e2e-tests` · `security-tests`
 → ficheiros em `.agent/workflows/<nome>.md`. No Claude Code sao tambem slash commands (`.claude/commands/`).
 
 ## Regras de ouro

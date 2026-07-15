@@ -41,6 +41,7 @@ Stack: {{STACK}}.
 | Setup / Onboarding        | `.agent/workflows/setup.md`            |
 | Planear funcionalidade    | `.agent/workflows/plan.md`             |
 | Review antes de commit    | `.agent/workflows/review.md`           |
+| Review de qualidade UI/UX | `.agent/workflows/design-review.md`    |
 | Refactoring seguro        | `.agent/workflows/refactor.md`         |
 | Testes E2E (Funcionais)   | `.agent/workflows/e2e-tests.md`        |
 | Testes de Seguranca       | `.agent/workflows/security-tests.md`   |

@@ -1,0 +1,2 @@
+description = "Review de qualidade de UI/UX (design, a11y, estados, premium) por tier"
+prompt = "Le e segue .agent/workflows/design-review.md: corre a rubrica de qualidade de UI/UX na alteracao atual, ao tier do projeto. Complementa o /review. Cada criterio passa/falha/N/A com correcao. So para UI."

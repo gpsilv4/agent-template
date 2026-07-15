@@ -2,6 +2,8 @@
 
 Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
+> Para alteracoes com **UI**, correr tambem `/design-review` (qualidade visual, UX, a11y, estados) — este `/review` cobre codigo/seguranca.
+
 ## 1. Build & CI Check
 
 - `npx tsc --noEmit` — 0 erros

@@ -201,6 +201,12 @@ Guarda as respostas — vais precisar delas para preencher todos os placeholders
 18. **Copyright holder** (nome ou organizacao para a licenca)
     → Substitui `{{COPYRIGHT_HOLDER}}` e `{{YEAR}}` em `LICENSE`
 
+19. **Tier de qualidade da UI** — *so perguntar se o projeto tem UI* (saltar para APIs/CLI/libs):
+    - `MVP` — funcional; estados basicos; sem polish obrigatorio
+    - `Polido` — estados completos, a11y AA basico, responsivo, microcopy cuidado
+    - `Elite` — tudo no maximo: a11y AA completo, motion com proposito, perf budget (Core Web Vitals), atencao ao detalhe
+    → Substitui `{{QUALITY_TIER}}` em `core-rules.md` e `design-review.md`. Se nao houver UI, usar `N/A` e o `/design-review` fica inativo.
+
 ---
 
 ## Fase 2 — Ficheiros a Gerar/Customizar
@@ -236,6 +242,7 @@ Percorrer todos os `.md`, `.mjs` e `LICENSE` e substituir:
 | `{{COPYRIGHT_HOLDER}}` | Pergunta 18 (nome ou organizacao para LICENSE) |
 | `{{YEAR}}` | Ano atual (ex: 2026) |
 | `{{SPRINT_DESCRIPTION}}` | "A definir" (placeholder inicial) |
+| `{{QUALITY_TIER}}` | Pergunta 19 (MVP/Polido/Elite; `N/A` se sem UI) |
 
 ### 2.2 Ficheiros a GERAR do zero
 
@@ -244,7 +251,7 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 | Ficheiro | Base | Conteudo |
 |----------|------|----------|
 | `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. |
-| `.agent/rules/pages-architecture.md` | Perguntas 9, 10 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. |
+| `.agent/rules/pages-architecture.md` | Perguntas 9, 10, 19 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. **Incluir uma seccao "Design System / Barra de Qualidade"** com os tokens/escala concretos da UI lib escolhida (cores, espacamento, tipografia, radius/sombras) e os criterios do tier `{{QUALITY_TIER}}` (estados obrigatorios, a11y, motion, SEO se web publico). Se o projeto usa error tracking/observabilidade (ex: Sentry), notar aqui como capturar erros de UI — senao, omitir (nao assumir vendor). |
 
 **Formato sugerido para `business-logic.md`:**
 
@@ -332,6 +339,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **setup.md**: Adaptar env vars, scripts de build, estrutura de diretorios
 - **deploy.md**: Adaptar ao hosting (Vercel vs Netlify vs Docker, etc.) e backend (migracoes)
 - **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
+- **design-review.md**: Substituir `{{QUALITY_TIER}}`; ajustar criterios a UI lib e ao tier escolhido. Se o projeto nao tem UI, o workflow fica inativo (documentar).
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
 
 ### 2.7 Customizar GitHub CI/CD e Governance
