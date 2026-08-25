@@ -8,6 +8,11 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - dependencies
+      # Descomentar para LIGAR o auto-merge de patch/minor neste ecosystem
+      # (ver .github/workflows/dependabot-auto-merge.yml — majors ficam sempre
+      # para review humano). Requer branch protection em `main` com required
+      # status checks; sem isso, nao ligar.
+      # - automerge
     versioning-strategy: increase
     commit-message:
       prefix: chore
@@ -27,6 +32,8 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - ci
+      # Descomentar para LIGAR o auto-merge de patch/minor neste ecosystem.
+      # - automerge
     commit-message:
       prefix: ci
       include: scope

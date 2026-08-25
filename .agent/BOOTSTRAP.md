@@ -365,8 +365,8 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
-- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario
-- **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Ligar so se o projeto tiver branch protection (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
+- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario. **Criar as labels no repo** — o Dependabot aplica labels existentes, **nao as cria**, e abre PRs sem label nenhuma se faltarem (falha silenciosa): `gh label create dependencies -c 0366d6`, `gh label create ci -c 1d76db`, `gh label create automerge -c fbca04`
+- **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Liga-se descomentando a label `automerge` no ecosystem escolhido em `.github/dependabot.yml` — so o fazer se o projeto tiver branch protection em `main` com required status checks (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
 - **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
 - **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)

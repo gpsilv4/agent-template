@@ -219,7 +219,12 @@ git commit -m "chore: bootstrap agent config"
 
 - Weekly npm dependency updates (minor + patch grouped)
 - Weekly GitHub Actions updates
-- Automatic PRs with `dependencies` / `ci` labels
+- Automatic PRs labelled `dependencies` / `ci` — **but only if those labels exist in the repo**. Dependabot applies existing labels; it does not create them, and silently opens unlabelled PRs otherwise:
+  ```bash
+  gh label create dependencies -d "Dependency updates (Dependabot)" -c 0366d6
+  gh label create ci           -d "CI/CD and GitHub Actions"        -c 1d76db
+  gh label create automerge    -d "Opt-in: Dependabot auto-merge"   -c fbca04
+  ```
 
 ### GitHub Configuration
 
