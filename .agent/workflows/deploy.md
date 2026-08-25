@@ -28,8 +28,9 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 2. CI Pipeline Status
 
-- Confirmar que o branch tem **todos os CI checks em verde** no GitHub (TypeScript, lint, build, unit tests, audit)
+- Confirmar que o branch tem **todos os CI checks em verde** no GitHub (TypeScript, lint, build, unit tests)
 - Se algum check falhou, corrigir antes de continuar o deploy
+- **Security Audit**: por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
 - Se E2E tests estao configurados no CI, devem estar verdes tambem
 - Ver status em: GitHub > repo > branch > checks
 
@@ -108,16 +109,22 @@ Verificacao manual apenas (ver seccao 8).
 - Antes de commitar, o Agente **tem** de perguntar: _"Estou pronto para fazer o commit/push, posso avancar?"_
 
 ```bash
-# 1. Merge da feature branch para main
-git checkout main
-git merge feature/nome-da-feature
-git push origin main
+# 1. Abrir/mergear o Pull Request da feature branch para main (nunca merge direto)
+#    Usar o template do repo — NAO `--fill`, que preenche o corpo a partir dos
+#    commits e ignora o pull_request_template.md (checklist obrigatoria).
+gh pr create --title "<tipo(scope): descricao>" \
+             --body-file .github/pull_request_template.md
+# -> preencher a checklist no PR, confirmar CI verde + review, depois:
+gh pr merge --squash         # (ou merge pela UI do GitHub)
 # -> Deploy automatico para producao
 
 # 2. Aplicar migracoes em prod (se houver)
 # (adaptar ao backend do projeto)
 
-# 3. Criar tag da versao
+# 3. Criar tag da versao — no commit de merge em main, NAO no branch de feature
+#    (apos squash merge o main local esta desatualizado: sincronizar primeiro)
+git checkout main
+git pull origin main
 git tag vX.Y.Z -m "Descricao da release"
 git push origin --tags
 ```

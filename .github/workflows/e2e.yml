@@ -52,6 +52,8 @@ jobs:
 
       - run: npm ci
 
+      # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
+      # Vitest browser mode, …), replace this install step and the run commands below.
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
 
@@ -64,7 +66,7 @@ jobs:
           # TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
       - name: Upload Test Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report
@@ -87,6 +89,8 @@ jobs:
 
       - run: npm ci
 
+      # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
+      # Vitest browser mode, …), replace this install step and the run commands below.
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
 

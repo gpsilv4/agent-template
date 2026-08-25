@@ -13,7 +13,7 @@ Instead, email **{{SECURITY_EMAIL}}** with:
 - Potential impact
 - Suggested fix (if any)
 
-You will receive a response within **48 hours** acknowledging receipt.
+You will receive a best-effort response acknowledging receipt. <!-- Set a concrete SLA (e.g. "within 48 hours") if your project commits to one. -->
 
 ## Supported Versions
 
@@ -26,9 +26,9 @@ You will receive a response within **48 hours** acknowledging receipt.
 
 This template enforces security through:
 
-- **CI Pipeline**: Automated `npm audit --audit-level=high` on every PR
+- **CI Pipeline**: Automated `npm audit --audit-level=high` on every PR — reported, but **non-blocking** by default (`continue-on-error` in `ci.yml`), since transitive high-severity advisories are often unfixable without a breaking bump. Remove `continue-on-error` to make it a hard gate once your dependency tree is clean.
 - **Dependabot**: Weekly automatic dependency updates
-- **Security Tests**: Playwright-based security test suite (headers, XSS, auth bypass, CSRF, IDOR)
+- **Security Tests**: {{TEST_FRAMEWORK}}-based security test suite (headers, XSS, auth bypass, CSRF, IDOR)
 - **RLS / Auth**: Backend security policies documented in `.agent/rules/core-rules.md`
 - **Zero Secrets**: No credentials in committed files — enforced by rules, PR checklist, and automated scanning (below)
 

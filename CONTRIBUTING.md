@@ -65,18 +65,18 @@ ci(actions): add Playwright browser caching
 
 ## Pull Request Process
 
-1. Ensure CI passes (TypeScript, lint, build, tests, audit)
+1. Ensure CI passes (TypeScript, lint, build, tests) and **read the security audit report** — it is informative by default, so it stays green even with advisories
 2. Fill in the PR template checklist (`.github/pull_request_template.md`)
 3. Update documentation if needed (see the sync-docs checklist in `.agent/rules/sync-docs.md`)
 4. Request review from CODEOWNERS
 5. Squash and merge after approval
-6. After sprint/release merge: create version tag (`git tag vX.Y.Z -m "Description"` + `git push origin --tags`)
+6. After sprint/release merge: sync `main` first, then tag it — after a squash merge your local `main` is stale, so tagging without pulling would tag the feature branch (`git checkout main && git pull origin main`, then `git tag vX.Y.Z -m "Description"` + `git push origin --tags`)
 
 ## Testing
 
 ```bash
 npm run test:unit       # Unit tests
-npm run test            # E2E tests (Playwright)
+npm run test            # E2E tests ({{TEST_FRAMEWORK}})
 npm run test:security   # Security tests
 npm run test:audit      # Dependency audit
 npm run test:all        # All tests
