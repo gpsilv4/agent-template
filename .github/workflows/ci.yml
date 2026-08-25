@@ -80,6 +80,12 @@ jobs:
       # - name: Backlog Check
       #   run: node .agent/scripts/check-backlog.mjs
 
+      # Uncomment to run the doc-guards' own negative tests: for each guard, break
+      # what it claims to check and assert it warns AND exits != 0. Needs no
+      # package.json or dependencies, so it can also live in an ungated job.
+      # - name: Guard Tests
+      #   run: node .agent/scripts/test-guards.mjs
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
