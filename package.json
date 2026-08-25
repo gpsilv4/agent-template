@@ -2,13 +2,5 @@
   "name": "ci-guard-probe",
   "version": "0.0.0",
   "private": true,
-  "description": "TEMPORARY probe to exercise ci.yml per-step guards in Actions. Delete with the branch.",
-  "scripts": {
-    "lint": "echo GUARD-PROBE: lint ran",
-    "build": "echo GUARD-PROBE: build ran",
-    "test:unit": "echo GUARD-PROBE: test:unit ran"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.0"
-  }
+  "description": "TEMPORARY probe B — no tsconfig, no scripts key at all. Guards must SKIP, job must stay green."
 }
