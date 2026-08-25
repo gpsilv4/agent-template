@@ -4,14 +4,27 @@
 # DEPOIS do CI passar. Majors NUNCA sao auto-merged (ficam para review humano).
 #
 # Para LIGAR (os 3 sao necessarios):
-#   1. Repo variable: Settings > Secrets and variables > Actions > Variables >
-#      criar `DEPENDABOT_AUTOMERGE` = `true`  (sem isto, este workflow nao faz nada)
+#   1. Em `.github/dependabot.yml`, descomentar a label `automerge` no ecosystem
+#      que queres auto-mergear (sem essa label, este workflow nao faz nada).
+#      O interruptor fica VERSIONADO no repo — visivel em code review, e podes
+#      ligar so `github-actions` e manter `npm` em review manual.
+#      ⚠️ A label TEM de existir no repo — o Dependabot aplica labels existentes,
+#      NAO as cria. Se faltar, o PR nasce sem label e isto nunca dispara:
+#        gh label create automerge -d "Opt-in: Dependabot patch/minor auto-merge" -c fbca04
+#      (o mesmo vale para `dependencies` e `ci` do dependabot.yml — sem elas, o
+#      `labels:` desse ficheiro e silenciosamente inerte)
 #   2. Settings > General > ativar "Allow auto-merge" (e "Allow squash merging",
 #      usado pelo `--squash` abaixo)
 #   3. Branch protection em `main` com "Require status checks to pass before merging"
 #      (os checks do CI). E ISTO que garante que so mergeia com o CI verde.
 #      (Nota: se exigires tambem "required reviewers", o auto-merge nao avanca — o
 #      GITHUB_TOKEN nao aprova PRs; usa required *status checks*, nao reviews.)
+#
+# ⚠️ O AUDIT NAO TRAVA NADA: em `ci.yml` o `npm audit` corre com `continue-on-error`
+# (informativo por defeito), logo o check fica SEMPRE verde. Com este auto-merge
+# ligado, um PR patch/minor do Dependabot com advisory de severidade alta entra sem
+# ninguem ler o relatorio. Se ligares o auto-merge, remove o `continue-on-error` do
+# passo Audit em `ci.yml` para o tornar um gate real (e atualiza `SECURITY.md`).
 #
 # ⚠️ REPOS PRIVADOS: branch protection / required checks exige plano PAGO
 # (Pro/Team/Enterprise) em repos privados — e GRATIS em repos publicos. Num repo
@@ -21,7 +34,19 @@
 
 name: Dependabot auto-merge
 
-on: pull_request
+# Restrito a `main`: a seguranca disto assenta na branch protection de `main`
+# (passo 3 acima). Sem o filtro, um PR do Dependabot para outro branch (via
+# `target-branch` no dependabot.yml) seria auto-mergeado onde essa protecao
+# provavelmente nao existe.
+#
+# `labeled` esta na lista de proposito: se o Dependabot aplicar as labels DEPOIS de
+# criar o PR, o payload do `opened` nao as traria e o gate nunca dispararia. Nao abre
+# brecha — se for um humano a por a label, `github.actor` passa a ser essa pessoa e o
+# `if` do job bloqueia (ou seja, a label so liga o auto-merge vinda do Dependabot).
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   contents: write
@@ -29,8 +54,12 @@ permissions:
 
 jobs:
   auto-merge:
-    # Opt-in: so corre para PRs do Dependabot E se a repo variable estiver ligada.
-    if: github.actor == 'dependabot[bot]' && vars.DEPENDABOT_AUTOMERGE == 'true'
+    # Opt-in: so corre para PRs do Dependabot E se o PR tiver a label `automerge`
+    # (adicionada pelo `dependabot.yml` — ver passo 1 no cabecalho).
+    # `github.actor` (nao `pull_request.user.login`) e deliberado: se um humano
+    # fizer push para o branch do Dependabot, o actor passa a ser essa pessoa e o
+    # auto-merge NAO dispara.
+    if: github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'automerge')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

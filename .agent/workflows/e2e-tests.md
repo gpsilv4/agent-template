@@ -1,6 +1,8 @@
-# /e2e-tests — Testes E2E Funcionais (Playwright)
+# /e2e-tests — Testes E2E Funcionais ({{TEST_FRAMEWORK}})
 
-Checklist para execucao e manutencao da suite de testes Playwright do {{PROJECT_NAME}}.
+Checklist para execucao e manutencao da suite de testes {{TEST_FRAMEWORK}} do {{PROJECT_NAME}}.
+
+> **Nota:** os comandos concretos abaixo (instalacao de browser, `test:ui`/`test:headed`, `PLAYWRIGHT_BASE_URL`) assumem **Playwright** como default. Se `{{TEST_FRAMEWORK}}` for outro (Cypress, Vitest browser mode, …), adaptar os comandos.
 
 ## 1. Variaveis de Ambiente Necessarias
 
@@ -14,7 +16,7 @@ Antes de correr os testes, garante que o teu ficheiro `.env.local` contem as cre
 ## 2. Preparacao e Dependencias
 
 - Correr `npm install`
-- Correr `npx playwright install chromium` (instala o browser para execucao)
+- Instalar o runner/browser de testes — ex. Playwright: `npx playwright install chromium` (adaptar ao `{{TEST_FRAMEWORK}}`)
 
 ## 3. Execucao da Suite de Testes
 
@@ -24,7 +26,7 @@ Os testes dependem de um ficheiro de global setup que gera o estado de autentica
 
 ### Outras formas de execucao:
 
-- `npm run test:ui` — Interface do Playwright para debugging facil.
+- `npm run test:ui` — Interface de debugging do runner (ex. Playwright UI mode).
 - `npm run test:headed` — Abre o browser de forma visivel.
 
 ## 4. O que testamos?

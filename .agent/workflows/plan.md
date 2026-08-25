@@ -59,7 +59,7 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
 ## 6. Testes & CI/CD
 
-- [ ] Planear testes E2E com Playwright para fluxos criticos
+- [ ] Planear testes E2E com {{TEST_FRAMEWORK}} para fluxos criticos
 - [ ] Planear testes de seguranca se houver novos formularios, APIs ou headers
 - [ ] Se novas dependencias forem adicionadas, planear auditoria
 - [ ] CI pipeline (`.github/workflows/ci.yml`) precisa de atualizacao? (novos env vars, novos scripts de teste, novos targets de bundle)

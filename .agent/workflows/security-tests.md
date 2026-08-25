@@ -9,7 +9,7 @@ As mesmas do E2E funcional — os testes de seguranca reutilizam as sessoes aute
 ## 2. Execucao
 
 ```bash
-# Testes de seguranca (Playwright)
+# Testes de seguranca ({{TEST_FRAMEWORK}})
 npm run test:security
 
 # Auditoria de dependencias
@@ -79,12 +79,16 @@ npm run test:audit
 
 ## 5. OWASP ZAP (Manual, Pre-Release)
 
-Scan completo opcional antes de releases importantes:
+Scan completo opcional antes de releases importantes (instalar o OWASP ZAP conforme o teu OS — ver https://www.zaproxy.org/download/):
 
 ```bash
-brew install --cask zap
-zap-cli quick-scan http://localhost:3000
+# Exemplo (adaptar OS/porta ao projeto):
+zap-cli quick-scan http://localhost:<PORT>
 ```
+
+> **Nota:** `zap-cli` **nao** vem com o ZAP — e um wrapper Python separado (`pip install zapcli`).
+> Em alternativa, usar o modo headless do proprio ZAP (`zap.sh -cmd ...`) — confirmar os flags
+> na documentacao da versao instalada.
 
 **Quando usar:** Antes de releases com alteracoes significativas em auth, formularios ou APIs.
 

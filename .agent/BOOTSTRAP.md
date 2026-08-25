@@ -137,6 +137,15 @@ Se algum campo nao foi discutido na Fase 0, assinalar com `[a confirmar]` e perg
 
 Guarda as respostas — vais precisar delas para preencher todos os placeholders.
 
+### Decisao de arranque — dimensao do processo (perguntar PRIMEIRO)
+
+Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo**:
+
+- **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
+- **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 11 workflows + ritual de backlog/sprint + guards.
+
+> Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `sync-docs.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
+
 ### Obrigatorias
 
 1. **Nome do projeto** (ex: "MyShop", "HealthTracker", "TaskFlow")
@@ -342,17 +351,22 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
 - **design-review.md**: Substituir `{{QUALITY_TIER}}`; ajustar criterios a UI lib e ao tier escolhido. Se o projeto nao tem UI, o workflow fica inativo (documentar).
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
+- **e2e-tests.md / security-tests.md**: substituir `{{TEST_FRAMEWORK}}` e adaptar os comandos concretos (instalacao de browser/runner, `test:ui`/`test:headed`, `PLAYWRIGHT_BASE_URL`, ZAP) se o framework nao for Playwright.
 
-> **Modo minimo (opcional).** O template traz 11 workflows — e muito para um projeto pequeno. Um projeto pode ficar so com o essencial (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>` e `.gemini/commands/<x>`). O Guard 6/7 continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
+> **Idiomas de toolchain nao sao placeholders.** Os workflows assumem `npm`/`npx tsc`/`npm run lint|build` e Playwright como default. O sweep de placeholders da Fase 3 **nao** apanha estes — se o projeto usa pnpm/yarn/bun, nao e TypeScript, ou usa outro runner de testes, **adaptar manualmente** os comandos em todos os workflows (e no `ci.yml`). O `ci.yml` ja e resiliente (salta typecheck/lint/build/test se o tsconfig/script nao existir), mas a prosa dos workflows precisa de revisao humana.
+
+> **Modo minimo (ver decisao de arranque na Fase 1).** Se escolheste Modo minimo, **remover agora** os workflows nao-essenciais: para cada um, apagar o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>.md` e `.gemini/commands/<x>.toml` + a linha na tabela de `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`. O Guard 6/7 (`check-doc-versions.mjs`) continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
 
 ### 2.7 Customizar GitHub CI/CD e Governance
 
-- **`.github/workflows/ci.yml`**: Verificar node version, descomentar bundle size check se necessario, ajustar scripts de teste ao projeto
+- **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check e os guards (`check-doc-versions`, `check-backlog`) se aplicavel. Duas decisoes a tomar **com o utilizador**:
+  - **Guards por step** (`if [ -f tsconfig.json ]`, `scripts?.lint`, …): existem para o template puro nao ficar vermelho. Assim que a stack estiver fixa, **remover o guard** dos steps que o projeto usa de facto — senao um script apagado por acidente passa a "skip" silencioso em vez de falhar.
+  - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`.
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
-- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario
-- **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Ligar so se o projeto tiver branch protection (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
+- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario. **Criar as labels no repo** — o Dependabot aplica labels existentes, **nao as cria**, e abre PRs sem label nenhuma se faltarem (falha silenciosa): `gh label create dependencies -c 0366d6`, `gh label create ci -c 1d76db`, `gh label create automerge -c fbca04`
+- **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Liga-se descomentando a label `automerge` no ecosystem escolhido em `.github/dependabot.yml` — so o fazer se o projeto tiver branch protection em `main` com required status checks (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
 - **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
 - **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)
@@ -360,7 +374,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`SECURITY.md`**: Substituir `{{SECURITY_EMAIL}}`; adaptar politica de disclosure se necessario
 - **`CONTRIBUTING.md`**: Adaptar workflow, commit format e scripts de teste ao projeto
 - **`CODE_OF_CONDUCT.md`**: Manter Contributor Covenant ou adaptar
-- **`.nvmrc`**: Verificar que versao Node corresponde a `ci.yml` e `setup.md`
+- **`.nvmrc`**: definir a versao Node do projeto — e a **fonte unica** (o `ci.yml`/`e2e.yml` leem-na via `node-version-file` e o `setup.md` remete para ela, por isso nao ha versao a duplicar)
 
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
@@ -385,7 +399,18 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 
 ### Checklist
 
-- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? (`grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/` — deve devolver **zero** linhas)
+- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? Correr o **sweep** abaixo — deve devolver **zero** linhas:
+
+  ```bash
+  git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
+    | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
+  ```
+
+  Cobre o repo inteiro (incl. `.github/CODEOWNERS`, `.agent/scripts/`, `.claude/`, `.gemini/`). Notas:
+  - `git grep --untracked` inclui os ficheiros **gerados** nesta fase (ainda sem `git add`) e exclui automaticamente o que esta em `.gitignore` — sem `node_modules/`, `dist/`, `.next/` a poluir. **Nao** trocar por `grep -r`, que os apanharia todos.
+  - O `sed` **anula** (nao descarta a linha) os dois usos legitimos de `{{ }}`: as expressoes `${{ ... }}` do GitHub Actions e o token `{{args}}` dos wrappers do Gemini. Anular em vez de filtrar a linha e deliberado — assim uma linha que misture um destes com um placeholder **real** continua a aparecer.
+  - `BOOTSTRAP.md`/`README.md` sao os catalogos de placeholders — remover a exclusao do `README.md` depois de o substituir pelo do projeto.
+  - Limpo = **sem output**; o pipeline sai com codigo `1` (o `grep` nao encontrou nada). Inverter se algum dia for usado como gate de CI.
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
 - [ ] `anti-patterns.md`: exemplo `AP1` comentado removido, so cabecalho + linha "sem entradas"?
@@ -419,8 +444,9 @@ Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue temp
 Sugerir ao utilizador:
 
 ```bash
-# Verificar que nao ficou nenhum placeholder
-grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/
+# Verificar que nao ficou nenhum placeholder (mesmo sweep da Fase 3 — zero linhas)
+git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
+  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
 
 # Primeiro commit
 git add .

@@ -51,14 +51,20 @@ jobs:
 
       - run: npm ci
 
+      # Each step is guarded so a project WITHOUT that tool/script does not red-fail.
+      # `detect` only proves package.json exists; these guards prove the specific
+      # toolchain exists before running it. Remove a guard once your stack is fixed.
       - name: TypeScript
-        run: npx tsc --noEmit
+        run: |
+          if [ -f tsconfig.json ]; then npx tsc --noEmit; else echo "No tsconfig.json — skipping typecheck"; fi
 
       - name: Lint
-        run: npm run lint
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.lint?0:1)"; then npm run lint; else echo "No 'lint' script — skipping"; fi
 
       - name: Build
-        run: npm run build
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.build?0:1)"; then npm run build; else echo "No 'build' script — skipping"; fi
 
       # Uncomment after configuring bundle targets in .agent/scripts/check-bundle-sizes.mjs
       # - name: Bundle Sizes
@@ -91,7 +97,8 @@ jobs:
       - run: npm ci
 
       - name: Unit Tests
-        run: npm run test:unit
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:unit']?0:1)"; then npm run test:unit; else echo "No 'test:unit' script — skipping"; fi
 
   security-audit:
     name: Security Audit
@@ -109,7 +116,12 @@ jobs:
 
       - run: npm ci
 
+      # Informative, NOT a hard gate: transitive high-sev advisories are common and
+      # often unfixable without a breaking bump — blocking every merge on them is a
+      # footgun. Review the report; escalate to a gate (remove continue-on-error) once
+      # your dependency tree is clean, or narrow with --audit-level / an allowlist.
       - name: Audit
+        continue-on-error: true
         run: npm audit --audit-level=high
 
   # Runs on every push/PR, including the bare template (no package.json guard):

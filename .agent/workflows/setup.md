@@ -66,10 +66,11 @@ git add .
 git commit -m "feat: descricao"
 git push origin feature/nome-da-feature
 
-# Quando validado -> merge para main (deploy para prod)
-git checkout main
-git merge feature/nome-da-feature
-git push origin main
+# Abrir Pull Request para main (nunca merge direto).
+# `--body-file` usa o template do repo; `--fill` ignorava-o.
+gh pr create --title "feat: descricao" \
+             --body-file .github/pull_request_template.md
+# -> preencher checklist -> CI verde + review -> `gh pr merge --squash` (deploy para prod)
 ```
 
 ## 5. Estrutura do Projeto

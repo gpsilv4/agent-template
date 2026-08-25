@@ -153,8 +153,20 @@ The AI will:
 ### 3. Verify and commit
 
 ```bash
-# Verify no placeholders remain
-grep -r "{{" --exclude=BOOTSTRAP.md .agent/ CLAUDE.md GEMINI.md AGENTS.md LICENSE SECURITY.md src/docs/
+# Verify no placeholders remain. Must return zero lines.
+#   git grep --untracked  -> every tracked AND newly generated file, but nothing
+#                            .gitignore'd (no node_modules/dist/.next noise)
+#   sed                   -> blanks out the two non-placeholder uses of {{ }}:
+#                            GitHub Actions ${{ ... }} expressions and Gemini's
+#                            own {{args}} token. Blanking (not dropping the line)
+#                            keeps a line that mixes one of those with a REAL
+#                            placeholder visible.
+#   the two excluded files are the placeholder catalogs themselves — drop the
+#   README exclusion once you replace it with your project's own.
+# NOTE: clean means "no output"; the pipeline then exits 1 (grep found nothing).
+#       Invert it if you ever wire this into CI as a gate.
+git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
+  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
 
 # Initial commit
 git add .
@@ -180,14 +192,16 @@ git commit -m "chore: bootstrap agent config"
 
 | Step | What it does |
 |------|--------------|
-| TypeScript | `npx tsc --noEmit` — 0 errors |
-| Lint | `npm run lint` — no warnings |
-| Build | `npm run build` — verify bundle |
-| Unit Tests | `npm run test:unit` |
-| Security Audit | `npm audit --audit-level=high` |
+| TypeScript | `npx tsc --noEmit` — 0 errors (skipped if there is no `tsconfig.json`) |
+| Lint | `npm run lint` — no warnings (skipped if there is no `lint` script) |
+| Build | `npm run build` — verify bundle (skipped if there is no `build` script) |
+| Unit Tests | `npm run test:unit` (skipped if there is no `test:unit` script) |
+| Security Audit | `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms (opt-in, uncomment in ci.yml) |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs (opt-in, uncomment in ci.yml) |
+
+> **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
 
 > CI runs on `pull_request` + `push` with a least-privilege `permissions: contents: read` block. Dependabot PRs ride the normal `pull_request` path (GitHub's safe default: read-only token, no secrets) — no `pull_request_target` needed, since no CI step requires secrets. A separate `secret-scan` (gitleaks) job runs on every push, even on the bare template.
 
@@ -205,7 +219,12 @@ git commit -m "chore: bootstrap agent config"
 
 - Weekly npm dependency updates (minor + patch grouped)
 - Weekly GitHub Actions updates
-- Automatic PRs with `dependencies` / `ci` labels
+- Automatic PRs labelled `dependencies` / `ci` — **but only if those labels exist in the repo**. Dependabot applies existing labels; it does not create them, and silently opens unlabelled PRs otherwise:
+  ```bash
+  gh label create dependencies -d "Dependency updates (Dependabot)" -c 0366d6
+  gh label create ci           -d "CI/CD and GitHub Actions"        -c 1d76db
+  gh label create automerge    -d "Opt-in: Dependabot auto-merge"   -c fbca04
+  ```
 
 ### GitHub Configuration
 
