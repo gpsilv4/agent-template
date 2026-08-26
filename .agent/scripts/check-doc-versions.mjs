@@ -58,6 +58,18 @@ function read(path) {
   }
 }
 
+/** Ficheiro presente mas sem conteudo util. Um entry point truncado a 0 bytes fazia os
+ *  guards que testam truthiness saltarem com a mensagem FALSA "sem CLAUDE.md". */
+function isBlank(content) {
+  return content !== null && content.trim() === "";
+}
+const blankFiles = [];
+function readMeaningful(path) {
+  const c = read(path);
+  if (isBlank(c)) blankFiles.push(path);
+  return c;
+}
+
 let hasWarnings = false;
 let guardsRun = 0;
 let guardsSkipped = 0;
@@ -113,8 +125,9 @@ for (const f of BOOTSTRAP_RULES) {
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
 // Gemini usa `@[path]`, Claude/Cursor usa `@path`. Normalizar antes de comparar
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.
-const claude = read("CLAUDE.md");
-const gemini = read("GEMINI.md");
+const claude = readMeaningful("CLAUDE.md");
+const gemini = readMeaningful("GEMINI.md");
+for (const f of blankFiles) warn(`${f} existe mas esta VAZIO — os guards que dependem dele nao tem o que verificar`);
 if (claude !== null && gemini !== null) {
   // Normaliza a sintaxe de import (@[x] -> @x) e colapsa espacamento/padding
   // (as celulas @[...] sao mais largas, logo o alinhamento das tabelas difere de forma cosmetica).
@@ -159,8 +172,8 @@ if (pkgRaw === null) {
     warn("package.json invalido — nao foi possivel ler version");
   }
   const changelog = read(CHANGELOG_PATH);
-  if (!pkgInvalid && pkgVersion === null) {
-    warn(`package.json sem campo "version" — o Guard 3 nao tem com que comparar`);
+  if (!pkgInvalid && !pkgVersion) {
+    warn(`package.json sem campo "version" utilizavel — o Guard 3 nao tem com que comparar`);
   }
   if (changelog === null) {
     warn(`${CHANGELOG_PATH} nao encontrado — core-rules.md exige-o atualizado antes de cada commit`);
@@ -180,11 +193,19 @@ if (pkgRaw === null) {
     } else {
       // Nao assumir que o topo e a versao mais alta: comparar contra o maximo e
       // avisar se a ordenacao estiver invertida (um CHANGELOG ascendente dava falso positivo).
+      // SemVer: comparar core numerico e, em empate, tratar pre-release como MENOR que
+      // a release (1.2.3-beta.1 < 1.2.3). Sem isto os dois empatavam e o `sort` estavel
+      // fazia o "maior" cair no ultimo, produzindo um falso positivo de ordenacao.
       const cmp = (a, b) => {
-        const pa = a.split(/[.\-+]/).map(Number);
-        const pb = b.split(/[.\-+]/).map(Number);
-        for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0);
-        return 0;
+        const [ca, pra = ""] = a.split(/[-+]/, 2);
+        const [cb, prb = ""] = b.split(/[-+]/, 2);
+        const na = ca.split(".").map(Number);
+        const nb = cb.split(".").map(Number);
+        for (let i = 0; i < 3; i++) if ((na[i] || 0) !== (nb[i] || 0)) return (na[i] || 0) - (nb[i] || 0);
+        if (pra === prb) return 0;
+        if (pra === "") return 1;   // release > pre-release
+        if (prb === "") return -1;
+        return pra < prb ? -1 : 1;
       };
       const max = [...found].sort(cmp).at(-1);
       if (found[0] !== max) {
@@ -314,15 +335,20 @@ if (claude) {
     warn("CLAUDE.md sem nenhum `@import` — os ficheiros de regras/contexto nao serao carregados");
   } else {
     let broken = 0;
+    let pending = 0;
     for (const path of imports) {
       if (read(path) !== null) continue;
-      if (BOOTSTRAP_GENERATED.has(path)) skip(`@${path} — gerado no bootstrap, ainda nao existe`);
-      else {
+      if (BOOTSTRAP_GENERATED.has(path)) {
+        skip(`@${path} — gerado no bootstrap, ainda nao existe`);
+        pending++;
+      } else {
         warn(`CLAUDE.md importa \`@${path}\` mas o ficheiro NAO EXISTE`);
         broken++;
       }
     }
-    if (broken === 0) ok(`${imports.length} @imports de CLAUDE.md resolvem`);
+    // Contar so os que RESOLVEM: antes dizia "11 @imports resolvem" logo a seguir a
+    // dois SKIP de imports que nao resolviam.
+    if (broken === 0) ok(`${imports.length - pending} de ${imports.length} @imports de CLAUDE.md resolvem`);
   }
   guardsRun++;
 } else {
@@ -412,10 +438,16 @@ if (settingsRaw === null) {
         issues++;
       }
     }
-    // Wildcard sem delimitador: `Bash(npm run lint*)` cobre `npm run lint-and-deploy`;
-    // `Bash(node x/*)` cobre qualquer ficheiro nesse caminho. So `:*` ou ` *` sao seguros.
+    // Num `allow` de Bash, o UNICO `*` aceitavel e o sufixo exato `:*` (a convencao de
+    // "subcomandos de"). Qualquer outro `*` alarga o comando de forma dificil de prever:
+    // `Bash(npm run lint*)` cobre `npm run lint-and-deploy`, `Bash(node x/*)` cobre qualquer
+    // ficheiro nesse caminho, e `Bash(*)` ou `Bash(rm -rf *)` abrem tudo. Uma versao anterior
+    // desta regra exigia um caractere de palavra antes do `*` e por isso dava OK a `Bash(*)`
+    // e a `Bash(rm -rf *)` — o guard falhava exatamente no caso mais perigoso.
     for (const rule of allow) {
-      if (/^Bash\(.*[A-Za-z0-9_.\/-]\*\)$/.test(rule)) {
+      const m = /^Bash\((.*)\)$/.exec(rule);
+      const body = m?.[1] ?? "";
+      if (m && body.includes("*") && !/^[^*]+:\*$/.test(body)) {
         warn(`${SETTINGS_PATH}: \`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
         issues++;
       }

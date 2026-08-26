@@ -8,8 +8,10 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 - `npx tsc --noEmit` — 0 erros
 - `npm run lint` — passa
-- CI pipeline verde no branch — **verificar com um comando, nao a olho**:
-  `gh pr checks --watch` (sai `!= 0` se falhar, `8` se ainda pendente)
+- CI pipeline verde no branch — **verificar com um comando, nao a olho**, mas so quando
+  **ja existe PR** (o `/review` corre tipicamente antes do commit; sem PR o comando sai em
+  erro "no pull requests found"): `gh pr checks --watch` — espera e sai `!= 0` se falhar.
+  Antes de haver PR, os equivalentes locais sao o `tsc`/`lint`/testes desta checklist
 - Se CI falhou, corrigir antes de pedir review/merge
 - **Security Audit**: corre com `continue-on-error` por defeito, logo fica **sempre verde**.
   Abrir o log e ler o relatorio — verde nao significa limpo
@@ -83,19 +85,20 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] **Triagem proativa** (`process-rules.md`): cada item tocado justifica teste novo? **unit** (funcao pura/regra de negocio), **E2E** (fluxo de utilizador), **security** (rota/input/header novo). Propor ao utilizador — nao esperar que peca
 - [ ] Cada teste **novo** nasce com o seu **controlo negativo**: quebrar de proposito o codigo que ele cobre e confirmar que fica vermelho **na assercao certa**. Um teste que passa com o defeito no ecra nao afirma nada
 
-## 9. Sincronizacao de Conhecimento (Docs Sync)
+## 10. Sincronizacao de Conhecimento (Docs Sync)
 
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
+- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`): `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` — sem eles, um guard partido parece um guard a passar
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 
-## 10. Backlog
+## 11. Backlog
 
 - [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, **remover** a linha das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
 - [ ] Atualizar contadores da tabela "Resumo" e validar com `node .agent/scripts/check-backlog.mjs` (0 divergencias).
 - [ ] Atualizar a barra de progresso e a linha **Proximo:** no `backlog.md`.
 - [ ] O trabalho revelou novos bugs ou melhorias? Propor novos items ao utilizador.
 
-## 11. Sessao (Handoff)
+## 12. Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 

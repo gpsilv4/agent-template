@@ -35,6 +35,7 @@
       "Bash(node .agent/scripts/check-backlog.mjs)",
       "Bash(node .agent/scripts/check-bundle-sizes.mjs)",
       "Bash(node .agent/scripts/test-guards.mjs)",
+      "Bash(node .agent/scripts/test-bundle-sizes.mjs)",
       "Bash(npx tsc --noEmit)",
       "Bash(npm run lint)",
       "Bash(npm run lint:*)",

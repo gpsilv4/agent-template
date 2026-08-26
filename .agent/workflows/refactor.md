@@ -48,7 +48,9 @@ Seguir o checklist estrito:
 6. Verificar que nao ha **ghost fetchers** — chamadas a funcoes de fetch onde devia estar
    invalidacao de cache (`debug.md`). **O `tsc` NAO deteta isto**: e codigo bem tipado.
    Procurar a olho nos handlers de escrita, com apoio de:
-   `grep -rn "fetch\|refetch\|load[A-Z]" src/ | grep -i "handle\|onSubmit\|onClick"`
+   `grep -rn -A5 -iE "handle|onSubmit|onClick" src/ | grep -nE "fetch|refetch|load[A-Z]"`
+   (o `-A5` e essencial: a chamada de fetch quase nunca esta na MESMA linha do handler —
+   um `grep | grep` sem contexto devolve zero mesmo com ghost fetchers a existir)
 7. Verificar variable shadowing (tambem invisivel ao `tsc` — revisao manual)
 
 ## 6. Verificacao Pos-Refactor

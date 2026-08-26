@@ -63,7 +63,10 @@ function sandbox() {
 function runGuard(dir, cwd) {
   try {
     const stdout = execFileSync(process.execPath, [join(dir, GUARD)], {
-      cwd: cwd ?? dir,
+      // `cwd` e relativo a sandbox. Uma versao anterior passava `cwd ?? dir` com um
+      // `expect.cwd` sempre `undefined`, pelo que os testes de cwd corriam na raiz e
+      // eram copias exatas do baseline — passavam com o defeito reintroduzido.
+      cwd: cwd ? join(dir, cwd) : dir,
       encoding: "utf8",
     });
     return { code: 0, out: stdout };
@@ -115,21 +118,40 @@ test("baseline: repo intacto passa", null, {
 });
 
 // --- Independencia do cwd (o defeito mais grave: 0 guards + "todos passaram") --
-test("cwd: correr de um subdiretorio nao desliga os guards", (dir) => {
+const withDecoyNvmrc = (dir) => {
   mkdirSync(file(dir, "sub"), { recursive: true });
-  writeF(dir, "sub/.nvmrc", "18\n"); // isca: antes, este .nvmrc era o unico guard a "correr"
-}, {
+  writeF(dir, "sub/.nvmrc", "18\n"); // isca: com ROOT=cwd, era o unico guard a "correr"
+};
+
+test("cwd: correr DE UM SUBDIRETORIO nao desliga os guards", withDecoyNvmrc, {
   code: 0,
+  cwd: "sub",
   includes: ["12 guard(s) executado(s)"],
-  cwd: undefined, // substituido abaixo
 });
-test("cwd: raiz e derivada do script, nao do cwd", (dir) => {
-  mkdirSync(file(dir, "sub"), { recursive: true });
-  writeF(dir, "sub/.nvmrc", "18\n");
-}, {
+
+test("cwd: a raiz vem do script, nao do cwd (le o .nvmrc certo)", withDecoyNvmrc, {
   code: 0,
+  cwd: "sub",
   includes: ["12 guard(s) executado(s)", ".nvmrc = 24"],
   excludes: [".nvmrc = 18"],
+});
+
+// CONTROLO NEGATIVO PERMANENTE: reintroduz o defeito na copia da sandbox e exige que
+// a suite o apanhe. Sem isto, os dois testes acima passavam com ROOT = process.cwd().
+test("cwd: [controlo negativo] com ROOT = cwd, o guard TEM de falhar", (dir) => {
+  withDecoyNvmrc(dir);
+  const patched = readF(dir, GUARD).replace(
+    /^const ROOT = .*$/m,
+    "const ROOT = process.cwd();"
+  );
+  if (!patched.includes("const ROOT = process.cwd();")) {
+    throw new Error("o patch do controlo negativo nao aplicou — a linha `const ROOT =` mudou de forma");
+  }
+  writeF(dir, GUARD, patched);
+}, {
+  code: 1,
+  cwd: "sub",
+  excludes: ["Todos os guards de documentacao passaram"],
 });
 
 // --- Guard 1: orcamento de bytes e rules obrigatorias -------------------------

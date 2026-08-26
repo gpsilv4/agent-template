@@ -63,6 +63,7 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── implementation_plan.md  <- Implementation plan
 │   ├── backlog.md              <- Backlog: active work (imported into context)
 │   ├── backlog-archive.md      <- Closed items + closed sprints (NOT imported)
+│   ├── audit-history.md        <- /audit baselines, accumulated (NOT imported; created on first run)
 │   ├── decisions-archive.md    <- Archived old decisions (NOT imported)
 │   └── walkthrough-archive.md  <- Archived old releases (NOT imported)
 ├── workflows/

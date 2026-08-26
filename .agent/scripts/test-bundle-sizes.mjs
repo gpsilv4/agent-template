@@ -18,7 +18,7 @@
  * Sai != 0 se algum teste falhar. Opt-in no CI (descomentar em .github/workflows/ci.yml).
  */
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, cpSync } from "fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, cpSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -48,6 +48,18 @@ function chunk(dir, relPath, bytes, filler = "x") {
   const body = filler.repeat(bytes);
   writeFileSync(full, body);
   return gzipSync(Buffer.from(body)).length;
+}
+
+/** Reescreve o literal TARGETS na copia do checker (para exercitar varias rotas). */
+function withTargets(dir, targets) {
+  const p = join(dir, CHECKER);
+  const src = readFileSync(p, "utf8");
+  const body = Object.entries(targets)
+    .map(([r, c]) => `  ${JSON.stringify(r)}: { name: ${JSON.stringify(c.name)}, target: ${c.target}, alarm: ${c.alarm} },`)
+    .join("\n");
+  const out = src.replace(/const TARGETS = \{[\s\S]*?\n\};/, `const TARGETS = {\n${body}\n};`);
+  if (out === src) throw new Error("o patch de TARGETS nao aplicou — o literal mudou de forma");
+  writeFileSync(p, out);
 }
 
 function manifest(dir, obj) {
@@ -158,6 +170,42 @@ test("chunk de layout entra na baseline partilhada", (dir) => {
   code: 0,
   excludes: ["Shared (framework + layout): 0.0 kB"],
 });
+
+// --- Contagem entre rotas (First Load JS e POR ROTA) -------------------------
+
+test("chunk partilhado por DUAS rotas conta nas duas", (dir) => {
+  const shared = chunk(dir, "static/chunks/shared.js", 10_000, "s");
+  const common = chunk(dir, "static/chunks/common-ab.js", 500_000, "c");
+  chunk(dir, "static/chunks/app/page-a.js", 1_000, "a");
+  chunk(dir, "static/chunks/app/rotab/page-b.js", 1_000, "b");
+  manifest(dir, {
+    rootMainFiles: ["static/chunks/shared.js"],
+    pages: {
+      "app/page": ["static/chunks/common-ab.js"],
+      "app/rotab/page": ["static/chunks/common-ab.js"],
+    },
+  });
+  withTargets(dir, {
+    "/": { name: "RotaA", target: 160, alarm: 180 },
+    "/rotab": { name: "RotaB", target: 160, alarm: 180 },
+  });
+  // Um `seen` partilhado entre rotas dava o chunk comum so a primeira, e a segunda
+  // reportava ~80% a menos com [OK]. As duas tem de mostrar o MESMO valor.
+  const expected = ((shared + common + gzipSync(Buffer.from("a".repeat(1_000))).length) / 1024).toFixed(1);
+  const expectedB = ((shared + common + gzipSync(Buffer.from("b".repeat(1_000))).length) / 1024).toFixed(1);
+  return { includes: [`RotaA${" ".repeat(18)}${expected.padStart(7)} kB`, `RotaB${" ".repeat(18)}${expectedB.padStart(7)} kB`] };
+}, { code: 0 });
+
+test("layout tambem listado em rootMainFiles NAO duplica a baseline", (dir) => {
+  const layout = chunk(dir, "static/chunks/app/layout-xyz.js", 600_000, "l");
+  chunk(dir, "static/chunks/app/page-abc.js", 1_000, "p");
+  manifest(dir, { rootMainFiles: ["static/chunks/app/layout-xyz.js"], pages: {} });
+  // Antes, o varrimento de layouts nao consultava o `seen`: a baseline vinha a dobrar.
+  return {
+    includes: [`Shared (framework + layout): ${(layout / 1024).toFixed(1)} kB`],
+    excludes: [`Shared (framework + layout): ${((layout * 2) / 1024).toFixed(1)} kB`],
+  };
+}, { code: 0 });
 
 // --- Targets ----------------------------------------------------------------
 

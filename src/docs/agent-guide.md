@@ -111,6 +111,7 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 **Como funciona:**
 - IDs sao unicos e permanentes (nunca reutilizar)
 - Items concluidos saem das tabelas ativas e passam para o "Historico" em `backlog-archive.md` (nao carregado no contexto)
+- O `/audit` guarda cada baseline datada em `.agent/context/audit-history.md` — acumulado e **nao** carregado no contexto (criado na primeira corrida)
 - Sprints organizam a ordem de execucao com dependencias entre items
 - O Agente consulta o backlog antes de planear (`/plan`), corrigir (`/debug`) ou refatorar (`/refactor`)
 

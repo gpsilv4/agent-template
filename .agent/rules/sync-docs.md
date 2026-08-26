@@ -25,6 +25,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
    - [ ] Items fechados movidos para `backlog-archive.md`; ordem das seccoes respeitada (🎯 -> 📚)?
 8. [ ] `.agent/context/decisions.md` — novas decisoes registadas (arquivar as antigas se > ~150 linhas, ver Regra de Arquivamento)
 9. [ ] `.agent/context/walkthrough.md` — se houve feature/fix user-facing (arquivar se > ~200 linhas)
+9b. [ ] `.agent/context/audit-history.md` — se correste `/audit`: baseline datada acrescentada? (acumulado, **nao** importado)
 10. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
 11. [ ] `.agent/workflows/` — workflows refletem processos atuais
 12. [ ] `.agent/scripts/` — scripts e targets atualizados

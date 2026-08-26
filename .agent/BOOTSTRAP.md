@@ -401,6 +401,10 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
     pre-aprova qualquer ficheiro nesse caminho (incluindo um que o agente acabe de escrever) e um
     `Bash(npm run lint*)` pre-aprova `npm run lint-and-deploy`. Ao adicionar um script, acrescentar
     a linha exata — nao alargar o padrao.
+  - **Assimetria deliberada**: o `.gitignore` versiona `.env.example` (`!.env.example`) mas o
+    `deny` de `Read(./.env.*)` impede o agente de o ler. E intencional — um ficheiro de exemplo
+    costuma conter valores realistas, e o agente nao precisa dele. Se o teu projeto quiser que o
+    agente o leia, renomear para um nome que o `deny` nao apanhe (ex: `env.example`).
   - **Limite conhecido**: as regras `Read(...)` nao alcancam ficheiros abertos por um subprocesso
     (`node`, `python`). Para bloqueio a nivel de OS, usar sandbox ou um hook `PreToolUse`.
   - Ajustar `allow` a stack do projeto. `settings.local.json` e pessoal (gitignored) — nao versionar.

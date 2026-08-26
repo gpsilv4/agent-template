@@ -41,10 +41,14 @@
  */
 
 import { readFileSync, readdirSync, existsSync } from "fs";
-import { join, relative } from "path";
+import { join, relative, sep, dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { gzipSync } from "zlib";
 
-const NEXT_DIR = ".next";
+// Ancorado a raiz do repo, como o check-doc-versions.mjs: correr de um subdiretorio
+// produzia "build-manifest.json nao encontrado", uma mensagem errada para a causa real.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const NEXT_DIR = join(ROOT, ".next");
 const MANIFEST_PATH = join(NEXT_DIR, "build-manifest.json");
 
 // Adaptar ao projeto: definir paginas e targets
@@ -105,26 +109,29 @@ try {
   process.exit(1);
 }
 
-const seen = new Set();
+// `sharedSeen` cobre o que e carregado em TODAS as paginas (rootMainFiles + layout).
+// Cada rota parte de uma COPIA deste conjunto — nunca de um `seen` global acumulado:
+// o First Load JS e uma metrica POR ROTA, e um chunk partilhado por duas rotas conta nas
+// duas. Um `seen` partilhado entre rotas fazia a segunda rota perder esse chunk e reportar
+// um valor menor com `[OK]` — o mesmo pecado de imprimir um numero que nao mediu.
+const sharedSeen = new Set();
 
 // Shared chunks (rootMainFiles — carregados em todas as paginas)
-const shared = addFiles(manifest.rootMainFiles || [], seen);
+const shared = addFiles(manifest.rootMainFiles || [], sharedSeen);
 let sharedSize = shared.total;
 
-// Chunk do layout do App Router (carregado em todas as paginas)
-const appLayoutDir = join(NEXT_DIR, "static", "chunks", "app");
-let layoutSize = 0;
+// Chunk do layout do App Router (carregado em todas as paginas).
+// Passa pelo MESMO addFiles/sharedSeen: um layout tambem listado em rootMainFiles era
+// contado duas vezes na baseline, inflando todas as rotas e podendo disparar ALARM falso.
+const layoutFiles = [];
 try {
-  for (const f of readdirSync(appLayoutDir)) {
-    if (f.startsWith("layout-") && f.endsWith(".js")) {
-      const size = gzipSize(join(appLayoutDir, f));
-      if (size === null) missing.push(join("static", "chunks", "app", f));
-      else layoutSize += size;
-    }
+  for (const f of readdirSync(join(NEXT_DIR, "static", "chunks", "app"))) {
+    if (f.startsWith("layout-") && f.endsWith(".js")) layoutFiles.push(`static/chunks/app/${f}`);
   }
 } catch {
   // sem chunks de layout — normal em Pages Router
 }
+const layoutSize = addFiles(layoutFiles, sharedSeen).total;
 
 const baseSize = sharedSize + layoutSize;
 
@@ -136,9 +143,12 @@ let hasFail = false;
 const unresolved = [];
 
 for (const [route, config] of Object.entries(TARGETS)) {
+  // Copia do conjunto partilhado: dentro da rota nao se conta duas vezes o mesmo ficheiro,
+  // mas entre rotas cada uma conta os seus chunks por inteiro.
+  const routeSeen = new Set(sharedSeen);
   // Nota: para App Router isto e sempre [] — ver LIMITE CONHECIDO no cabecalho.
   const pageKey = `app${route === "/" ? "" : route}/page`;
-  const fromManifest = addFiles(manifest.pages?.[pageKey] || [], seen);
+  const fromManifest = addFiles(manifest.pages?.[pageKey] || [], routeSeen);
   let pageSize = fromManifest.total;
   let pageChunks = fromManifest.counted;
 
@@ -150,9 +160,10 @@ for (const [route, config] of Object.entries(TARGETS)) {
     if (existsSync(dir)) {
       for (const f of readdirSync(dir)) {
         if (!f.startsWith("page-") || !f.endsWith(".js")) continue;
-        const relKey = relative(NEXT_DIR, join(dir, f));
-        if (seen.has(relKey)) continue;
-        seen.add(relKey);
+        // Chave sempre com `/`, para casar com as do manifest tambem em Windows.
+        const relKey = relative(NEXT_DIR, join(dir, f)).split(sep).join("/");
+        if (routeSeen.has(relKey)) continue;
+        routeSeen.add(relKey);
         const size = gzipSize(join(dir, f));
         if (size === null) missing.push(relKey);
         else {
@@ -189,9 +200,10 @@ console.log("");
 
 // --- Integridade da medicao (antes dos targets: sem medicao nao ha veredicto) ---
 
-if (missing.length > 0) {
+const missingUnique = [...new Set(missing)]; // a mesma falta pode surgir em varias rotas
+if (missingUnique.length > 0) {
   console.log("FAILED: ficheiros referenciados pelo build mas AUSENTES do disco:");
-  for (const f of missing) console.log(`  - ${f}`);
+  for (const f of missingUnique) console.log(`  - ${f}`);
   console.log("");
   console.log("  Um ficheiro no manifest e ausente do disco e erro de build, nao 0 kB.");
   console.log("  Apagar .next/ e correr 'npm run build' de novo. Se persistir, o manifest");
