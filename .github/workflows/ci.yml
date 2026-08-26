@@ -86,6 +86,12 @@ jobs:
       # - name: Guard Tests
       #   run: node .agent/scripts/test-guards.mjs
 
+      # Uncomment to run the bundle checker's own negative tests: fake .next/ trees
+      # asserting it refuses to report a number it could not measure. Needs no
+      # Next.js install — fixtures are plain files and a hand-written manifest.
+      # - name: Bundle Checker Tests
+      #   run: node .agent/scripts/test-bundle-sizes.mjs
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
