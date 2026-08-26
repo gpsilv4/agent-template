@@ -389,7 +389,21 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
 - **`.claude/agents/*.md`** (`code-reviewer`, `debugger`): subagentes read-only/investigacao. Ajustar se o processo mudar.
-- **`.claude/settings.json`**: permissions do projeto (nega leitura de `.env*`, permite scripts seguros). Ajustar `allow`/`deny` a stack. `settings.local.json` e pessoal (gitignored) — nao versionar.
+- **`.claude/settings.json`**: **a fronteira de seguranca real** do projeto — e o unico ficheiro
+  machine-enforceable, e JSON nao aceita comentarios, por isso o racional vive aqui:
+  - `deny` e avaliado **antes** de `ask` e `allow` (primeira match ganha). Cobre leitura de secrets
+    (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `.npmrc`, `credentials*`, `secrets/**`), escrita sobre
+    `.env*`, e **edicao do proprio `settings.json`** — sem esta ultima, o agente alarga as proprias
+    permissoes. Mais os destrutivos irrecuperaveis (`git push --force`, `git reset --hard`, `rm -rf`).
+  - `ask` cobre o que o `CLAUDE.md` declara como "Perguntar primeiro": `git commit`/`push`/`merge`,
+    `gh pr merge`, `npm install`/`uninstall`. Sem isto, essas fronteiras existem so em prosa.
+  - `allow` **enumera comandos exatos, nunca prefixos abertos**. Um `Bash(node .agent/scripts/*)`
+    pre-aprova qualquer ficheiro nesse caminho (incluindo um que o agente acabe de escrever) e um
+    `Bash(npm run lint*)` pre-aprova `npm run lint-and-deploy`. Ao adicionar um script, acrescentar
+    a linha exata — nao alargar o padrao.
+  - **Limite conhecido**: as regras `Read(...)` nao alcancam ficheiros abertos por um subprocesso
+    (`node`, `python`). Para bloqueio a nivel de OS, usar sandbox ou um hook `PreToolUse`.
+  - Ajustar `allow` a stack do projeto. `settings.local.json` e pessoal (gitignored) — nao versionar.
 
 ---
 
