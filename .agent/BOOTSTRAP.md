@@ -312,7 +312,16 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** os guards genericos: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, paridade workflows↔wrappers + workflows nas tabelas, versao `package.json`≡`CHANGELOG`, `.nvmrc`, e scanner de termos obsoletos. **Opcionalmente**, adaptar dois arrays:
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+
+> **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs` e
+> `node .agent/scripts/test-bundle-sizes.mjs` quebram cada guard de proposito e exigem que
+> avise e saia `!= 0`. Correr **sempre que mexeres nos scripts** — um guard que passa quando
+> devia falhar produz confianca infundada, e foi assim que dois deles ficaram sem apanhar
+> nada. Correm no CI no job `guard-tests`, que nao depende de `package.json`.
+
+Se renomeares ou acrescentares rules, adaptar tambem os arrays `REQUIRED_RULES`,
+`BOOTSTRAP_RULES` e `BOOTSTRAP_GENERATED` no topo do script. **Opcionalmente**, adaptar dois arrays:
 
 - `CHECKS` — dependencias com versoes referenciadas na documentacao:
 
@@ -444,7 +453,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
-- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs` e `node .agent/scripts/check-backlog.mjs` (ambos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs`, `node .agent/scripts/check-backlog.mjs`, `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 
 > **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 

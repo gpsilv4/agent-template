@@ -70,15 +70,24 @@ function gzipSize(filePath) {
   }
 }
 
+/** Chave canonica de um ficheiro dentro de `.next/`, relativa e sempre com `/`.
+ *  Sem isto o `seen` comparava as strings CRUAS do manifest: `./x.js` e `x.js` sao o
+ *  mesmo ficheiro e eram contados duas vezes, e em Windows o `\` do varrimento de
+ *  diretorio nunca casava com o `/` do manifest. */
+function keyOf(file) {
+  return relative(NEXT_DIR, resolve(NEXT_DIR, file)).split(sep).join("/");
+}
+
 /** Soma os ficheiros ainda nao vistos, registando os que faltam no disco. */
 function addFiles(files, seen) {
   let total = 0;
   let counted = 0;
   for (const f of files) {
-    if (seen.has(f)) continue;
-    seen.add(f); // sem isto, um ficheiro repetido na mesma lista era contado N vezes
-    const size = gzipSize(join(NEXT_DIR, f));
-    if (size === null) missing.push(f);
+    const key = keyOf(f);
+    if (seen.has(key)) continue;
+    seen.add(key); // sem isto, um ficheiro repetido na mesma lista era contado N vezes
+    const size = gzipSize(join(NEXT_DIR, key));
+    if (size === null) missing.push(key);
     else {
       total += size;
       counted++;
@@ -160,8 +169,7 @@ for (const [route, config] of Object.entries(TARGETS)) {
     if (existsSync(dir)) {
       for (const f of readdirSync(dir)) {
         if (!f.startsWith("page-") || !f.endsWith(".js")) continue;
-        // Chave sempre com `/`, para casar com as do manifest tambem em Windows.
-        const relKey = relative(NEXT_DIR, join(dir, f)).split(sep).join("/");
+        const relKey = keyOf(join(dir, f));
         if (routeSeen.has(relKey)) continue;
         routeSeen.add(relKey);
         const size = gzipSize(join(dir, f));

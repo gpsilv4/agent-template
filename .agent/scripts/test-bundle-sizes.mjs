@@ -15,7 +15,7 @@
  * Uso:
  *   node .agent/scripts/test-bundle-sizes.mjs
  *
- * Sai != 0 se algum teste falhar. Opt-in no CI (descomentar em .github/workflows/ci.yml).
+ * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml.
  */
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, cpSync } from "fs";
@@ -66,9 +66,9 @@ function manifest(dir, obj) {
   writeFileSync(join(dir, ".next", "build-manifest.json"), JSON.stringify(obj));
 }
 
-function run(dir) {
+function run(dir, cwd) {
   try {
-    return { code: 0, out: execFileSync(process.execPath, [join(dir, CHECKER)], { cwd: dir, encoding: "utf8" }) };
+    return { code: 0, out: execFileSync(process.execPath, [join(dir, CHECKER)], { cwd: cwd ? join(dir, cwd) : dir, encoding: "utf8" }) };
   } catch (err) {
     return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -79,11 +79,26 @@ function test(name, build, expect) {
   try {
     // build() pode devolver { includes, excludes } extra — usado quando a
     // expectativa e um numero calculado a partir das fixtures.
-    const extra = build(dir) ?? {};
-    const { code, out } = run(dir);
+    // Um `throw` aqui (ex: o patch de TARGETS a nao aplicar) abortava o processo a meio
+    // e os testes seguintes nunca corriam, sem sequer linha de resumo.
+    let extra;
+    try {
+      extra = build(dir) ?? {};
+    } catch (err) {
+      failures.push({ name, problems: [`setup rebentou: ${err.message}`], out: "" });
+      console.log(`  FAIL  ${name}`);
+      console.log(`          setup rebentou: ${err.message}`);
+      return;
+    }
+    const { code, out } = run(dir, expect.cwd);
     const problems = [];
     const includes = [...(expect.includes ?? []), ...(extra.includes ?? [])];
     const excludes = [...(expect.excludes ?? []), ...(extra.excludes ?? [])];
+    for (const [route, want] of Object.entries(extra.numbers ?? {})) {
+      const m = new RegExp(`${route}\\s+([\\d.]+) kB`).exec(out);
+      if (!m) problems.push(`nao encontrei uma linha de medicao para "${route}"`);
+      else if (m[1] !== want) problems.push(`${route}: esperado ${want} kB, medido ${m[1]} kB`);
+    }
     if (code !== expect.code) problems.push(`exit esperado ${expect.code}, obtido ${code}`);
     for (const s of includes) if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
     for (const s of excludes) if (out.includes(s)) problems.push(`output NAO devia conter "${s}"`);
@@ -193,7 +208,9 @@ test("chunk partilhado por DUAS rotas conta nas duas", (dir) => {
   // reportava ~80% a menos com [OK]. As duas tem de mostrar o MESMO valor.
   const expected = ((shared + common + gzipSync(Buffer.from("a".repeat(1_000))).length) / 1024).toFixed(1);
   const expectedB = ((shared + common + gzipSync(Buffer.from("b".repeat(1_000))).length) / 1024).toFixed(1);
-  return { includes: [`RotaA${" ".repeat(18)}${expected.padStart(7)} kB`, `RotaB${" ".repeat(18)}${expectedB.padStart(7)} kB`] };
+  // Extrair o NUMERO em vez de afirmar a linha formatada: uma alteracao ao padEnd()
+  // do checker fazia este teste de CONTAGEM ficar vermelho por ALINHAMENTO.
+  return { numbers: { RotaA: expected, RotaB: expectedB } };
 }, { code: 0 });
 
 test("layout tambem listado em rootMainFiles NAO duplica a baseline", (dir) => {
@@ -201,6 +218,44 @@ test("layout tambem listado em rootMainFiles NAO duplica a baseline", (dir) => {
   chunk(dir, "static/chunks/app/page-abc.js", 1_000, "p");
   manifest(dir, { rootMainFiles: ["static/chunks/app/layout-xyz.js"], pages: {} });
   // Antes, o varrimento de layouts nao consultava o `seen`: a baseline vinha a dobrar.
+  return {
+    includes: [`Shared (framework + layout): ${(layout / 1024).toFixed(1)} kB`],
+    excludes: [`Shared (framework + layout): ${((layout * 2) / 1024).toFixed(1)} kB`],
+  };
+}, { code: 0 });
+
+// --- Ancoragem a raiz do repo ------------------------------------------------
+// O checker recebeu a mesma ancoragem que o check-doc-versions.mjs, mas sem teste:
+// era possivel troca-la por `process.cwd()` e a suite continuar 10/10 verde.
+const anchorFixture = (dir) => {
+  chunk(dir, "static/chunks/shared.js", 10_000, "s");
+  chunk(dir, "static/chunks/app/page-abc.js", 20_000, "p");
+  manifest(dir, { rootMainFiles: ["static/chunks/shared.js"], pages: {} });
+  mkdirSync(join(dir, "sub"), { recursive: true }); // subdiretorio sem .next/
+};
+
+test("ancoragem: correr de um subdiretorio continua a medir", anchorFixture, {
+  code: 0, cwd: "sub", includes: ["[OK]"], excludes: ["nao encontrado"],
+});
+
+test("ancoragem: [controlo negativo] com ROOT = cwd, TEM de falhar", (dir) => {
+  anchorFixture(dir);
+  const patched = readFileSync(join(dir, CHECKER), "utf8").replace(
+    /^const ROOT = .*$/m, "const ROOT = process.cwd();"
+  );
+  if (!patched.includes("const ROOT = process.cwd();")) {
+    throw new Error("o patch do controlo negativo nao aplicou");
+  }
+  writeFileSync(join(dir, CHECKER), patched);
+}, { code: 1, cwd: "sub", includes: ["nao encontrado"] });
+
+// --- Chaves equivalentes ------------------------------------------------------
+test("`./x.js` e `x.js` sao o mesmo ficheiro, nao dois", (dir) => {
+  const layout = chunk(dir, "static/chunks/app/layout-xyz.js", 600_000, "l");
+  chunk(dir, "static/chunks/app/page-abc.js", 1_000, "p");
+  // O manifest escreve com "./", o varrimento de diretorio sem — o `seen` comparava
+  // as strings cruas e contava a baseline a dobrar.
+  manifest(dir, { rootMainFiles: ["./static/chunks/app/layout-xyz.js"], pages: {} });
   return {
     includes: [`Shared (framework + layout): ${(layout / 1024).toFixed(1)} kB`],
     excludes: [`Shared (framework + layout): ${((layout * 2) / 1024).toFixed(1)} kB`],

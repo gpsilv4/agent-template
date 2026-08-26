@@ -16,7 +16,8 @@
  * Uso:
  *   node .agent/scripts/test-guards.mjs
  *
- * Sai != 0 se algum teste falhar. Opt-in no CI (descomentar em .github/workflows/ci.yml).
+ * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml
+ * (sem `package.json` e sem gate do `detect` — o template puro e exatamente o caso coberto).
  */
 
 import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, appendFileSync, existsSync } from "fs";
@@ -80,7 +81,13 @@ function runGuard(dir, cwd) {
  * @param mutate  (dir) => void — a quebra a aplicar; omitir para o baseline
  * @param expect  { code, includes?: string[], excludes?: string[], cwd?: string }
  */
+let skipped = 0;
 function test(name, mutate, expect) {
+  if (expect.code === 0 && !baselineClean) {
+    console.log(`  SKIP  ${name}`);
+    skipped++;
+    return;
+  }
   const dir = sandbox();
   try {
     if (mutate) mutate(dir);
@@ -110,6 +117,25 @@ const dropLinesContaining = (dir, p, needle) =>
   writeF(dir, p, readF(dir, p).split("\n").filter((l) => !l.includes(needle)).join("\n"));
 
 console.log("\n=== Testes dos Doc Guards ===\n");
+
+// A sandbox e uma COPIA do repo real, logo os testes que esperam `code: 0` assumem que o
+// repo esta limpo. Num projeto derivado com drift de docs, isso produzia uma dezena de
+// falhas vermelhas com nomes que nada tinham a ver com a causa (`G5: lts/* e aceito`, ...).
+// Estes testes verificam o GUARD, nao o estado do repo: se o baseline ja avisa, sao SKIP.
+let baselineClean = true;
+{
+  const dir = sandbox();
+  try {
+    baselineClean = runGuard(dir).code === 0;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  if (!baselineClean) {
+    console.log("  NOTA  o repo ja tem avisos de doc guards — os testes que exigem exit 0");
+    console.log("        ficam SKIP (verificam o guard, nao o estado do repo).");
+    console.log("        Corre `node .agent/scripts/check-doc-versions.mjs` para os ver.\n");
+  }
+}
 
 // --- Baseline -----------------------------------------------------------------
 test("baseline: repo intacto passa", null, {
@@ -327,11 +353,13 @@ test("G10: wrapper vazio avisa", (dir) => {
 }, { code: 1, includes: [".gemini/commands/debug.toml nao aponta"] });
 
 // --- Guard 11: sanidade do settings.json -------------------------------------
-test("G11: deny de .env removido avisa", (dir) => {
+test("G11: deny de .env retirado por completo avisa", (dir) => {
   const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
-  cfg.permissions.deny = cfg.permissions.deny.filter((r) => r !== "Read(./.env)");
+  // Retirar TODAS as regras que cobrem .env — retirar so uma das quatro deixaria as
+  // outras a cobrir o caminho, e o guard verifica cobertura, nao literais.
+  cfg.permissions.deny = cfg.permissions.deny.filter((r) => !r.includes(".env"));
   writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
-}, { code: 1, includes: ["falta `Read(./.env)` no deny"] });
+}, { code: 1, includes: ["nenhuma regra `deny` cobre a leitura de"] });
 
 test("G11: wildcard sem delimitador no allow avisa", (dir) => {
   const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
@@ -353,9 +381,104 @@ test("G11: settings.json ausente da SKIP visivel", (dir) => {
   rmSync(file(dir, ".claude/settings.json"));
 }, { code: 0, includes: ["SKIP  Guard 11"] });
 
+// --- Guard 11: formas de bypass que uma versao anterior aprovava ---------------
+// Estas existem porque a primeira versao do Guard 11 so olhava para o `*` precedido de
+// caractere de palavra. `Bash(*)`, `Bash` sem parenteses e `Bash(sh:*)` passavam todos.
+const patchSettings = (dir, fn) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  fn(cfg);
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+};
+
+test("G11: `Bash(*)` e apanhado", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(*)"));
+}, { code: 1, includes: ["Bash(*)", "wildcard sem delimitador"] });
+
+test("G11: `Bash` sem parenteses (concessao maxima) e apanhado", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash"));
+}, { code: 1, includes: ["concede a ferramenta INTEIRA"] });
+
+test("G11: `Bash(sh:*)` respeita a forma `:*` mas e execucao arbitraria", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(sh:*)"));
+}, { code: 1, includes: ["interpretador/comando perigoso"] });
+
+test("G11: `Bash(node:*)` idem", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(node:*)"));
+}, { code: 1, includes: ["interpretador/comando perigoso"] });
+
+test("G11: `Read(./**)` abrange o repo inteiro", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Read(./**)"));
+}, { code: 1, includes: ["abrange o repo inteiro"] });
+
+test("G11: `defaultMode: bypassPermissions` desliga tudo", (dir) => {
+  patchSettings(dir, (c) => (c.permissions.defaultMode = "bypassPermissions"));
+}, { code: 1, includes: ["desliga a fronteira de permissoes"] });
+
+test("G11: `allow` que nao e array nao rebenta", (dir) => {
+  patchSettings(dir, (c) => (c.permissions.allow = {}));
+}, { code: 1, includes: ["devia ser um array"], excludes: ["is not iterable"] });
+
+test("G11: deny mais ESTRITO nao e falso positivo", (dir) => {
+  patchSettings(dir, (c) => (c.permissions.deny = ["Read(./.env*)", "Read(./**/.env*)"]));
+}, { code: 0, excludes: ["nenhuma regra `deny` cobre"] });
+
+// --- Ficheiros em branco: "existe mas vazio" != "ausente" ---------------------
+test("blank: AGENTS.md vazio nao passa a verde", (dir) => {
+  writeF(dir, "AGENTS.md", "");
+}, { code: 1, includes: ["AGENTS.md existe mas esta VAZIO"], excludes: ["Todos os guards de documentacao passaram"] });
+
+test("blank: agent-guide.md vazio nao passa a verde", (dir) => {
+  writeF(dir, "src/docs/agent-guide.md", "");
+}, { code: 1, includes: ["agent-guide.md existe mas esta VAZIO"] });
+
+test("blank: rule obrigatoria a 0 bytes nao recebe OK", (dir) => {
+  writeF(dir, ".agent/rules/core-rules.md", "");
+}, { code: 1, includes: ["core-rules.md = 0 bytes mas esta VAZIO"] });
+
+test("blank: CLAUDE.md so com espacos e tratado como vazio", (dir) => {
+  writeF(dir, "CLAUDE.md", "   \n\t\n  ");
+}, { code: 1, includes: ["CLAUDE.md existe mas esta VAZIO"], excludes: ["nao listado na tabela"] });
+
+test("blank: a mensagem de SKIP nao mente sobre a causa", (dir) => {
+  writeF(dir, "CLAUDE.md", "");
+}, { code: 1, includes: ["CLAUDE.md esta vazio"], excludes: ["Guard 8 (@imports) — sem CLAUDE.md"] });
+
+// --- Guard 3: precedencia SemVer ---------------------------------------------
+const withPkg = (dir, version, changelog) => {
+  writeF(dir, "package.json", JSON.stringify({ name: "x", version }));
+  writeF(dir, "src/docs/CHANGELOG.md", changelog);
+};
+
+test("G3: `version` vazia nao desliga o guard em silencio", (dir) => {
+  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "" }));
+}, { code: 1, includes: ['sem campo "version" utilizavel'] });
+
+test("G3: beta.10 > beta.9 (numerico, nao string)", (dir) => {
+  withPkg(dir, "1.2.3-beta.10", "# CL\n\n## [v1.2.3-beta.10] - Nova\n\n## [v1.2.3-beta.9] - Velha\n");
+}, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+test("G3: build metadata nao conta para precedencia", (dir) => {
+  withPkg(dir, "1.2.3", "# CL\n\n## [v1.2.3+build.5] - Atual\n\n## [v1.2.2] - Velha\n");
+}, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+test("G3: pre-release com hifen no identificador nao empata", (dir) => {
+  withPkg(dir, "1.2.3-beta-9", "# CL\n\n## [v1.2.3-beta-9] - Nova\n\n## [v1.2.3-beta-2] - Velha\n");
+}, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+test("G3: ordem ERRADA em pre-releases numericos e apanhada", (dir) => {
+  withPkg(dir, "1.2.3-rc.10", "# CL\n\n## [v1.2.3-rc.2] - Topo errado\n\n## [v1.2.3-rc.10] - Maior\n");
+}, { code: 1, includes: ["ordenar por versao decrescente"] });
+
+// --- Guard 8: a contagem tem de excluir os que nao resolvem ------------------
+test("G8: conta so os imports que RESOLVEM", null, {
+  code: 0,
+  includes: ["9 de 11 @imports"],
+  excludes: ["  OK    11 @imports"],
+});
+
 // --- Resumo ------------------------------------------------------------------
 console.log("");
-console.log(`  ${passed} passaram, ${failures.length} falharam.`);
+console.log(`  ${passed} passaram, ${failures.length} falharam${skipped ? `, ${skipped} saltados (baseline com avisos)` : ""}.`);
 if (failures.length) {
   console.log("\n--- Detalhe das falhas ---");
   for (const f of failures) {

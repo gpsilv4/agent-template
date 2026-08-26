@@ -71,7 +71,7 @@ As regras sao diretivas que o Agente consulta antes de cada acao.
 - **[anti-patterns.md]**: Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente).
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
-- **sync-docs.md**: Checklist de sincronizacao de docs (23 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
+- **sync-docs.md**: Checklist de sincronizacao de docs (24 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
 
 ---
 

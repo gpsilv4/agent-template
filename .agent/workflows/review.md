@@ -87,7 +87,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 10. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (24 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
 - [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`): `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` — sem eles, um guard partido parece um guard a passar
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 

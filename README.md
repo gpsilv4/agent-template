@@ -203,8 +203,8 @@ git commit -m "chore: bootstrap agent config"
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms (opt-in, uncomment in ci.yml) |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs (opt-in, uncomment in ci.yml) |
-| Guard Tests | `node .agent/scripts/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (opt-in, uncomment in ci.yml) |
-| Bundle Tests | `node .agent/scripts/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (opt-in, uncomment in ci.yml) |
+| Guard Tests | `node .agent/scripts/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
+| Bundle Tests | `node .agent/scripts/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
 

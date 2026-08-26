@@ -58,17 +58,24 @@ function read(path) {
   }
 }
 
-/** Ficheiro presente mas sem conteudo util. Um entry point truncado a 0 bytes fazia os
- *  guards que testam truthiness saltarem com a mensagem FALSA "sem CLAUDE.md". */
-function isBlank(content) {
-  return content !== null && content.trim() === "";
-}
-const blankFiles = [];
+/** Le um ficheiro que TEM de ter conteudo. Vazio, so espacos ou so BOM avisa na hora e
+ *  devolve `null`, para que os guards a jusante o tratem como ausente em vez de correrem
+ *  sobre uma string vazia. Uma versao anterior acumulava os avisos e fazia flush num ponto
+ *  fixo, pelo que qualquer chamada abaixo desse ponto ficava silenciosa; e `"   "` era
+ *  truthy, activando guards que depois cuspiam avisos espurios. */
+const blankPaths = new Set();
 function readMeaningful(path) {
   const c = read(path);
-  if (isBlank(c)) blankFiles.push(path);
+  if (c === null) return null;
+  if (c.replace(/^\uFEFF/, "").trim() === "") {
+    warn(`${path} existe mas esta VAZIO — os guards que dependem dele nao tem o que verificar`);
+    blankPaths.add(path);
+    return null;
+  }
   return c;
 }
+/** Mensagem honesta para um SKIP: distingue "nao existe" de "existe mas esta vazio". */
+const why = (path) => (blankPaths.has(path) ? `${path} esta vazio` : `sem ${path}`);
 
 let hasWarnings = false;
 let guardsRun = 0;
@@ -99,6 +106,10 @@ function checkRuleBytes(file) {
   const content = read(file);
   if (content === null) return null;
   const bytes = Buffer.byteLength(content, "utf8");
+  if (content.trim() === "") {
+    warn(`${file} = ${bytes} bytes mas esta VAZIO — e uma rule importada em CLAUDE.md/GEMINI.md`);
+    return bytes;
+  }
   if (bytes > RULES_MAX_BYTES) {
     warn(`${file} = ${bytes} bytes > ${RULES_MAX_BYTES} — condensar; mover detalhe para src/docs/ ou ficheiro nao-carregado`);
   } else if (bytes > RULES_WARN_BYTES) {
@@ -127,7 +138,6 @@ for (const f of BOOTSTRAP_RULES) {
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.
 const claude = readMeaningful("CLAUDE.md");
 const gemini = readMeaningful("GEMINI.md");
-for (const f of blankFiles) warn(`${f} existe mas esta VAZIO — os guards que dependem dele nao tem o que verificar`);
 if (claude !== null && gemini !== null) {
   // Normaliza a sintaxe de import (@[x] -> @x) e colapsa espacamento/padding
   // (as celulas @[...] sao mais largas, logo o alinhamento das tabelas difere de forma cosmetica).
@@ -193,26 +203,46 @@ if (pkgRaw === null) {
     } else {
       // Nao assumir que o topo e a versao mais alta: comparar contra o maximo e
       // avisar se a ordenacao estiver invertida (um CHANGELOG ascendente dava falso positivo).
-      // SemVer: comparar core numerico e, em empate, tratar pre-release como MENOR que
-      // a release (1.2.3-beta.1 < 1.2.3). Sem isto os dois empatavam e o `sort` estavel
-      // fazia o "maior" cair no ultimo, produzindo um falso positivo de ordenacao.
+      // Precedencia SemVer (spec §11). Uma versao anterior desta funcao usava
+      // `split(/[-+]/, 2)` e comparacao de strings, o que dava tres bugs de uma vez:
+      // `beta.10 < beta.9` (string), `1.2.3+build < 1.2.3` (build tratado como
+      // pre-release) e `beta-9 == beta-2` (o split truncava o resto). Isso fazia o guard
+      // BLOQUEAR um CHANGELOG correctamente ordenado.
+      const parseV = (v) => {
+        const m = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(v);
+        if (!m) return null;
+        return { core: [+m[1], +m[2], +m[3]], pre: m[4] ? m[4].split(".") : [] };
+      };
       const cmp = (a, b) => {
-        const [ca, pra = ""] = a.split(/[-+]/, 2);
-        const [cb, prb = ""] = b.split(/[-+]/, 2);
-        const na = ca.split(".").map(Number);
-        const nb = cb.split(".").map(Number);
-        for (let i = 0; i < 3; i++) if ((na[i] || 0) !== (nb[i] || 0)) return (na[i] || 0) - (nb[i] || 0);
-        if (pra === prb) return 0;
-        if (pra === "") return 1;   // release > pre-release
-        if (prb === "") return -1;
-        return pra < prb ? -1 : 1;
+        const pa = parseV(a);
+        const pb = parseV(b);
+        if (!pa || !pb) return a < b ? -1 : a > b ? 1 : 0;
+        for (let i = 0; i < 3; i++) if (pa.core[i] !== pb.core[i]) return pa.core[i] - pb.core[i];
+        // Build metadata ja foi descartado: nao conta para precedencia (spec §10).
+        if (pa.pre.length === 0 && pb.pre.length === 0) return 0;
+        if (pa.pre.length === 0) return 1;  // release > pre-release
+        if (pb.pre.length === 0) return -1;
+        for (let i = 0; i < Math.max(pa.pre.length, pb.pre.length); i++) {
+          const x = pa.pre[i];
+          const y = pb.pre[i];
+          if (x === undefined) return -1;   // menos identificadores = menor
+          if (y === undefined) return 1;
+          const nx = /^\d+$/.test(x);
+          const ny = /^\d+$/.test(y);
+          if (nx && ny) { if (+x !== +y) return +x - +y; continue; }
+          if (nx !== ny) return nx ? -1 : 1; // numerico < alfanumerico
+          if (x !== y) return x < y ? -1 : 1;
+        }
+        return 0;
       };
       const max = [...found].sort(cmp).at(-1);
       if (found[0] !== max) {
         warn(`${CHANGELOG_PATH}: a entrada no topo e v${found[0]} mas a maior e v${max} — ordenar por versao decrescente`);
       }
+      // Comparar por precedencia, nao por string: `1.2.3` e `1.2.3+build.5` sao a mesma
+      // versao (spec §10), e a igualdade de string reportava-as como divergentes.
       const clean = pkgVersion.replace(/^v/, "");
-      if (clean === max) ok(`CHANGELOG (v${max}) === package.json`);
+      if (cmp(clean, max) === 0) ok(`CHANGELOG (v${max}) === package.json`);
       else warn(`package.json (${pkgVersion}) != maior versao do CHANGELOG (v${max}) — atualizar o CHANGELOG antes do commit`);
     }
   }
@@ -319,7 +349,7 @@ if (workflows && claude) {
   if (missing === 0) ok(`workflows listados nas tabelas de entrada (${workflows.length})`);
   guardsRun++;
 } else {
-  skip("Guard 7 (workflows nas tabelas) — falta .agent/workflows/ ou CLAUDE.md");
+  skip(`Guard 7 (workflows nas tabelas) — falta .agent/workflows/ ou ${why("CLAUDE.md")}`);
 }
 
 // --- Guard 8: os `@imports` de CLAUDE.md resolvem ---
@@ -352,14 +382,14 @@ if (claude) {
   }
   guardsRun++;
 } else {
-  skip("Guard 8 (@imports) — sem CLAUDE.md");
+  skip(`Guard 8 (@imports) — ${why("CLAUDE.md")}`);
 }
 
 // --- Guard 9: workflows listados em AGENTS.md e agent-guide.md ---
 // O Guard 7 cobre so o par CLAUDE/GEMINI. Estes dois ficheiros duplicam a mesma lista
 // e nao tinham rede nenhuma. Os nomes sao delimitados por backticks nos dois formatos,
 // o que da a fronteira exata (`review` nao casa com `design-review`).
-const agentsMd = read("AGENTS.md");
+const agentsMd = readMeaningful("AGENTS.md");
 if (workflows && agentsMd) {
   let missing = 0;
   for (const w of workflows) {
@@ -371,10 +401,10 @@ if (workflows && agentsMd) {
   if (missing === 0) ok(`workflows listados em AGENTS.md (${workflows.length})`);
   guardsRun++;
 } else {
-  skip("Guard 9a (AGENTS.md) — ficheiro ausente");
+  skip(`Guard 9a — ${why("AGENTS.md")}`);
 }
 
-const agentGuide = read("src/docs/agent-guide.md");
+const agentGuide = readMeaningful("src/docs/agent-guide.md");
 if (workflows && agentGuide) {
   let missing = 0;
   for (const w of workflows) {
@@ -386,7 +416,7 @@ if (workflows && agentGuide) {
   if (missing === 0) ok(`workflows listados em agent-guide.md (${workflows.length})`);
   guardsRun++;
 } else {
-  skip("Guard 9b (agent-guide.md) — ficheiro ausente");
+  skip(`Guard 9b — ${why("src/docs/agent-guide.md")}`);
 }
 
 // --- Guard 10: cada wrapper aponta para o SEU workflow ---
@@ -428,31 +458,85 @@ if (settingsRaw === null) {
   }
   if (settings) {
     const perms = settings.permissions ?? {};
-    const deny = perms.deny ?? [];
-    const allow = perms.allow ?? [];
+    const asList = (v, name) => {
+      if (v === undefined) return [];
+      if (Array.isArray(v)) return v;
+      warn(`${SETTINGS_PATH}: \`permissions.${name}\` devia ser um array`);
+      return [];
+    };
+    const deny = asList(perms.deny, "deny");
+    const allow = asList(perms.allow, "allow");
     let issues = 0;
+    const flag = (msg) => {
+      warn(`${SETTINGS_PATH}: ${msg}`);
+      issues++;
+    };
 
-    for (const required of ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"]) {
-      if (!deny.includes(required)) {
-        warn(`${SETTINGS_PATH}: falta \`${required}\` no deny — leitura de secrets fica aberta`);
-        issues++;
-      }
+    // Cobertura do deny de secrets: verificar que ALGUM padrao cobre cada caminho tipico,
+    // em vez de exigir os 4 literais. Um projeto com `Read(./**/.env*)` (superset estrito)
+    // era reportado como tendo o deny em falta.
+    const denyCovers = (target) =>
+      deny.some((rule) => {
+        const m = /^Read\((.*)\)$/.exec(rule);
+        if (!m) return false;
+        // Traducao glob->regex numa passagem unica. Fazer os `replace` em cadeia era
+        // um bug: o `.*` inserido pelo passo do `**` continha um `*` que o passo
+        // seguinte voltava a reescrever, produzindo `(?:.[^/]*/)?` — que nao casa com
+        // caminhos aninhados, e o guard reportava um deny correcto como estando em falta.
+        const glob = m[1].replace(/^\.\//, "");
+        let rxSrc = "";
+        for (let i = 0; i < glob.length; i++) {
+          if (glob[i] === "*" && glob[i + 1] === "*") {
+            if (glob[i + 2] === "/") { rxSrc += "(?:[^/]+/)*"; i += 2; }
+            else { rxSrc += ".*"; i += 1; }
+          } else if (glob[i] === "*") {
+            rxSrc += "[^/]*";
+          } else {
+            rxSrc += glob[i].replace(/[.+^${}()|[\]\\?]/, "\\$&");
+          }
+        }
+        const rx = new RegExp(`^${rxSrc}$`);
+        return rx.test(target);
+      });
+    for (const target of [".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local"]) {
+      if (!denyCovers(target)) flag(`nenhuma regra \`deny\` cobre a leitura de \`${target}\``);
     }
-    // Num `allow` de Bash, o UNICO `*` aceitavel e o sufixo exato `:*` (a convencao de
-    // "subcomandos de"). Qualquer outro `*` alarga o comando de forma dificil de prever:
-    // `Bash(npm run lint*)` cobre `npm run lint-and-deploy`, `Bash(node x/*)` cobre qualquer
-    // ficheiro nesse caminho, e `Bash(*)` ou `Bash(rm -rf *)` abrem tudo. Uma versao anterior
-    // desta regra exigia um caractere de palavra antes do `*` e por isso dava OK a `Bash(*)`
-    // e a `Bash(rm -rf *)` — o guard falhava exatamente no caso mais perigoso.
+
+    // Um `allow` demasiado largo anula o deny ao lado. Casos que ja foram reais aqui:
+    // `Bash(npm run lint*)` cobria `npm run lint-and-deploy`; `Bash(node .agent/scripts/*)`
+    // cobria qualquer ficheiro nesse caminho; `Bash(*)` e `Bash(rm -rf *)` abriam tudo; e
+    // `Bash` sem parenteses e a concessao maxima possivel.
+    const INTERPRETERS = /^(sh|bash|zsh|fish|node|deno|bun|python3?|ruby|perl|eval|exec|env|xargs|sudo|doas|rm|chmod|chown|curl|wget|nc|ssh)\b/;
     for (const rule of allow) {
-      const m = /^Bash\((.*)\)$/.exec(rule);
-      const body = m?.[1] ?? "";
-      if (m && body.includes("*") && !/^[^*]+:\*$/.test(body)) {
-        warn(`${SETTINGS_PATH}: \`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
-        issues++;
+      if (/^(Bash|Read|Edit|Write|WebFetch|Task)$/.test(rule)) {
+        flag(`\`${rule}\` sem \`(...)\` concede a ferramenta INTEIRA — enumerar os comandos/caminhos exatos`);
+        continue;
+      }
+      const bash = /^Bash\((.*)\)$/.exec(rule);
+      if (bash) {
+        const body = bash[1];
+        if (body.includes("*") && !/^[^*]+:\*$/.test(body)) {
+          flag(`\`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
+        } else if (/^(.+):\*$/.test(body) && INTERPRETERS.test(body)) {
+          // `Bash(sh:*)` / `Bash(node:*)` / `Bash(rm:*)` respeitam a forma `:*` mas
+          // pre-aprovam execucao arbitraria — a forma correcta nao torna o comando seguro.
+          flag(`\`${rule}\` usa \`:*\` sobre um interpretador/comando perigoso — equivale a execucao arbitraria`);
+        }
+        continue;
+      }
+      const fileTool = /^(Read|Edit|Write)\((.*)\)$/.exec(rule);
+      if (fileTool && /^\.?\/?\*\*\/?\*?$/.test(fileTool[2])) {
+        flag(`\`${rule}\` abrange o repo inteiro — restringir a um subcaminho`);
       }
     }
-    if (issues === 0) ok(`${SETTINGS_PATH} (deny de secrets presente, allow sem wildcards abertos)`);
+
+    // `bypassPermissions` anula tudo o que esta acima.
+    const mode = perms.defaultMode;
+    if (mode && !["default", "acceptEdits", "plan"].includes(mode)) {
+      flag(`\`defaultMode: "${mode}"\` desliga a fronteira de permissoes deste ficheiro`);
+    }
+
+    if (issues === 0) ok(`${SETTINGS_PATH} (deny de secrets cobre .env*, allow sem concessoes largas)`);
   }
   guardsRun++;
 }

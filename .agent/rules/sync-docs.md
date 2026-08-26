@@ -25,21 +25,21 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
    - [ ] Items fechados movidos para `backlog-archive.md`; ordem das seccoes respeitada (🎯 -> 📚)?
 8. [ ] `.agent/context/decisions.md` — novas decisoes registadas (arquivar as antigas se > ~150 linhas, ver Regra de Arquivamento)
 9. [ ] `.agent/context/walkthrough.md` — se houve feature/fix user-facing (arquivar se > ~200 linhas)
-9b. [ ] `.agent/context/audit-history.md` — se correste `/audit`: baseline datada acrescentada? (acumulado, **nao** importado)
-10. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
-11. [ ] `.agent/workflows/` — workflows refletem processos atuais
-12. [ ] `.agent/scripts/` — scripts e targets atualizados
-13. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
-14. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
-15. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
-16. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
-17. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
-18. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
-19. [ ] `.github/dependabot.yml` — schedule e labels corretos
-20. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
-21. [ ] `SECURITY.md` — politica de disclosure atualizada
-22. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
-23. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+10. [ ] `.agent/context/audit-history.md` — se correste `/audit`: baseline datada acrescentada? (acumulado, **nao** importado)
+11. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
+12. [ ] `.agent/workflows/` — workflows refletem processos atuais
+13. [ ] `.agent/scripts/` — scripts e targets atualizados
+14. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
+15. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
+16. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
+17. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
+18. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
+19. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
+20. [ ] `.github/dependabot.yml` — schedule e labels corretos
+21. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
+22. [ ] `SECURITY.md` — politica de disclosure atualizada
+23. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
+24. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
 
@@ -52,7 +52,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 | **Rule sempre-carregada** (`.agent/rules/X.md`) | `@import` em `CLAUDE.md` + `GEMINI.md`; **`AGENTS.md`** (enumera as rules pelo nome); array `REQUIRED_RULES` em `check-doc-versions.mjs` (orcamento de bytes); `agent-guide.md`; `README.md` |
 | **Rule NAO carregada** (checklist/guia) | referencia on-demand nos workflows que a usam; `README.md`/`agent-guide.md` — **sem** `@import` |
 | **Script** (`.agent/scripts/X.mjs`) | passo opt-in em `.github/workflows/ci.yml`; `core-rules.md` (seccao scripts); `README.md` (arvore + tabela); **e os sitios que o INVOCAM**: `review.md`, `deploy.md`, `.github/pull_request_template.md`, `BOOTSTRAP.md` §2.4 — sem isto o guard fica documentado em todo o lado e corrido por nada. Se e um guard, criar tambem o `test-X.mjs` com os controlos negativos |
-| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist de 1-23 acima**; classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
+| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist de 1-24 acima**; classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
 
 > Regra de paridade: qualquer edicao a `CLAUDE.md` tem espelho em `GEMINI.md` (so difere `@[...]`) — validado por `check-doc-versions.mjs`.
 
