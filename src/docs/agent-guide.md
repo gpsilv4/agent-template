@@ -127,17 +127,16 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 4. commit + git push -> Preview URL automaticamente
 5. /e2e-tests -> correr testes E2E contra a Preview URL
 6. /security-tests -> correr testes de seguranca
-7. /deploy    -> checklist completo antes de mergear para main
-8. merge main -> deploy producao automatico
-9. verificacao manual em prod
 ```
+
+> O ticket **acaba no `/review`**. O `/deploy` e sprint-level — ver abaixo.
+> (`process-rules.md`: *"tickets individuais fazem commit no branch mas nao deploy"*.)
 
 ### Bug / Hotfix
 
 ```
 1. /debug     -> isolar e corrigir o bug
 2. /review    -> antes de commit
-3. /deploy    -> antes de mergear para main
 ```
 
 ### Refactoring
@@ -145,7 +144,16 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 ```
 1. /refactor  -> workflow de refactoring seguro (baseline -> extracao -> verificacao)
 2. /review    -> antes de commit
-3. /deploy    -> antes de mergear para main
+```
+
+### Sprint completo (o unico fluxo com `/deploy`)
+
+```
+1. (todos os tickets do sprint feitos, cada um ate ao /review)
+2. relatorio de fecho de sprint (6 pontos — ver process-rules.md)
+3. /deploy    -> checklist completo + gate de CI antes de mergear
+4. merge para main -> deploy de producao
+5. verificacao manual em prod + tag da versao
 ```
 
 ### Onboarding (novo developer)

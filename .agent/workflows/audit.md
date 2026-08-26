@@ -7,7 +7,7 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
 
 ## 1. Ambito & Guards
 
-- **Ambito**: perguntar ao utilizador — auditoria **completa** (todo o repo) ou **scoped** (so o que mudou desde a ultima tag/release: `git diff <ultima-tag>`). Scoped e mais barato para milestones frequentes.
+- **Ambito**: perguntar ao utilizador — auditoria **completa** (todo o repo) ou **scoped** (so o que mudou desde a ultima tag/release: `git diff <ultima-tag>..HEAD --stat` + `git log <ultima-tag>..HEAD` — o `git diff <tag>` sozinho compara com a working tree e ignora untracked). Scoped e mais barato para milestones frequentes.
 - Correr os **guards deterministicos** primeiro e incluir o resultado:
   - `node .agent/scripts/check-doc-versions.mjs`
   - `node .agent/scripts/check-backlog.mjs`
@@ -15,10 +15,17 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
 
 ## 2. Lentes (uma por especialista)
 
-No **Claude Code**: fan-out de subagentes, um por lente (reutilizar o subagente `code-reviewer` para as lentes de codigo). Noutros agentes: sequencial.
+No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequencial.
+
+> **Que lentes vao para o subagente.** O `code-reviewer` **le codigo** — serve as lentes 1, 3,
+> 8 e a parte de leitura da 4. As lentes que exigem **correr** coisas (2: `npm run build`/estado
+> do CI; 5: bundle checker; gitleaks na 4) ficam no agente principal, que ja as corre no passo 1.
+> Pedir a um subagente uma lente que ele nao consegue executar produz "nao verificado" silencioso
+> ou alucinacao. Confirmar tambem que ferramentas o subagente tem **de facto** — o campo `tools:`
+> do frontmatter nao entrega necessariamente o que declara (ver `.claude/agents/code-reviewer.md`).
 
 1. **Organizacao & Conformidade com as Regras** — estrutura correta? Cumpre as suas proprias regras (`.agent/rules/`: ficheiros > 500 linhas, `any` proibido, data-fetching, tokens de design)? CLAUDE == GEMINI, wrappers <-> workflows.
-2. **Build & CI/CD** — `npm run build` passa? CI verde no branch? `.nvmrc` == node-version do `ci.yml`? Guards locais espelham o pipeline? Tags/releases em dia?
+2. **Build & CI/CD** — `npm run build` passa? CI verde no branch (`gh pr checks`, nao a olho)? `.nvmrc` presente e o CI a le-lo via `node-version-file` em **todos** os jobs (nao versao hardcoded)? Guards locais espelham o pipeline? Tags/releases em dia?
 3. **Arquitetura & Qualidade de Codigo** — complexidade, ficheiros grandes, dead code, duplicacao (DRY), anti-padroes (`anti-patterns.md`), acoplamento/fronteiras. **Dados/BD**: schema, migracoes, indices, integridade. **Resiliencia**: error boundaries, tratamento de erros, logging/observabilidade (como a app falha).
 4. **Seguranca** (exploitabilidade) — secrets versionados (gitleaks, se disponivel: `gitleaks detect`), authz/authn, validacao de input, headers, superficie de API. Cobre as categorias de `/security-tests`.
 5. **Performance** — bundle vs targets (`check-bundle-sizes.mjs`), waterfalls, N+1, imports pesados nao-lazy, Core Web Vitals*.
@@ -49,7 +56,9 @@ No **Claude Code**: fan-out de subagentes, um por lente (reutilizar o subagente 
 3. **Delta** vs auditoria anterior, se existir (novos / resolvidos por severidade)
 4. **Proposta de backlog** — cada achado por resolver vira item candidato (ID, seccao, esforco); aguardar aprovacao antes de adicionar
 5. **Anti-padroes** — achados recorrentes -> propor entrada em `anti-patterns.md`
-6. **Guardar o relatorio datado** (resumo por lente + severidades) — por defeito, para servir de **baseline** ao delta da proxima auditoria (ex: em `.agent/context/session.md` ou nota dedicada). Sem isto, o passo 3 nunca tem com que comparar.
+6. **Guardar o relatorio datado** (resumo por lente + severidades) — por defeito, para servir de **baseline** ao delta da proxima auditoria em **`.agent/context/audit-history.md`** — ficheiro **acumulado e NAO importado**, criado a
+   primeira vez que correres o `/audit`. **Nao usar o `session.md`**: ele declara-se substituido
+   a cada sessao, logo a baseline desaparecia e o passo 3 nunca teria com que comparar.
 
 ## Sessao (Handoff)
 

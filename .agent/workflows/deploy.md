@@ -28,11 +28,15 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 2. CI Pipeline Status
 
-- Confirmar que o branch tem **todos os CI checks em verde** no GitHub (TypeScript, lint, build, unit tests)
+- Confirmar que o branch tem **todos os CI checks em verde** — com um comando, nao a olho:
+  ```bash
+  gh pr checks --watch    # sai != 0 se algum falhar, 8 se ainda pendente
+  ```
+  Um agente em terminal nao consegue "ver no GitHub"; sem este comando o gate e so prosa.
 - Se algum check falhou, corrigir antes de continuar o deploy
 - **Security Audit**: por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
 - Se E2E tests estao configurados no CI, devem estar verdes tambem
-- Ver status em: GitHub > repo > branch > checks
+- Para inspecao humana: GitHub > repo > branch > checks
 
 ## 3. Verificacoes de Build (Local)
 
@@ -109,6 +113,9 @@ Verificacao manual apenas (ver seccao 8).
 - Antes de commitar, o Agente **tem** de perguntar: _"Estou pronto para fazer o commit/push, posso avancar?"_
 
 ```bash
+# 0. GATE: nao mergear sem os checks verdes (falha != 0 e aborta a cadeia)
+gh pr checks --watch
+
 # 1. Abrir/mergear o Pull Request da feature branch para main (nunca merge direto)
 #    Usar o template do repo — NAO `--fill`, que preenche o corpo a partir dos
 #    commits e ignora o pull_request_template.md (checklist obrigatoria).

@@ -8,8 +8,11 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 - `npx tsc --noEmit` — 0 erros
 - `npm run lint` — passa
-- CI pipeline (`.github/workflows/ci.yml`) deve estar verde no branch
+- CI pipeline verde no branch — **verificar com um comando, nao a olho**:
+  `gh pr checks --watch` (sai `!= 0` se falhar, `8` se ainda pendente)
 - Se CI falhou, corrigir antes de pedir review/merge
+- **Security Audit**: corre com `continue-on-error` por defeito, logo fica **sempre verde**.
+  Abrir o log e ler o relatorio — verde nao significa limpo
 - Mensagens de commit seguem Conventional Commits (`feat:`, `fix:`, `docs:`, etc.) — ver `CONTRIBUTING.md`
 
 ## 2. CHANGELOG
@@ -51,6 +54,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] One-time form init usa guard `initialized` para evitar resets por revalidation
 - [ ] `useMemo` para dados computados antes de passar a sub-components
 - [ ] Sem `// eslint-disable` sem comentario justificativo
+- [ ] **Duplicacao nova**: extraida, ou justificada por escrito? (`core-rules.md`, Rule of three — a partir da 2a repeticao, extrair; logica de negocio nunca se duplica)
 
 ## 7. Seguranca
 
@@ -59,12 +63,25 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] Chaves secretas nunca expostas no frontend
 - [ ] **ZERO dados sensiveis em ficheiros commitados**
 
-## 8. Testes
+## 8. Anti-Padroes
+
+> `anti-patterns.md` define, para cada entrada, um **`grep` de detecao "para o /review"**.
+> Este e o passo que os corre — sem ele, esse campo nao tem consumidor.
+
+- [ ] Correr os `grep` de detecao de **cada entrada** de `.agent/rules/anti-patterns.md` sobre o diff
+- [ ] Algum achado -> corrigir, ou justificar por escrito porque nao se aplica
+- [ ] O trabalho revelou um padrao evitavel novo? -> propor entrada nova em `anti-patterns.md`
+
+## 9. Testes
 
 - [ ] Testes unitarios passam: `npm run test:unit`
 - [ ] Testes E2E funcionais passam: `npm run test`
 - [ ] Testes de seguranca passam: `npm run test:security`
 - [ ] Auditoria de dependencias: `npm run test:audit`
+- [ ] **Nunca filtrar o sumario de uma corrida** (`| tail`, `| grep`): esconde o `1 failed` no meio dos `125 passed`
+- [ ] **Restruturas de UI**: os `data-testid` afetados foram corrigidos **no mesmo PR**? (`process-rules.md`)
+- [ ] **Triagem proativa** (`process-rules.md`): cada item tocado justifica teste novo? **unit** (funcao pura/regra de negocio), **E2E** (fluxo de utilizador), **security** (rota/input/header novo). Propor ao utilizador — nao esperar que peca
+- [ ] Cada teste **novo** nasce com o seu **controlo negativo**: quebrar de proposito o codigo que ele cobre e confirmar que fica vermelho **na assercao certa**. Um teste que passa com o defeito no ecra nao afirma nada
 
 ## 9. Sincronizacao de Conhecimento (Docs Sync)
 

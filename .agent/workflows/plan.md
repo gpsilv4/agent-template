@@ -67,7 +67,10 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
 ## 7. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **src/docs/CHANGELOG.md** atualizado com o plano?
+- [ ] **src/docs/CHANGELOG.md**: *prever* a entrada a escrever no commit — **nao escrever agora**.
+      O CHANGELOG regista alteracoes feitas, e o Guard 3 compara o seu topo com o `package.json`:
+      escrever `## [v0.2.0]` durante o `/plan`, com o `package.json` ainda em `0.1.0`, faz o guard
+      falhar e trava o `/review` e o `/deploy`. A escrita pertence ao `/review`.
 - [ ] **Regras do Agente** (`.agent/rules/`) atualizadas se houver novos padroes?
 - [ ] **Workflows do Agente** (`.agent/workflows/`) atualizados se o processo mudar?
 - [ ] **Scripts de Automacao** (`.agent/scripts/`) atualizados se targets mudaram?

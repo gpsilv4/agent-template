@@ -442,7 +442,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `LICENSE` tem copyright holder correto?
 - [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs` e `node .agent/scripts/check-backlog.mjs` (ambos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 
-> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`). Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 
