@@ -32,13 +32,17 @@ const GUARD = ".agent/scripts/check-doc-versions.mjs";
 const FIXTURE_PATHS = [
   ".agent/rules",
   ".agent/workflows",
+  ".agent/context",
   ".agent/scripts",
   ".claude/commands",
+  ".claude/settings.json",
   ".gemini/commands",
   "CLAUDE.md",
   "GEMINI.md",
+  "AGENTS.md",
   ".nvmrc",
   "src/docs/CHANGELOG.md",
+  "src/docs/agent-guide.md",
 ];
 
 let passed = 0;
@@ -116,7 +120,7 @@ test("cwd: correr de um subdiretorio nao desliga os guards", (dir) => {
   writeF(dir, "sub/.nvmrc", "18\n"); // isca: antes, este .nvmrc era o unico guard a "correr"
 }, {
   code: 0,
-  includes: ["7 guard(s) executado(s)"],
+  includes: ["12 guard(s) executado(s)"],
   cwd: undefined, // substituido abaixo
 });
 test("cwd: raiz e derivada do script, nao do cwd", (dir) => {
@@ -124,7 +128,7 @@ test("cwd: raiz e derivada do script, nao do cwd", (dir) => {
   writeF(dir, "sub/.nvmrc", "18\n");
 }, {
   code: 0,
-  includes: ["7 guard(s) executado(s)", ".nvmrc = 24"],
+  includes: ["12 guard(s) executado(s)", ".nvmrc = 24"],
   excludes: [".nvmrc = 18"],
 });
 
@@ -259,6 +263,73 @@ test("G7: /design-review removido da tabela avisa", (dir) => {
 test("G7: workflow sem colisao de nome continua a ser apanhado", (dir) => {
   for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, ".agent/workflows/debug.md");
 }, { code: 1, includes: ['Workflow "debug" nao listado'] });
+
+// --- Guard 8: @imports de CLAUDE.md resolvem ---------------------------------
+test("G8: @import para ficheiro inexistente avisa", (dir) => {
+  writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md").replace("@.agent/rules/core-rules.md", "@.agent/rules/nao-existe.md"));
+}, { code: 1, includes: ["importa `@.agent/rules/nao-existe.md`", "NAO EXISTE"] });
+
+test("G8: rule obrigatoria apagada e apanhada pelo import pendurado", (dir) => {
+  rmSync(file(dir, ".agent/rules/process-rules.md"));
+}, { code: 1, includes: ["process-rules.md"] });
+
+test("G8: as duas rules do bootstrap dao SKIP, nao WARN", null, {
+  code: 0,
+  includes: ["SKIP  @.agent/rules/business-logic.md"],
+});
+
+test("G8: CLAUDE.md sem imports avisa", (dir) => {
+  writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md").split("\n").filter((l) => !l.startsWith("@")).join("\n"));
+}, { code: 1, includes: ["sem nenhum `@import`"] });
+
+// --- Guard 9: AGENTS.md e agent-guide.md -------------------------------------
+test("G9a: workflow removido do AGENTS.md avisa", (dir) => {
+  writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace("`market-scan`", "`removido`"));
+}, { code: 1, includes: ['Workflow "market-scan" nao listado em AGENTS.md'] });
+
+test("G9a: /review removido nao e mascarado por design-review", (dir) => {
+  writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace("`review` · ", ""));
+}, { code: 1, includes: ['Workflow "review" nao listado em AGENTS.md'] });
+
+test("G9b: workflow removido do agent-guide.md avisa", (dir) => {
+  dropLinesContaining(dir, "src/docs/agent-guide.md", "`/refactor`");
+}, { code: 1, includes: ['Workflow "refactor" nao listado em src/docs/agent-guide.md'] });
+
+// --- Guard 10: conteudo dos wrappers -----------------------------------------
+test("G10: wrapper a apontar para o workflow ERRADO avisa", (dir) => {
+  writeF(dir, ".claude/commands/review.md", "---\ndescription: x\n---\n\nLer `.agent/workflows/deploy.md`.\n");
+}, { code: 1, includes: [".claude/commands/review.md nao aponta"] });
+
+test("G10: wrapper vazio avisa", (dir) => {
+  writeF(dir, ".gemini/commands/debug.toml", "");
+}, { code: 1, includes: [".gemini/commands/debug.toml nao aponta"] });
+
+// --- Guard 11: sanidade do settings.json -------------------------------------
+test("G11: deny de .env removido avisa", (dir) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  cfg.permissions.deny = cfg.permissions.deny.filter((r) => r !== "Read(./.env)");
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+}, { code: 1, includes: ["falta `Read(./.env)` no deny"] });
+
+test("G11: wildcard sem delimitador no allow avisa", (dir) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  cfg.permissions.allow.push("Bash(node .agent/scripts/*)", "Bash(npm run lint*)");
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+}, { code: 1, includes: ["Bash(node .agent/scripts/*)", "Bash(npm run lint*)", "wildcard sem delimitador"] });
+
+test("G11: `:*` e delimitador valido, nao avisa", (dir) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  cfg.permissions.allow.push("Bash(git log:*)");
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+}, { code: 0, excludes: ["wildcard sem delimitador"] });
+
+test("G11: settings.json invalido avisa", (dir) => {
+  writeF(dir, ".claude/settings.json", "{ nope,, }");
+}, { code: 1, includes: ["nao e JSON valido"] });
+
+test("G11: settings.json ausente da SKIP visivel", (dir) => {
+  rmSync(file(dir, ".claude/settings.json"));
+}, { code: 0, includes: ["SKIP  Guard 11"] });
 
 // --- Resumo ------------------------------------------------------------------
 console.log("");

@@ -301,6 +301,130 @@ if (workflows && claude) {
   skip("Guard 7 (workflows nas tabelas) — falta .agent/workflows/ ou CLAUDE.md");
 }
 
+// --- Guard 8: os `@imports` de CLAUDE.md resolvem ---
+// Um caminho com gralha era silencioso: o agente carregava menos contexto do que
+// pensava, sem sinal nenhum. As duas rules geradas no bootstrap sao a excecao esperada.
+const BOOTSTRAP_GENERATED = new Set([
+  ".agent/rules/business-logic.md",
+  ".agent/rules/pages-architecture.md",
+]);
+if (claude) {
+  const imports = [...claude.matchAll(/^@(\S+)/gm)].map((m) => m[1]);
+  if (imports.length === 0) {
+    warn("CLAUDE.md sem nenhum `@import` — os ficheiros de regras/contexto nao serao carregados");
+  } else {
+    let broken = 0;
+    for (const path of imports) {
+      if (read(path) !== null) continue;
+      if (BOOTSTRAP_GENERATED.has(path)) skip(`@${path} — gerado no bootstrap, ainda nao existe`);
+      else {
+        warn(`CLAUDE.md importa \`@${path}\` mas o ficheiro NAO EXISTE`);
+        broken++;
+      }
+    }
+    if (broken === 0) ok(`${imports.length} @imports de CLAUDE.md resolvem`);
+  }
+  guardsRun++;
+} else {
+  skip("Guard 8 (@imports) — sem CLAUDE.md");
+}
+
+// --- Guard 9: workflows listados em AGENTS.md e agent-guide.md ---
+// O Guard 7 cobre so o par CLAUDE/GEMINI. Estes dois ficheiros duplicam a mesma lista
+// e nao tinham rede nenhuma. Os nomes sao delimitados por backticks nos dois formatos,
+// o que da a fronteira exata (`review` nao casa com `design-review`).
+const agentsMd = read("AGENTS.md");
+if (workflows && agentsMd) {
+  let missing = 0;
+  for (const w of workflows) {
+    if (!agentsMd.includes(`\`${w}\``)) {
+      warn(`Workflow "${w}" nao listado em AGENTS.md (esperado o token \`${w}\`)`);
+      missing++;
+    }
+  }
+  if (missing === 0) ok(`workflows listados em AGENTS.md (${workflows.length})`);
+  guardsRun++;
+} else {
+  skip("Guard 9a (AGENTS.md) — ficheiro ausente");
+}
+
+const agentGuide = read("src/docs/agent-guide.md");
+if (workflows && agentGuide) {
+  let missing = 0;
+  for (const w of workflows) {
+    if (!agentGuide.includes(`\`/${w}\``)) {
+      warn(`Workflow "${w}" nao listado em src/docs/agent-guide.md (esperado \`/${w}\`)`);
+      missing++;
+    }
+  }
+  if (missing === 0) ok(`workflows listados em agent-guide.md (${workflows.length})`);
+  guardsRun++;
+} else {
+  skip("Guard 9b (agent-guide.md) — ficheiro ausente");
+}
+
+// --- Guard 10: cada wrapper aponta para o SEU workflow ---
+// O Guard 6 valida existencia; este valida conteudo. Um wrapper vazio, ou a apontar
+// para o workflow errado, passava — e core-rules.md exige ponteiros finos, verificavel.
+if (workflows && (claudeCmds || geminiCmds)) {
+  let bad = 0;
+  const checkPointer = (file, w, label) => {
+    const content = read(file);
+    if (content === null) return; // ausencia ja e apanhada pelo Guard 6
+    if (!content.includes(`.agent/workflows/${w}.md`)) {
+      warn(`Wrapper ${label} nao aponta para \`.agent/workflows/${w}.md\` — ponteiro fino em falta`);
+      bad++;
+    }
+  };
+  for (const w of workflows) {
+    if (claudeCmds?.includes(w)) checkPointer(`.claude/commands/${w}.md`, w, `.claude/commands/${w}.md`);
+    if (geminiCmds?.includes(w)) checkPointer(`.gemini/commands/${w}.toml`, w, `.gemini/commands/${w}.toml`);
+  }
+  if (bad === 0) ok("wrappers apontam para o workflow correspondente");
+  guardsRun++;
+} else {
+  skip("Guard 10 (conteudo dos wrappers) — sem pastas de wrappers");
+}
+
+// --- Guard 11: sanidade do .claude/settings.json ---
+// E a fronteira de seguranca do projeto e nao tinha rede nenhuma: um `allow` demasiado
+// largo passava CI sem sinal. Nao substitui revisao humana — apanha as regressoes obvias.
+const SETTINGS_PATH = ".claude/settings.json";
+const settingsRaw = read(SETTINGS_PATH);
+if (settingsRaw === null) {
+  skip(`Guard 11 (${SETTINGS_PATH}) — ficheiro ausente (projeto pode nao usar Claude Code)`);
+} else {
+  let settings = null;
+  try {
+    settings = JSON.parse(settingsRaw);
+  } catch (err) {
+    warn(`${SETTINGS_PATH} nao e JSON valido (${err instanceof Error ? err.message : String(err)})`);
+  }
+  if (settings) {
+    const perms = settings.permissions ?? {};
+    const deny = perms.deny ?? [];
+    const allow = perms.allow ?? [];
+    let issues = 0;
+
+    for (const required of ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"]) {
+      if (!deny.includes(required)) {
+        warn(`${SETTINGS_PATH}: falta \`${required}\` no deny — leitura de secrets fica aberta`);
+        issues++;
+      }
+    }
+    // Wildcard sem delimitador: `Bash(npm run lint*)` cobre `npm run lint-and-deploy`;
+    // `Bash(node x/*)` cobre qualquer ficheiro nesse caminho. So `:*` ou ` *` sao seguros.
+    for (const rule of allow) {
+      if (/^Bash\(.*[A-Za-z0-9_.\/-]\*\)$/.test(rule)) {
+        warn(`${SETTINGS_PATH}: \`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
+        issues++;
+      }
+    }
+    if (issues === 0) ok(`${SETTINGS_PATH} (deny de secrets presente, allow sem wildcards abertos)`);
+  }
+  guardsRun++;
+}
+
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---
 // pattern: regex que captura a versao no markdown (ex: "Next.js 16.2.2")
 const CHECKS = [

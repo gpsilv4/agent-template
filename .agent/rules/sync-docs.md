@@ -38,7 +38,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 20. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 21. [ ] `SECURITY.md` — politica de disclosure atualizada
 22. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
-23. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+23. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
 
@@ -47,11 +47,11 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 
 | Novo ficheiro | Onde replicar/registar |
 |---|---|
-| **Workflow** (`.agent/workflows/X.md`) | wrapper `.claude/commands/X.md` + `.gemini/commands/X.toml`; tabela de workflows em `CLAUDE.md` + `GEMINI.md` + `AGENTS.md`; `src/docs/agent-guide.md`; `README.md` (arvore) |
-| **Rule sempre-carregada** (`.agent/rules/X.md`) | `@import` em `CLAUDE.md` + `GEMINI.md`; array `RULES_FILES` em `check-doc-versions.mjs` (orcamento de bytes); `agent-guide.md`; `README.md` |
+| **Workflow** (`.agent/workflows/X.md`) | wrapper `.claude/commands/X.md` + `.gemini/commands/X.toml` (ponteiro fino que **cita o caminho do proprio workflow** — validado pelo Guard 10); tabela de workflows em `CLAUDE.md` + `GEMINI.md` + `AGENTS.md`; `src/docs/agent-guide.md`; `README.md` (arvore); **tabela de fluxo por tipo** em `process-rules.md` e `CONTRIBUTING.md`; listas de essenciais/removiveis do Modo minimo em `BOOTSTRAP.md` |
+| **Rule sempre-carregada** (`.agent/rules/X.md`) | `@import` em `CLAUDE.md` + `GEMINI.md`; **`AGENTS.md`** (enumera as rules pelo nome); array `REQUIRED_RULES` em `check-doc-versions.mjs` (orcamento de bytes); `agent-guide.md`; `README.md` |
 | **Rule NAO carregada** (checklist/guia) | referencia on-demand nos workflows que a usam; `README.md`/`agent-guide.md` — **sem** `@import` |
-| **Script** (`.agent/scripts/X.mjs`) | passo opt-in em `.github/workflows/ci.yml`; `core-rules.md` (seccao scripts); `README.md` (arvore + tabela) |
-| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); `README.md`; `agent-guide.md` |
+| **Script** (`.agent/scripts/X.mjs`) | passo opt-in em `.github/workflows/ci.yml`; `core-rules.md` (seccao scripts); `README.md` (arvore + tabela); **e os sitios que o INVOCAM**: `review.md`, `deploy.md`, `.github/pull_request_template.md`, `BOOTSTRAP.md` §2.4 — sem isto o guard fica documentado em todo o lado e corrido por nada. Se e um guard, criar tambem o `test-X.mjs` com os controlos negativos |
+| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist de 1-23 acima**; classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
 
 > Regra de paridade: qualquer edicao a `CLAUDE.md` tem espelho em `GEMINI.md` (so difere `@[...]`) — validado por `check-doc-versions.mjs`.
 
