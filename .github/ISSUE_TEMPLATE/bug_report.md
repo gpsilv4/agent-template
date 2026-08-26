@@ -24,11 +24,20 @@ assignees: ""
 
 <!-- What actually happens -->
 
+## Triage
+
+<!-- Fields the backlog tables require. Filling them here avoids a round-trip. -->
+
+- **Severity**: Critical / High / Medium / Low
+- **Effort**: S (< 30 min) / M (1-2h) / L (half a day+)
+- **Affected area**: (page, route, module, or CLI command)
+
 ## Environment
+
+<!-- If applicable — skip for projects without a UI -->
 
 - **Browser**: (e.g., Chrome 120, Safari 17)
 - **Device**: (e.g., Desktop, iPhone 15)
-- **Page**: (e.g., Dashboard, /games)
 
 ## Screenshots
 

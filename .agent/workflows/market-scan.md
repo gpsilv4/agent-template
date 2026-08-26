@@ -6,7 +6,7 @@ Research **externo** de produto para o {{PROJECT_NAME}}: o que fazem apps semelh
 
 ## 1. Enquadramento (perguntar ao utilizador)
 
-- 3-5 **concorrentes / apps de referencia** (se nao souber, sugerir com base no dominio em `business-logic.md`)
+- 3-5 **concorrentes / apps de referencia** (se nao souber, sugerir com base no dominio em `.agent/rules/business-logic.md`)
 - **Utilizador-alvo e job-to-be-done (JTBD)**: que "trabalho" a app resolve para o utilizador
 - **Diferenciador / posicionamento** pretendido
 
