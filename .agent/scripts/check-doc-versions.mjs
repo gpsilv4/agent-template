@@ -236,7 +236,7 @@ if (pkgRaw === null) {
         return 0;
       };
       const max = [...found].sort(cmp).at(-1);
-      if (found[0] !== max) {
+      if (cmp(found[0], max) !== 0) {
         warn(`${CHANGELOG_PATH}: a entrada no topo e v${found[0]} mas a maior e v${max} — ordenar por versao decrescente`);
       }
       // Comparar por precedencia, nao por string: `1.2.3` e `1.2.3+build.5` sao a mesma
@@ -464,7 +464,11 @@ if (settingsRaw === null) {
       warn(`${SETTINGS_PATH}: \`permissions.${name}\` devia ser um array`);
       return [];
     };
-    const deny = asList(perms.deny, "deny");
+    const deny = asList(perms.deny, "deny").filter((r) => {
+      if (typeof r === "string") return true;
+      warn(`${SETTINGS_PATH}: entrada do \`deny\` que nao e string (${JSON.stringify(r)})`);
+      return false;
+    });
     const allow = asList(perms.allow, "allow");
     let issues = 0;
     const flag = (msg) => {
@@ -499,34 +503,75 @@ if (settingsRaw === null) {
         return rx.test(target);
       });
     for (const target of [".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local"]) {
-      if (!denyCovers(target)) flag(`nenhuma regra \`deny\` cobre a leitura de \`${target}\``);
+      if (!denyCovers(target)) flag(`nenhuma regra \`deny\` cobre a leitura de \`${target}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
     }
 
     // Um `allow` demasiado largo anula o deny ao lado. Casos que ja foram reais aqui:
     // `Bash(npm run lint*)` cobria `npm run lint-and-deploy`; `Bash(node .agent/scripts/*)`
     // cobria qualquer ficheiro nesse caminho; `Bash(*)` e `Bash(rm -rf *)` abriam tudo; e
     // `Bash` sem parenteses e a concessao maxima possivel.
-    const INTERPRETERS = /^(sh|bash|zsh|fish|node|deno|bun|python3?|ruby|perl|eval|exec|env|xargs|sudo|doas|rm|chmod|chown|curl|wget|nc|ssh)\b/;
-    for (const rule of allow) {
-      if (/^(Bash|Read|Edit|Write|WebFetch|Task)$/.test(rule)) {
+    // A propriedade que interessa nao e a FORMA da regra — e se o argumento fica
+    // constrangido. Uma versao anterior testava a forma e por isso aprovava
+    // `Bash(/bin/sh:*)` (prefixo derrota o `^`), `Bash(npm:*)` (npm exec e arbitrario),
+    // `Bash ` (sem trim), `Grep`/`NotebookEdit`/`mcp__*` (fora da lista hardcoded), e
+    // ao mesmo tempo marcava como perigosa a concessao estreita e legitima
+    // `Bash(node .agent/scripts/x.mjs:*)`.
+    const WRAPPERS = new Set(["env", "command", "nohup", "nice", "time", "sudo", "doas", "xargs", "exec"]);
+    const RISKY = new Set([
+      "sh", "bash", "zsh", "fish", "dash", "csh", "ksh",
+      "node", "deno", "bun", "python", "python3", "ruby", "perl", "php", "osascript",
+      "eval", "npm", "npx", "pnpm", "yarn", "make", "git", "find", "awk", "sed",
+      "rm", "chmod", "chown", "curl", "wget", "nc", "ssh", "docker", "security", "defaults",
+    ]);
+    const baseName = (tok) => tok.split("/").pop();
+
+    for (const raw of allow) {
+      if (typeof raw !== "string") {
+        flag(`entrada do \`allow\` que nao e string (${JSON.stringify(raw)}) — ignorada em silencio pelo motor`);
+        continue;
+      }
+      const rule = raw.trim();
+
+      // Nome de ferramenta sem `(...)` concede a ferramenta INTEIRA. Aceitar qualquer
+      // identificador (inclui `Grep`, `NotebookEdit`, `mcp__servidor__tool`) em vez de
+      // enumerar seis nomes.
+      if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(rule)) {
         flag(`\`${rule}\` sem \`(...)\` concede a ferramenta INTEIRA — enumerar os comandos/caminhos exatos`);
         continue;
       }
+
       const bash = /^Bash\((.*)\)$/.exec(rule);
       if (bash) {
-        const body = bash[1];
-        if (body.includes("*") && !/^[^*]+:\*$/.test(body)) {
+        const body = bash[1].trim();
+        const suffix = /^(.*[^*]):\*$/.exec(body);
+        if (body.includes("*") && !suffix) {
           flag(`\`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
-        } else if (/^(.+):\*$/.test(body) && INTERPRETERS.test(body)) {
-          // `Bash(sh:*)` / `Bash(node:*)` / `Bash(rm:*)` respeitam a forma `:*` mas
-          // pre-aprovam execucao arbitraria — a forma correcta nao torna o comando seguro.
-          flag(`\`${rule}\` usa \`:*\` sobre um interpretador/comando perigoso — equivale a execucao arbitraria`);
+          continue;
+        }
+        if (!suffix) continue; // comando fixo, sem wildcard — o caso ideal
+        // Tokens do prefixo fixo, sem os wrappers que nao mudam o que e executado.
+        const tokens = suffix[1].split(/\s+/).filter((t) => t && !WRAPPERS.has(baseName(t)));
+        const head = baseName(tokens[0] ?? "");
+        if (tokens.length <= 1) {
+          flag(`\`${rule}\` pre-aprova QUAISQUER argumentos de \`${head || body}\` — fixar mais do comando`);
+        } else if (RISKY.has(head)) {
+          // Interpretador com alvo fixo (`node caminho/script.mjs:*`) e aceitavel; com
+          // uma flag (`bash -c:*`) e execucao arbitraria.
+          const target = tokens[1];
+          if (target.startsWith("-") || target.includes("*")) {
+            flag(`\`${rule}\` passa flags a \`${head}\` — equivale a execucao arbitraria`);
+          }
         }
         continue;
       }
-      const fileTool = /^(Read|Edit|Write)\((.*)\)$/.exec(rule);
-      if (fileTool && /^\.?\/?\*\*\/?\*?$/.test(fileTool[2])) {
-        flag(`\`${rule}\` abrange o repo inteiro — restringir a um subcaminho`);
+
+      const fileTool = /^(Read|Edit|Write|Glob|Grep)\((.*)\)$/.exec(rule);
+      if (fileTool) {
+        const pat = fileTool[2].replace(/^\.\//, "");
+        // `**`, `**/*`, `*` — qualquer padrao sem um unico segmento literal.
+        if (/^[*/]+$/.test(pat)) {
+          flag(`\`${rule}\` abrange o repo inteiro — restringir a um subcaminho`);
+        }
       }
     }
 

@@ -95,7 +95,9 @@ function test(name, build, expect) {
     const includes = [...(expect.includes ?? []), ...(extra.includes ?? [])];
     const excludes = [...(expect.excludes ?? []), ...(extra.excludes ?? [])];
     for (const [route, want] of Object.entries(extra.numbers ?? {})) {
-      const m = new RegExp(`${route}\\s+([\\d.]+) kB`).exec(out);
+      // Escapar: uma rota com `(`, `.` ou `/` (route group) partia o regex.
+      const esc = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const m = new RegExp(`${esc}\\s+([\\d.]+) kB`).exec(out);
       if (!m) problems.push(`nao encontrei uma linha de medicao para "${route}"`);
       else if (m[1] !== want) problems.push(`${route}: esperado ${want} kB, medido ${m[1]} kB`);
     }
@@ -248,6 +250,25 @@ test("ancoragem: [controlo negativo] com ROOT = cwd, TEM de falhar", (dir) => {
   }
   writeFileSync(join(dir, CHECKER), patched);
 }, { code: 1, cwd: "sub", includes: ["nao encontrado"] });
+
+// --- Confinamento a .next/ ---------------------------------------------------
+// Regressao introduzida pelo `keyOf`: `resolve(NEXT_DIR, "/fora/x")` sai do `.next/`,
+// e o checker media um ficheiro que nao faz parte do bundle. Antes recusava-o.
+test("caminho ABSOLUTO no manifest e recusado, nao medido", (dir) => {
+  chunk(dir, "static/chunks/real.js", 1_000, "r");
+  const fora = join(dir, "FORA-DO-NEXT.txt");
+  writeFileSync(fora, "F".repeat(300_000));
+  manifest(dir, { rootMainFiles: ["static/chunks/real.js", fora], pages: {} });
+}, {
+  code: 1,
+  includes: ["FORA de .next/", "FORA-DO-NEXT.txt"],
+  excludes: ["Todas as paginas dentro dos targets"],
+});
+
+test("`../` no manifest e recusado", (dir) => {
+  writeFileSync(join(dir, "FORA.txt"), "F".repeat(1_000));
+  manifest(dir, { rootMainFiles: ["../FORA.txt"], pages: {} });
+}, { code: 1, includes: ["FORA de .next/", "../FORA.txt"] });
 
 // --- Chaves equivalentes ------------------------------------------------------
 test("`./x.js` e `x.js` sao o mesmo ficheiro, nao dois", (dir) => {

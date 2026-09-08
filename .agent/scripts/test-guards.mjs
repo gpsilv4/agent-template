@@ -20,7 +20,7 @@
  * (sem `package.json` e sem gate do `detect` — o template puro e exatamente o caso coberto).
  */
 
-import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync, appendFileSync, existsSync } from "fs";
+import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync, appendFileSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -81,19 +81,36 @@ function runGuard(dir, cwd) {
  * @param mutate  (dir) => void — a quebra a aplicar; omitir para o baseline
  * @param expect  { code, includes?: string[], excludes?: string[], cwd?: string }
  */
-let skipped = 0;
 function test(name, mutate, expect) {
-  if (expect.code === 0 && !baselineClean) {
-    console.log(`  SKIP  ${name}`);
-    skipped++;
-    return;
-  }
   const dir = sandbox();
   try {
-    if (mutate) mutate(dir);
+    // Um `throw` no setup abortava o processo a meio: os testes seguintes nunca corriam
+    // e nao havia linha de resumo. O ficheiro irmao ja tinha esta guarda; este nao.
+    if (mutate) {
+      try {
+        mutate(dir);
+      } catch (err) {
+        failures.push({ name, problems: [`setup rebentou: ${err.message}`], out: "" });
+        console.log(`  FAIL  ${name}`);
+        console.log(`          setup rebentou: ${err.message}`);
+        return;
+      }
+    }
     const { code, out } = runGuard(dir, expect.cwd);
     const problems = [];
-    if (code !== expect.code) problems.push(`exit esperado ${expect.code}, obtido ${code}`);
+    if (!out.includes("=== Doc Guards ===")) {
+      problems.push(`o guard nao produziu output (rebentou?): ${out.slice(0, 160)}`);
+    }
+    // Afirmacao por DIFERENCA face ao baseline, nao pelo exit code absoluto. Uma versao
+    // anterior saltava os testes `code: 0` quando o repo tinha avisos — desligava 17 dos
+    // 64 em silencio, com exit 0 e a dizer "todos passaram". Agora todos correm sempre.
+    const novos = [...warnsOf(out)].filter((w) => !baselineWarns.has(w));
+    if (expect.code === 0) {
+      if (novos.length) problems.push(`nao devia acrescentar avisos; acrescentou ${novos.length}: ${novos[0]}`);
+    } else {
+      if (novos.length === 0) problems.push("devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum");
+      if (code === 0) problems.push("devia sair != 0");
+    }
     for (const s of expect.includes ?? []) if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
     for (const s of expect.excludes ?? []) if (out.includes(s)) problems.push(`output NAO devia conter "${s}"`);
     if (problems.length) {
@@ -113,34 +130,55 @@ function test(name, mutate, expect) {
 const file = (dir, p) => join(dir, p);
 const readF = (dir, p) => readFileSync(file(dir, p), "utf8");
 const writeF = (dir, p, s) => writeFileSync(file(dir, p), s);
+const patchSettings = (dir, fn) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  fn(cfg);
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+};
+
+/** Linhas de tabela com o caminho de cada workflow, para um CLAUDE.md sintetico nao
+ *  disparar o Guard 7 (que exige todos os workflows listados). */
+const listWorkflowRows = (dir) =>
+  readdirSync(join(dir, ".agent/workflows"))
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => `| ${f.slice(0, -3)} | \`.agent/workflows/${f}\` |`);
 const dropLinesContaining = (dir, p, needle) =>
   writeF(dir, p, readF(dir, p).split("\n").filter((l) => !l.includes(needle)).join("\n"));
 
 console.log("\n=== Testes dos Doc Guards ===\n");
 
-// A sandbox e uma COPIA do repo real, logo os testes que esperam `code: 0` assumem que o
-// repo esta limpo. Num projeto derivado com drift de docs, isso produzia uma dezena de
-// falhas vermelhas com nomes que nada tinham a ver com a causa (`G5: lts/* e aceito`, ...).
-// Estes testes verificam o GUARD, nao o estado do repo: se o baseline ja avisa, sao SKIP.
-let baselineClean = true;
+// A sandbox e uma COPIA do repo real. Em vez de assumir que o repo esta limpo (ou de
+// saltar testes quando nao esta), captura-se o conjunto de WARN do baseline UMA vez e
+// tudo se afirma por diferenca. Assim os 64 testes correm sempre e o veredicto e sobre
+// o guard, nao sobre o estado do repo.
+const warnsOf = (out) =>
+  new Set(out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).map((l) => l.trim()));
+let baselineWarns;
 {
   const dir = sandbox();
   try {
-    baselineClean = runGuard(dir).code === 0;
+    const base = runGuard(dir);
+    if (!base.out.includes("=== Doc Guards ===")) {
+      console.log("  ERRO  o guard nao produziu output no baseline — abortar:\n" + base.out);
+      process.exit(1);
+    }
+    baselineWarns = warnsOf(base.out);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-  if (!baselineClean) {
-    console.log("  NOTA  o repo ja tem avisos de doc guards — os testes que exigem exit 0");
-    console.log("        ficam SKIP (verificam o guard, nao o estado do repo).");
+  if (baselineWarns.size > 0) {
+    console.log(`  NOTA  o repo tem ${baselineWarns.size} aviso(s) no baseline dos doc guards.`);
+    console.log("        Todos os testes correm: as assercoes sao por DIFERENCA face a esse baseline.");
     console.log("        Corre `node .agent/scripts/check-doc-versions.mjs` para os ver.\n");
   }
 }
 
 // --- Baseline -----------------------------------------------------------------
-test("baseline: repo intacto passa", null, {
+test("baseline: o guard produz veredicto e nao acrescenta avisos", null, {
   code: 0,
-  includes: ["Todos os guards de documentacao passaram", "guard(s) executado(s)"],
+  // Nao afirma "todos passaram": isso seria afirmar o estado do REPO, e num projeto
+  // derivado com drift ficaria vermelho por uma causa que nada tem a ver com o guard.
+  includes: ["guard(s) executado(s)", "saltado(s)"],
 });
 
 // --- Independencia do cwd (o defeito mais grave: 0 guards + "todos passaram") --
@@ -196,7 +234,11 @@ test("G1: rules geradas no bootstrap dao SKIP visivel", null, {
 
 // --- Guard 2: paridade CLAUDE/GEMINI ------------------------------------------
 test("G2: divergencia de conteudo avisa", (dir) => {
-  writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md").replace("Fronteiras", "FRONTEIRAS-ALTERADO"));
+  // Normalizar os dois primeiro: se o repo ja divergir no baseline, o aviso nao seria
+  // "novo" e o teste media o estado do repo em vez do guard.
+  const base = "# Entry\n\n@.agent/rules/core-rules.md\n\n| W | F |\n|---|---|\n| S | `.agent/workflows/setup.md` |\n";
+  writeF(dir, "CLAUDE.md", base);
+  writeF(dir, "GEMINI.md", base.replace("# Entry", "# Entry DIFERENTE"));
 }, { code: 1, includes: ["DIVERGEM"] });
 
 test("G2: par incompleto avisa", (dir) => {
@@ -384,12 +426,6 @@ test("G11: settings.json ausente da SKIP visivel", (dir) => {
 // --- Guard 11: formas de bypass que uma versao anterior aprovava ---------------
 // Estas existem porque a primeira versao do Guard 11 so olhava para o `*` precedido de
 // caractere de palavra. `Bash(*)`, `Bash` sem parenteses e `Bash(sh:*)` passavam todos.
-const patchSettings = (dir, fn) => {
-  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
-  fn(cfg);
-  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
-};
-
 test("G11: `Bash(*)` e apanhado", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(*)"));
 }, { code: 1, includes: ["Bash(*)", "wildcard sem delimitador"] });
@@ -400,11 +436,11 @@ test("G11: `Bash` sem parenteses (concessao maxima) e apanhado", (dir) => {
 
 test("G11: `Bash(sh:*)` respeita a forma `:*` mas e execucao arbitraria", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(sh:*)"));
-}, { code: 1, includes: ["interpretador/comando perigoso"] });
+}, { code: 1, includes: ["pre-aprova QUAISQUER argumentos"] });
 
 test("G11: `Bash(node:*)` idem", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(node:*)"));
-}, { code: 1, includes: ["interpretador/comando perigoso"] });
+}, { code: 1, includes: ["pre-aprova QUAISQUER argumentos"] });
 
 test("G11: `Read(./**)` abrange o repo inteiro", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Read(./**)"));
@@ -421,6 +457,46 @@ test("G11: `allow` que nao e array nao rebenta", (dir) => {
 test("G11: deny mais ESTRITO nao e falso positivo", (dir) => {
   patchSettings(dir, (c) => (c.permissions.deny = ["Read(./.env*)", "Read(./**/.env*)"]));
 }, { code: 0, excludes: ["nenhuma regra `deny` cobre"] });
+
+// --- Guard 11: bypasses por PREFIXO e nomes de ferramenta fora da lista -------
+// Todos estes passavam a verde quando o guard testava a FORMA da regra em vez da
+// propriedade ("o argumento fica constrangido?").
+for (const rule of [
+  "Bash(/bin/sh:*)",        // prefixo derrota um `^` ancorado
+  "Bash(/bin/bash -c:*)",   // interpretador + flag = execucao arbitraria
+  "Bash(/usr/bin/env sh:*)",// wrapper `env` a esconder o interpretador
+  "Bash(npm:*)",            // npm exec -- qualquer coisa
+  "Bash(npx:*)",
+  "Bash(git:*)",            // git -c core.pager='sh -c ...'
+  "Bash(find:*)",           // find -exec
+  "Bash(awk:*)",            // awk 'BEGIN{system(...)}'
+  "Bash(docker:*)",
+  "Bash ",                  // sem trim, era um nome de ferramenta nu
+  "Grep",                   // fora da lista hardcoded de 6 nomes
+  "NotebookEdit",           // ferramenta de ESCRITA fora da lista
+  "mcp__servidor__tool",    // ferramentas MCP nao eram olhadas
+  "Read(./*)",              // raiz inteira
+]) {
+  test(`G11: \`${rule}\` e apanhado`, (dir) => {
+    patchSettings(dir, (c) => c.permissions.allow.push(rule));
+  }, { code: 1 });
+}
+
+test("G11: entrada do allow que nao e string e apanhada", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push({ tool: "Bash", args: "*" }));
+}, { code: 1, includes: ["nao e string"] });
+
+// E o simetrico: concessoes ESTREITAS e legitimas nao podem ser falsos positivos.
+for (const rule of [
+  "Bash(node .agent/scripts/check-doc-versions.mjs:*)", // interpretador com alvo FIXO
+  "Bash(npm run lint:*)",                               // prefixo de 3 tokens
+  "Bash(git log:*)",
+  "Read(./.agent/**)",
+]) {
+  test(`G11: \`${rule}\` NAO e falso positivo`, (dir) => {
+    patchSettings(dir, (c) => c.permissions.allow.push(rule));
+  }, { code: 0 });
+}
 
 // --- Ficheiros em branco: "existe mas vazio" != "ausente" ---------------------
 test("blank: AGENTS.md vazio nao passa a verde", (dir) => {
@@ -465,20 +541,42 @@ test("G3: pre-release com hifen no identificador nao empata", (dir) => {
   withPkg(dir, "1.2.3-beta-9", "# CL\n\n## [v1.2.3-beta-9] - Nova\n\n## [v1.2.3-beta-2] - Velha\n");
 }, { code: 0, excludes: ["ordenar por versao decrescente"] });
 
+test("G3: build metadata nao torna a ordenacao invalida", (dir) => {
+  // O topo e a entrada seguinte sao a MESMA versao por precedencia (spec §10) e
+  // diferentes por string. A verificacao de ordenacao comparava strings e avisava.
+  withPkg(dir, "1.2.3", "# CL\n\n## [v1.2.3] - Atual\n\n## [v1.2.3+build.5] - Rebuild\n");
+}, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
 test("G3: ordem ERRADA em pre-releases numericos e apanhada", (dir) => {
   withPkg(dir, "1.2.3-rc.10", "# CL\n\n## [v1.2.3-rc.2] - Topo errado\n\n## [v1.2.3-rc.10] - Maior\n");
 }, { code: 1, includes: ["ordenar por versao decrescente"] });
 
 // --- Guard 8: a contagem tem de excluir os que nao resolvem ------------------
-test("G8: conta so os imports que RESOLVEM", null, {
+test("G8: conta so os imports que RESOLVEM", (dir) => {
+  // CLAUDE.md sintetico: 2 imports validos + 1 gerado no bootstrap (SKIP esperado).
+  // Colar ao numero de imports do ficheiro real punha este teste vermelho num projeto
+  // derivado, com um nome que nao descreve a causa.
+  const md = [
+    "# Entry",
+    "",
+    "@.agent/rules/core-rules.md",
+    "@.agent/rules/process-rules.md",
+    "@.agent/rules/business-logic.md",
+    "",
+    "| W | F |",
+    "|---|---|",
+    ...listWorkflowRows(dir),
+  ].join("\n") + "\n";
+  writeF(dir, "CLAUDE.md", md);
+  writeF(dir, "GEMINI.md", md.replace(/^@(.*)$/gm, "@[$1]"));
+}, {
   code: 0,
-  includes: ["9 de 11 @imports"],
-  excludes: ["  OK    11 @imports"],
+  includes: ["2 de 3 @imports"],
 });
 
 // --- Resumo ------------------------------------------------------------------
 console.log("");
-console.log(`  ${passed} passaram, ${failures.length} falharam${skipped ? `, ${skipped} saltados (baseline com avisos)` : ""}.`);
+console.log(`  ${passed} passaram, ${failures.length} falharam.`);
 if (failures.length) {
   console.log("\n--- Detalhe das falhas ---");
   for (const f of failures) {

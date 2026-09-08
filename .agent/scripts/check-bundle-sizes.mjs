@@ -59,6 +59,7 @@ const TARGETS = {
 };
 
 const missing = [];
+const outside = []; // caminhos do manifest que saem de .next/
 
 /** Devolve o tamanho gzipped, ou `null` se o ficheiro nao existir/nao for legivel.
  *  NUNCA devolve 0 por falha — 0 e um tamanho valido e mascarava builds partidos. */
@@ -73,9 +74,15 @@ function gzipSize(filePath) {
 /** Chave canonica de um ficheiro dentro de `.next/`, relativa e sempre com `/`.
  *  Sem isto o `seen` comparava as strings CRUAS do manifest: `./x.js` e `x.js` sao o
  *  mesmo ficheiro e eram contados duas vezes, e em Windows o `\` do varrimento de
- *  diretorio nunca casava com o `/` do manifest. */
+ *  diretorio nunca casava com o `/` do manifest.
+ *
+ *  Devolve `null` se o caminho SAI de `.next/`. Sem esta guarda, um caminho absoluto ou
+ *  com `../` no manifest era resolvido para fora e o script media um ficheiro que nao
+ *  faz parte do bundle — contradizendo o principio no cabecalho. */
 function keyOf(file) {
-  return relative(NEXT_DIR, resolve(NEXT_DIR, file)).split(sep).join("/");
+  const key = relative(NEXT_DIR, resolve(NEXT_DIR, file)).split(sep).join("/");
+  if (key === "" || key === ".." || key.startsWith("../")) return null;
+  return key;
 }
 
 /** Soma os ficheiros ainda nao vistos, registando os que faltam no disco. */
@@ -84,6 +91,10 @@ function addFiles(files, seen) {
   let counted = 0;
   for (const f of files) {
     const key = keyOf(f);
+    if (key === null) {
+      outside.push(f);
+      continue;
+    }
     if (seen.has(key)) continue;
     seen.add(key); // sem isto, um ficheiro repetido na mesma lista era contado N vezes
     const size = gzipSize(join(NEXT_DIR, key));
@@ -207,6 +218,16 @@ for (const [route, config] of Object.entries(TARGETS)) {
 console.log("");
 
 // --- Integridade da medicao (antes dos targets: sem medicao nao ha veredicto) ---
+
+const outsideUnique = [...new Set(outside)];
+if (outsideUnique.length > 0) {
+  console.log("FAILED: o manifest referencia caminhos FORA de .next/:");
+  for (const f of outsideUnique) console.log(`  - ${f}`);
+  console.log("");
+  console.log("  Um bundle e composto por ficheiros dentro de .next/. Um caminho absoluto");
+  console.log("  ou com `../` nao faz parte do bundle e nao deve entrar na medicao.");
+  process.exit(1);
+}
 
 const missingUnique = [...new Set(missing)]; // a mesma falta pode surgir em varias rotas
 if (missingUnique.length > 0) {
