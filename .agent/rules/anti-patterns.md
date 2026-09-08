@@ -23,22 +23,23 @@
 
 -->
 
-## AP1 — Teste cuja assercao e satisfeita por outro guard
+## AP1 — Teste cuja assercao e satisfeita por outra verificacao
 
-- **Origem**: quatro rondas consecutivas de review a este repo (a mesma classe, quatro vezes).
-- **Anti-padrao**: afirmar `out.includes("<texto>")` sobre o output INTEIRO de um verificador,
-  com uma mutacao que quebra mais do que o alvo do teste. Tipico: escrever `CLAUDE.md` sem
-  escrever `GEMINI.md`, o que dispara sempre o guard de paridade. O teste fica verde porque
-  OUTRO guard avisou, e neutralizar o guard sob teste passa despercebido. A variante mais
-  subtil: `includes` nao distingue `WARN` de `NOTE`, logo despromover um aviso a nota mantem
-  o teste verde e desliga o gate.
-- **Correto**: afirmar contra as linhas do NIVEL certo (so as `WARN`), e mutar apenas o input
-  do guard sob teste — ou normalizar tudo o resto primeiro. Para verificadores, medir
-  **cobertura de mutacao**: sabotar cada sitio de aviso, um a um, e exigir que a suite fique
-  vermelha em cada um. Foi essa varredura que revelou 7 ramos sem cobertura que 109 testes
-  verdes escondiam.
-- **Detecao em review**: `grep -n 'writeF(dir, "CLAUDE.md"' .agent/scripts/test-guards.mjs` —
-  cada ocorrencia tem de escrever tambem o `GEMINI.md`, ou declarar `excludes: ["DIVERGEM"]`.
-  E `grep -c 'includes:' .agent/scripts/test-guards.mjs` nao pode crescer sem que a varredura
-  de mutacao (`node .agent/scripts/test-guards.mjs` apos sabotar cada `warn(`) continue a
-  apanhar 100% dos sitios.
+- **Origem**: cinco rondas de review a este template, sempre a mesma classe.
+- **Anti-padrao**: afirmar `output.includes("<texto>")` sobre o output INTEIRO de um
+  verificador, com uma mutacao que quebra mais do que o alvo do teste. O teste fica verde
+  porque OUTRA verificacao falhou, e neutralizar a que esta sob teste passa despercebido.
+  Variante: o `includes` nao distingue niveis, logo despromover um erro a aviso mantem o
+  teste verde e desliga o gate.
+- **Correto**: afirmar contra as linhas do nivel certo, e mutar so o input do alvo. Para
+  verificadores, medir **cobertura de mutacao**: sabotar cada sitio de erro, um a um, e
+  exigir que a suite fique vermelha em cada um.
+- **Detecao em review**: sabotar e contar.
+  `grep -c 'includes:' <ficheiro-de-testes>` nao pode crescer sem que a varredura de
+  mutacao continue a apanhar 100% dos sitios. Neste repo:
+  `node .agent/scripts/test-guards.mjs` apos trocar cada `warn(` por `note(` em
+  `check-doc-versions.mjs` — 47 sitios, todos tem de ficar vermelhos.
+
+> Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
+> verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
+> um bug teu revelar.
