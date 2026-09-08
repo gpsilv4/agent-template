@@ -387,7 +387,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
-- **`.agent/rules/anti-patterns.md`**: apagar o exemplo `AP1` comentado (e ilustrativo); manter o cabecalho, o preambulo "como fazer crescer" e a linha "sem anti-padroes registados ainda".
+- **`.agent/rules/anti-patterns.md`**: apagar o exemplo comentado (e ilustrativo). A entrada **AP1** que vem preenchida e real e herdada do template — aplica-se a qualquer projeto que escreva testes de verificadores. Manter se o projeto tiver guards/scripts proprios; substituir pela primeira entrada tua se nao tiver.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em `CLAUDE.md`/`GEMINI.md`.
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
 

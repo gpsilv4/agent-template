@@ -23,7 +23,7 @@
 - [ ] Doc guards pass (`node .agent/scripts/check-doc-versions.mjs`) — no WARN
 - [ ] If `.agent/scripts/` changed: guard tests pass (`node .agent/scripts/test-guards.mjs`, `node .agent/scripts/test-bundle-sizes.mjs`)
 - [ ] Backlog counters valid (`node .agent/scripts/check-backlog.mjs`) — 0 divergences
-- [ ] CI is green on the branch (`gh pr checks`) — never merge on red
+- [ ] CI is green on the branch — never merge on red, and **check that checks exist**: `gh pr checks --watch` exits 0 when none have been reported yet
 - [ ] `src/docs/CHANGELOG.md` updated
 - [ ] `.agent/context/backlog.md` updated (if applicable)
 - [ ] No secrets or credentials in committed files

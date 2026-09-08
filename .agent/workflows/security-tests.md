@@ -92,6 +92,21 @@ zap-cli quick-scan http://localhost:<PORT>
 
 **Quando usar:** Antes de releases com alteracoes significativas em auth, formularios ou APIs.
 
+### Alternativa: agente autonomo de pentesting
+
+Para projetos onde o scan de headers/inputs nao chega — auth complexa, multi-tenant,
+APIs publicas — existem agentes de pentesting autonomos (ex: `usestrix/strix`) que exploram
+a app em vez de correr uma checklist fixa.
+
+**Nao e dependencia deste template** e nao substitui as seccoes 1-4: e uma opcao a considerar
+no mesmo momento do ZAP, pre-release. Se o usares:
+
+- **So contra ambientes teus** (local ou staging dedicado) — nunca producao, e nunca contra
+  sistemas de terceiros sem autorizacao escrita.
+- Tratar os achados como o `/review` trata os do `code-reviewer`: **verificar cada um** contra
+  o codigo real antes de agir. Um agente que explora tambem alucina.
+- Os achados confirmados viram tickets no backlog, com severidade e esforco.
+
 ## 6. Regras para Novos Testes de Seguranca
 
 - Novos headers de seguranca -> adicionar teste em "Security Headers"

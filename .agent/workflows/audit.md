@@ -25,7 +25,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 > do frontmatter nao entrega necessariamente o que declara (ver `.claude/agents/code-reviewer.md`).
 
 1. **Organizacao & Conformidade com as Regras** — estrutura correta? Cumpre as suas proprias regras (`.agent/rules/`: ficheiros > 500 linhas, `any` proibido, data-fetching, tokens de design)? CLAUDE == GEMINI, wrappers <-> workflows.
-2. **Build & CI/CD** — `npm run build` passa? CI verde no branch (`gh pr checks`, nao a olho)? `.nvmrc` presente e o CI a le-lo via `node-version-file` em **todos** os jobs (nao versao hardcoded)? Guards locais espelham o pipeline? Tags/releases em dia?
+2. **Build & CI/CD** — `npm run build` passa? CI verde no branch (`gh pr checks`, nao a olho — e contar que existem checks: com zero, o comando sai 0)? `.nvmrc` presente e o CI a le-lo via `node-version-file` em **todos** os jobs (nao versao hardcoded)? Guards locais espelham o pipeline? Tags/releases em dia?
 3. **Arquitetura & Qualidade de Codigo** — complexidade, ficheiros grandes, dead code, duplicacao (DRY), anti-padroes (`anti-patterns.md`), acoplamento/fronteiras. **Dados/BD**: schema, migracoes, indices, integridade. **Resiliencia**: error boundaries, tratamento de erros, logging/observabilidade (como a app falha).
 4. **Seguranca** (exploitabilidade) — secrets versionados (gitleaks, se disponivel: `gitleaks detect`), authz/authn, validacao de input, headers, superficie de API. Cobre as categorias de `/security-tests`.
 5. **Performance** — bundle vs targets (`check-bundle-sizes.mjs`), waterfalls, N+1, imports pesados nao-lazy, Core Web Vitals*.
