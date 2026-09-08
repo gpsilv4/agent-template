@@ -270,6 +270,17 @@ test("`../` no manifest e recusado", (dir) => {
   manifest(dir, { rootMainFiles: ["../FORA.txt"], pages: {} });
 }, { code: 1, includes: ["FORA de .next/", "../FORA.txt"] });
 
+test("rota cujo diretorio escapa do .next/ e recusada", (dir) => {
+  mkdirSync(join(dir, "FORA", "x"), { recursive: true });
+  writeFileSync(join(dir, "FORA", "x", "page-evil.js"), "E".repeat(400_000));
+  manifest(dir, { rootMainFiles: [], pages: {} });
+  // O confinamento tinha sido aplicado ao addFiles e nao ao varrimento de diretorio,
+  // que e o unico caminho que conta chunks proprios no App Router.
+  // Quatro niveis: o varrimento parte de `.next/static/chunks/app`, logo `../../` ainda
+  // cai DENTRO do `.next/`. Sao precisos quatro para chegar a raiz da sandbox.
+  withTargets(dir, { "/../../../../FORA/x": { name: "Escapada", target: 160, alarm: 180 } });
+}, { code: 1, includes: ["FORA de .next/"], excludes: ["[OK]"] });
+
 // --- Chaves equivalentes ------------------------------------------------------
 test("`./x.js` e `x.js` sao o mesmo ficheiro, nao dois", (dir) => {
   const layout = chunk(dir, "static/chunks/app/layout-xyz.js", 600_000, "l");

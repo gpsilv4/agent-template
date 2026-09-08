@@ -312,7 +312,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards numerados (o script reporta **12 executados** porque o Guard 9 conta como 9a+9b): orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards numerados. O total que ele reporta como "executados" **varia com a configuracao** (12 no template puro, porque o Guard 1 conta uma vez por rule obrigatoria e os Guards 3 e 4 saltam; +1 quando existe `package.json`, +1 com uma entrada em `BANNED`, +1 por `CHECK`): orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs` e
 > `node .agent/scripts/test-bundle-sizes.mjs` quebram cada guard de proposito e exigem que

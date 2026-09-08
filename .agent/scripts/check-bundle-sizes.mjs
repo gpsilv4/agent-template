@@ -181,6 +181,13 @@ for (const [route, config] of Object.entries(TARGETS)) {
       for (const f of readdirSync(dir)) {
         if (!f.startsWith("page-") || !f.endsWith(".js")) continue;
         const relKey = keyOf(join(dir, f));
+        if (relKey === null) {
+          // O confinamento tinha sido aplicado ao `addFiles` e nao aqui — e este e o
+          // unico caminho que conta chunks proprios no App Router. Uma rota como
+          // `/../../FORA` media ficheiros fora do `.next/` e reportava `[OK]`.
+          outside.push(join(dir, f));
+          continue;
+        }
         if (routeSeen.has(relKey)) continue;
         routeSeen.add(relKey);
         const size = gzipSize(join(dir, f));
@@ -224,8 +231,9 @@ if (outsideUnique.length > 0) {
   console.log("FAILED: o manifest referencia caminhos FORA de .next/:");
   for (const f of outsideUnique) console.log(`  - ${f}`);
   console.log("");
-  console.log("  Um bundle e composto por ficheiros dentro de .next/. Um caminho absoluto");
-  console.log("  ou com `../` nao faz parte do bundle e nao deve entrar na medicao.");
+  console.log("  Um bundle e composto por ficheiros dentro de .next/. Um caminho absoluto,");
+  console.log("  com `../`, vazio, ou que resolva para o proprio .next/ nao e um ficheiro do");
+  console.log("  bundle e nao deve entrar na medicao.");
   process.exit(1);
 }
 

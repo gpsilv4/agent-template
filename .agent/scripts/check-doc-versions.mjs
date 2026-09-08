@@ -464,17 +464,20 @@ if (settingsRaw === null) {
       warn(`${SETTINGS_PATH}: \`permissions.${name}\` devia ser um array`);
       return [];
     };
-    const deny = asList(perms.deny, "deny").filter((r) => {
-      if (typeof r === "string") return true;
-      warn(`${SETTINGS_PATH}: entrada do \`deny\` que nao e string (${JSON.stringify(r)})`);
-      return false;
-    });
+    const denyRaw = asList(perms.deny, "deny");
     const allow = asList(perms.allow, "allow");
     let issues = 0;
     const flag = (msg) => {
       warn(`${SETTINGS_PATH}: ${msg}`);
       issues++;
     };
+    // Filtrar DEPOIS de `flag` existir: uma versao anterior usava `warn` aqui, logo
+    // `issues` ficava 0 e o guard imprimia o WARN e o OK ao mesmo tempo.
+    const deny = denyRaw.filter((r) => {
+      if (typeof r === "string") return true;
+      flag(`entrada do \`deny\` que nao e string (${JSON.stringify(r)})`);
+      return false;
+    });
 
     // Cobertura do deny de secrets: verificar que ALGUM padrao cobre cada caminho tipico,
     // em vez de exigir os 4 literais. Um projeto com `Read(./**/.env*)` (superset estrito)
@@ -516,14 +519,28 @@ if (settingsRaw === null) {
     // `Bash ` (sem trim), `Grep`/`NotebookEdit`/`mcp__*` (fora da lista hardcoded), e
     // ao mesmo tempo marcava como perigosa a concessao estreita e legitima
     // `Bash(node .agent/scripts/x.mjs:*)`.
-    const WRAPPERS = new Set(["env", "command", "nohup", "nice", "time", "sudo", "doas", "xargs", "exec"]);
+    // O que interessa e se o argumento fica constrangido. Formas que versoes anteriores
+    // aprovaram, cada uma por uma razao diferente:
+    //   `Bash(sh:*)`            -> apanhado
+    //   `Bash(/bin/sh:*)`       -> prefixo derrotava um `^` ancorado
+    //   `Bash(env -i sh:*)`     -> remover o wrapper deixava a FLAG como head
+    //   `Bash(BASH -c:*)`       -> comparacao case-sensitive
+    //   `Bash(git log; sh:*)`   -> metacaracteres de shell nunca eram olhados
+    //   `Read(~/**)`            -> so padroes feitos de `*` e `/` eram vistos
+    //   `WebFetch(*)`           -> so os nomes NUS eram cobertos
+    const WRAPPERS = new Set(["env", "command", "nohup", "nice", "time", "sudo", "doas", "xargs", "exec", "setsid", "stdbuf"]);
     const RISKY = new Set([
-      "sh", "bash", "zsh", "fish", "dash", "csh", "ksh",
-      "node", "deno", "bun", "python", "python3", "ruby", "perl", "php", "osascript",
-      "eval", "npm", "npx", "pnpm", "yarn", "make", "git", "find", "awk", "sed",
-      "rm", "chmod", "chown", "curl", "wget", "nc", "ssh", "docker", "security", "defaults",
+      "sh", "bash", "zsh", "fish", "dash", "csh", "ksh", "tcsh",
+      "node", "deno", "bun", "python", "python3", "ruby", "perl", "php", "osascript", "lua",
+      "eval", "npm", "npx", "pnpm", "yarn", "make", "git", "find", "awk", "sed", "xargs",
+      "rm", "mv", "dd", "chmod", "chown", "curl", "wget", "nc", "ncat", "ssh", "scp",
+      "docker", "kubectl", "security", "defaults", "launchctl", "systemctl", "sudo", "doas",
     ]);
-    const baseName = (tok) => tok.split("/").pop();
+    // `;` `&&` `||` `|` backtick `$(` `>` `<` `\n` — encadeiam um segundo comando.
+    const SHELL_META = /[;|&`\n]|\$\(|>|</;
+    // Comandos que, mesmo com argumentos fixos, nao devem ser pre-aprovados.
+    const DESTRUCTIVE = new Set(["rm", "dd", "mv", "chmod", "chown", "mkfs", "shutdown", "reboot", "killall"]);
+    const baseName = (tok) => tok.split("/").pop().toLowerCase();
 
     for (const raw of allow) {
       if (typeof raw !== "string") {
@@ -532,46 +549,78 @@ if (settingsRaw === null) {
       }
       const rule = raw.trim();
 
-      // Nome de ferramenta sem `(...)` concede a ferramenta INTEIRA. Aceitar qualquer
-      // identificador (inclui `Grep`, `NotebookEdit`, `mcp__servidor__tool`) em vez de
-      // enumerar seis nomes.
+      // Nome de ferramenta sem `(...)`: concede a ferramenta INTEIRA.
       if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(rule)) {
         flag(`\`${rule}\` sem \`(...)\` concede a ferramenta INTEIRA — enumerar os comandos/caminhos exatos`);
         continue;
       }
 
-      const bash = /^Bash\((.*)\)$/.exec(rule);
-      if (bash) {
-        const body = bash[1].trim();
+      const parsed = /^([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$/.exec(rule);
+      if (!parsed) {
+        flag(`\`${rule}\` nao tem a forma \`Ferramenta(padrao)\` — o motor pode ignora-la`);
+        continue;
+      }
+      const [, tool, bodyRaw] = parsed;
+      const body = bodyRaw.trim();
+
+      if (tool === "Bash") {
+        if (SHELL_META.test(body)) {
+          flag(`\`${rule}\` contem metacaracteres de shell — encadeia um segundo comando`);
+          continue;
+        }
         const suffix = /^(.*[^*]):\*$/.exec(body);
         if (body.includes("*") && !suffix) {
           flag(`\`${rule}\` tem wildcard sem delimitador — enumerar os comandos exatos`);
           continue;
         }
-        if (!suffix) continue; // comando fixo, sem wildcard — o caso ideal
-        // Tokens do prefixo fixo, sem os wrappers que nao mudam o que e executado.
-        const tokens = suffix[1].split(/\s+/).filter((t) => t && !WRAPPERS.has(baseName(t)));
-        const head = baseName(tokens[0] ?? "");
-        if (tokens.length <= 1) {
-          flag(`\`${rule}\` pre-aprova QUAISQUER argumentos de \`${head || body}\` — fixar mais do comando`);
-        } else if (RISKY.has(head)) {
-          // Interpretador com alvo fixo (`node caminho/script.mjs:*`) e aceitavel; com
-          // uma flag (`bash -c:*`) e execucao arbitraria.
-          const target = tokens[1];
-          if (target.startsWith("-") || target.includes("*")) {
-            flag(`\`${rule}\` passa flags a \`${head}\` — equivale a execucao arbitraria`);
+        // Procurar um comando perigoso em QUALQUER posicao do prefixo fixo, nao so na
+        // primeira. Descartar apenas o head nao bastava: em `sudo -u root sh:*` o loop
+        // consumia `sudo` e `-u`, e o head passava a ser `root` — o argumento do wrapper.
+        const fixed = suffix ? suffix[1] : body;
+        const tokens = fixed.split(/\s+/).filter(Boolean);
+        const riskyAt = tokens.findIndex((t) => RISKY.has(baseName(t)));
+        const head = riskyAt === -1 ? "" : baseName(tokens[riskyAt]);
+        const next = riskyAt === -1 ? undefined : tokens[riskyAt + 1];
+        if (!suffix) {
+          // Comando FIXO: nao ha argumentos livres, logo `npx tsc --noEmit` e seguro.
+          // So interessam dois casos: um interpretador sozinho (shell interactiva) ou
+          // um comando destrutivo pre-aprovado.
+          if (riskyAt !== -1 && (next === undefined || DESTRUCTIVE.has(head))) {
+            flag(`\`${rule}\` pre-aprova \`${head}\` — shell interactiva ou comando destrutivo`);
           }
+          continue;
+        }
+        if (riskyAt !== -1) {
+          // Com `:*` ha argumentos livres: so aceitavel se o comando perigoso vier
+          // seguido de um alvo FIXO (`node caminho/script.mjs:*`, `npm run lint:*`).
+          const alvoFixo = next && !next.startsWith("-") && !next.includes("*");
+          if (!alvoFixo) {
+            flag(`\`${rule}\` deixa \`${head}\` receber argumentos livres — equivale a execucao arbitraria`);
+            continue;
+          }
+        }
+        if (tokens.length === 1) {
+          // Comando desconhecido com um so token: largo, mas nao necessariamente perigoso
+          // (`ls:*`, `cat:*`). NOTE em vez de WARN — nao trava o gate.
+          note(`${SETTINGS_PATH}: \`${rule}\` pre-aprova quaisquer argumentos de \`${baseName(tokens[0])}\` — considerar fixar mais`);
         }
         continue;
       }
 
-      const fileTool = /^(Read|Edit|Write|Glob|Grep)\((.*)\)$/.exec(rule);
-      if (fileTool) {
-        const pat = fileTool[2].replace(/^\.\//, "");
-        // `**`, `**/*`, `*` — qualquer padrao sem um unico segmento literal.
-        if (/^[*/]+$/.test(pat)) {
+      if (["Read", "Edit", "Write", "Glob", "Grep"].includes(tool)) {
+        const pat = body.replace(/^\.\//, "");
+        if (pat.startsWith("~") || pat.startsWith("/") || pat.split("/").includes("..")) {
+          flag(`\`${rule}\` sai do projeto (\`~\`, caminho absoluto ou \`..\`) — restringir ao repo`);
+        } else if (/^[*/]+$/.test(pat)) {
           flag(`\`${rule}\` abrange o repo inteiro — restringir a um subcaminho`);
         }
+        continue;
+      }
+
+      // Qualquer outra ferramenta (WebFetch, Task, mcp__*): um padrao de puro wildcard
+      // e concessao total.
+      if (/^[*/]*\*[*/]*$/.test(body)) {
+        flag(`\`${rule}\` concede \`${tool}\` sem restricao — enumerar os alvos permitidos`);
       }
     }
 

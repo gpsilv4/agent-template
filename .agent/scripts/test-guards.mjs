@@ -82,13 +82,18 @@ function runGuard(dir, cwd) {
  * @param expect  { code, includes?: string[], excludes?: string[], cwd?: string }
  */
 function test(name, mutate, expect) {
-  const dir = sandbox();
+  // `synthetic: true` parte da fixture limpa por construcao, em vez de uma copia do
+  // repo. Necessario para testes cuja mutacao produz um aviso que o repo real pode ja
+  // ter — nesse caso o aviso nao seria "novo" e o teste media o estado do repo.
+  const dir = expect.synthetic ? syntheticSandbox() : sandbox();
+  const base = expect.synthetic ? syntheticBaselineWarns : baselineWarns;
   try {
     // Um `throw` no setup abortava o processo a meio: os testes seguintes nunca corriam
     // e nao havia linha de resumo. O ficheiro irmao ja tinha esta guarda; este nao.
+    let extra = {};
     if (mutate) {
       try {
-        mutate(dir);
+        extra = mutate(dir) ?? {};
       } catch (err) {
         failures.push({ name, problems: [`setup rebentou: ${err.message}`], out: "" });
         console.log(`  FAIL  ${name}`);
@@ -104,15 +109,25 @@ function test(name, mutate, expect) {
     // Afirmacao por DIFERENCA face ao baseline, nao pelo exit code absoluto. Uma versao
     // anterior saltava os testes `code: 0` quando o repo tinha avisos — desligava 17 dos
     // 64 em silencio, com exit 0 e a dizer "todos passaram". Agora todos correm sempre.
-    const novos = [...warnsOf(out)].filter((w) => !baselineWarns.has(w));
+    // INVARIANTE, verificada em cada corrida: o exit code tem de refletir os avisos.
+    // Sem isto, trocar a ultima linha do guard por `process.exit(1)` dava 84/84 verde —
+    // as assercoes diferenciais falam de mensagens e nao do veredicto.
+    const temWarn = out.includes("  WARN  ");
+    if (temWarn && code === 0) problems.push("imprimiu WARN mas saiu 0");
+    if (!temWarn && code !== 0) problems.push(`nao imprimiu WARN mas saiu ${code}`);
+    const novos = [...warnsOf(out)].filter((w) => !base.has(w));
     if (expect.code === 0) {
       if (novos.length) problems.push(`nao devia acrescentar avisos; acrescentou ${novos.length}: ${novos[0]}`);
     } else {
       if (novos.length === 0) problems.push("devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum");
       if (code === 0) problems.push("devia sair != 0");
     }
-    for (const s of expect.includes ?? []) if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
-    for (const s of expect.excludes ?? []) if (out.includes(s)) problems.push(`output NAO devia conter "${s}"`);
+    for (const s of [...(expect.includes ?? []), ...(extra.includes ?? [])]) {
+      if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
+    }
+    for (const s of [...(expect.excludes ?? []), ...(extra.excludes ?? [])]) {
+      if (out.includes(s)) problems.push(`output NAO devia conter "${s}"`);
+    }
     if (problems.length) {
       failures.push({ name, problems, out });
       console.log(`  FAIL  ${name}`);
@@ -145,6 +160,53 @@ const listWorkflowRows = (dir) =>
 const dropLinesContaining = (dir, p, needle) =>
   writeF(dir, p, readF(dir, p).split("\n").filter((l) => !l.includes(needle)).join("\n"));
 
+/** Repo minimo e LIMPO POR CONSTRUCAO, montado do zero — nao e copia do repo real.
+ *  Existe porque as assercoes diferenciais nao conseguem afirmar o exit code: num
+ *  baseline que ja avisa, "nao acrescentou avisos" e satisfeito por um guard que
+ *  falha sempre. Aqui sabemos que o veredicto correcto e exit 0, logo podemos exigi-lo. */
+function syntheticSandbox() {
+  const dir = mkdtempSync(join(tmpdir(), "guard-synth-"));
+  const w = (rel, body) => {
+    const full = join(dir, rel);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, body);
+  };
+  mkdirSync(join(dir, ".agent", "scripts"), { recursive: true });
+  cpSync(join(ROOT, GUARD), join(dir, GUARD));
+
+  for (const r of ["core-rules", "process-rules", "anti-patterns"]) {
+    w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n`);
+  }
+  w(".agent/workflows/plan.md", "# /plan\n");
+  w(".claude/commands/plan.md", "---\ndescription: x\n---\n\nLer `.agent/workflows/plan.md`.\n");
+  w(".gemini/commands/plan.toml", 'description = "x"\nprompt = "Le .agent/workflows/plan.md"\n');
+  w(".agent/context/session.md", "# Session\n");
+  const entry = [
+    "# Entry",
+    "",
+    "@.agent/rules/core-rules.md",
+    "@.agent/rules/process-rules.md",
+    "@.agent/rules/anti-patterns.md",
+    "@.agent/context/session.md",
+    "",
+    "| Workflow | Ficheiro |",
+    "|---|---|",
+    "| Planear | `.agent/workflows/plan.md` |",
+  ].join("\n") + "\n";
+  w("CLAUDE.md", entry);
+  w("GEMINI.md", entry.replace(/^@(.*)$/gm, "@[$1]"));
+  w("AGENTS.md", "# Agents\n\nWorkflows: `plan`\n");
+  w("src/docs/agent-guide.md", "# Guia\n\n| **`/plan`** | Planear |\n");
+  w(".nvmrc", "24\n");
+  w(".claude/settings.json", JSON.stringify({
+    permissions: {
+      deny: ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"],
+      allow: ["Read(./.agent/**)", "Bash(npx tsc --noEmit)"],
+    },
+  }, null, 2));
+  return dir;
+}
+
 console.log("\n=== Testes dos Doc Guards ===\n");
 
 // A sandbox e uma COPIA do repo real. Em vez de assumir que o repo esta limpo (ou de
@@ -154,6 +216,7 @@ console.log("\n=== Testes dos Doc Guards ===\n");
 const warnsOf = (out) =>
   new Set(out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).map((l) => l.trim()));
 let baselineWarns;
+let syntheticBaselineWarns;
 {
   const dir = sandbox();
   try {
@@ -166,6 +229,12 @@ let baselineWarns;
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  const synth = syntheticSandbox();
+  try {
+    syntheticBaselineWarns = warnsOf(runGuard(synth).out);
+  } finally {
+    rmSync(synth, { recursive: true, force: true });
+  }
   if (baselineWarns.size > 0) {
     console.log(`  NOTA  o repo tem ${baselineWarns.size} aviso(s) no baseline dos doc guards.`);
     console.log("        Todos os testes correm: as assercoes sao por DIFERENCA face a esse baseline.");
@@ -174,6 +243,54 @@ let baselineWarns;
 }
 
 // --- Baseline -----------------------------------------------------------------
+// Estes dois nao usam `test()`: correm contra a fixture sintetica, nao contra o repo.
+{
+  const dir = syntheticSandbox();
+  try {
+    const { code, out } = runGuard(dir);
+    const problems = [];
+    if (code !== 0) problems.push(`fixture limpa por construcao devia sair 0, saiu ${code}`);
+    if (!out.includes("Todos os guards de documentacao passaram")) {
+      problems.push("devia declarar que todos os guards passaram");
+    }
+    if (out.includes("  WARN  ")) problems.push(`nao devia haver WARN: ${out.split("\n").find((l) => l.includes("  WARN  "))}`);
+    const name = "sintetico: repo limpo por construcao sai 0 e declara que passou";
+    if (problems.length) {
+      failures.push({ name, problems, out });
+      console.log(`  FAIL  ${name}`);
+      for (const p of problems) console.log(`          ${p}`);
+    } else {
+      passed++;
+      console.log(`  PASS  ${name}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+{
+  const dir = syntheticSandbox();
+  try {
+    // Uma unica quebra na fixture limpa: o exit code TEM de mudar.
+    writeFileSync(join(dir, ".nvmrc"), "");
+    const { code, out } = runGuard(dir);
+    const name = "sintetico: uma quebra na fixture limpa muda o exit code";
+    const problems = [];
+    if (code === 0) problems.push("devia sair != 0");
+    if (!out.includes("  WARN  ")) problems.push("devia imprimir WARN");
+    if (problems.length) {
+      failures.push({ name, problems, out });
+      console.log(`  FAIL  ${name}`);
+      for (const p of problems) console.log(`          ${p}`);
+    } else {
+      passed++;
+      console.log(`  PASS  ${name}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 test("baseline: o guard produz veredicto e nao acrescenta avisos", null, {
   code: 0,
   // Nao afirma "todos passaram": isso seria afirmar o estado do REPO, e num projeto
@@ -236,10 +353,13 @@ test("G1: rules geradas no bootstrap dao SKIP visivel", null, {
 test("G2: divergencia de conteudo avisa", (dir) => {
   // Normalizar os dois primeiro: se o repo ja divergir no baseline, o aviso nao seria
   // "novo" e o teste media o estado do repo em vez do guard.
-  const base = "# Entry\n\n@.agent/rules/core-rules.md\n\n| W | F |\n|---|---|\n| S | `.agent/workflows/setup.md` |\n";
-  writeF(dir, "CLAUDE.md", base);
-  writeF(dir, "GEMINI.md", base.replace("# Entry", "# Entry DIFERENTE"));
-}, { code: 1, includes: ["DIVERGEM"] });
+  // Listar TODOS os workflows: uma versao anterior listava um so e gerava 10 WARN de
+  // ruido do Guard 7, que satisfaziam a assercao diferencial por acidente.
+  const md = ["# Entry", "", "@.agent/rules/core-rules.md", "", "| W | F |", "|---|---|",
+    ...listWorkflowRows(dir)].join("\n") + "\n";
+  writeF(dir, "CLAUDE.md", md);
+  writeF(dir, "GEMINI.md", md.replace("# Entry", "# Entry DIFERENTE"));
+}, { code: 1, synthetic: true, includes: ["DIVERGEM"], excludes: ["nao listado na tabela"] });
 
 test("G2: par incompleto avisa", (dir) => {
   rmSync(file(dir, "GEMINI.md"));
@@ -351,17 +471,26 @@ test("G7: /design-review removido da tabela avisa", (dir) => {
 }, { code: 1, includes: ['Workflow "design-review" nao listado'] });
 
 test("G7: workflow sem colisao de nome continua a ser apanhado", (dir) => {
+  // Escrever a tabela COMPLETA primeiro: num projeto derivado que ja tenha removido
+  // este workflow da tabela, o aviso estaria no baseline e passaria invisivel.
+  const base = ["# Entry", "", "@.agent/rules/core-rules.md", "", "| W | F |", "|---|---|",
+    ...listWorkflowRows(dir)].join("\n") + "\n";
+  writeF(dir, "CLAUDE.md", base);
+  writeF(dir, "GEMINI.md", base.replace(/^@(.*)$/gm, "@[$1]"));
   for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, ".agent/workflows/debug.md");
 }, { code: 1, includes: ['Workflow "debug" nao listado'] });
 
 // --- Guard 8: @imports de CLAUDE.md resolvem ---------------------------------
 test("G8: @import para ficheiro inexistente avisa", (dir) => {
   writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md").replace("@.agent/rules/core-rules.md", "@.agent/rules/nao-existe.md"));
-}, { code: 1, includes: ["importa `@.agent/rules/nao-existe.md`", "NAO EXISTE"] });
+}, { code: 1, synthetic: true, includes: ["importa `@.agent/rules/nao-existe.md`", "NAO EXISTE"] });
 
 test("G8: rule obrigatoria apagada e apanhada pelo import pendurado", (dir) => {
   rmSync(file(dir, ".agent/rules/process-rules.md"));
-}, { code: 1, includes: ["process-rules.md"] });
+  // `includes: ["process-rules.md"]` era satisfeito pelo WARN do Guard 1 — o teste
+  // passava mesmo com o aviso do Guard 8 removido. Exigir a mensagem do Guard 8.
+  return { includes: ["importa `@.agent/rules/process-rules.md`"] };
+}, { code: 1 });
 
 test("G8: as duas rules do bootstrap dao SKIP, nao WARN", null, {
   code: 0,
@@ -396,10 +525,13 @@ test("G10: wrapper vazio avisa", (dir) => {
 
 // --- Guard 11: sanidade do settings.json -------------------------------------
 test("G11: deny de .env retirado por completo avisa", (dir) => {
+  // Escrever primeiro um settings.json com o deny COMPLETO: num projeto derivado que
+  // ja nao o tenha, o aviso estaria no baseline e a assercao diferencial nao o veria.
+  writeF(dir, ".claude/settings.json", JSON.stringify({
+    permissions: { deny: ["Read(./.env)", "Read(./**/.env)", "Read(./.env.*)", "Read(./**/.env.*)"], allow: [] },
+  }, null, 2));
   const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
-  // Retirar TODAS as regras que cobrem .env — retirar so uma das quatro deixaria as
-  // outras a cobrir o caminho, e o guard verifica cobertura, nao literais.
-  cfg.permissions.deny = cfg.permissions.deny.filter((r) => !r.includes(".env"));
+  cfg.permissions.deny = [];
   writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
 }, { code: 1, includes: ["nenhuma regra `deny` cobre a leitura de"] });
 
@@ -436,11 +568,11 @@ test("G11: `Bash` sem parenteses (concessao maxima) e apanhado", (dir) => {
 
 test("G11: `Bash(sh:*)` respeita a forma `:*` mas e execucao arbitraria", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(sh:*)"));
-}, { code: 1, includes: ["pre-aprova QUAISQUER argumentos"] });
+}, { code: 1, includes: ["receber argumentos livres"] });
 
 test("G11: `Bash(node:*)` idem", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(node:*)"));
-}, { code: 1, includes: ["pre-aprova QUAISQUER argumentos"] });
+}, { code: 1, includes: ["receber argumentos livres"] });
 
 test("G11: `Read(./**)` abrange o repo inteiro", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Read(./**)"));
@@ -476,9 +608,32 @@ for (const rule of [
   "NotebookEdit",           // ferramenta de ESCRITA fora da lista
   "mcp__servidor__tool",    // ferramentas MCP nao eram olhadas
   "Read(./*)",              // raiz inteira
+  // Ronda 4: cada uma passava por uma razao diferente.
+  "Bash(env -i sh:*)",      // remover o wrapper deixava a FLAG como head
+  "Bash(sudo -u root sh:*)",// o head passava a ser `root`, argumento do wrapper
+  "Bash(nice -n 0 bash:*)",
+  "Bash(xargs -I{} sh:*)",
+  "Bash(BASH -c:*)",        // comparacao case-sensitive
+  "Bash(/bin/SH -c:*)",
+  "Bash(git log; sh:*)",    // metacaracteres de shell nunca eram olhados
+  "Bash(git log|sh:*)",
+  "Bash(cd / && sh:*)",
+  "Bash(sh)",               // comando fixo: shell interactiva
+  "Bash(rm -rf ~)",         // comando fixo destrutivo
+  "Read(~/**)",             // home inteira, inclui ~/.ssh
+  "Read(/Users/**)",        // caminho absoluto
+  "Read(../**)",            // sai do repo
+  "Write(~/.ssh/**)",
+  "WebFetch(*)",            // ferramenta com parenteses fora de Bash/ficheiro
+  "Task(*)",
+  "mcp__srv__tool(*)",
 ]) {
   test(`G11: \`${rule}\` e apanhado`, (dir) => {
     patchSettings(dir, (c) => c.permissions.allow.push(rule));
+    // Afirmar que foi ESTA regra a ser marcada. Sem isto o teste passava com o guard a
+    // avisar por qualquer outra razao — vermelho, mas nao na assercao certa.
+    // `.trim()`: o guard reporta a regra normalizada (o caso `"Bash "` perde o espaco).
+    return { includes: [rule.trim()] };
   }, { code: 1 });
 }
 
@@ -492,6 +647,13 @@ for (const rule of [
   "Bash(npm run lint:*)",                               // prefixo de 3 tokens
   "Bash(git log:*)",
   "Read(./.agent/**)",
+  // Ronda 4: comandos fixos nao tem argumentos livres, logo sao seguros.
+  "Bash(npx tsc --noEmit)",
+  "Bash(git status)",
+  "Glob(**/*.ts)",
+  // Read-only com um so token: NOTE, nao WARN — nao pode travar o gate.
+  "Bash(ls:*)",
+  "Bash(cat:*)",
 ]) {
   test(`G11: \`${rule}\` NAO e falso positivo`, (dir) => {
     patchSettings(dir, (c) => c.permissions.allow.push(rule));
