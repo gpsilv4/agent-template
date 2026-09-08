@@ -63,7 +63,10 @@ function sandbox() {
 
 function runGuard(dir, cwd) {
   try {
+    // `stdio` explicito: o ramo de erro concatenava stdout+stderr e o de sucesso so
+    // devolvia stdout, logo um aviso em stderr com exit 0 era invisivel.
     const stdout = execFileSync(process.execPath, [join(dir, GUARD)], {
+      stdio: ["ignore", "pipe", "pipe"],
       // `cwd` e relativo a sandbox. Uma versao anterior passava `cwd ?? dir` com um
       // `expect.cwd` sempre `undefined`, pelo que os testes de cwd corriam na raiz e
       // eram copias exatas do baseline — passavam com o defeito reintroduzido.
@@ -79,7 +82,15 @@ function runGuard(dir, cwd) {
 /**
  * @param name    descricao do cenario
  * @param mutate  (dir) => void — a quebra a aplicar; omitir para o baseline
- * @param expect  { code, includes?: string[], excludes?: string[], cwd?: string }
+ * @param expect  {
+ *   code,                 exit esperado (0 ou 1)
+ *   includes?: string[],  afirmado contra as linhas WARN quando code=1, senao contra o output
+ *   anyOut?: string[],    afirmado sempre contra o output inteiro (linhas OK/SKIP/NOTE)
+ *   excludes?: string[],  nao pode aparecer em nenhum sitio do output
+ *   cwd?: string,         subdiretorio da sandbox de onde correr o guard
+ *   synthetic?: boolean,  partir da fixture limpa por construcao em vez da copia do repo
+ * }
+ * `mutate` pode devolver { includes?, excludes? } extra, para expectativas calculadas.
  */
 function test(name, mutate, expect) {
   // `synthetic: true` parte da fixture limpa por construcao, em vez de uma copia do
@@ -122,7 +133,19 @@ function test(name, mutate, expect) {
       if (novos.length === 0) problems.push("devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum");
       if (code === 0) problems.push("devia sair != 0");
     }
+    // CAUSA-RAIZ de quatro rondas de defeitos: `out.includes(...)` nao olha ao NIVEL da
+    // linha. Um teste `code: 1` era satisfeito por uma linha `NOTE` com o mesmo texto, ou
+    // pelo WARN de OUTRO guard que a mutacao tambem disparava — e sabotar o guard sob teste
+    // ficava invisivel. Um teste que espera aviso afirma-se contra as linhas WARN e mais
+    // nada; um que espera sucesso pode afirmar OK/SKIP/NOTE, logo usa o output inteiro.
+    const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
+    const ondeAlvo = expect.code === 0 ? "output" : "linhas WARN";
     for (const s of [...(expect.includes ?? []), ...(extra.includes ?? [])]) {
+      if (!alvo.includes(s)) problems.push(`${ondeAlvo} devia conter "${s}"`);
+    }
+    // `anyOut`: para afirmar linhas que NAO sao WARN (OK/SKIP/NOTE) num teste que
+    // ainda assim espera exit != 0.
+    for (const s of expect.anyOut ?? []) {
       if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
     }
     for (const s of [...(expect.excludes ?? []), ...(extra.excludes ?? [])]) {
@@ -187,6 +210,11 @@ function syntheticSandbox() {
     "@.agent/rules/core-rules.md",
     "@.agent/rules/process-rules.md",
     "@.agent/rules/anti-patterns.md",
+    // Importadas mas NAO criadas: e o estado do template antes do bootstrap, e da aos
+    // guards 1 e 8 o `SKIP` que dois testes afirmam. SKIP nao e WARN, logo a fixture
+    // continua limpa.
+    "@.agent/rules/business-logic.md",
+    "@.agent/rules/pages-architecture.md",
     "@.agent/context/session.md",
     "",
     "| Workflow | Ficheiro |",
@@ -200,7 +228,10 @@ function syntheticSandbox() {
   w(".nvmrc", "24\n");
   w(".claude/settings.json", JSON.stringify({
     permissions: {
-      deny: ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)"],
+      // Deny e ask completos: a fixture tem de satisfazer a cobertura que o Guard 11
+      // exige, senao deixa de estar "limpa por construcao".
+      deny: ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)", "Read(./**/*.pem)", "Read(./**/*.key)", "Read(./**/id_rsa*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)"],
+      ask: ["Bash(git commit:*)", "Bash(git push:*)", "Bash(npm install:*)"],
       allow: ["Read(./.agent/**)", "Bash(npx tsc --noEmit)"],
     },
   }, null, 2));
@@ -231,7 +262,12 @@ let syntheticBaselineWarns;
   }
   const synth = syntheticSandbox();
   try {
-    syntheticBaselineWarns = warnsOf(runGuard(synth).out);
+    const baseSynth = runGuard(synth);
+    if (!baseSynth.out.includes("=== Doc Guards ===")) {
+      console.log("  ERRO  o guard nao produziu output na fixture sintetica — abortar:\n" + baseSynth.out);
+      process.exit(1);
+    }
+    syntheticBaselineWarns = warnsOf(baseSynth.out);
   } finally {
     rmSync(synth, { recursive: true, force: true });
   }
@@ -307,13 +343,13 @@ const withDecoyNvmrc = (dir) => {
 test("cwd: correr DE UM SUBDIRETORIO nao desliga os guards", withDecoyNvmrc, {
   code: 0,
   cwd: "sub",
-  includes: ["12 guard(s) executado(s)"],
+  includes: ["guard(s) executado(s)"],
 });
 
 test("cwd: a raiz vem do script, nao do cwd (le o .nvmrc certo)", withDecoyNvmrc, {
   code: 0,
   cwd: "sub",
-  includes: ["12 guard(s) executado(s)", ".nvmrc = 24"],
+  includes: ["guard(s) executado(s)", ".nvmrc = 24"],
   excludes: [".nvmrc = 18"],
 });
 
@@ -346,6 +382,7 @@ test("G1: rule obrigatoria ausente avisa (nao passa em silencio)", (dir) => {
 
 test("G1: rules geradas no bootstrap dao SKIP visivel", null, {
   code: 0,
+  synthetic: true, // num projeto ja bootstrapped estas rules EXISTEM e nao ha SKIP
   includes: ["SKIP  .agent/rules/business-logic.md", "SKIP  .agent/rules/pages-architecture.md"],
 });
 
@@ -494,6 +531,7 @@ test("G8: rule obrigatoria apagada e apanhada pelo import pendurado", (dir) => {
 
 test("G8: as duas rules do bootstrap dao SKIP, nao WARN", null, {
   code: 0,
+  synthetic: true,
   includes: ["SKIP  @.agent/rules/business-logic.md"],
 });
 
@@ -587,7 +625,11 @@ test("G11: `allow` que nao e array nao rebenta", (dir) => {
 }, { code: 1, includes: ["devia ser um array"], excludes: ["is not iterable"] });
 
 test("G11: deny mais ESTRITO nao e falso positivo", (dir) => {
-  patchSettings(dir, (c) => (c.permissions.deny = ["Read(./.env*)", "Read(./**/.env*)"]));
+  // Supersets estritos dos padroes do template: um por classe de secret.
+  patchSettings(dir, (c) => (c.permissions.deny = [
+    "Read(./.env*)", "Read(./**/.env*)", "Read(./**/*.pem)", "Read(./**/*.key)",
+    "Read(./**/id_rsa*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)",
+  ]));
 }, { code: 0, excludes: ["nenhuma regra `deny` cobre"] });
 
 // --- Guard 11: bypasses por PREFIXO e nomes de ferramenta fora da lista -------
@@ -660,6 +702,34 @@ for (const rule of [
   }, { code: 0 });
 }
 
+// Ramos acrescentados na ronda 5 — descobertos pela varredura de mutacao, que revelou
+// que eu os tinha escrito sem teste (o proprio AP1 a acontecer).
+test("G11: caminho fora do projeto e apanhado", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(cat ~/.ssh/id_rsa)"));
+}, { code: 1, synthetic: true, includes: ["fora do projeto"] });
+
+test("G11: comando fixo destrutivo e apanhado", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(rm -rf /tmp/x)"));
+}, { code: 1, synthetic: true, includes: ["shell interactiva ou comando destrutivo"] });
+
+test("G11: allow que cai dentro de um prefixo em ask e contradicao", (dir) => {
+  patchSettings(dir, (c) => {
+    c.permissions.ask = ["Bash(git push:*)"];
+    c.permissions.allow.push("Bash(git push origin:*)");
+  });
+}, { code: 1, synthetic: true, includes: ["cai dentro de", "contradicao"] });
+
+test("CHECKS: versao de dependencia desatualizada na doc avisa", (dir) => {
+  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.0.0", dependencies: { next: "16.2.2" } }));
+  writeF(dir, "src/docs/CHANGELOG.md", "# CL\n\n## [v1.0.0] - Atual\n");
+  writeF(dir, ".agent/rules/core-rules.md", "# core\n\nStack: Next.js 15.0.0\n");
+  const g = readF(dir, GUARD).replace(
+    "const CHECKS = [\n",
+    'const CHECKS = [\n  { name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+(?:\\.\\d+(?:\\.\\d+)?)?)/g, files: [".agent/rules/core-rules.md"] },\n'
+  );
+  writeF(dir, GUARD, g);
+}, { code: 1, synthetic: true, includes: ["documentado 15.0.0", "atual 16.2.2"] });
+
 // --- Ficheiros em branco: "existe mas vazio" != "ausente" ---------------------
 test("blank: AGENTS.md vazio nao passa a verde", (dir) => {
   writeF(dir, "AGENTS.md", "");
@@ -679,7 +749,27 @@ test("blank: CLAUDE.md so com espacos e tratado como vazio", (dir) => {
 
 test("blank: a mensagem de SKIP nao mente sobre a causa", (dir) => {
   writeF(dir, "CLAUDE.md", "");
-}, { code: 1, includes: ["CLAUDE.md esta vazio"], excludes: ["Guard 8 (@imports) — sem CLAUDE.md"] });
+}, { code: 1, anyOut: ["CLAUDE.md esta vazio"], excludes: ["Guard 8 (@imports) — sem CLAUDE.md"] });
+
+// --- Ramos que nao tinham teste nenhum ---------------------------------------
+// Descobertos sabotando cada `warn(`/`flag(` do guard um a um: estes quatro podiam ser
+// neutralizados com a suite a dar 109/109 verde.
+test("G2: nenhum entry point existe avisa", (dir) => {
+  rmSync(file(dir, "CLAUDE.md"));
+  rmSync(file(dir, "GEMINI.md"));
+}, { code: 1, synthetic: true, includes: ["nao encontrados — sao os entry points"] });
+
+test("G6: .agent/workflows/ ausente avisa", (dir) => {
+  rmSync(file(dir, ".agent/workflows"), { recursive: true });
+}, { code: 1, synthetic: true, includes: [".agent/workflows/ nao encontrado"] });
+
+test("G11: entrada do deny que nao e string e apanhada", (dir) => {
+  patchSettings(dir, (c) => c.permissions.deny.push({ pattern: "Read(./.env)" }));
+}, { code: 1, synthetic: true, includes: ["do `deny` que nao e string"] });
+
+test("G11: regra sem a forma Ferramenta(padrao) e apanhada", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(sh:*"));
+}, { code: 1, synthetic: true, includes: ["nao tem a forma"] });
 
 // --- Guard 3: precedencia SemVer ---------------------------------------------
 const withPkg = (dir, version, changelog) => {
@@ -733,6 +823,7 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
   writeF(dir, "GEMINI.md", md.replace(/^@(.*)$/gm, "@[$1]"));
 }, {
   code: 0,
+  synthetic: true, // a contagem depende de `business-logic.md` nao existir
   includes: ["2 de 3 @imports"],
 });
 

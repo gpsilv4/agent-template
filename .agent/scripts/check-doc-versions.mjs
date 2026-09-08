@@ -505,7 +505,13 @@ if (settingsRaw === null) {
         const rx = new RegExp(`^${rxSrc}$`);
         return rx.test(target);
       });
-    for (const target of [".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local"]) {
+    // Alvos de TODAS as classes de secret que o template protege — nao so `.env*`.
+    // Apagar as regras de `*.pem`/`id_rsa`/`secrets/**` era invisivel.
+    for (const target of [
+      ".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local",
+      "chave.pem", "a/b/tls.key", "id_rsa", "a/id_rsa.pub", ".npmrc",
+      "credentials.json", "a/secrets/db.json",
+    ]) {
       if (!denyCovers(target)) flag(`nenhuma regra \`deny\` cobre a leitura de \`${target}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
     }
 
@@ -529,6 +535,15 @@ if (settingsRaw === null) {
     //   `Read(~/**)`            -> so padroes feitos de `*` e `/` eram vistos
     //   `WebFetch(*)`           -> so os nomes NUS eram cobertos
     const WRAPPERS = new Set(["env", "command", "nohup", "nice", "time", "sudo", "doas", "xargs", "exec", "setsid", "stdbuf"]);
+    // Familia de interpretadores por PADRAO, nao por nome exacto: uma lista fechada
+    // deixava passar `pwsh`, `python3.12`, `ruby2.7`, `tclsh`, `bash5`.
+    const INTERP = /^(sh|bash|zsh|fish|dash|csh|ksh|tcsh|pwsh|powershell|node|deno|bun|python|ruby|perl|php|lua|tclsh|osascript|expect|rscript|gcc|clang)[\d.]*$/i;
+    // Subcomandos que reabrem execucao arbitraria apesar de o 2o token ser "fixo".
+    const REABRE = new Set([
+      "npm exec", "npm x", "npx", "pnpm exec", "pnpm dlx", "yarn dlx", "bun x", "bunx",
+      "deno run", "deno eval", "pip install", "uv run", "uvx", "git commit", "git -c",
+      "gh api", "make -f", "docker run", "kubectl exec",
+    ]);
     const RISKY = new Set([
       "sh", "bash", "zsh", "fish", "dash", "csh", "ksh", "tcsh",
       "node", "deno", "bun", "python", "python3", "ruby", "perl", "php", "osascript", "lua",
@@ -578,7 +593,34 @@ if (settingsRaw === null) {
         // consumia `sudo` e `-u`, e o head passava a ser `root` — o argumento do wrapper.
         const fixed = suffix ? suffix[1] : body;
         const tokens = fixed.split(/\s+/).filter(Boolean);
-        const riskyAt = tokens.findIndex((t) => RISKY.has(baseName(t)));
+        // Caminho fora do projeto em QUALQUER token, seja o comando fixo ou com `:*`.
+        const foraDoProjeto = tokens.find((t) => t.startsWith("~") || t.startsWith("/etc") || /(^|\/)\.\.(\/|$)/.test(t) || /^\/(Users|home|root|var|private)\//.test(t));
+        if (foraDoProjeto) {
+          flag(`\`${rule}\` referencia \`${foraDoProjeto}\`, fora do projeto`);
+          continue;
+        }
+        // Subcomando que reabre execucao: `npm:*` era marcado porque "npm exec e
+        // arbitrario", mas `npm exec:*` — que concede exactamente isso — passava.
+        const doisPrimeiros = tokens.slice(0, 2).map(baseName).join(" ");
+        if (suffix && (REABRE.has(doisPrimeiros) || REABRE.has(baseName(tokens[0] ?? "")))) {
+          flag(`\`${rule}\` pre-aprova \`${doisPrimeiros}\`, que reabre execucao arbitraria`);
+          continue;
+        }
+        // Um INTERPRETADOR em qualquer posicao e o caso mais grave: so e aceitavel com um
+        // alvo fixo que nao seja ele proprio um interpretador. Tratar wrappers como
+        // "comando perigoso com alvo fixo" era um buraco: em `env sh:*` o `env` ficava
+        // como head e o `sh` passava por alvo — concedendo shell arbitraria.
+        const interpAt = tokens.findIndex((t) => INTERP.test(baseName(t)));
+        if (interpAt !== -1) {
+          const alvo = tokens[interpAt + 1];
+          const alvoOk = alvo && !alvo.startsWith("-") && !alvo.includes("*") && !INTERP.test(baseName(alvo));
+          if (!alvoOk) {
+            flag(`\`${rule}\` deixa \`${baseName(tokens[interpAt])}\` receber argumentos livres — equivale a execucao arbitraria`);
+            continue;
+          }
+        }
+        const isRisky = (t) => RISKY.has(baseName(t)) || WRAPPERS.has(baseName(t));
+        const riskyAt = tokens.findIndex(isRisky);
         const head = riskyAt === -1 ? "" : baseName(tokens[riskyAt]);
         const next = riskyAt === -1 ? undefined : tokens[riskyAt + 1];
         if (!suffix) {
@@ -600,14 +642,15 @@ if (settingsRaw === null) {
           }
         }
         if (tokens.length === 1) {
-          // Comando desconhecido com um so token: largo, mas nao necessariamente perigoso
-          // (`ls:*`, `cat:*`). NOTE em vez de WARN — nao trava o gate.
+          // Um so token e desconhecido: largo mas nao necessariamente perigoso
+          // (`ls:*`, `cat:*`). NOTE, nao WARN — nao trava o gate. Interpretadores e
+          // wrappers ja foram marcados acima; despromove-los a NOTE foi uma regressao.
           note(`${SETTINGS_PATH}: \`${rule}\` pre-aprova quaisquer argumentos de \`${baseName(tokens[0])}\` — considerar fixar mais`);
         }
         continue;
       }
 
-      if (["Read", "Edit", "Write", "Glob", "Grep"].includes(tool)) {
+      if (["Read", "Edit", "Write", "Glob", "Grep", "NotebookEdit", "MultiEdit", "NotebookRead"].includes(tool)) {
         const pat = body.replace(/^\.\//, "");
         if (pat.startsWith("~") || pat.startsWith("/") || pat.split("/").includes("..")) {
           flag(`\`${rule}\` sai do projeto (\`~\`, caminho absoluto ou \`..\`) — restringir ao repo`);
@@ -621,6 +664,36 @@ if (settingsRaw === null) {
       // e concessao total.
       if (/^[*/]*\*[*/]*$/.test(body)) {
         flag(`\`${rule}\` concede \`${tool}\` sem restricao — enumerar os alvos permitidos`);
+      }
+    }
+
+    // Cobertura do `ask`: `process-rules.md` declara commit/push/merge e instalacao de
+    // dependencias como "perguntar primeiro". Apagar a lista inteira era invisivel.
+    const ask = asList(perms.ask, "ask");
+    const askCovers = (cmd) => ask.some((r) => {
+      const m = /^Bash\((.*?):?\*?\)$/.exec(typeof r === "string" ? r : "");
+      return m ? cmd.startsWith(m[1].trim()) : false;
+    });
+    for (const cmd of ["git commit", "git push", "npm install"]) {
+      if (!askCovers(cmd)) flag(`\`${cmd}\` nao esta em \`ask\` nem em \`deny\` — o CLAUDE.md declara-o como "perguntar primeiro"`);
+    }
+
+    // Um `allow` que caia dentro de um prefixo negado ou perguntado e contradicao
+    // silenciosa: o repo tem `git commit` em `ask`, e `Bash(git commit -m:*)` no allow
+    // passava sem sinal.
+    const prefixOf = (r) => /^Bash\((.*?):?\*?\)$/.exec(r)?.[1]?.trim() ?? null;
+    for (const a of allow) {
+      if (typeof a !== "string") continue;
+      const pa = prefixOf(a);
+      if (!pa) continue;
+      for (const [lista, nome] of [[deny, "deny"], [asList(perms.ask, "ask"), "ask"]]) {
+        for (const other of lista) {
+          if (typeof other !== "string") continue;
+          const po = prefixOf(other);
+          if (po && pa.startsWith(po)) {
+            flag(`\`${a}\` no allow cai dentro de \`${other}\` no ${nome} — contradicao`);
+          }
+        }
       }
     }
 
