@@ -80,6 +80,7 @@ jobs:
       # - name: Backlog Check
       #   run: node .agent/scripts/check-backlog.mjs
 
+
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -123,6 +124,23 @@ jobs:
       - name: Audit
         continue-on-error: true
         run: npm audit --audit-level=high
+
+  # Negative tests for the guard scripts themselves. Deliberately NOT behind `detect`:
+  # they need no package.json and no dependencies, and the bare template is exactly the
+  # case they cover — gating them behind a package.json would mean they never run here.
+  guard-tests:
+    name: Guard Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - name: Doc guards — negative tests
+        run: node .agent/scripts/test-guards.mjs
+      - name: Bundle checker — negative tests
+        run: node .agent/scripts/test-bundle-sizes.mjs
 
   # Runs on every push/PR, including the bare template (no package.json guard):
   # scans the full history for committed secrets/keys.

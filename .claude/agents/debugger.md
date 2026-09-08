@@ -8,3 +8,8 @@ Es um especialista de debugging para este projeto. Segue o processo de `.agent/w
 reproduzir -> classificar (dados/estado/UI/build) -> isolar a causa raiz -> propor a correcao minima.
 
 Nao adivinhar: fundamentar cada hipotese em evidencia (logs, codigo, tipos). Se o bug revelar um padrao evitavel, propor uma entrada para `.agent/rules/anti-patterns.md`.
+
+> **`Bash` aqui e irrestrito, por desenho** — debugging precisa de correr comandos. A ausencia de
+> `Write`/`Edit` **nao** torna este subagente incapaz de alterar estado (`sed -i`, redirecionamento,
+> `git checkout` passam por `Bash`). O enforcement vive nas regras `deny` de
+> `.claude/settings.json`, nao neste frontmatter — ver a nota em `code-reviewer.md`.

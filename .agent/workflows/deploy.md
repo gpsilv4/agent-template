@@ -20,19 +20,25 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 1. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (23 pontos)
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (24 pontos)
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` — sem WARN
 - [ ] **`.agent/context/session.md`** limpo — tarefas concluidas e proximos passos atualizados?
+- [ ] **Testes dos guards** passam (`node .agent/scripts/test-guards.mjs`, `node .agent/scripts/test-bundle-sizes.mjs`)?
 - [ ] **`.agent/context/backlog.md`** + **`backlog-archive.md`** — items concluidos movidos para o Historico, contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - Se a documentacao nao foi atualizada, fazer **ANTES** de continuar o deploy.
 
 ## 2. CI Pipeline Status
 
-- Confirmar que o branch tem **todos os CI checks em verde** no GitHub (TypeScript, lint, build, unit tests)
+- Confirmar que o branch tem **todos os CI checks em verde** — com um comando, nao a olho.
+  **Requer PR aberto** (sem PR, `gh pr checks` sai em erro "no pull requests found"):
+  ```bash
+  gh pr checks --watch    # espera ate terminarem; sai != 0 se algum falhar
+  ```
+  Um agente em terminal nao consegue "ver no GitHub"; sem este comando o gate e so prosa.
 - Se algum check falhou, corrigir antes de continuar o deploy
 - **Security Audit**: por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
 - Se E2E tests estao configurados no CI, devem estar verdes tambem
-- Ver status em: GitHub > repo > branch > checks
+- Para inspecao humana: GitHub > repo > branch > checks
 
 ## 3. Verificacoes de Build (Local)
 
@@ -109,12 +115,13 @@ Verificacao manual apenas (ver seccao 8).
 - Antes de commitar, o Agente **tem** de perguntar: _"Estou pronto para fazer o commit/push, posso avancar?"_
 
 ```bash
-# 1. Abrir/mergear o Pull Request da feature branch para main (nunca merge direto)
+# 1. Abrir o Pull Request da feature branch para main (nunca merge direto)
 #    Usar o template do repo — NAO `--fill`, que preenche o corpo a partir dos
 #    commits e ignora o pull_request_template.md (checklist obrigatoria).
 gh pr create --title "<tipo(scope): descricao>" \
              --body-file .github/pull_request_template.md
-# -> preencher a checklist no PR, confirmar CI verde + review, depois:
+# -> preencher a checklist no PR. SO DEPOIS de o PR existir e que ha checks para esperar:
+gh pr checks --watch         # GATE: espera ate terminarem; sai != 0 se algum falhar
 gh pr merge --squash         # (ou merge pela UI do GitHub)
 # -> Deploy automatico para producao
 

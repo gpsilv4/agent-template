@@ -15,7 +15,7 @@ Workflow para refactoring que garante seguranca e nao introduz regressoes no {{P
 
 ## 3. Identificar Alvos
 
-- Ficheiros com > 400 linhas -> candidatos a component splitting
+- Ficheiros com > 500 linhas -> candidatos a component splitting (limiar de flag do `core-rules.md`; ~400 e o ideal, nao o gatilho)
 - Componentes com > 8 props -> candidatos a composicao ou context
 - Componentes pesados / charts / exports -> candidatos a lazy loading
 - Logica duplicada entre paginas -> candidatos a custom hooks
@@ -45,8 +45,14 @@ Seguir o checklist estrito:
 3. Substituir chamadas manuais por invalidacao de cache
 4. Para **hybrid state** (server-init, client-editable): dependencia especifica, nao do objeto inteiro
 5. Para **formularios**: guard `initialized` para evitar resets por revalidation
-6. Verificar que nao ha ghost fetchers (`npx tsc --noEmit`)
-7. Verificar variable shadowing
+6. Verificar que nao ha **ghost fetchers** — chamadas a funcoes de fetch onde devia estar
+   invalidacao de cache (`debug.md`). **O `tsc` NAO deteta isto**: e codigo bem tipado.
+   Procurar a olho nos handlers de escrita, com apoio de:
+   `grep -rn -A5 -E "handle[A-Z]|onSubmit|onClick" src/ | grep -E "fetch|refetch|load[A-Z]"`
+   (sem `-n` no segundo grep: numeraria a posicao no *pipe*, nao no ficheiro)
+   (o `-A5` e essencial: a chamada de fetch quase nunca esta na MESMA linha do handler —
+   um `grep | grep` sem contexto devolve zero mesmo com ghost fetchers a existir)
+7. Verificar variable shadowing (tambem invisivel ao `tsc` — revisao manual)
 
 ## 6. Verificacao Pos-Refactor
 
@@ -87,6 +93,9 @@ Seguir o checklist estrito:
 
 Se ferramentas de substituicao falharem em ficheiros > 500 linhas:
 
-- Criar script Node.js temporario com `fs.readFileSync` + `.replace()` + `fs.writeFileSync`
-- Verificar com `npx tsc --noEmit` imediatamente apos
+- Criar script Node.js temporario com `fs.readFileSync` + **`.replaceAll()`** + `fs.writeFileSync`
+  — `.replace()` com um padrao string substitui **so a primeira ocorrencia**: num ficheiro
+  > 500 linhas ficam metade das substituicoes por fazer, e o `tsc` pode passar na mesma
+- **Asserir a contagem** antes de escrever: contar as ocorrencias esperadas e falhar se nao bater
+- Verificar com `npx tsc --noEmit` **e** `git diff --stat` (o `tsc` sozinho nao mostra o que faltou)
 - Apagar o script temporario

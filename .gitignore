@@ -14,8 +14,8 @@ coverage/
 
 # Env / secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
 # Tooling / local overrides
 .vercel

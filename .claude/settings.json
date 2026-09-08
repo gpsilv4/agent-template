@@ -5,13 +5,42 @@
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./**/.env)",
-      "Read(./**/.env.*)"
+      "Read(./**/.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.key)",
+      "Read(./**/id_rsa*)",
+      "Read(./**/.npmrc)",
+      "Read(./**/credentials*)",
+      "Read(./**/secrets/**)",
+      "Edit(./.claude/settings.json)",
+      "Write(./.claude/settings.json)",
+      "Edit(./.env*)",
+      "Write(./.env*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(rm -rf:*)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git merge:*)",
+      "Bash(gh pr merge:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)"
     ],
     "allow": [
-      "Read(.agent/**)",
-      "Bash(node .agent/scripts/*)",
+      "Read(./.agent/**)",
+      "Bash(node .agent/scripts/check-doc-versions.mjs)",
+      "Bash(node .agent/scripts/check-backlog.mjs)",
+      "Bash(node .agent/scripts/check-bundle-sizes.mjs)",
+      "Bash(node .agent/scripts/test-guards.mjs)",
+      "Bash(node .agent/scripts/test-bundle-sizes.mjs)",
       "Bash(npx tsc --noEmit)",
-      "Bash(npm run lint*)",
+      "Bash(npm run lint)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run build)",
+      "Bash(npm run test)",
       "Bash(npm run test:*)"
     ]
   }

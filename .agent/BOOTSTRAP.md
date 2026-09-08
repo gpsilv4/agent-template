@@ -312,7 +312,16 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** os guards genericos: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, paridade workflows↔wrappers + workflows nas tabelas, versao `package.json`≡`CHANGELOG`, `.nvmrc`, e scanner de termos obsoletos. **Opcionalmente**, adaptar dois arrays:
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards numerados. O total que ele reporta como "executados" **varia com a configuracao** (12 no template puro, porque o Guard 1 conta uma vez por rule obrigatoria e os Guards 3 e 4 saltam; +1 quando existe `package.json`, +1 com uma entrada em `BANNED`, +1 por `CHECK`): orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+
+> **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs` e
+> `node .agent/scripts/test-bundle-sizes.mjs` quebram cada guard de proposito e exigem que
+> avise e saia `!= 0`. Correr **sempre que mexeres nos scripts** — um guard que passa quando
+> devia falhar produz confianca infundada, e foi assim que dois deles ficaram sem apanhar
+> nada. Correm no CI no job `guard-tests`, que nao depende de `package.json`.
+
+Se renomeares ou acrescentares rules, adaptar tambem os arrays `REQUIRED_RULES`,
+`BOOTSTRAP_RULES` e `BOOTSTRAP_GENERATED` no topo do script. **Opcionalmente**, adaptar dois arrays:
 
 - `CHECKS` — dependencias com versoes referenciadas na documentacao:
 
@@ -389,7 +398,25 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
 - **`.claude/agents/*.md`** (`code-reviewer`, `debugger`): subagentes read-only/investigacao. Ajustar se o processo mudar.
-- **`.claude/settings.json`**: permissions do projeto (nega leitura de `.env*`, permite scripts seguros). Ajustar `allow`/`deny` a stack. `settings.local.json` e pessoal (gitignored) — nao versionar.
+- **`.claude/settings.json`**: **a fronteira de seguranca real** do projeto — e o unico ficheiro
+  machine-enforceable, e JSON nao aceita comentarios, por isso o racional vive aqui:
+  - `deny` e avaliado **antes** de `ask` e `allow` (primeira match ganha). Cobre leitura de secrets
+    (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `.npmrc`, `credentials*`, `secrets/**`), escrita sobre
+    `.env*`, e **edicao do proprio `settings.json`** — sem esta ultima, o agente alarga as proprias
+    permissoes. Mais os destrutivos irrecuperaveis (`git push --force`, `git reset --hard`, `rm -rf`).
+  - `ask` cobre o que o `CLAUDE.md` declara como "Perguntar primeiro": `git commit`/`push`/`merge`,
+    `gh pr merge`, `npm install`/`uninstall`. Sem isto, essas fronteiras existem so em prosa.
+  - `allow` **enumera comandos exatos, nunca prefixos abertos**. Um `Bash(node .agent/scripts/*)`
+    pre-aprova qualquer ficheiro nesse caminho (incluindo um que o agente acabe de escrever) e um
+    `Bash(npm run lint*)` pre-aprova `npm run lint-and-deploy`. Ao adicionar um script, acrescentar
+    a linha exata — nao alargar o padrao.
+  - **Assimetria deliberada**: o `.gitignore` versiona `.env.example` (`!.env.example`) mas o
+    `deny` de `Read(./.env.*)` impede o agente de o ler. E intencional — um ficheiro de exemplo
+    costuma conter valores realistas, e o agente nao precisa dele. Se o teu projeto quiser que o
+    agente o leia, renomear para um nome que o `deny` nao apanhe (ex: `env.example`).
+  - **Limite conhecido**: as regras `Read(...)` nao alcancam ficheiros abertos por um subprocesso
+    (`node`, `python`). Para bloqueio a nivel de OS, usar sandbox ou um hook `PreToolUse`.
+  - Ajustar `allow` a stack do projeto. `settings.local.json` e pessoal (gitignored) — nao versionar.
 
 ---
 
@@ -426,9 +453,9 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
-- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs` e `node .agent/scripts/check-backlog.mjs` (ambos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs`, `node .agent/scripts/check-backlog.mjs`, `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 
-> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`). Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 

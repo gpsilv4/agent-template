@@ -23,4 +23,22 @@
 
 -->
 
-_(Sem anti-padroes registados ainda. Adicionar a primeira entrada quando um bug revelar um padrao evitavel.)_
+## AP1 — Teste cuja assercao e satisfeita por outro guard
+
+- **Origem**: quatro rondas consecutivas de review a este repo (a mesma classe, quatro vezes).
+- **Anti-padrao**: afirmar `out.includes("<texto>")` sobre o output INTEIRO de um verificador,
+  com uma mutacao que quebra mais do que o alvo do teste. Tipico: escrever `CLAUDE.md` sem
+  escrever `GEMINI.md`, o que dispara sempre o guard de paridade. O teste fica verde porque
+  OUTRO guard avisou, e neutralizar o guard sob teste passa despercebido. A variante mais
+  subtil: `includes` nao distingue `WARN` de `NOTE`, logo despromover um aviso a nota mantem
+  o teste verde e desliga o gate.
+- **Correto**: afirmar contra as linhas do NIVEL certo (so as `WARN`), e mutar apenas o input
+  do guard sob teste — ou normalizar tudo o resto primeiro. Para verificadores, medir
+  **cobertura de mutacao**: sabotar cada sitio de aviso, um a um, e exigir que a suite fique
+  vermelha em cada um. Foi essa varredura que revelou 7 ramos sem cobertura que 109 testes
+  verdes escondiam.
+- **Detecao em review**: `grep -n 'writeF(dir, "CLAUDE.md"' .agent/scripts/test-guards.mjs` —
+  cada ocorrencia tem de escrever tambem o `GEMINI.md`, ou declarar `excludes: ["DIVERGEM"]`.
+  E `grep -c 'includes:' .agent/scripts/test-guards.mjs` nao pode crescer sem que a varredura
+  de mutacao (`node .agent/scripts/test-guards.mjs` apos sabotar cada `warn(`) continue a
+  apanhar 100% dos sitios.

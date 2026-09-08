@@ -134,7 +134,7 @@ Antes de tocar no codigo, ler:
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear.** Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
+- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear** — exceto o Security Audit, que e informativo (`continue-on-error`) e fica verde mesmo com advisories: abrir o log e ler o relatorio. Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:
@@ -145,8 +145,15 @@ Outros ficheiros `.github/`:
 - **`dependabot-auto-merge.yml`**: auto-merge de PRs patch/minor do Dependabot — **opt-in** (desligado; ver cabecalho do ficheiro). Majors ficam sempre para review manual
 - **`CODEOWNERS`**: Define reviewers automaticos por ficheiro
 
-Para correr o CI localmente (mesmos comandos do pipeline):
+Para correr localmente o **essencial** do pipeline (nao e equivalente — ver notas):
 
 ```bash
-npx tsc --noEmit && npm run lint && npm run build && npm run test:unit && npm audit --audit-level=high
+npx tsc --noEmit && npm run lint && npm run build && npm run test:unit
+npm audit --audit-level=high   # separado: informativo, nao deve abortar a cadeia
 ```
+
+> **Tres diferencas face ao CI**, para nao criares expectativas erradas:
+> 1. O `npm audit` corre com `continue-on-error` no CI — nunca reprova o merge.
+> 2. Falta aqui o `secret-scan` (gitleaks), que no CI corre **sempre**, ate no template puro.
+> 3. No CI cada step e **guardado** (salta se faltar `tsconfig.json` ou o script); a cadeia
+>    `&&` local morre no primeiro que faltar.
