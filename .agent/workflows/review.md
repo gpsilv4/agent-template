@@ -10,7 +10,9 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - `npm run lint` — passa
 - CI pipeline verde no branch — **verificar com um comando, nao a olho**, mas so quando
   **ja existe PR** (o `/review` corre tipicamente antes do commit; sem PR o comando sai em
-  erro "no pull requests found"): `gh pr checks --watch` — espera e sai `!= 0` se falhar.
+  erro "no pull requests found"). **Contar os checks antes de os esperar** — com zero checks
+  o `gh pr checks --watch` sai `0` e o gate passa sem nada ter sido verificado:
+  `n=$(gh pr checks --json state --jq 'length'); [ "$n" -gt 0 ] && gh pr checks --watch`
   Antes de haver PR, os equivalentes locais sao o `tsc`/`lint`/testes desta checklist
 - Se CI falhou, corrigir antes de pedir review/merge
 - **Security Audit**: corre com `continue-on-error` por defeito, logo fica **sempre verde**.

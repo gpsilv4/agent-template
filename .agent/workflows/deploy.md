@@ -31,9 +31,14 @@ Producao (main branch + {{BACKEND}} PROD)
 
 - Confirmar que o branch tem **todos os CI checks em verde** — com um comando, nao a olho.
   **Requer PR aberto** (sem PR, `gh pr checks` sai em erro "no pull requests found"):
-  ```bash
-  gh pr checks --watch    # espera ate terminarem; sai != 0 se algum falhar
-  ```
+```bash
+# GATE: exigir que os checks EXISTAM antes de exigir que estejam verdes.
+# `gh pr checks --watch` sai 0 quando nao ha check nenhum — na janela de propagacao
+# logo apos abrir o PR, um gate so com `--watch` passa sem nada ter sido verificado.
+n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0)
+[ "${n:-0}" -gt 0 ] || { echo "GATE: nenhum check reportado — o CI ainda nao arrancou"; exit 1; }
+gh pr checks --watch
+```
   Um agente em terminal nao consegue "ver no GitHub"; sem este comando o gate e so prosa.
 - Se algum check falhou, corrigir antes de continuar o deploy
 - **Security Audit**: por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
@@ -120,8 +125,10 @@ Verificacao manual apenas (ver seccao 8).
 #    commits e ignora o pull_request_template.md (checklist obrigatoria).
 gh pr create --title "<tipo(scope): descricao>" \
              --body-file .github/pull_request_template.md
-# -> preencher a checklist no PR. SO DEPOIS de o PR existir e que ha checks para esperar:
-gh pr checks --watch         # GATE: espera ate terminarem; sai != 0 se algum falhar
+# -> preencher a checklist no PR. SO DEPOIS de o PR existir e que ha checks para esperar.
+#    Contar antes de esperar: com zero checks o `--watch` sai 0 e o gate passa vazio.
+n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0)
+[ "${n:-0}" -gt 0 ] && gh pr checks --watch || { echo "GATE: CI ainda nao arrancou"; exit 1; }
 gh pr merge --squash         # (ou merge pela UI do GitHub)
 # -> Deploy automatico para producao
 
