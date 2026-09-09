@@ -2,6 +2,11 @@
 
 Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
+> Este workflow **e a Fase 0** do Metodo de Trabalho por Ticket (`process-rules.md`):
+> explicar antes de fazer, e **esperar aprovacao**. Num ticket `M`/`L` o resultado escreve-se
+> em `.agent/context/implementation_plan.md`, com as **alternativas rejeitadas e porque**.
+> Detalhe e escala por tamanho: `.agent/rules/ticket-method.md` (nao carregado).
+
 ## 0. Verificar Backlog
 
 - Antes de planear, consultar `.agent/context/backlog.md` — o item pode ja estar registado

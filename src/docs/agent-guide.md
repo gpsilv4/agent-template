@@ -66,12 +66,13 @@ Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os
 
 As regras sao diretivas que o Agente consulta antes de cada acao.
 
-- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, DRY/reutilizacao, performance, seguranca, CI/CD pipeline, scripts de automacao (bundle sizes, doc guards — opt-in).
+- **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, DRY/reutilizacao, performance, seguranca, CI/CD pipeline, scripts de automacao (doc guards, bundle sizes, backlog, e a varredura de mutacao que prova que as suites afirmam algo).
 - **[process-rules.md]**: Regras de processo: sessao, backlog, arquivamento, sprints, fluxos de trabalho por tipo, testes proativos, Conventional Commits, CI Gate, Git, branches.
 - **[anti-patterns.md]**: Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente).
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
-- **sync-docs.md**: Checklist de sincronizacao de docs (24 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
+- **sync-docs.md**: Checklist de sincronizacao de docs (25 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
+- **ticket-method.md**: As 6 fases por ticket, 0 a 5 (explicar e esperar -> desenvolver com controlo negativo -> loop da maquina -> loop do julgamento por angulos -> leitor independente -> relatorio) e a escala `S`/`M`/`L` — **nao carregada**, aberta ao iniciar um ticket `M` ou `L`. O ponteiro obrigatorio esta em `process-rules.md`.
 
 ---
 

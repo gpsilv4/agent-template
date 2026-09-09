@@ -4,6 +4,11 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 > Para alteracoes com **UI**, correr tambem `/design-review` (qualidade visual, UX, a11y, estados) — este `/review` cobre codigo/seguranca.
 
+> Este workflow **e a Fase 3** do Metodo de Trabalho por Ticket (`process-rules.md`): cada
+> passagem **declara o angulo antes de correr**, e um angulo ja usado nesta alteracao **nao
+> conta como passagem**. Para-se na primeira passagem que declare um angulo novo e nao
+> encontre nada. A lista de angulos esta em `.agent/rules/ticket-method.md` (nao carregado).
+
 ## 1. Build & CI Check
 
 - `npx tsc --noEmit` — 0 erros
@@ -89,18 +94,38 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 10. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (24 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
-- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`): `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` — sem eles, um guard partido parece um guard a passar
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (25 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
+- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`): `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs` e `test-mutation-sweep.mjs` — sem eles, um guard partido parece um guard a passar
+- [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 
-## 11. Backlog
+## 11. Leitor Independente (Fase 4)
+
+> Este `/review` e a Fase 3 — o teu julgamento. A Fase 4 e outra coisa: **outra leitura, sem
+> o raciocinio de quem escreveu**. Nao substitui nada acima; le codigo (logica, invariantes,
+> ramos mortos, escopo) e nao corre a app nem olha para o output.
+
+- [ ] **Corre?** `S`: nao. `M`: se pedires. `L` ou toca no nucleo do dominio: **sim**.
+- [ ] Invocado como subagente `code-reviewer` (Claude Code) ou, noutro agente, uma sessao
+      separada a quem se da so o diff e as regras — **sem** o teu raciocinio.
+- [ ] **Instruido a atacar**, nao a elogiar: "assume que esta errado ate prova em contrario",
+      cada achado com `ficheiro:linha` + reproducao, e **CONFIRMADO** vs **PLAUSIVEL** explicito.
+- [ ] **Cada achado verificado** contra o ficheiro real antes de agir — subagentes alucinam, e
+      um achado que nao se confirma custa mais do que nao o ter tido.
+- [ ] Confirmado **que ferramentas o subagente tem de facto** (pedir-lhe que as enumere): o
+      campo `tools:` do frontmatter nao entrega necessariamente o que declara.
+- [ ] Se encontrou algo -> **volta-se a Fase 2** (o loop da maquina) antes de seguir.
+
+> Detalhe e a escala por tamanho: `.agent/rules/ticket-method.md`.
+
+## 12. Backlog
 
 - [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, **remover** a linha das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
 - [ ] Atualizar contadores da tabela "Resumo" e validar com `node .agent/scripts/check-backlog.mjs` (0 divergencias).
 - [ ] Atualizar a barra de progresso e a linha **Proximo:** no `backlog.md`.
 - [ ] O trabalho revelou novos bugs ou melhorias? Propor novos items ao utilizador.
 
-## 12. Sessao (Handoff)
+## 13. Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 

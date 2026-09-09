@@ -141,6 +141,15 @@ jobs:
         run: node .agent/scripts/test-guards.mjs
       - name: Bundle checker — negative tests
         run: node .agent/scripts/test-bundle-sizes.mjs
+      - name: Backlog checker — negative tests
+        run: node .agent/scripts/test-backlog.mjs
+      - name: Mutation sweep — negative tests
+        run: node .agent/scripts/test-mutation-sweep.mjs
+      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (~50 sitios),
+      # logo custa minutos, nao segundos. Fica opt-in: correr localmente apos mexer num
+      # verificador. Se a quiseres no CI, descomenta e sobe o timeout-minutes deste job.
+      # - name: Mutation sweep — cada aviso tem de ficar vermelho
+      #   run: node .agent/scripts/mutation-sweep.mjs
 
   # Runs on every push/PR, including the bare template (no package.json guard):
   # scans the full history for committed secrets/keys.

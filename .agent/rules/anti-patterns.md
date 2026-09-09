@@ -34,11 +34,31 @@
 - **Correto**: afirmar contra as linhas do nivel certo, e mutar so o input do alvo. Para
   verificadores, medir **cobertura de mutacao**: sabotar cada sitio de erro, um a um, e
   exigir que a suite fique vermelha em cada um.
-- **Detecao em review**: sabotar e contar.
-  `grep -c 'includes:' <ficheiro-de-testes>` nao pode crescer sem que a varredura de
-  mutacao continue a apanhar 100% dos sitios. Neste repo:
-  `node .agent/scripts/test-guards.mjs` apos trocar cada `warn(` por `note(` em
-  `check-doc-versions.mjs` — 47 sitios, todos tem de ficar vermelhos.
+- **Detecao em review**: sabotar, nao contar a olho.
+  `node .agent/scripts/mutation-sweep.mjs` — desliga cada sitio de erro dos verificadores,
+  um a um, e exige que a suite fique vermelha em cada um. Sai `!= 0` se algum sitio puder
+  ser desligado com a suite verde, **e tambem** se um verificador nao tiver suite nenhuma.
+  (A versao anterior desta entrada trazia o numero de sitios escrito a mao. Envelheceu na
+  primeira alteracao ao verificador, e a receita ao lado nunca chegava a esse numero —
+  por isso o numero passou a ser derivado por um script.)
+
+## AP2 — Zero resultados lido como zero problemas
+
+- **Origem**: o `check-backlog.mjs` deste template.
+- **Anti-padrao**: um verificador que nao encontra dados concluir que **nao ha nada a
+  verificar**. Um backlog com tres items, mas com o titulo de uma seccao renomeado, lia zero
+  linhas e anunciava `Backlog vazio — nada a validar` com exit `0`: o gate passava **a
+  afirmar** que estava vazio. Variantes da mesma forma: caminhos relativos ao `cwd` (corrido
+  de uma subpasta le zero e passa), e esperar por checks de CI que ainda nao arrancaram
+  (`gh pr checks --watch` sai `0` com zero checks).
+- **Correto**: separar **"nao ha nada"** de **"nao consegui ler"**. Verificar primeiro que a
+  estrutura de que dependes existe (cabecalhos, ficheiros, contagem > 0) e reprovar se nao
+  existir; ancorar caminhos a raiz do repo, nunca ao `cwd`; e nunca afirmar "vazio" quando
+  algum aviso disparou.
+- **Detecao em review**: pegar num input **valido e populado**, renomear/mover o que o
+  verificador procura, e exigir que ele reprove. Se ele responder "vazio, nada a validar",
+  esta a mentir com exit `0`. Correr tambem cada verificador de uma subpasta: o resultado
+  tem de ser identico ao da raiz.
 
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que

@@ -2,6 +2,10 @@
 
 Workflow para refactoring que garante seguranca e nao introduz regressoes no {{PROJECT_NAME}}.
 
+> Um refactor e um ticket: **Fase 0** primeiro (o que muda, o que **nao** muda, e esperar).
+> Toca no nucleo do dominio? Entao o leitor independente da **Fase 4** e obrigatorio.
+> Ver `.agent/rules/ticket-method.md`.
+
 ## 1. Baseline
 
 - Correr `npx tsc --noEmit` e guardar o resultado (deve ser 0 erros)

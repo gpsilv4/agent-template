@@ -19,13 +19,20 @@
  */
 
 import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve, join } from "path";
+
+// Ancorar a raiz do REPO, nao ao cwd. Com caminhos relativos, correr o script de qualquer
+// subpasta (ou de um hook que nao faz cd) lia zero ficheiros, imprimia SKIP e saia 0 — um
+// gate a passar tendo validado nada. Mesma ancoragem que o check-doc-versions.mjs.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const ACTIVE = ".agent/context/backlog.md";
 const ARCHIVE = ".agent/context/backlog-archive.md";
 
 function read(path) {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(join(ROOT, path), "utf8");
   } catch {
     return null;
   }
@@ -90,10 +97,16 @@ console.log("\n=== Backlog Check ===\n");
 
 const active = read(ACTIVE);
 if (!active) {
-  console.log(`  SKIP  ${ACTIVE} nao encontrado.\n`);
-  process.exit(0);
+  // NAO sair 0: este ficheiro e importado pelas rules e a sua ausencia impede a
+  // verificacao por completo. Sair 0 aqui transformava o gate em decoracao.
+  console.log(`  WARN  ${ACTIVE} nao encontrado ou vazio — impossivel validar o backlog.\n`);
+  process.exit(1);
 }
-const archive = read(ARCHIVE) ?? "";
+// O arquivo guarda os items fechados. Ausente != vazio: se nao existe, os contadores de
+// Concluido/Cancelado sao calculados a partir de nada e a divergencia seria atribuida ao
+// Resumo em vez a fonte que falta.
+const archiveRaw = read(ARCHIVE);
+const archive = archiveRaw ?? "";
 
 let warnings = 0;
 const warn = (msg) => {
@@ -101,12 +114,19 @@ const warn = (msg) => {
   warnings++;
 };
 
+if (archiveRaw === null) {
+  warn(`${ARCHIVE} nao encontrado — o layout de dois ficheiros do backlog esta incompleto (items fechados vivem la)`);
+}
+
 // Seccoes por tipo (ordem == ordem das linhas do Resumo, sem a linha Total).
+// `resumo` e o rotulo tal como aparece na primeira coluna da tabela Resumo — usado para
+// casar por nome em vez de por posicao. Ao renomear uma seccao num projeto derivado,
+// atualizar aqui e no `backlog.md` em simultaneo (o guard avisa se divergirem).
 const SECTIONS = [
-  { key: "Bugs", re: /^##\s*1\./, tipos: ["bug", "bugs"] },
-  { key: "UX", re: /^##\s*2\./, tipos: ["ux"] },
-  { key: "Divida Tecnica", re: /^##\s*3\./, tipos: ["tecnica", "divida tecnica", "tech"] },
-  { key: "Features", re: /^##\s*4\./, tipos: ["feature", "features"] },
+  { key: "Bugs", resumo: "Bugs / Violacoes de Regras", re: /^##\s*1\./, tipos: ["bug", "bugs"] },
+  { key: "UX", resumo: "Melhorias UX", re: /^##\s*2\./, tipos: ["ux"] },
+  { key: "Divida Tecnica", resumo: "Divida Tecnica", re: /^##\s*3\./, tipos: ["tecnica", "divida tecnica", "tech"] },
+  { key: "Features", resumo: "Features Futuras", re: /^##\s*4\./, tipos: ["feature", "features"] },
 ];
 
 const counts = {};
@@ -138,6 +158,31 @@ for (const { key, re } of SECTIONS) {
       warn(`${key}: item "${id}" tem Estado desconhecido ("${cells[1]}")`);
       counts[key].total++;
     }
+  }
+}
+
+// 1b) A ESTRUTURA que este checker precisa existe de facto?
+// Sem isto havia um falso negativo grave: um backlog com items reais mas com o titulo de
+// uma seccao renomeado (`## 1. Bugs` -> `## Defeitos`) dava zero linhas encontradas, e o
+// checker anunciava "Backlog vazio (template) — nada a validar" com exit 0. Ou seja, o
+// gate passava A DIZER que o backlog estava vazio quando tinha items. Renomear seccoes e a
+// primeira customizacao natural num projeto derivado, logo este e o caminho provavel.
+//
+// Duas redes independentes: (a) os cabecalhos que o parser procura existem; (b) nenhuma
+// linha com aspeto de item ficou de fora da contagem — esta ultima apanha o drift mesmo
+// que os cabecalhos mudem de forma que (a) nao preveja.
+for (const { key, re } of SECTIONS) {
+  if (!active.split("\n").some((l) => re.test(l))) {
+    warn(`${ACTIVE}: nao encontrei o cabecalho da seccao "${key}" (${re}) — os items dessa seccao nao estao a ser contados`);
+  }
+}
+
+const ID_LIKE = /^[A-Z]{1,4}\d+$/;
+const contados = new Set(allIds.keys());
+for (const cells of tableRows(active)) {
+  const id = cells[0];
+  if (ID_LIKE.test(id) && !contados.has(id)) {
+    warn(`${ACTIVE}: item "${id}" esta numa tabela que nenhuma seccao reconhecida cobre — verificar os cabecalhos \`## 1.\`..\`## 4.\``);
   }
 }
 
@@ -174,15 +219,33 @@ const g = { pendente: 0, "a fazer": 0, concluido: 0, cancelado: 0, total: 0 };
 for (const { key } of SECTIONS) for (const k of Object.keys(g)) g[k] += counts[key][k];
 
 // --- Validar tabela Resumo ---
+// O heading `## Resumo` nao tinha rede: renomeado, `section()` devolve "", `tableRows("")`
+// devolve [], o forEach nao corre e o checker anunciava "contadores consistentes" com exit 0
+// — a desligar em silencio a sua propria razao de existir. Mesma forma do AP2 que este
+// ficheiro deu origem, e que ficou de fora quando os cabecalhos `## 1.`..`## 4.` a ganharam.
 const resumoRows = tableRows(section(active, /^##\s*Resumo/i)).filter((r) => !norm(r[0]).includes("total"));
-resumoRows.forEach((cells, i) => {
-  const sec = SECTIONS[i];
-  if (!sec) return;
-  const c = counts[sec.key];
+if (resumoRows.length !== SECTIONS.length) {
+  warn(
+    `${ACTIVE}: a tabela "Resumo" tem ${resumoRows.length} linha(s) de seccao, esperadas ${SECTIONS.length} ` +
+      `— cabecalho \`## Resumo\` renomeado, tabela alterada ou linha a mais/menos. Contadores NAO validados`
+  );
+}
+// Casar por NOME e nao por posicao: `process-rules.md` di-lo explicitamente ("atualiza as
+// tabelas pelo nome da seccao — nunca assumindo posicao"). Por posicao, trocar duas linhas
+// do Resumo atribuia os numeros a seccao errada e a mensagem apontava para o sitio errado.
+const porNome = new Map();
+for (const { key, resumo } of SECTIONS) porNome.set(norm(resumo ?? key), key);
+resumoRows.forEach((cells) => {
+  const key = porNome.get(norm(cells[0]));
+  if (key === undefined) {
+    warn(`${ACTIVE}: linha do Resumo "${cells[0]}" nao corresponde a nenhuma seccao conhecida`);
+    return;
+  }
+  const c = counts[key];
   const nums = cells.slice(1, 6).map((x) => parseInt(x, 10) || 0);
   const expected = [c.total, c.pendente, c["a fazer"], c.concluido, c.cancelado];
   if (nums.join(",") !== expected.join(",")) {
-    warn(`Resumo "${sec.key}": escrito [${nums.join(",")}] != calculado [${expected.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
+    warn(`Resumo "${key}": escrito [${nums.join(",")}] != calculado [${expected.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
   }
 });
 
@@ -212,8 +275,13 @@ console.log(`  Items: total ${g.total} | pendente ${g.pendente} | a fazer ${g["a
 console.log(`  Progresso calculado: ${g.concluido}/${countable} (${expectedPct}%), ${expectedFilled}/20 blocos`);
 console.log("");
 
-if (g.total === 0) {
+if (g.total === 0 && warnings === 0) {
+  // "Vazio" so se pode afirmar quando NADA avisou. Com avisos, zero items contados e
+  // provavelmente um problema de leitura (seccoes renomeadas), nao um backlog vazio —
+  // dizer "nada a validar" ali era desinformar sobre a propria falha.
   console.log("  Backlog vazio (template) — nada a validar.\n");
+} else if (g.total === 0) {
+  console.log(`WARNING: ${warnings} problema(s) e ZERO items contados — o backlog pode nao estar vazio, mas ilegivel. Corrigir antes de commit.\n`);
 } else if (warnings === 0) {
   console.log("  OK — contadores, barra e IDs consistentes.\n");
 } else {
