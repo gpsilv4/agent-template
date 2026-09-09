@@ -308,8 +308,8 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 | Agent | File it auto-loads | Slash commands | Verified how |
 |-------|--------------------|----------------|--------------|
-| Claude Code | `CLAUDE.md` (+ `.claude/`) | native, 11 | Used throughout this template's own development |
-| Google Gemini CLI | `GEMINI.md` | native, 11 (`.gemini/commands/`) | Entry file and wrappers checked by Guards 2, 6, 7, 10 |
+| Claude Code | `CLAUDE.md` (+ `.claude/`) | native (all of them) | Used throughout this template's own development |
+| Google Gemini CLI | `GEMINI.md` | native (`.gemini/commands/`) | Entry file and wrappers checked by Guards 2, 6, 7, 10 |
 | GitHub Copilot | `.github/copilot-instructions.md` | no | File shipped and points to `AGENTS.md`; **not exercised in a real Copilot session** |
 | Cursor | `.cursor/rules/*.mdc` | no | Same — shipped, pointing to `AGENTS.md`; **not exercised in a real Cursor session** |
 | ChatGPT / Codex | `AGENTS.md` | no | Same — `AGENTS.md` is its documented convention; **not exercised** |

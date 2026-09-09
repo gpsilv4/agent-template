@@ -57,8 +57,9 @@
   algum aviso disparou.
 - **Detecao em review**: pegar num input **valido e populado**, renomear/mover o que o
   verificador procura, e exigir que ele reprove. Se ele responder "vazio, nada a validar",
-  esta a mentir com exit `0`. Correr tambem cada verificador de uma subpasta: o resultado
-  tem de ser identico ao da raiz.
+  esta a mentir com exit `0`. Correr tambem cada verificador **de uma subpasta** (resultado
+  identico ao da raiz) e **num clone com CRLF** (`core.autocrlf=true` em Windows): um patch
+  ou regex com `"\n"` literal deixa de casar e o teste passa a nao afirmar nada.
 
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que

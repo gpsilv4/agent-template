@@ -238,7 +238,9 @@ test("CHECKS: versao de dependencia desatualizada na doc avisa", (dir) => {
   // dependencias sairam do ficheiro principal. Patch no modulo, nao no GUARD.
   const alvo = `${GUARD_MODULES}/versions.mjs`;
   const g = readF(dir, alvo).replace(
-    "const CHECKS = [\n",
+    // Regex e nao literal: num clone com `core.autocrlf=true` o ficheiro tem `\r\n` e o
+    // literal "\n" nao casava — o patch nao se aplicava e a asserção rebentava (bem).
+    /const CHECKS = \[\r?\n/,
     'const CHECKS = [\n  { name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+(?:\\.\\d+(?:\\.\\d+)?)?)/g, files: [".agent/rules/core-rules.md"] },\n'
   );
   if (g === readF(dir, alvo)) throw new Error(`nao encontrei 'const CHECKS = [' em ${alvo}`);
