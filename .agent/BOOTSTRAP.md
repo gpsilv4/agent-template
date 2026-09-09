@@ -458,6 +458,8 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
 - [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs` e `test-mutation-sweep.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o
+  `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
 
 > **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
@@ -474,6 +476,21 @@ Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue temp
 ### Proximo passo
 
 Sugerir ao utilizador:
+
+**Gravar de que ponto do template este projeto nasceu** — sem isto, o `/upgrade` nao sabe o
+que ja tens e tem de adivinhar por deteccao de capacidades em vez de por diff:
+
+```bash
+# Correr AINDA dentro do clone do template, antes de apagar a origem, ou apontando-lhe:
+printf 'template: %s\ncommit: %s\ndata: %s\n' \
+  "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
+  "$(git rev-parse HEAD)" \
+  "$(date +%F)" > .agent/.template-version
+```
+
+> Este ficheiro **nao existe no template** — nasce aqui, com o commit de origem deste
+> projeto. O `/upgrade` le-o para saber o que mudou desde entao (Modo A). Sem ele cai no
+> Modo B, que funciona mas propoe mais e com menos precisao.
 
 ```bash
 # Verificar que nao ficou nenhum placeholder (mesmo sweep da Fase 3 — zero linhas)

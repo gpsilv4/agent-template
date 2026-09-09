@@ -59,6 +59,7 @@ Stack: {{STACK}}.
 | Deploy para producao      | `.agent/workflows/deploy.md`           |
 | Auditoria completa        | `.agent/workflows/audit.md`            |
 | Analise de mercado        | `.agent/workflows/market-scan.md`      |
+| Atualizar do template     | `.agent/workflows/upgrade.md`          |
 
 ---
 

@@ -78,7 +78,8 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── e2e-tests.md            <- /e2e-tests — E2E tests (Playwright)
 │   ├── security-tests.md       <- /security-tests — Security tests
 │   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
-│   └── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
+│   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
+│   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
 └── scripts/
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
