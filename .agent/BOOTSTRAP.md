@@ -312,7 +312,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards numerados. O total que ele reporta como "executados" **varia com a configuracao** (12 no template puro, porque o Guard 1 conta uma vez por rule obrigatoria e os Guards 3 e 4 saltam; +1 quando existe `package.json`, +1 com uma entrada em `BANNED`, +1 por `CHECK`): orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 14 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -427,7 +427,10 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 
 ### Checklist
 
-- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? Correr o **sweep** abaixo — deve devolver **zero** linhas:
+- [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? O **Guard 13** verifica-o automaticamente
+  (`node .agent/scripts/check-doc-versions.mjs`) a partir do momento em que o `business-logic.md`
+  existe — antes disso salta, porque no template os placeholders sao esperados. O sweep manual
+  abaixo continua util para ver as linhas exatas, e deve devolver **zero**:
 
   ```bash
   git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \

@@ -50,6 +50,9 @@ const GUARD_MODULES = ".agent/scripts/guards";
 const FIXTURE_PATHS = [
   ".agent/rules",
   ".agent/workflows",
+  // O `BOOTSTRAP.md` nao estava aqui, logo qualquer guard que o leia ficava sem teste — foi
+  // o que aconteceu ao 12d (contagem de guards numerados), que o cita.
+  ".agent/BOOTSTRAP.md",
   ".agent/context",
   ".agent/scripts",
   ".claude/commands",

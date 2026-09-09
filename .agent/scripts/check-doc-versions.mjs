@@ -35,6 +35,7 @@ import { dirname, resolve, join } from "path";
 import { guardSettings } from "./guards/settings.mjs";
 import { guardChangelogVersion, guardDependencyVersions } from "./guards/versions.mjs";
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
+import { guardPlaceholders } from "./guards/placeholders.mjs";
 
 // --- Ancoragem a raiz do repo -------------------------------------------------
 // Este ficheiro vive em <raiz>/.agent/scripts/, logo a raiz esta dois niveis acima.
@@ -372,6 +373,11 @@ guardsRun += guardSettings({ read, warn, ok, note, skip });
 // --- Guards 12 e 12c: contagens citadas em prosa como dados DERIVADOS ---
 // Extraidos para `guards/derived-counts.mjs`.
 guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir });
+// --- Guard 13: placeholders esquecidos apos o bootstrap ---
+// A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
+// `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
+guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir });
+
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---
 // Extraidos para `guards/versions.mjs`. Configurar o `CHECKS` la.
 guardsRun += guardDependencyVersions({ read, warn, ok, skip });

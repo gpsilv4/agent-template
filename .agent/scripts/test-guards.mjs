@@ -18,6 +18,7 @@ import { join } from "path";
 import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado } from "./test-harness.mjs";
 import { registar as registarSettings } from "./tests-settings.mjs";
 import { registar as registarDerivedCounts } from "./tests-derived-counts.mjs";
+import { registar as registarPlaceholders } from "./tests-placeholders.mjs";
 
 // --- Baseline -----------------------------------------------------------------
 // Estes dois nao usam `test()`: correm contra a fixture sintetica, nao contra o repo.
@@ -393,5 +394,6 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
 
 
 registarDerivedCounts();
+registarPlaceholders();
 
 resumo();

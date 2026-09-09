@@ -88,6 +88,12 @@ const PARES = [
     neutro: "(() => {})(",
   },
   {
+    alvo: ".agent/scripts/guards/placeholders.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-bundle-sizes.mjs",
     suite: ".agent/scripts/test-bundle-sizes.mjs",
     // Unico par opcional: um projeto sem bundler pode apagar este verificador. Todos os

@@ -109,4 +109,25 @@ test("G12c: metodo ausente da SKIP visivel, nao silencio", (dir) => {
   rmSync(file(dir, METODO));
 }, { code: 0, includes: ["SKIP  Guard 12c"] });
 
+
+  // --- 12d: contagem de guards numerados ------------------------------------
+  // Terceira instancia do padrao: o BOOTSTRAP.md dizia "11 guards numerados" com 14 a
+  // existir. Sem rede, um numero a mao envelhece na primeira alteracao.
+  test("G12d: citacao desatualizada de 'N guards numerados' avisa", (dir) => {
+    writeF(dir, ".agent/BOOTSTRAP.md",
+      readF(dir, ".agent/BOOTSTRAP.md").replace(/\d+ guards numerados/, "3 guards numerados"));
+  }, { code: 1, includes: ['diz "3 guards numerados" mas existem'] });
+
+  test("G12d: guard novo sem atualizar a prosa avisa", (dir) => {
+    writeF(dir, ".agent/scripts/guards/settings.mjs",
+      readF(dir, ".agent/scripts/guards/settings.mjs") + "\n// --- Guard 99: inventado ---\n");
+  }, { code: 1, includes: ["guards numerados\" mas existem"] });
+
+  test("G12d: cabecalhos `// --- Guard N:` em outro formato avisam", (dir) => {
+    for (const f of ["check-doc-versions.mjs", "guards/settings.mjs", "guards/versions.mjs",
+                     "guards/derived-counts.mjs", "guards/placeholders.mjs"]) {
+      writeF(dir, `.agent/scripts/${f}`,
+        readF(dir, `.agent/scripts/${f}`).replace(/^\/\/ --- Guard (\d+[a-z]?):/gm, "// --- Verificacao:"));
+    }
+  }, { code: 1, includes: ["nao encontrei nenhum cabecalho"] });
 }

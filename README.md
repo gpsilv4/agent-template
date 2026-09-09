@@ -85,12 +85,14 @@ When you open a new AI session in any project using this template, the agent **a
     ├── guards/                 <- Guard modules split out of the entry point
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
-    │   └── derived-counts.mjs  <- Guards 12/12c: counts cited in prose, recomputed
+    │   ├── derived-counts.mjs  <- Guards 12/12c/12d: counts cited in prose, recomputed
+    │   └── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── test-guards.mjs         <- Entry point for the doc-guard suites (no deps, no package.json)
     ├── test-harness.mjs        <- Shared sandbox + test() + summary
     ├── tests-settings.mjs      <- Guard 11 tests (mirrors guards/settings.mjs)
-    ├── tests-derived-counts.mjs<- Guards 12/12c tests (mirrors guards/derived-counts.mjs)
+    ├── tests-derived-counts.mjs<- Guards 12/12c/12d tests
+    ├── tests-placeholders.mjs  <- Guard 13 tests (simulates a completed bootstrap)
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
