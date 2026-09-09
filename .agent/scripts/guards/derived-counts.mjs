@@ -150,5 +150,40 @@ if (metodo) {
 }
 
 
+  // --- 12d: o numero de guards numerados e dado DERIVADO ---
+  // Terceira instancia do mesmo padrao (checklist, fases, e agora isto): o `BOOTSTRAP.md`
+  // dizia "11 guards numerados" quando existiam 14. O numero era mantido a mao.
+  const fontes = [
+    ".agent/scripts/check-doc-versions.mjs",
+    ...(listDir(".agent/scripts/guards", ".mjs") || []).map((f) => `.agent/scripts/guards/${f}.mjs`),
+  ];
+  const numerados = new Set();
+  for (const f of fontes) {
+    const c = read(f);
+    if (c === null) continue;
+    for (const m of c.matchAll(/^\/\/ --- Guard (\d+[a-z]?):/gm)) numerados.add(m[1]);
+  }
+  if (numerados.size === 0) {
+    warn("nao encontrei nenhum cabecalho `// --- Guard N:` — os guards mudaram de formato?");
+  } else {
+    let cit = 0;
+    let mal = 0;
+    for (const f of ficheirosComProsa(listDir).concat([".agent/BOOTSTRAP.md"])) {
+      const c = read(f);
+      if (c === null) continue;
+      for (const linha of c.split("\n")) {
+        const m = /(\d+)\s+guards\s+numerados/.exec(linha);
+        if (!m) continue;
+        cit++;
+        if (Number(m[1]) !== numerados.size) {
+          warn(`${f} diz "${m[1]} guards numerados" mas existem ${numerados.size}`);
+          mal++;
+        }
+      }
+    }
+    if (cit > 0 && mal === 0) ok(`${cit} citacao(oes) de "N guards numerados" coerentes com ${numerados.size}`);
+  }
+  guardsRun++;
+
   return guardsRun;
 }
