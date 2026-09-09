@@ -68,6 +68,12 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 | **Script** (`.agent/scripts/X.mjs`) | passo em `.github/workflows/ci.yml` — **obrigatorio** e sem gate do `detect` se for um `test-*.mjs` (job `guard-tests`), opt-in comentado se depender de build ou de configuracao do projeto (`TARGETS`, `CHECKS`); `core-rules.md` (seccao scripts); `README.md` (arvore + tabela); **e os sitios que o INVOCAM**: `review.md`, `deploy.md`, `.github/pull_request_template.md`, `BOOTSTRAP.md` §2.4 — sem isto o guard fica documentado em todo o lado e corrido por nada. Se e um guard, criar tambem o `test-X.mjs` com os controlos negativos |
 | **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist de 1-24 acima**; classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
 
+> **Sentido inverso**: quando o **template de origem** ganha algo e se quer trazer para um
+> projeto derivado, o workflow e `/upgrade` (`.agent/workflows/upgrade.md`). Decide por
+> **categoria de ficheiro** — nunca por lista de nomes, que envelhece — e o `.agent/context/*`
+> nunca se toca. Se acrescentares uma categoria a matriz acima, acrescenta a linha
+> correspondente a tabela do `/upgrade`.
+
 > Regra de paridade: qualquer edicao a `CLAUDE.md` tem espelho em `GEMINI.md` (so difere `@[...]`) — validado por `check-doc-versions.mjs`.
 
 ## Contra-verificacao por grep (anti-drift)

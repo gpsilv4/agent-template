@@ -93,6 +93,7 @@ Os workflows sao sequencias de passos que o Agente executa para tarefas especifi
 | **`/deploy`**         | Deploy Producao    | Passos finais para enviar para producao.                |
 | **`/audit`**          | Auditoria Completa | Estado holistico do projeto/app (milestone; multi-lente).|
 | **`/market-scan`**    | Analise de Mercado | Concorrencia + gaps + ideacao de features (web).        |
+| **`/upgrade`**        | Atualizar do template | Trazer melhorias do template de origem sem perder o que e do projeto. |
 
 > **Como sao invocados:** os workflows vivem em `.agent/workflows/` e sao lidos **on-demand** (nao carregam sempre no contexto). No **Claude Code** existem tambem como slash commands nativos em `.claude/commands/` (wrappers finos). Com **outro agente** (Gemini, Cursor, Copilot), dizes _"corre o /plan"_ ou _"segue `.agent/workflows/plan.md`"_ — le o mesmo ficheiro. O `.claude/` (commands, `agents/` subagentes read-only, `settings.json` de permissions) e so-Claude; os outros ignoram-no. **O que se perde fora do Claude Code esta listado no `README.md`** (fronteira de permissoes, subagente da Fase 4, slash commands) — a logica nao, essa vive toda em `.agent/`. Entry cross-tool: `AGENTS.md`, com ponteiros finos em `.github/copilot-instructions.md` e `.cursor/rules/*.mdc` porque sao esses os ficheiros que o Copilot e o Cursor carregam.
 

@@ -1,0 +1,2 @@
+description = "Trazer melhorias do template de origem para este projeto, sem apagar o que e do projeto"
+prompt = "Le e segue .agent/workflows/upgrade.md"

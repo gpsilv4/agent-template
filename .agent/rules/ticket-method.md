@@ -13,6 +13,21 @@ Seis fases: **explicar antes de fazer** (0) · desenvolver (1) · um loop com cr
 O criterio diz o que conta como achado; **nao** diz quando o ciclo acaba. Isso e sempre uma
 decisao do utilizador (Fases 2 e 3).
 
+E ha, depois do commit, algo que **nao e do agente e nao se numera: usar** o que mudou. (Nao
+lhe chamo fase nem passagem de proposito — as fases sao seis, 0 a 5, e "passagem" ja significa
+uma volta da Fase 3.) Nao e
+um remate opcional — sao **tres instrumentos que apanham classes diferentes**, e o terceiro e
+o unico que apanha uma decisao errada:
+
+| Instrumento | Apanha |
+|-------------|--------|
+| As Fases 2-3 (o teu julgamento) | o que **acabaste de escrever** |
+| A Fase 4 (leitor independente) | o que **nao consegues ver por teres escrito** |
+| **Usar** (nao e do agente) | o que **decidiste mal** — inclui o que nunca chegou a existir |
+
+Detalhe mais abaixo, em _"A fase que nao e do agente"_. Saltar as tres nao e ir mais rapido:
+e trocar tres tipos de deteccao por um.
+
 O que escala com o tamanho do ticket sao tres delas — a **Fase 0** (do chat ao ficheiro com
 alternativas), a **Fase 3** (quantas passagens esperar) e a **Fase 4** (se corre). As outras
 tres sao **binarias**: um controlo negativo, o `tsc 0` e o relatorio de 5 pontos valem igual
@@ -197,11 +212,20 @@ E o Git pergunta-se **um passo por vez**: commit, depois push, depois PR, depois
 Depois de cada ticket, **uma passagem a usar o que mudou**. Num produto com UI, e abrir o
 ecra; numa lib, e consumi-la de fora; num template, e criar um projeto a partir dele.
 
-Isto nao e opcional nem cosmetico. Numa sessao medida, cinco rondas de review adversarial
-encontraram 22 defeitos — todos em codigo escrito minutos antes. **Uma unica passagem de uso
-encontrou um defeito de desenho que nenhuma das cinco viu**, e usar um gate a serio revelou
-que ele passava com zero verificacoes. Sao classes diferentes: a revisao apanha o que
-acabaste de escrever, o uso apanha o que decidiste mal.
+Isto nao e opcional nem cosmetico, e a medicao e especifica. Numa sessao real:
+
+- **A revisao** (Fases 2-3, seis passagens) encontrou 22 defeitos — todos em codigo escrito
+  minutos antes.
+- **O leitor independente** (Fase 4) encontrou, em dezasseis minutos, tres defeitos ALTO que
+  as seis passagens nao viram — incluindo um check de seguranca que podia ser desligado com a
+  suite toda verde. A revisao falhou ai porque quem escreveu o teste **sabe o que ele queria
+  dizer**.
+- **Usar** encontrou o que nao existia: simular o bootstrap revelou que faltava um verificador
+  inteiro (nenhuma revisao podia encontrar codigo ausente); converter o repo para CRLF revelou
+  dois testes que nao afirmavam nada; e correr um gate de CI a serio revelou que ele passava
+  com zero verificacoes.
+
+Nenhum destes tres substitui os outros. O erro nao e escolher mal — e escolher so um.
 
 ## O que o metodo nao faz
 
