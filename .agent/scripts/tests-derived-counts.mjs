@@ -7,10 +7,21 @@
  * NAO e um entry point: o `test-guards.mjs` importa e chama `registar()`, para a ordem dos
  * testes ser explicita em vez de depender da ordem de avaliacao dos imports.
  */
-import { rmSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings,
-         listWorkflowRows, dropLinesContaining, GUARD, GUARD_MODULES, ROOT } from "./test-harness.mjs";
+import { rmSync } from "fs";
+import { pathToFileURL } from "url";
+import { test, file, readF, writeF } from "./test-harness.mjs";
+
+// NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
+// suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
+// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// problemas"). Achado do leitor independente (Fase 4).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.error(
+    `tests-derived-counts.mjs nao e um entry point: nao corre testes por si.\n` +
+      "Correr `node .agent/scripts/test-guards.mjs`, que importa este modulo e chama registar()."
+  );
+  process.exit(1);
+}
 
 export function registar() {
 // --- Guard 12: a contagem da checklist como dado derivado ---------------------

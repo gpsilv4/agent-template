@@ -274,6 +274,38 @@ test("ancoragem: fixture valida vista de subpasta continua limpa", (dir) => {
   return f(dir, "src/deep");
 }, { code: 0, includes: ["OK — contadores, barra e IDs consistentes"], excludes: ["  WARN  "] });
 
+// --- Estrutura: a tabela Resumo tambem precisa de rede ------------------------
+// Achado do leitor independente (Fase 4): os cabecalhos `## 1.`..`## 4.` ganharam duas
+// redes e o `## Resumo` ficou sem nenhuma — o heading cujo drift desliga a razao de existir
+// do checker. Renomeado, dava "contadores consistentes" com exit 0 num backlog populado.
+test("Resumo: cabecalho `## Resumo` renomeado avisa", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    readF(dir, ".agent/context/backlog.md").replace("## Resumo", "## Sumario"));
+}, { code: 1,
+     includes: ['a tabela "Resumo" tem 0 linha(s) de seccao, esperadas 4'],
+     excludes: ["OK — contadores, barra e IDs consistentes"] });
+
+test("Resumo: linha de seccao apagada avisa", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    readF(dir, ".agent/context/backlog.md").replace("| Features Futuras | 1 | 0 | 0 | 0 | 1 |\n", ""));
+}, { code: 1, includes: ['tem 3 linha(s) de seccao, esperadas 4'] });
+
+test("Resumo: linha inventada avisa em vez de ser ignorada", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    readF(dir, ".agent/context/backlog.md").replace(
+      "| Features Futuras | 1 | 0 | 0 | 0 | 1 |",
+      "| Features Futuras | 1 | 0 | 0 | 0 | 1 |\n| Seccao Fantasma | 99 | 99 | 0 | 0 | 0 |"));
+}, { code: 1, includes: ['linha do Resumo "Seccao Fantasma" nao corresponde a nenhuma seccao conhecida'] });
+
+test("Resumo: casa por NOME, nao por posicao", (dir) => {
+  // Trocar as linhas de Bugs e UX. Por posicao, os numeros iam para a seccao errada e a
+  // mensagem apontava para o sitio errado; por nome, a fixture continua correta.
+  let c = readF(dir, ".agent/context/backlog.md");
+  c = c.replace("| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |\n| Melhorias UX | 1 | 1 | 0 | 0 | 0 |",
+                "| Melhorias UX | 1 | 1 | 0 | 0 | 0 |\n| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |");
+  writeF(dir, ".agent/context/backlog.md", c);
+}, { code: 0, includes: ["OK — contadores, barra e IDs consistentes"], excludes: ["  WARN  "] });
+
 // --- Estrutura: seccao renomeada nao pode virar "backlog vazio" --------------
 // O defeito que isto cobre: um backlog com items reais e o cabecalho `## 1. Bugs`
 // renomeado dava zero linhas lidas, e o checker anunciava "Backlog vazio (template) —

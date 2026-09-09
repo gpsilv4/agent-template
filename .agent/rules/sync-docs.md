@@ -38,7 +38,10 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     verificador sem suite — nao a silenciar, escrever a suite.
     **Guard extraido para `guards/*.mjs`?** A entrada em `PARES` e obrigatoria: os avisos
     passam a viver no modulo, e sem ela a varredura cobre so o ficheiro de entrada e reporta
-    100% a mentir. A soma dos sitios antes e depois de um refactor tem de ser a MESMA
+    100% a mentir. A soma dos sitios antes e depois de um refactor tem de ser a MESMA.
+    **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
+    (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
+    permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre
 15. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
 16. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
 17. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais

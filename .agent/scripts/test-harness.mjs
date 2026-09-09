@@ -20,11 +20,24 @@
  * (sem `package.json` e sem gate do `detect` — o template puro e exatamente o caso coberto).
  */
 
-import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync, appendFileSync, existsSync } from "fs";
+import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
+
+// NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
+// suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
+// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// problemas"). Achado do leitor independente (Fase 4).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.error(
+    `test-harness.mjs nao e um entry point: nao corre testes por si.\n` +
+      "Correr `node .agent/scripts/test-guards.mjs`, que importa este modulo e chama registar()."
+  );
+  process.exit(1);
+}
+
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GUARD = ".agent/scripts/check-doc-versions.mjs";

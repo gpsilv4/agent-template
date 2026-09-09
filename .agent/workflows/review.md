@@ -99,14 +99,33 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 
-## 11. Backlog
+## 11. Leitor Independente (Fase 4)
+
+> Este `/review` e a Fase 3 — o teu julgamento. A Fase 4 e outra coisa: **outra leitura, sem
+> o raciocinio de quem escreveu**. Nao substitui nada acima; le codigo (logica, invariantes,
+> ramos mortos, escopo) e nao corre a app nem olha para o output.
+
+- [ ] **Corre?** `S`: nao. `M`: se pedires. `L` ou toca no nucleo do dominio: **sim**.
+- [ ] Invocado como subagente `code-reviewer` (Claude Code) ou, noutro agente, uma sessao
+      separada a quem se da so o diff e as regras — **sem** o teu raciocinio.
+- [ ] **Instruido a atacar**, nao a elogiar: "assume que esta errado ate prova em contrario",
+      cada achado com `ficheiro:linha` + reproducao, e **CONFIRMADO** vs **PLAUSIVEL** explicito.
+- [ ] **Cada achado verificado** contra o ficheiro real antes de agir — subagentes alucinam, e
+      um achado que nao se confirma custa mais do que nao o ter tido.
+- [ ] Confirmado **que ferramentas o subagente tem de facto** (pedir-lhe que as enumere): o
+      campo `tools:` do frontmatter nao entrega necessariamente o que declara.
+- [ ] Se encontrou algo -> **volta-se a Fase 2** (o loop da maquina) antes de seguir.
+
+> Detalhe e a escala por tamanho: `.agent/rules/ticket-method.md`.
+
+## 12. Backlog
 
 - [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, **remover** a linha das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
 - [ ] Atualizar contadores da tabela "Resumo" e validar com `node .agent/scripts/check-backlog.mjs` (0 divergencias).
 - [ ] Atualizar a barra de progresso e a linha **Proximo:** no `backlog.md`.
 - [ ] O trabalho revelou novos bugs ou melhorias? Propor novos items ao utilizador.
 
-## 12. Sessao (Handoff)
+## 13. Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 

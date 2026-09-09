@@ -53,13 +53,26 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU");
 console.log("ok");
 `;
 
-function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false } = {}) {
+function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
   let check = FAKE_CHECK;
   if (!segundoSitio) check = check.replace('if (alvo.includes("zzz")) warn("encontrei \'zzz\'");\n', "");
-  writeFileSync(join(dir, ".agent/scripts/fake-check.mjs"), check);
+  if (doisNaMesmaLinha) {
+    // Duas chamadas de aviso na MESMA linha: `sitios` e indexado por linha e o `replace` nao
+    // e global, logo a segunda herdava a cobertura da primeira sem nunca ser medida.
+    //
+    // A linha ambigua tem de ser a linha COBERTA (a do "mau"), nao a descoberta. Na primeira
+    // versao deste teste ela era a do "zzz": desligar o `falhou` do LINHA AMBIGUA mantinha o
+    // exit 1 porque a INCOMPLETA disparava — a assercao era satisfeita por outra verificacao,
+    // que e exatamente o AP1. Assim, a unica razao de reprovar e a linha ambigua.
+    check = check.replace(
+      'if (alvo.includes("mau")) warn("encontrei \'mau\'");',
+      'if (alvo.includes("mau")) { warn("encontrei \'mau\'"); warn("extra"); }'
+    );
+  }
+  if (!semAlvo) writeFileSync(join(dir, ".agent/scripts/fake-check.mjs"), check);
 
   writeFileSync(
     join(dir, ".agent/scripts/fake-test.mjs"),
@@ -75,7 +88,7 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
   const paresFalso =
     "const PARES = [{ alvo: \".agent/scripts/fake-check.mjs\", suite: " +
     (suite === null ? "null" : JSON.stringify(suite)) +
-    ", sinal: " + sinal + ", neutro: \"(() => {})(\" }];";
+    ", sinal: " + sinal + ", neutro: \"(() => {})(\"" + (opcional ? ", opcional: true" : "") + " }];";
   writeFileSync(join(dir, ".agent/scripts/mutation-sweep.mjs"), src.slice(0, inicio) + paresFalso + src.slice(fim));
   return dir;
 }
@@ -121,7 +134,7 @@ console.log("\n=== Testes do Mutation Sweep ===\n");
 // --- O que o varredor existe para fazer --------------------------------------
 test("deteta um sitio de aviso que nenhum teste exercita", {}, [], {
   code: 1,
-  includes: ["INCOMPLETA", "1/2 sitios cobertos", "encontrei 'zzz'", "VARREDURA INCOMPLETA"],
+  includes: ["INCOMPLETA", "1/2 sitios cobertos", "encontrei 'zzz'", "VARREDURA NAO CONCLUSIVA"],
 });
 
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {
@@ -134,7 +147,7 @@ test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }
 // --- Os caminhos de reprovacao (um teste por sitio) --------------------------
 test("verificador SEM suite reprova", { suite: null }, [], {
   code: 1,
-  includes: ["SEM SUITE", "NENHUM teste", "VARREDURA INCOMPLETA"],
+  includes: ["SEM SUITE", "NENHUM teste", "VARREDURA NAO CONCLUSIVA"],
 });
 
 test("sinal que nao casa nada reprova (nao varre zero em silencio)", { sinal: "/nunca_casa_isto\\(/" }, [], {
@@ -150,6 +163,43 @@ test("baseline ja vermelha reprova antes de varrer", { baselineVermelha: true },
 test("--only sem correspondencia reprova e lista os alvos", {}, ["--only=nao-existe"], {
   code: 1,
   includes: ["nao casa nenhum alvo", "fake-check.mjs"],
+});
+
+// --- Alvo que desapareceu do disco (achado da Fase 4) ------------------------
+// Assimetria que existia: um `sinal` desatualizado reprovava, um `alvo` desatualizado
+// passava a dizer "Cobertura de mutacao completa". Renomear um verificador sem tocar em
+// `PARES` deixava o gate verde — o cenario que a matriz de propagacao quer prevenir.
+test("alvo que nao existe reprova (nao passa a dizer 'completa')", { semAlvo: true }, [], {
+  code: 1,
+  includes: ["ALVO AUSENTE", "sem atualizar PARES"],
+  excludes: ["Cobertura de mutacao completa"],
+});
+
+test("alvo declarado opcional pode faltar sem reprovar", { semAlvo: true, opcional: true }, [], {
+  code: 0,
+  includes: ["declarado opcional", "Cobertura de mutacao completa"],
+  excludes: ["ALVO AUSENTE"],
+});
+
+// --- `--list` nao pode engolir o veredicto (achado da Fase 4) -----------------
+// Os testes cobriam cada flag isolada; a COMBINACAO saia 0 a reportar um problema.
+test("--list com --only sem correspondencia continua a reprovar", {}, ["--list", "--only=nao-existe"], {
+  code: 1,
+  includes: ["nao casa nenhum alvo"],
+});
+
+test("--list com SEM SUITE continua a reprovar", { suite: null }, ["--list"], {
+  code: 1,
+  includes: ["SEM SUITE"],
+});
+
+// --- Duas chamadas de aviso na mesma linha (achado da propria varredura) -----
+test("dois avisos na mesma linha reprovam em vez de herdar cobertura",
+     { doisNaMesmaLinha: true, segundoSitio: false }, [], {
+  code: 1,
+  includes: ["LINHA AMBIGUA", "2 avisos na mesma linha", "separa-los para cada um ser medido"],
+  // Sem INCOMPLETA no output, a LINHA AMBIGUA e a unica coisa que pode fazer o exit != 0.
+  excludes: ["Cobertura de mutacao completa", "INCOMPLETA  .agent"],
 });
 
 // --- Contratos que nao se podem perder ---------------------------------------

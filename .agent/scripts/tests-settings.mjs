@@ -7,10 +7,21 @@
  * NAO e um entry point: o `test-guards.mjs` importa e chama `registar()`, para a ordem dos
  * testes ser explicita em vez de depender da ordem de avaliacao dos imports.
  */
-import { rmSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings,
-         listWorkflowRows, dropLinesContaining, GUARD, GUARD_MODULES, ROOT } from "./test-harness.mjs";
+import { rmSync } from "fs";
+import { pathToFileURL } from "url";
+import { test, file, readF, writeF, patchSettings, GUARD, GUARD_MODULES } from "./test-harness.mjs";
+
+// NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
+// suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
+// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// problemas"). Achado do leitor independente (Fase 4).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.error(
+    `tests-settings.mjs nao e um entry point: nao corre testes por si.\n` +
+      "Correr `node .agent/scripts/test-guards.mjs`, que importa este modulo e chama registar()."
+  );
+  process.exit(1);
+}
 
 export function registar() {
 // --- Guard 11: sanidade do settings.json -------------------------------------
@@ -24,6 +35,49 @@ test("G11: deny de .env retirado por completo avisa", (dir) => {
   cfg.permissions.deny = [];
   writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
 }, { code: 1, includes: ["nenhuma regra `deny` cobre a leitura de"] });
+
+// Achado do leitor independente (Fase 4), confirmado pela varredura: este era o UNICO
+// sitio de aviso do guard que podia ser desligado com a suite verde (20/21) — e e o que
+// impoe o "perguntar primeiro" do CLAUDE.md. Causa: AP1. O teste acima esvazia o `deny`
+// E o `ask` ao mesmo tempo, e o `includes` era satisfeito pelos flags do deny, logo o
+// `askCovers` desligado passava invisivel. Este esvazia SO o `ask`.
+// Achado do leitor independente (Fase 4): a lista de prefixos "fora do projeto" enumerava
+// `/etc`, `/Users`, `/home`, `/root`, `/var`, `/private` e deixava passar `/opt`, `/tmp`,
+// `/usr`, `/Volumes`, `/Library`. Passou a allowlist invertida — qualquer caminho absoluto.
+test("G11: caminhos absolutos que a lista de prefixos nao cobria sao apanhados", (dir) => {
+  patchSettings(dir, (c) =>
+    c.permissions.allow.push(
+      "Bash(cat /Volumes/externo/segredo)",
+      "Bash(cat /opt/config)",
+      "Bash(cat /usr/local/etc/x)",
+      "Bash(cat /Library/Preferences/x)"
+    )
+  );
+}, { code: 1, includes: ["/Volumes/externo/segredo", "/opt/config", "/usr/local/etc/x", "/Library/Preferences/x"] });
+
+test("G11: comando destrutivo com caminho absoluto da a mensagem destrutiva, nao a generica", (dir) => {
+  // A mensagem generica ("fora do projeto") mascarava a util quando as duas se aplicavam.
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(rm -rf /tmp/x)"));
+}, { code: 1, includes: ["shell interactiva ou comando destrutivo", "esta fora do projeto"] });
+
+// A varredura de mutacao apanhou este: ao desviar `rm -rf /tmp/x` para a mensagem nova do
+// `foraDoProjeto`, o sitio ORIGINAL do check destrutivo ficou so alcancavel por um comando
+// destrutivo com caminho RELATIVO — e nenhum teste fazia isso.
+test("G11: destrutivo com caminho relativo tambem e apanhado", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(rm -rf build)"));
+}, { code: 1,
+     includes: ["pre-aprova `rm` — shell interactiva ou comando destrutivo"],
+     excludes: ["esta fora do projeto"] });
+
+test("G11: `ask` esvaziado (deny intacto) avisa os tres comandos de perguntar primeiro", (dir) => {
+  const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
+  cfg.permissions.ask = [];
+  writeF(dir, ".claude/settings.json", JSON.stringify(cfg, null, 2));
+}, { code: 1, includes: [
+  "`git commit` nao esta em `ask` nem em `deny`",
+  "`git push` nao esta em `ask` nem em `deny`",
+  "`npm install` nao esta em `ask` nem em `deny`",
+], excludes: ["nenhuma regra `deny` cobre a leitura de"] });
 
 test("G11: wildcard sem delimitador no allow avisa", (dir) => {
   const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
@@ -72,9 +126,14 @@ test("G11: `defaultMode: bypassPermissions` desliga tudo", (dir) => {
   patchSettings(dir, (c) => (c.permissions.defaultMode = "bypassPermissions"));
 }, { code: 1, includes: ["desliga a fronteira de permissoes"] });
 
-test("G11: `allow` que nao e array nao rebenta", (dir) => {
+test("G11: `allow` que nao e array nao rebenta nem imprime o OK tranquilizador", (dir) => {
   patchSettings(dir, (c) => (c.permissions.allow = {}));
-}, { code: 1, includes: ["devia ser um array"], excludes: ["is not iterable"] });
+  // O `excludes` do OK e o que importa: sem ele este teste passava com o guard a dizer
+  // "allow sem concessoes largas" logo abaixo do WARN — a unica frase impossivel, porque
+  // o `asList` devolveu [] e o loop que analisa o allow nunca correu (AP1).
+}, { code: 1,
+     includes: ["devia ser um array"],
+     excludes: ["is not iterable", "allow sem concessoes largas"] });
 
 test("G11: deny mais ESTRITO nao e falso positivo", (dir) => {
   // Supersets estritos dos padroes do template: um por classe de secret.

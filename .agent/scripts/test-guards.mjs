@@ -13,10 +13,9 @@
  *   node .agent/scripts/test-guards.mjs
  */
 
-import { rmSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, existsSync } from "fs";
-import { join, dirname } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings,
-         listWorkflowRows, dropLinesContaining, GUARD, GUARD_MODULES, ROOT, resumo, registarResultado } from "./test-harness.mjs";
+import { appendFileSync, mkdirSync, rmSync, writeFileSync } from "fs";
+import { join } from "path";
+import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado } from "./test-harness.mjs";
 import { registar as registarSettings } from "./tests-settings.mjs";
 import { registar as registarDerivedCounts } from "./tests-derived-counts.mjs";
 

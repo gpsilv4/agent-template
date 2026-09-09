@@ -119,11 +119,14 @@ if (archiveRaw === null) {
 }
 
 // Seccoes por tipo (ordem == ordem das linhas do Resumo, sem a linha Total).
+// `resumo` e o rotulo tal como aparece na primeira coluna da tabela Resumo — usado para
+// casar por nome em vez de por posicao. Ao renomear uma seccao num projeto derivado,
+// atualizar aqui e no `backlog.md` em simultaneo (o guard avisa se divergirem).
 const SECTIONS = [
-  { key: "Bugs", re: /^##\s*1\./, tipos: ["bug", "bugs"] },
-  { key: "UX", re: /^##\s*2\./, tipos: ["ux"] },
-  { key: "Divida Tecnica", re: /^##\s*3\./, tipos: ["tecnica", "divida tecnica", "tech"] },
-  { key: "Features", re: /^##\s*4\./, tipos: ["feature", "features"] },
+  { key: "Bugs", resumo: "Bugs / Violacoes de Regras", re: /^##\s*1\./, tipos: ["bug", "bugs"] },
+  { key: "UX", resumo: "Melhorias UX", re: /^##\s*2\./, tipos: ["ux"] },
+  { key: "Divida Tecnica", resumo: "Divida Tecnica", re: /^##\s*3\./, tipos: ["tecnica", "divida tecnica", "tech"] },
+  { key: "Features", resumo: "Features Futuras", re: /^##\s*4\./, tipos: ["feature", "features"] },
 ];
 
 const counts = {};
@@ -216,15 +219,33 @@ const g = { pendente: 0, "a fazer": 0, concluido: 0, cancelado: 0, total: 0 };
 for (const { key } of SECTIONS) for (const k of Object.keys(g)) g[k] += counts[key][k];
 
 // --- Validar tabela Resumo ---
+// O heading `## Resumo` nao tinha rede: renomeado, `section()` devolve "", `tableRows("")`
+// devolve [], o forEach nao corre e o checker anunciava "contadores consistentes" com exit 0
+// — a desligar em silencio a sua propria razao de existir. Mesma forma do AP2 que este
+// ficheiro deu origem, e que ficou de fora quando os cabecalhos `## 1.`..`## 4.` a ganharam.
 const resumoRows = tableRows(section(active, /^##\s*Resumo/i)).filter((r) => !norm(r[0]).includes("total"));
-resumoRows.forEach((cells, i) => {
-  const sec = SECTIONS[i];
-  if (!sec) return;
-  const c = counts[sec.key];
+if (resumoRows.length !== SECTIONS.length) {
+  warn(
+    `${ACTIVE}: a tabela "Resumo" tem ${resumoRows.length} linha(s) de seccao, esperadas ${SECTIONS.length} ` +
+      `— cabecalho \`## Resumo\` renomeado, tabela alterada ou linha a mais/menos. Contadores NAO validados`
+  );
+}
+// Casar por NOME e nao por posicao: `process-rules.md` di-lo explicitamente ("atualiza as
+// tabelas pelo nome da seccao — nunca assumindo posicao"). Por posicao, trocar duas linhas
+// do Resumo atribuia os numeros a seccao errada e a mensagem apontava para o sitio errado.
+const porNome = new Map();
+for (const { key, resumo } of SECTIONS) porNome.set(norm(resumo ?? key), key);
+resumoRows.forEach((cells) => {
+  const key = porNome.get(norm(cells[0]));
+  if (key === undefined) {
+    warn(`${ACTIVE}: linha do Resumo "${cells[0]}" nao corresponde a nenhuma seccao conhecida`);
+    return;
+  }
+  const c = counts[key];
   const nums = cells.slice(1, 6).map((x) => parseInt(x, 10) || 0);
   const expected = [c.total, c.pendente, c["a fazer"], c.concluido, c.cancelado];
   if (nums.join(",") !== expected.join(",")) {
-    warn(`Resumo "${sec.key}": escrito [${nums.join(",")}] != calculado [${expected.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
+    warn(`Resumo "${key}": escrito [${nums.join(",")}] != calculado [${expected.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
   }
 });
 

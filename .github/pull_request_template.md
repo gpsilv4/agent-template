@@ -28,6 +28,10 @@
 - [ ] `src/docs/CHANGELOG.md` updated
 - [ ] `.agent/context/backlog.md` updated (if applicable)
 - [ ] No secrets or credentials in committed files
+- [ ] **L ticket, or touches the core domain?** Independent reader ran (Fase 4 — the
+      `code-reviewer` subagent, or a separate session given only the diff), each finding
+      **verified against the real file**, and CONFIRMED vs PLAUSIBLE stated. It reads code;
+      it is not a substitute for the `/review` passes above
 
 ## Test Plan
 

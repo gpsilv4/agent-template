@@ -45,8 +45,13 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // verificador inteiro (o mesmo silencio que este repo passou a sessao a eliminar).
 //
 // `sinal` casa a chamada que faz o verificador reprovar; `neutro` e o que a substitui para
-// a DESLIGAR sem quebrar a sintaxe. Nos dois casos a mensagem continua a ser impressa e so
-// o gate cai — que e precisamente a forma de falha do `AP1` (despromover um erro a aviso).
+// a DESLIGAR sem quebrar a sintaxe.
+//
+// O que isto mede, exatamente: se **algum teste nota a falta daquele aviso**. Para os pares
+// `warn(`/`flag(` o `neutro` faz a mensagem DESAPARECER — nao e a variante do `AP1` em que a
+// mensagem fica e so o gate cai (`warn(` -> `note(`). Nestes verificadores as duas coisas sao
+// o mesmo mecanismo (`hasWarnings`/`warnings`), logo a distincao nao e explorável aqui; mas
+// nao se deve ler a varredura como prova de que o VEREDICTO esta afirmado, so a mensagem.
 //
 // `skip(` fica de fora de proposito: um SKIP nao e um achado, e o que o dispara e a
 // ausencia de um ficheiro, nao a linha em si.
@@ -63,7 +68,11 @@ const PARES = [
     // originais e reportaria 100% a mentir. A suite e a mesma do ficheiro de origem.
     alvo: ".agent/scripts/guards/settings.mjs",
     suite: ".agent/scripts/test-guards.mjs",
-    sinal: /(?<![\w.$])warn\(/,
+    // `flag(` e obrigatorio aqui: este guard emite quase tudo por um wrapper `flag()` que
+    // chama `warn` por dentro. Com o padrao so a ver `warn(`, a varredura media 3 sitios de
+    // 21 — e o unico que via era o `warn(` DENTRO do `flag`, cuja mutacao desliga os 18 de
+    // uma vez. Media "existe pelo menos um teste que usa o flag", nao a cobertura.
+    sinal: /(?<![\w.$])(warn|flag)\(/,
     neutro: "(() => {})(",
   },
   {
@@ -81,6 +90,9 @@ const PARES = [
   {
     alvo: ".agent/scripts/check-bundle-sizes.mjs",
     suite: ".agent/scripts/test-bundle-sizes.mjs",
+    // Unico par opcional: um projeto sem bundler pode apagar este verificador. Todos os
+    // outros sao do nucleo do template — a sua ausencia e um erro, nao uma configuracao.
+    opcional: true,
     // Este nao usa `warn()`: imprime ERROR/FAILED e reprova com `process.exit(1)`.
     sinal: /process\.exit\(1\)/,
     neutro: "process.exit(0)",
@@ -146,18 +158,40 @@ try {
   // Se o pre-voo do --only ja reprovou, nao ha alvos para varrer.
   if (selecionados.length === 0) throw { __preflight: true };
 
-  for (const { alvo, suite, sinal, neutro } of selecionados) {
+  for (const { alvo, suite, sinal, neutro, opcional } of selecionados) {
     let src;
     try {
       // Ler SEMPRE do repo real: e o estado que se quer avaliar.
       src = readFileSync(join(ROOT, alvo), "utf8");
     } catch {
-      console.log(`  AUSENTE  ${alvo} — nao existe neste projeto, nada a varrer`);
+      // Assimetria que existia: um `sinal` desatualizado reprovava, um `alvo` desatualizado
+      // passava. Renomear um verificador sem tocar em `PARES` deixava o gate verde a
+      // afirmar "cobertura completa" — o cenario que a matriz de propagacao quer prevenir.
+      // Ausencia so e aceitavel quando o par a declara (verificador que um projeto derivado
+      // pode legitimamente nao ter).
+      if (opcional) {
+        console.log(`  AUSENTE  ${alvo} — declarado opcional, nao existe neste projeto`);
+      } else {
+        console.log(`  ALVO AUSENTE  ${alvo} nao existe — renomeado ou removido sem atualizar PARES?`);
+        falhou = true;
+      }
       continue;
     }
 
     const linhas = src.split("\n");
     const sitios = linhas.map((l, i) => (sinal.test(l) ? i : -1)).filter((i) => i !== -1);
+
+    // `sitios` e indexado por LINHA e o `replace` nao e global, logo duas chamadas de aviso
+    // na mesma linha contam como uma: a segunda nunca e desligada isoladamente e herda a
+    // cobertura da primeira. Nao ha linhas assim hoje; se aparecerem, o silencio seria pior.
+    const global = new RegExp(sinal.source, sinal.flags.includes("g") ? sinal.flags : sinal.flags + "g");
+    for (const i of sitios) {
+      const n = [...linhas[i].matchAll(global)].length;
+      if (n > 1) {
+        console.log(`  LINHA AMBIGUA  ${alvo}:${i + 1} tem ${n} avisos na mesma linha — separa-los para cada um ser medido`);
+        falhou = true;
+      }
+    }
 
     if (sitios.length === 0) {
       // Nao e um "nada a fazer": o verificador existe e reprova de alguma forma. Zero
@@ -230,6 +264,11 @@ try {
   }
 }
 
-if (listarSo) process.exit(0);
-console.log(falhou ? "\n  VARREDURA INCOMPLETA — ha avisos que ninguem testa.\n" : "\n  Cobertura de mutacao completa.\n");
+// M1: `--list` NAO descarta o veredicto. Descartava, e `--list --only=nao-existe` (ou
+// --list com um SINAL ERRADO, ou com um alvo sem suite) saia 0 a reportar um problema. Os
+// testes existentes cobriam cada flag isolada, nunca a combinacao.
+if (listarSo) process.exit(falhou ? 1 : 0);
+// A causa nao se afirma aqui: pode ser um aviso sem teste, um alvo ausente, um `sinal`
+// desatualizado, uma baseline vermelha ou uma linha ambigua. As linhas acima dizem qual.
+console.log(falhou ? "\n  VARREDURA NAO CONCLUSIVA — ver as linhas acima.\n" : "\n  Cobertura de mutacao completa.\n");
 process.exit(falhou ? 1 : 0);

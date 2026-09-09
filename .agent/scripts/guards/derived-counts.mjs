@@ -10,6 +10,23 @@
  * Os avisos vivem aqui, logo este ficheiro esta em `PARES` no `mutation-sweep.mjs`.
  */
 
+/** Ficheiros onde uma contagem citada em prosa pode viver. Era uma lista duplicada entre os
+ *  dois guards, e as duas versoes tinham DIVERGIDO: o 12c nao incluia `CLAUDE.md`/`GEMINI.md`,
+ *  logo um numero errado na rule sempre-carregada passava — e o Guard 2 (paridade) tambem nao
+ *  o apanha quando o erro esta igual nos dois espelhos. */
+function ficheirosComProsa(listDir) {
+  return [
+    ...(listDir(".agent/rules", ".md") || []).map((f) => `.agent/rules/${f}.md`),
+    ...(listDir(".agent/workflows", ".md") || []).map((f) => `.agent/workflows/${f}.md`),
+    "src/docs/agent-guide.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    "README.md",
+    "CONTRIBUTING.md",
+  ];
+}
+
 /** Guards 12 e 12c: numeros citados em prosa recalculados a partir da fonte.
  *  @returns {number} guards executados */
 export function guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir }) {
@@ -41,16 +58,7 @@ if (syncDocs) {
 
     // 12b: cada citacao em prosa tem de igualar a contagem real.
     const total = nums.length;
-    const alvos = [
-      ...(listDir(".agent/rules", ".md") || []).map((f) => `.agent/rules/${f}.md`),
-      ...(listDir(".agent/workflows", ".md") || []).map((f) => `.agent/workflows/${f}.md`),
-      "src/docs/agent-guide.md",
-      "CLAUDE.md",
-      "GEMINI.md",
-      "AGENTS.md",
-      "README.md",
-      "CONTRIBUTING.md",
-    ];
+    const alvos = ficheirosComProsa(listDir);
     let citacoes = 0;
     let erradas = 0;
     for (const f of alvos) {
@@ -102,15 +110,12 @@ if (metodo) {
     }
 
     const total = fases.length;
-    const alvos = [
-      ...(listDir(".agent/rules", ".md") || []).map((f) => `.agent/rules/${f}.md`),
-      ...(listDir(".agent/workflows", ".md") || []).map((f) => `.agent/workflows/${f}.md`),
-      "src/docs/agent-guide.md",
-      "README.md",
-      "AGENTS.md",
-    ];
-    // Formas em que o total aparece: "6 fases", "as 6 fases", "Seis fases".
-    const PALAVRA = { 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito" };
+    const alvos = ficheirosComProsa(listDir);
+    // Formas em que o total aparece: "6 fases", "as 6 fases", "Seis fases". O mapa cobre so
+    // as formas que a prosa usa; fora do intervalo, `esperadoPalavra` fica `undefined` e a
+    // mensagem passa a omitir o parentese em vez de dizer "(undefined)".
+    const PALAVRA = { 3: "tres", 4: "quatro", 5: "cinco", 6: "seis", 7: "sete", 8: "oito",
+                      9: "nove", 10: "dez", 11: "onze", 12: "doze" };
     let citacoes = 0;
     let erradas = 0;
     for (const f of alvos) {
@@ -127,7 +132,8 @@ if (metodo) {
           warn(`${f} diz "${escrito} fases" mas ${".agent/rules/ticket-method.md"} tem ${total}`);
           erradas++;
         } else if (palavra && palavra[1].toLowerCase() !== esperadoPalavra) {
-          warn(`${f} diz "${palavra[1]} fases" mas o metodo tem ${total} (${esperadoPalavra})`);
+          const sufixo = esperadoPalavra ? ` (${esperadoPalavra})` : "";
+          warn(`${f} diz "${palavra[1]} fases" mas o metodo tem ${total}${sufixo}`);
           erradas++;
         }
       }

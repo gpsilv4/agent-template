@@ -15,10 +15,13 @@
 // partilha — e foi o critério do "output byte-a-byte identico" que a denunciou, com um
 // `ReferenceError`. Este memo repoe a semantica de leitura unica sem reintroduzir a
 // dependencia de ordem entre as funcoes.
-let pkgRawMemo;
+// Indexado pelo `read`, nao global: um memo unico devolvia o `package.json` da primeira
+// raiz a qualquer chamador posterior, em silencio, se um dia dois entry points com raizes
+// diferentes chamarem estas funcoes no mesmo processo.
+const pkgRawMemo = new Map();
 function pkgRawOnce(read) {
-  if (pkgRawMemo === undefined) pkgRawMemo = read("package.json");
-  return pkgRawMemo;
+  if (!pkgRawMemo.has(read)) pkgRawMemo.set(read, read("package.json"));
+  return pkgRawMemo.get(read);
 }
 
 /** Guard 3: package.json version === ultima versao do CHANGELOG.

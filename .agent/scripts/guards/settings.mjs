@@ -34,19 +34,24 @@ if (settingsRaw === null) {
   }
   if (settings) {
     const perms = settings.permissions ?? {};
-    const asList = (v, name) => {
-      if (v === undefined) return [];
-      if (Array.isArray(v)) return v;
-      warn(`${SETTINGS_PATH}: \`permissions.${name}\` devia ser um array`);
-      return [];
-    };
-    const denyRaw = asList(perms.deny, "deny");
-    const allow = asList(perms.allow, "allow");
+    // `flag` PRIMEIRO, e o `asList` a usa-lo. Uma versao anterior tinha o `asList` a chamar
+    // `warn` direto: `issues` ficava 0 e o guard imprimia o WARN E o `ok()` final — que diz
+    // "allow sem concessoes largas" — quando o `asList` devolveu `[]` e o loop de analise do
+    // allow nunca correu. Era a unica frase que nao podia ser dita. O comentario abaixo ja
+    // descrevia este bug para o filtro do `deny`; o `asList` e que tinha ficado atras.
     let issues = 0;
     const flag = (msg) => {
       warn(`${SETTINGS_PATH}: ${msg}`);
       issues++;
     };
+    const asList = (v, name) => {
+      if (v === undefined) return [];
+      if (Array.isArray(v)) return v;
+      flag(`\`permissions.${name}\` devia ser um array`);
+      return [];
+    };
+    const denyRaw = asList(perms.deny, "deny");
+    const allow = asList(perms.allow, "allow");
     // Filtrar DEPOIS de `flag` existir: uma versao anterior usava `warn` aqui, logo
     // `issues` ficava 0 e o guard imprimia o WARN e o OK ao mesmo tempo.
     const deny = denyRaw.filter((r) => {
@@ -170,9 +175,22 @@ if (settingsRaw === null) {
         const fixed = suffix ? suffix[1] : body;
         const tokens = fixed.split(/\s+/).filter(Boolean);
         // Caminho fora do projeto em QUALQUER token, seja o comando fixo ou com `:*`.
-        const foraDoProjeto = tokens.find((t) => t.startsWith("~") || t.startsWith("/etc") || /(^|\/)\.\.(\/|$)/.test(t) || /^\/(Users|home|root|var|private)\//.test(t));
+        // Allowlist INVERTIDA em vez de lista de prefixos suspeitos: a versao anterior
+        // enumerava `/etc`, `/Users`, `/home`, `/root`, `/var`, `/private` e deixava passar
+        // `/opt`, `/tmp`, `/usr`, `/Volumes`, `/Library`. Agora qualquer caminho absoluto e
+        // "fora do projeto" — nenhum caminho absoluto tem razao de estar num `allow`.
+        const foraDoProjeto = tokens.find(
+          (t) => t.startsWith("~") || /^\//.test(t) || /(^|\/)\.\.(\/|$)/.test(t)
+        );
         if (foraDoProjeto) {
-          flag(`\`${rule}\` referencia \`${foraDoProjeto}\`, fora do projeto`);
+          // Um comando destrutivo merece a mensagem destrutiva, nao a generica: ao passar
+          // `foraDoProjeto` a apanhar QUALQUER caminho absoluto, `rm -rf /tmp/x` deixou de
+          // chegar ao check especifico e a mensagem util ficou mascarada pela vaga.
+          if (DESTRUCTIVE.has(baseName(tokens[0] ?? ""))) {
+            flag(`\`${rule}\` pre-aprova \`${baseName(tokens[0])}\` — shell interactiva ou comando destrutivo (e \`${foraDoProjeto}\` esta fora do projeto)`);
+          } else {
+            flag(`\`${rule}\` referencia \`${foraDoProjeto}\`, fora do projeto`);
+          }
           continue;
         }
         // Subcomando que reabre execucao: `npm:*` era marcado porque "npm exec e
@@ -262,7 +280,7 @@ if (settingsRaw === null) {
       if (typeof a !== "string") continue;
       const pa = prefixOf(a);
       if (!pa) continue;
-      for (const [lista, nome] of [[deny, "deny"], [asList(perms.ask, "ask"), "ask"]]) {
+      for (const [lista, nome] of [[deny, "deny"], [ask, "ask"]]) {
         for (const other of lista) {
           if (typeof other !== "string") continue;
           const po = prefixOf(other);
