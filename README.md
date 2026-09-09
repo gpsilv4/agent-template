@@ -120,7 +120,7 @@ When you open a new AI session in any project using this template, the agent **a
 
 .editorconfig                   <- Formatting config (2-space indent, LF)
 .nvmrc                          <- Node version pinning (matches CI)
-AGENTS.md                       <- Cross-tool entry point (Cursor, Windsurf, Copilot, ...)
+AGENTS.md                       <- Cross-tool entry point (ChatGPT/Codex, Windsurf, Zed, ...)
 CLAUDE.md                       <- Entry point for Claude Code / Cursor
 CODE_OF_CONDUCT.md              <- Contributor Covenant
 CONTRIBUTING.md                 <- Dev workflow, commit format, PR process
@@ -306,13 +306,19 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 ## AI Agent Compatibility
 
-| Agent | Entry File | Reference Syntax | Status |
-|-------|-----------|-----------------|--------|
-| Claude Code | `CLAUDE.md` (+ native `.claude/`) | `@file` (direct) | Tested |
-| Google Gemini | `GEMINI.md` | `@[file]` (bracket) | Tested |
-| Cursor | `CLAUDE.md` / `AGENTS.md` | `@file` (direct) | Tested |
-| GitHub Copilot | `CLAUDE.md` / `AGENTS.md` | `@file` (direct) | Tested |
-| Other (Windsurf, Zed, ...) | `AGENTS.md` | — | Community |
+| Agent | File it auto-loads | Slash commands | Verified how |
+|-------|--------------------|----------------|--------------|
+| Claude Code | `CLAUDE.md` (+ `.claude/`) | native, 11 | Used throughout this template's own development |
+| Google Gemini CLI | `GEMINI.md` | native, 11 (`.gemini/commands/`) | Entry file and wrappers checked by Guards 2, 6, 7, 10 |
+| GitHub Copilot | `.github/copilot-instructions.md` | no | File shipped and points to `AGENTS.md`; **not exercised in a real Copilot session** |
+| Cursor | `.cursor/rules/*.mdc` | no | Same — shipped, pointing to `AGENTS.md`; **not exercised in a real Cursor session** |
+| ChatGPT / Codex | `AGENTS.md` | no | Same — `AGENTS.md` is its documented convention; **not exercised** |
+| Windsurf, Zed, others | `AGENTS.md` (if supported) | no | Unverified — check your tool's docs for which file it loads |
+
+> **On "verified"**: an earlier version of this table marked Cursor and Copilot as *Tested*
+> while listing `CLAUDE.md` as their entry file — which neither tool loads, and no such test
+> had been run. The columns above say what was actually done. If you exercise one of the
+> unverified rows, a PR correcting it is welcome.
 
 > **Why multiple entry files?** Claude Code parses `@file`, Gemini needs `@[file]` brackets, and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
 
@@ -320,10 +326,23 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 `.claude/` (slash commands, subagents, `settings.json`) is read **only by Claude Code** — other tools ignore it. But **no logic lives there**: each command is a thin wrapper that says *"read and follow `.agent/workflows/<name>.md`"*. The workflows, rules, and context all live in `.agent/`, which **every agent reads**.
 
-- **Claude Code**: `/plan`, `/review`, etc. are real typed slash commands; permissions and subagents apply.
-- **Any other agent** (Gemini, Cursor, Copilot, ...): invoke the same workflow by asking *"run /plan"* or *"follow `.agent/workflows/plan.md`"* — it reads the identical file. `settings.json` and subagents are simply ignored (each tool has its own equivalents). Nothing essential is lost.
+- **Claude Code**: `/plan`, `/review`, etc. are typed slash commands; the permission boundary and subagents apply.
+- **Gemini CLI**: the same 11 commands ship as `.gemini/commands/*.toml`.
+- **Any other agent**: ask *"run /plan"* or *"follow `.agent/workflows/plan.md`"* — the identical file.
 
-Native slash commands ship for **both** Claude Code (`.claude/commands/`) and Gemini CLI (`.gemini/commands/*.toml`) — same commands, thin wrappers over `.agent/workflows/`. For heavy Cursor use, a `.cursor/commands/` adapter can be added at bootstrap, but `AGENTS.md` + the workflow table already make it work.
+**What you do lose outside Claude Code**, stated plainly rather than waved away:
+
+| Lost | Consequence | What to do instead |
+|------|-------------|--------------------|
+| `.claude/settings.json` | No enforced boundary: nothing blocks reading `.env*`, and nothing forces a prompt before `git commit`/`push` or `npm install`. Guard 11 has nothing to check and skips | Use your tool's own permission/approval settings, and keep the rules in `.agent/rules/` as the stated contract |
+| `.claude/agents/code-reviewer.md` | **Fase 4** of the per-ticket method has no subagent | Run it as a separate session given only the diff — the point is a reader without the author's reasoning, not the mechanism |
+| Typed slash commands (except Gemini) | `/plan` is not a keystroke | Say *"follow `.agent/workflows/plan.md`"*. The wrappers were never more than that sentence |
+
+Everything that carries logic — rules, workflows, context, the guards and their tests — is in
+`.agent/` and `.agent/scripts/`, which any agent can read and any shell can run. The guards
+need only Node; they have no dependencies and no `package.json`.
+
+Native slash commands ship for **both** Claude Code (`.claude/commands/`) and Gemini CLI (`.gemini/commands/*.toml`) — same commands, thin wrappers over `.agent/workflows/`. `.github/copilot-instructions.md` and `.cursor/rules/project.mdc` ship as equally thin pointers to `AGENTS.md`, because those are the files those tools load; neither adds logic.
 
 ## Commit Convention
 

@@ -47,6 +47,11 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir }) {
     "LICENSE",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
+    // Pontos de entrada que o Copilot e o Cursor carregam. Nao estavam aqui quando foram
+    // criados, logo um placeholder esquecido neles passava — e sao os primeiros ficheiros
+    // que essas ferramentas leem.
+    ".github/copilot-instructions.md",
+    ...(listDir(".cursor/rules", ".mdc") || []).map((f) => `.cursor/rules/${f}.mdc`),
     ".github/dependabot.yml",
     ".github/workflows/ci.yml",
     ".github/workflows/e2e.yml",

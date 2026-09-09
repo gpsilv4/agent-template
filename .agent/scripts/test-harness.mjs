@@ -57,6 +57,8 @@ const FIXTURE_PATHS = [
   ".agent/scripts",
   ".claude/commands",
   ".claude/settings.json",
+  ".cursor/rules",
+  ".github/copilot-instructions.md",
   ".gemini/commands",
   "CLAUDE.md",
   "GEMINI.md",

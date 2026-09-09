@@ -35,7 +35,9 @@ const bootstrapado = (dir) => {
       if (e.name === ".git" || e.name === "node_modules") continue;
       const sub = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) anda(sub);
-      else if (/\.(md|mjs|json|yml|toml)$/.test(e.name) || e.name === "LICENSE" || e.name === "CODEOWNERS") {
+      // A lista de tipos espelha a Fase 2.1 do BOOTSTRAP. Faltava `.mdc` nas DUAS — o helper
+      // e o bootstrap — o que deixava a regra do Cursor com o placeholder para sempre.
+      else if (/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) || e.name === "LICENSE" || e.name === "CODEOWNERS") {
         const c = readF(dir, sub);
         const novo = c.replace(/\{\{(?!args\})[A-Z_]+\}\}/g, "VALOR");
         if (novo !== c) writeF(dir, sub, novo);
