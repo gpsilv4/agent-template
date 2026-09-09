@@ -174,7 +174,9 @@ test("G3: CHANGELOG em ordem ascendente avisa ordenacao", (dir) => {
 // Com o regex /g reutilizado, o 2o ficheiro era silenciosamente ignorado.
 test("G4: termo banido e apanhado em TODOS os ficheiros, nao so no primeiro", (dir) => {
   const g = readF(dir, GUARD).replace(
-    "const BANNED = [\n",
+    // Regex e nao literal: num clone com `core.autocrlf=true` o ficheiro tem `\r\n` e o
+    // literal "\n" nao casava — o patch nao se aplicava e a asserção rebentava (bem).
+    /const BANNED = \[\r?\n/,
     'const BANNED = [\n  { re: /Fronteiras/g, msg: "termo de teste" },\n'
   );
   // Um `.replace()` que nao casa devolve o ficheiro intacto, e o teste passaria pela razao
@@ -292,6 +294,23 @@ test("G10: wrapper vazio avisa", (dir) => {
   writeF(dir, ".gemini/commands/debug.toml", "");
 }, { code: 1, includes: [".gemini/commands/debug.toml nao aponta"] });
 
+
+// --- Clone em Windows: CRLF nao pode desligar nada ---------------------------
+// Um clone com `core.autocrlf=true` entrega `\r\n`. Dois patches de teste usavam o literal
+// "\n" e deixavam de casar, e as assercoes acrescentadas hoje rebentaram em voz alta em vez
+// de o teste passar pela razao errada. Isto fixa o comportamento.
+test("crlf: o guard passa num clone com line endings do Windows", (dir) => {
+  const paraCrlf = (p) => {
+    const b = readFileSync(file(dir, p));
+    if (!b.includes("\r\n")) writeFileSync(file(dir, p), b.toString("utf8").replace(/\n/g, "\r\n"));
+  };
+  for (const p of ["CLAUDE.md", "GEMINI.md", "AGENTS.md", ".nvmrc",
+                   ".agent/rules/core-rules.md", ".agent/rules/process-rules.md",
+                   ".agent/rules/anti-patterns.md", ".agent/rules/sync-docs.md",
+                   ".agent/rules/ticket-method.md", "src/docs/agent-guide.md"]) {
+    try { paraCrlf(p); } catch { /* nao existe nesta fixture */ }
+  }
+}, { code: 0, excludes: ["  WARN  "] });
 
 registarSettings();
 
