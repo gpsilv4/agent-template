@@ -1,6 +1,8 @@
 # AGENTS.md — {{PROJECT_NAME}}
 
-> Entry point cross-tool para agentes de IA (Cursor, Windsurf, Zed, GitHub Copilot coding agent, etc.).
+> Entry point cross-tool para agentes de IA (Cursor, Windsurf, Zed, ChatGPT/Codex, GitHub Copilot, etc.).
+> O Copilot e o Cursor carregam ficheiros proprios (`.github/copilot-instructions.md` e
+> `.cursor/rules/*.mdc`) — ambos sao ponteiros finos que remetem para aqui, sem logica.
 > Claude Code usa `CLAUDE.md` e Gemini usa `GEMINI.md` (mesmo conteudo, so difere a sintaxe de import).
 > A **fonte de verdade** partilhada esta em `.agent/` — nunca editar regras aqui; editar em `.agent/`.
 

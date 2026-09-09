@@ -1,0 +1,18 @@
+---
+description: Regras e workflows de {{PROJECT_NAME}} — fonte unica em .agent/
+alwaysApply: true
+---
+
+# Ponteiro fino — nao duplicar logica aqui
+
+O Cursor carrega as regras de `.cursor/rules/*.mdc`; nao carrega `CLAUDE.md`.
+Este ficheiro existe para o ligar a fonte unica de verdade.
+
+Le e segue **`AGENTS.md`** na raiz. Em resumo:
+
+- `.agent/rules/` — regras sempre validas (codigo, processo, anti-padroes)
+- `.agent/workflows/` — passos por tarefa; ao pedirem `/plan`, `/review`, `/debug`,
+  `/refactor` ou `/deploy`, **abre `.agent/workflows/<nome>.md` e segue-o**
+- `.agent/context/` — estado atual (sessao, backlog, decisoes)
+
+So-Claude Code, ignora: `.claude/settings.json`, `.claude/agents/`, `.claude/commands/`.
