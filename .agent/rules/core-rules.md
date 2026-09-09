@@ -73,6 +73,10 @@
 - Componentes duplicados devem ser unificados com generics.
 - One-time form init com guard `initialized` para evitar resets de revalidation.
 
+### Diff minimo
+
+- **Nao reformatar o que o ticket nao toca.** Um formatador que o projeto nao usa (`npx prettier` num repo sem prettier) inflou um diff de 1 linha para `+225/-99` — a revisao passa a procurar a alteracao real no meio de ruido. Formatacao errada e ticket proprio.
+
 ### Reutilizacao & DRY
 
 - **Procurar antes de criar**: `grep`/pesquisa pelo que ja existe (util, hook, componente) antes de escrever codigo novo.
@@ -128,7 +132,6 @@
 - **`.github/CODEOWNERS`**: Define reviewers automaticos por ficheiro/pasta.
 - **`LICENSE`**: MIT (ou outra licenca adequada ao projeto).
 - **Branch Protection**: Branch protection rules (require status checks, bloquear force push) requerem GitHub Pro em repos privados. O CI funciona como **semaforo informativo**. Se disponivel, ativar em GitHub Settings > Branches > Branch protection rules.
-- **Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Tags sao criadas apos merge de sprints/releases para main. Visiveis em GitHub > Code > Tags.
 
 ### Docs & Knowledge Sync
 
