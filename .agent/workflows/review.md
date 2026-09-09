@@ -58,6 +58,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 6. Arquitetura
 
 - [ ] Ficheiros com menos de ~400 linhas (flag se > 500)
+- [ ] **Diff minimo**: nenhuma reformatacao de codigo que o ticket nao toca — `git diff --stat` proporcional a alteracao (`core-rules.md`)
 - [ ] Parent detem estado, sub-components recebem props
 - [ ] Nomes de componentes descritivos
 - [ ] One-time form init usa guard `initialized` para evitar resets por revalidation

@@ -39,6 +39,26 @@ nao vale numa mudanca de texto.
 
 ---
 
+## De onde vem cada regra
+
+Nenhuma foi inventada em abstracto. Cada uma veio de um erro **que aconteceu** — metade neste
+repo (marcadas `T`, de template) e metade num projeto construido a partir dele (`P`), que e a
+razao de estarem aqui: sao as que qualquer projeto repete.
+
+| Erro real | Regra que ficou | |
+|-----------|-----------------|-|
+| Um `tail -1` mostrou `125 passed` e engoliu o `1 failed` | **Nunca filtrar** o sumario de uma corrida (Fase 2) | `P` |
+| Uma assercao passava com o defeito no ecra — um `toHaveCount(0)` cumpre-se no primeiro instante em que a contagem e zero | Cada teste novo nasce com o seu **controlo negativo** (Fase 1) | `P` |
+| Duas passagens de `/review` seguidas nao encontraram nada, por serem a mesma checklist | Cada passagem **declara o angulo** antes de correr (Fase 3) | `P` |
+| Uma varredura reportou `39/39` medindo **3 sitios de 21**: o padrao so via `warn(`, e o verificador emitia por um wrapper `flag()` | Cobertura de mutacao **derivada por script**, nunca contada a mao (Fase 1) | `T` |
+| Um check de seguranca — o que obriga a pedir autorizacao antes de `git commit`/`push` — podia ser desligado com a suite **toda verde** | O **leitor independente** da Fase 4 e obrigatorio num `L` ou no nucleo do dominio | `T` |
+| Faltava um verificador **inteiro**: um placeholder esquecido no bootstrap nao avisava ninguem | **Usar** o que se construiu — nenhuma revisao encontra codigo que nao existe | `T` |
+| Seis passagens minhas declararam o trabalho limpo; uma leitura independente achou tres defeitos ALTO em 16 minutos | "Validei e esta limpo" **nao e informacao** quando o validador e o autor | `T` |
+| Um `npx prettier` num projeto sem prettier inflou um diff para `+225/-99` | **Nao reformatar o que o ticket nao toca** (Fase 1) | `P` |
+
+> Num projeto derivado, **substitui estas linhas pelas tuas**. A tabela vale pelos erros que
+> *tu* cometeste: sao esses que a tua equipa reconhece e por isso respeita.
+
 ## Fase 0 — Explicar, e esperar
 
 Antes de tocar no codigo: o problema, os ficheiros que vao mudar, a abordagem, **as
@@ -226,6 +246,19 @@ Isto nao e opcional nem cosmetico, e a medicao e especifica. Numa sessao real:
   com zero verificacoes.
 
 Nenhum destes tres substitui os outros. O erro nao e escolher mal — e escolher so um.
+
+## O que custa
+
+Aplicado por inteiro a tudo, multiplica o tempo por ticket por **2 a 3**. E por isso que tres
+fases escalam por tamanho: sem escala, o metodo e abandonado a segunda semana.
+
+A **Fase 4** e a unica com um custo grande e mensuravel. Medido neste repo: uma passagem sobre
+dois commits (33 ficheiros) consumiu **~168k tokens** e 16 minutos, e devolveu tres defeitos
+ALTO que seis passagens minhas nao viram — um deles a fronteira de seguranca. E cara e vale a
+pena onde a tabela da Fase 4 diz que corre; nao vale num `S`.
+
+O resto e quase gratis em tempo de maquina: os controlos negativos correm com a suite, e a
+varredura de mutacao custa minutos **uma vez** por alteracao a um verificador, nao por commit.
 
 ## O que o metodo nao faz
 
