@@ -58,6 +58,27 @@ const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // Modulo do Guard 11, extraido do check-doc-versions.mjs. Tem de estar aqui: os avisos
+    // vivem neste ficheiro, e sem a entrada a varredura cobriria 652 das 911 linhas
+    // originais e reportaria 100% a mentir. A suite e a mesma do ficheiro de origem.
+    alvo: ".agent/scripts/guards/settings.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    alvo: ".agent/scripts/guards/versions.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    alvo: ".agent/scripts/guards/derived-counts.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-bundle-sizes.mjs",
     suite: ".agent/scripts/test-bundle-sizes.mjs",
     // Este nao usa `warn()`: imprime ERROR/FAILED e reprova com `process.exit(1)`.
