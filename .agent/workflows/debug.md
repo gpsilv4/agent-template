@@ -2,6 +2,10 @@
 
 Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinhar — seguir o processo.
 
+> Um bug e um ticket: corre a **Fase 0** (explicar a causa e a correcao, e esperar) antes de
+> tocar no codigo, e o teste de regressao nasce com o seu **controlo negativo** (Fase 1) —
+> sem isso nao se sabe se apanha o bug. Ver `.agent/rules/ticket-method.md`.
+
 ## 0. Verificar Backlog
 
 - Consultar `.agent/context/backlog.md` — o bug pode ja estar registado (seccao 1: Bugs)

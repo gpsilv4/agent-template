@@ -54,7 +54,8 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
-│   └── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
+│   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
+│   └── ticket-method.md        <- Per-ticket 5-phase method (NOT loaded; on-demand)
 ├── context/
 │   ├── session.md              <- Current session state
 │   ├── task.md                 <- Tasks in progress
@@ -83,7 +84,10 @@ When you open a new AI session in any project using this template, the agent **a
     ├── check-doc-versions.mjs  <- Doc guards: rules byte-budget, CLAUDE/GEMINI parity, CHANGELOG, versions
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── test-guards.mjs         <- Negative tests for the doc guards (no deps, no package.json)
-    └── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
+    ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
+    ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
+    ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
+    └── test-mutation-sweep.mjs <- Negative tests for the sweep itself (fake checker + fake suite)
 
 .github/                        <- DevOps & governance
 ├── workflows/
@@ -205,6 +209,9 @@ git commit -m "chore: bootstrap agent config"
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs (opt-in, uncomment in ci.yml) |
 | Guard Tests | `node .agent/scripts/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
+| Backlog Tests | `node .agent/scripts/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
+| Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — run locally after touching a `check-*.mjs` (opt-in in ci.yml) |
+| Sweep Tests | `node .agent/scripts/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
 

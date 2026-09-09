@@ -19,13 +19,20 @@
  */
 
 import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, resolve, join } from "path";
+
+// Ancorar a raiz do REPO, nao ao cwd. Com caminhos relativos, correr o script de qualquer
+// subpasta (ou de um hook que nao faz cd) lia zero ficheiros, imprimia SKIP e saia 0 — um
+// gate a passar tendo validado nada. Mesma ancoragem que o check-doc-versions.mjs.
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 const ACTIVE = ".agent/context/backlog.md";
 const ARCHIVE = ".agent/context/backlog-archive.md";
 
 function read(path) {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(join(ROOT, path), "utf8");
   } catch {
     return null;
   }
@@ -90,16 +97,26 @@ console.log("\n=== Backlog Check ===\n");
 
 const active = read(ACTIVE);
 if (!active) {
-  console.log(`  SKIP  ${ACTIVE} nao encontrado.\n`);
-  process.exit(0);
+  // NAO sair 0: este ficheiro e importado pelas rules e a sua ausencia impede a
+  // verificacao por completo. Sair 0 aqui transformava o gate em decoracao.
+  console.log(`  WARN  ${ACTIVE} nao encontrado ou vazio — impossivel validar o backlog.\n`);
+  process.exit(1);
 }
-const archive = read(ARCHIVE) ?? "";
+// O arquivo guarda os items fechados. Ausente != vazio: se nao existe, os contadores de
+// Concluido/Cancelado sao calculados a partir de nada e a divergencia seria atribuida ao
+// Resumo em vez a fonte que falta.
+const archiveRaw = read(ARCHIVE);
+const archive = archiveRaw ?? "";
 
 let warnings = 0;
 const warn = (msg) => {
   console.log(`  WARN  ${msg}`);
   warnings++;
 };
+
+if (archiveRaw === null) {
+  warn(`${ARCHIVE} nao encontrado — o layout de dois ficheiros do backlog esta incompleto (items fechados vivem la)`);
+}
 
 // Seccoes por tipo (ordem == ordem das linhas do Resumo, sem a linha Total).
 const SECTIONS = [
@@ -138,6 +155,31 @@ for (const { key, re } of SECTIONS) {
       warn(`${key}: item "${id}" tem Estado desconhecido ("${cells[1]}")`);
       counts[key].total++;
     }
+  }
+}
+
+// 1b) A ESTRUTURA que este checker precisa existe de facto?
+// Sem isto havia um falso negativo grave: um backlog com items reais mas com o titulo de
+// uma seccao renomeado (`## 1. Bugs` -> `## Defeitos`) dava zero linhas encontradas, e o
+// checker anunciava "Backlog vazio (template) — nada a validar" com exit 0. Ou seja, o
+// gate passava A DIZER que o backlog estava vazio quando tinha items. Renomear seccoes e a
+// primeira customizacao natural num projeto derivado, logo este e o caminho provavel.
+//
+// Duas redes independentes: (a) os cabecalhos que o parser procura existem; (b) nenhuma
+// linha com aspeto de item ficou de fora da contagem — esta ultima apanha o drift mesmo
+// que os cabecalhos mudem de forma que (a) nao preveja.
+for (const { key, re } of SECTIONS) {
+  if (!active.split("\n").some((l) => re.test(l))) {
+    warn(`${ACTIVE}: nao encontrei o cabecalho da seccao "${key}" (${re}) — os items dessa seccao nao estao a ser contados`);
+  }
+}
+
+const ID_LIKE = /^[A-Z]{1,4}\d+$/;
+const contados = new Set(allIds.keys());
+for (const cells of tableRows(active)) {
+  const id = cells[0];
+  if (ID_LIKE.test(id) && !contados.has(id)) {
+    warn(`${ACTIVE}: item "${id}" esta numa tabela que nenhuma seccao reconhecida cobre — verificar os cabecalhos \`## 1.\`..\`## 4.\``);
   }
 }
 
@@ -212,8 +254,13 @@ console.log(`  Items: total ${g.total} | pendente ${g.pendente} | a fazer ${g["a
 console.log(`  Progresso calculado: ${g.concluido}/${countable} (${expectedPct}%), ${expectedFilled}/20 blocos`);
 console.log("");
 
-if (g.total === 0) {
+if (g.total === 0 && warnings === 0) {
+  // "Vazio" so se pode afirmar quando NADA avisou. Com avisos, zero items contados e
+  // provavelmente um problema de leitura (seccoes renomeadas), nao um backlog vazio —
+  // dizer "nada a validar" ali era desinformar sobre a propria falha.
   console.log("  Backlog vazio (template) — nada a validar.\n");
+} else if (g.total === 0) {
+  console.log(`WARNING: ${warnings} problema(s) e ZERO items contados — o backlog pode nao estar vazio, mas ilegivel. Corrigir antes de commit.\n`);
 } else if (warnings === 0) {
   console.log("  OK — contadores, barra e IDs consistentes.\n");
 } else {

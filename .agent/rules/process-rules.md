@@ -50,15 +50,10 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 5. Atualizar os contadores na tabela "Resumo" (Total +1, Pendente +1)
 
 **Ao iniciar um item:**
-1. **ANTES de implementar**, o Agente deve explicar detalhadamente:
-   - O que e o problema/melhoria (contexto)
-   - Que ficheiros vai alterar
-   - Como vai resolver (abordagem tecnica)
-   - Impacto esperado para o utilizador
-2. Aguardar aprovacao do utilizador antes de tocar no codigo
-3. Na tabela da seccao, mudar `Estado` de `Pendente` para `A Fazer`
-4. Atualizar contadores no "Resumo" (Pendente -1, A Fazer +1)
-5. Atualizar a linha **Proximo:** com o item seguinte do sprint
+1. Correr a **Fase 0** do Metodo de Trabalho por Ticket (explicar e esperar aprovacao)
+2. Na tabela da seccao, mudar `Estado` de `Pendente` para `A Fazer`
+3. Atualizar contadores no "Resumo" (Pendente -1, A Fazer +1)
+4. Atualizar a linha **Proximo:** com o item seguinte do sprint
 
 **Ao iniciar um sprint:**
 - O agente deve ler o sprint ativo no `backlog.md` e **avaliar o tamanho**:
@@ -74,8 +69,8 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
   2. Tabela de items com estado final
   3. **Desvios do plano**: para cada item que diferiu da explicacao pre-implementacao, descrever o que mudou e porque
   4. **Problemas encontrados**: erros, bugs ou dificuldades tecnicas e como foram resolvidos
-  5. **Testes**: para cada item, avaliar se justifica criar/atualizar testes (unitarios, E2E ou security) e perguntar ao utilizador — indicando qual o tipo adequado e porque
-  6. **Trabalho nao planeado**: listar qualquer trabalho feito que NAO estava no sprint (hotfixes, testes adicionais, refactors de oportunidade) e criar tickets no backlog com IDs antes de pedir commit
+  5. **Testes**: por item, avaliar se justifica teste novo (unit/E2E/security) e perguntar
+  6. **Trabalho nao planeado**: listar o que NAO estava no sprint e criar tickets com IDs antes do commit
 - So depois perguntar: _"Queres que atualize a documentacao, faca commit e crie o PR?"_
 - Ao concluir, perguntar: _"Sprint X concluido. Queres avancar para o Sprint Y?"_
 - Remover a seccao do sprint concluido de `backlog.md` (os items ja estao no Historico) e adicionar uma linha ao "Sprints Fechados (Indice)" em `backlog-archive.md`
@@ -100,7 +95,7 @@ principio do backlog (ativo vs arquivo) a todo o historico inerte:
 
 ### Checklist de Sync Docs
 
-> A checklist completa (24 pontos) vive em **`.agent/rules/sync-docs.md`** — **nao carregada automaticamente**,
+> A checklist completa (25 pontos) vive em **`.agent/rules/sync-docs.md`** — **nao carregada automaticamente**,
 > para manter o contexto enxuto. O agente deve **abri-la e corre-la** antes de dizer "Estou pronto para commit"
 > (proativamente, sem esperar que o utilizador peca), e sempre nos workflows `/review` e `/deploy`.
 
@@ -125,9 +120,24 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 | Ticket refactor | `/refactor` -> implementar -> `/review` |
 | Sprint completo | implementar todos -> `/review` -> `/deploy` |
 
-- O Agente **propoe** o proximo passo e aguarda aprovacao: _"Implementacao concluida. Posso correr o /review?"_
-- O `/deploy` so corre quando o sprint esta completo e pronto para merge — tickets individuais fazem commit no branch mas nao deploy
-- O utilizador pode pedir para saltar ou reordenar passos
+- O `/deploy` so corre quando o sprint esta completo — tickets individuais fazem commit no branch mas nao deploy
+
+### Metodo de Trabalho por Ticket (obrigatorio)
+
+Cada ticket passa por 6 fases (0 a 5): **explicar e esperar aprovacao** -> desenvolver (cada
+teste novo nasce com o seu **controlo negativo**) -> loop da maquina (criterio objetivo, tecto
+de 5, **sumarios nunca filtrados**) -> loop do julgamento (cada passagem **declara o angulo**)
+-> **leitor independente** (o subagente `code-reviewer`; obrigatorio num `L` ou no nucleo do
+dominio) -> **relatorio de 5 pontos**, e so depois o commit.
+
+**Nenhum loop se encerra por decisao do agente.** Sem achados numa passagem, ou chegado ao
+numero previsto, ele **apresenta e espera**: achados, angulos ja usados **e os que faltam**,
+o que fica aberto, e o custo. Quem escolhe entre aceitar assim, mais um ciclo, ou corrigir
+algo por inteiro primeiro e o utilizador. Uma passagem sem achados nao significa "esta
+limpo". Git tambem um passo por vez: um "avanca" cobre o passo em causa e nao os seguintes.
+
+O detalhe, a escala por tamanho (`S`/`M`/`L`) e a lista de angulos estao em
+**`.agent/rules/ticket-method.md`** — **nao carregado**; abrir ao iniciar um ticket `M` ou `L`.
 
 ---
 
@@ -148,7 +158,6 @@ Todas as mensagens de commit seguem o formato [Conventional Commits](https://www
 - **CI Gate**: Antes de mergear para main, confirmar que **todos os CI checks passaram** (TypeScript, lint, build, tests, audit). Nunca mergear com checks vermelhos.
 - **PRs**: Usar o template de PR (`.github/pull_request_template.md`) que impoe checklist alinhada com o workflow `/review`.
 - **Tags**: Apos cada release/sprint concluido e mergeado para main, criar tag anotada: `git tag vX.Y.Z <commit> -m "Descricao da release"` + `git push origin --tags`. Tags marcam releases oficiais no GitHub.
-- **Branch Protection**: Branch protection rules (require status checks, bloquear force push) requerem GitHub Pro em repos privados. O CI funciona como **semaforo informativo**. Se disponivel no futuro, ativar em GitHub Settings > Branches > Branch protection rules.
 
 ### Regra de Branch (Agente de IA)
 

@@ -21,7 +21,8 @@
 - [ ] Security tests pass (`npm run test:security`)
 - [ ] Dependency audit reviewed (`npm run test:audit`) — it is informative in CI, so green does not mean clean
 - [ ] Doc guards pass (`node .agent/scripts/check-doc-versions.mjs`) — no WARN
-- [ ] If `.agent/scripts/` changed: guard tests pass (`node .agent/scripts/test-guards.mjs`, `node .agent/scripts/test-bundle-sizes.mjs`)
+- [ ] If `.agent/scripts/` changed: guard tests pass (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`)
+- [ ] If a `check-*.mjs` changed: `node .agent/scripts/mutation-sweep.mjs` exits 0 (every warning site goes red; no checker without a suite)
 - [ ] Backlog counters valid (`node .agent/scripts/check-backlog.mjs`) — 0 divergences
 - [ ] CI is green on the branch — never merge on red, and **check that checks exist**: `gh pr checks --watch` exits 0 when none have been reported yet
 - [ ] `src/docs/CHANGELOG.md` updated

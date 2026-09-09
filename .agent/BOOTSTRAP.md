@@ -314,8 +314,8 @@ const TARGETS = {
 
 O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 11 guards numerados. O total que ele reporta como "executados" **varia com a configuracao** (12 no template puro, porque o Guard 1 conta uma vez por rule obrigatoria e os Guards 3 e 4 saltam; +1 quando existe `package.json`, +1 com uma entrada em `BANNED`, +1 por `CHECK`): orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
 
-> **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs` e
-> `node .agent/scripts/test-bundle-sizes.mjs` quebram cada guard de proposito e exigem que
+> **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs`,
+> `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
 > avise e saia `!= 0`. Correr **sempre que mexeres nos scripts** — um guard que passa quando
 > devia falhar produz confianca infundada, e foi assim que dois deles ficaram sem apanhar
 > nada. Correm no CI no job `guard-tests`, que nao depende de `package.json`.
@@ -388,6 +388,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
 - **`.agent/rules/anti-patterns.md`**: apagar o exemplo comentado (e ilustrativo). A entrada **AP1** que vem preenchida e real e herdada do template — aplica-se a qualquer projeto que escreva testes de verificadores. Manter se o projeto tiver guards/scripts proprios; substituir pela primeira entrada tua se nao tiver.
+- **`.agent/rules/ticket-method.md`**: adaptar duas coisas ao projeto — o **nucleo do dominio** (os sitios onde um erro destroi dados ou a confianca, nao apenas da uma resposta errada: reducer, seed, pontuacao, migracoes, precos) e a **lista de angulos** da Fase 3 (os de UI nao servem a uma CLI ou lib). Nao importar — o ponteiro obrigatorio vive em `process-rules.md`.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em `CLAUDE.md`/`GEMINI.md`.
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
 
@@ -453,7 +454,8 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
-- [ ] **Guards passam**: `node .agent/scripts/check-doc-versions.mjs`, `node .agent/scripts/check-backlog.mjs`, `node .agent/scripts/test-guards.mjs` e `node .agent/scripts/test-bundle-sizes.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs` e `test-mutation-sweep.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
 
 > **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
