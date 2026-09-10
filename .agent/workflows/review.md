@@ -11,6 +11,11 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 1. Build & CI Check
 
+> **No template nu ainda nao ha `package.json`**, logo os dois primeiros passos saem em erro
+> ("Missing script") e nao ha nada a concluir dai. Nesse estado, o que substitui esta seccao
+> sao as suites de `.agent/scripts/` (ver §9) e o job `guard-tests` do CI. A partir do momento
+> em que o projeto tem app, estes passos passam a valer.
+
 - `npx tsc --noEmit` — 0 erros
 - `npm run lint` — passa
 - CI pipeline verde no branch — **verificar com um comando, nao a olho**, mas so quando
@@ -27,6 +32,11 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 2. CHANGELOG
 
 - [ ] Alteracoes significativas registadas em `src/docs/CHANGELOG.md`?
+
+> **Excecao, no template**: `src/docs/CHANGELOG.md` e os ficheiros de `.agent/context/`
+> ficam **deliberadamente vazios/nao tocados** enquanto isto e um template — sao o estado
+> inicial que cada projeto derivado herda. Escrever historia do template neles daria a cada
+> novo projeto um passado que nao e o dele. Num projeto derivado, a regra vale por inteiro.
 
 ## 3. Performance
 
@@ -83,6 +93,17 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] O trabalho revelou um padrao evitavel novo? -> propor entrada nova em `anti-patterns.md`
 
 ## 9. Testes
+
+> **Os testes da camada de agente correm sempre**, com ou sem app, e sao estes — sem eles um
+> agente que siga esta seccao num template nu nao corre nada e marca a checkbox:
+>
+> ```
+> node .agent/scripts/test-guards.mjs          node .agent/scripts/test-backlog.mjs
+> node .agent/scripts/test-bundle-sizes.mjs    node .agent/scripts/test-mutation-sweep.mjs
+> node .agent/scripts/test-test-surface.mjs    node .claude/hooks/tests/test-hooks.mjs
+> ```
+>
+> Os `npm run` abaixo sao os da **app** e so existem depois de haver `package.json`.
 
 - [ ] Testes unitarios passam: `npm run test:unit`
 - [ ] Testes E2E funcionais passam: `npm run test`
