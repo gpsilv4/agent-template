@@ -46,6 +46,12 @@ const TEST_GLOBS = [
   /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
 const CONFIG_GLOBS = [
+  // O que seleciona os testes NESTE repo nao e um `vitest.config`: e a lista de steps do
+  // `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step do CI desliga uma
+  // suite inteira sem tocar em nenhum ficheiro de teste — e o invariante 2 do `AP4`, que o
+  // cabecalho deste ficheiro cita e nao cumpria.
+  /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
+  /(^|\/)mutation-sweep\.mjs$/,
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
   /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
@@ -59,7 +65,23 @@ const CONFIG_GLOBS = [
 const CONTAGENS = [
   { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
   { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
-  { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes" },
+  { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
+  // O vocabulario DESTE repo. Sem estas tres linhas a contagem de assercoes era **zero em
+  // 10 das 10 suites**, e esvaziar os 55 `includes: [...]` de `test-guards.mjs` passava com
+  // `sem marcas de enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que
+  // o projeto nao usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
+  // `\[[^\]]` e nao `\[`: o ataque medido foi trocar `includes: ["x"]` por `includes: []`,
+  // que mantem o `includes: [` e portanto a contagem. So os arrays NAO VAZIOS contam.
+  { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
+  { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
+  { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
+  // A2: a "configuracao do runner" deste repo conta-se assim.
+  // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
+  // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
+  // forma YAML/JS equivalente (`- run:` inline, `{ alvo: ... }` na mesma linha). Um teste com
+  // a outra forma apanhou-o.
+  { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
+  { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
 ];
 
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
@@ -74,7 +96,10 @@ const MARCAS = [
 ];
 
 function git(args) {
-  return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
+  // `core.quotepath=false`: sem isto o git escapa caminhos nao-ASCII
+  // (`"tests/\303\251.test.js"`), o `existsSync` desse literal falha e um ficheiro que
+  // ninguem apagou e reportado como APAGADO — o gate fechava por razao errada.
+  return execFileSync("git", ["-c", "core.quotepath=false", ...args], { cwd: ROOT, encoding: "utf8" }).trim();
 }
 
 let problemas = 0;
@@ -102,6 +127,15 @@ console.log("\n=== Test Surface Check ===\n");
 let base = process.argv[2];
 try {
   if (!base) {
+    // Detached HEAD tratado explicitamente: o `symbolic-ref` lanca, o catch de baixo
+    // apanhava-o e dizia `baseline "(auto)" nao resolve`, o que atribui a culpa a coisa
+    // errada. Quem esta em detached tem de passar o ref, e a mensagem tem de o dizer.
+    if (git(["rev-parse", "--abbrev-ref", "HEAD"]) === "HEAD") {
+      fatal(
+        "HEAD esta detached, logo nao ha branch de onde derivar a baseline",
+        "        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>"
+      );
+    }
     const head = git(["symbolic-ref", "--short", "HEAD"]);
     // Os remote-tracking refs entram na lista, e nao por elegancia: num projeto **derivado**
     // acabado de clonar, o branch de trabalho e `fix/...` e nao existe `main` LOCAL — so
@@ -196,9 +230,13 @@ if (tocados.length === 0) {
       ...achadas.map((a) => `${a.msg} acrescentado(s)`),
       ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
     ];
+    // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
+    // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
+    // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
+    const contavel = CONTAGENS.some((c) => conta(antes, c.re) > 0);
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
-    } else if (config) {
+    } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
     } else {
       ok(`${f} alterado, sem marcas de enfraquecimento`);

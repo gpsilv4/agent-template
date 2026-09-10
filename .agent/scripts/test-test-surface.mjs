@@ -169,7 +169,7 @@ test("glob: suite nomeada tests-x.mjs (plural) tambem", (dir) => {
 test("contagem: casos de teste apagados sem nenhuma marca reprovam", (dir) => {
   writeFileSync(join(dir, "tests/exemplo.test.js"), "// suite esvaziada, sem skip nenhum\n");
   commit(dir, "esvaziar");
-}, { code: 1, includes: ["casos de teste: 1 -> 0", "assercoes: 1 -> 0"] });
+}, { code: 1, includes: ["casos de teste: 1 -> 0", "assercoes (expect/assert): 1 -> 0"] });
 
 test("contagem: acrescentar testes NAO e enfraquecimento", (dir) => {
   writeFileSync(join(dir, "tests/exemplo.test.js"),
@@ -247,6 +247,50 @@ test("nao consegue medir: index corrompido REPROVA em vez de dar OK", (dir, base
   writeFileSync(join(dir, ".git/index"), "isto nao e um index valido");
   return base;
 }, { code: 1, includes: ["nao conseguiu listar as alteracoes"] });
+
+// --- O vocabulario de assercao DESTE repo, e a configuracao que o seleciona --------
+// Duas provas de uma segunda leitura independente. A primeira era o defeito mais caro: a
+// contagem de assercoes media `expect(`/`assert(`, que aparecem **zero vezes** nas 10 suites
+// deste repo, logo esvaziar 55 `includes: [...]` passava com exit 0.
+
+test("assercao: esvaziar um includes: [...] faz a contagem descer", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", null, { code: 1, includes: ["x"] });\ntest("b", null, { code: 1, includes: ["y"] });\n');
+  commit(dir, "suite com assercoes em dados");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", null, { code: 1, includes: [] });\ntest("b", null, { code: 1, includes: [] });\n');
+  commit(dir, "esvaziar as assercoes");
+  return ref;
+}, { code: 1, includes: ["assercoes (includes/excludes): 2 -> 0"] });
+
+test("config: apagar um step de teste do CI faz a contagem descer", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n      - run: node b-test.mjs\n");
+  commit(dir, "ci com dois steps");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "apagar um step");
+  return ref;
+}, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+
+test("config: apagar um par da varredura faz a contagem descer", (dir) => {
+  mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
+  writeFileSync(join(dir, ".agent/scripts/mutation-sweep.mjs"),
+    'const PARES = [\n  { alvo: "a.mjs" },\n  { alvo: "b.mjs" },\n];\n');
+  commit(dir, "dois pares");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/mutation-sweep.mjs"), 'const PARES = [\n  { alvo: "a.mjs" },\n];\n');
+  commit(dir, "um par");
+  return ref;
+}, { code: 1, includes: ["pares alvo/suite da varredura: 2 -> 1"] });
+
+test("nao consegue medir: detached HEAD diz o que se passa, nao culpa a baseline", (dir) => {
+  git(dir, ["checkout", "-q", "--detach", "HEAD"]);
+  return ""; // sem baseline: e a auto-deteccao que tem de explicar-se
+}, { code: 1, includes: ["detached"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

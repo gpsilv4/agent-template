@@ -359,9 +359,18 @@ senao ele mede zero e passa:
   sem deixar nenhuma marca de `skip` para tras.
 
 > **Como confirmar que nao mede zero**: apaga uma suite (sem commitar) e corre
-> `node .agent/scripts/check-test-surface.mjs`. Tem de dizer `APAGADO` e sair `!= 0`. Se
-> disser `superficie de teste intacta`, os `TEST_GLOBS` nao veem os teus testes — foi
-> exatamente o que aconteceu neste template, onde 9 das 10 suites eram invisiveis.
+> `node .agent/scripts/check-test-surface.mjs`. Tem de dizer **`APAGADO`** e sair `!= 0`.
+>
+> Confirma a **mensagem**, nao so o exit code: num repo com um unico commit a baseline
+> automatica (`main^`) nao existe e o verificador sai `1` a dizer `baseline ... nao resolve`,
+> que e outra coisa. Nesse caso passa a baseline a mao:
+> `node .agent/scripts/check-test-surface.mjs "$(git rev-list --max-parents=0 HEAD)"`.
+>
+> Se disser `superficie de teste intacta`, os `TEST_GLOBS` nao veem os teus testes — foi
+> exatamente o que aconteceu neste template, onde 9 das 10 suites eram invisiveis. E se disser
+> `intacta` depois de esvaziares as **assercoes** (em vez de apagar o ficheiro), o problema
+> esta nas `CONTAGENS`: mediam `expect(`/`assert(` num repo cujo vocabulario era
+> `includes:`/`eq(`, logo contavam zero — e zero nao desce.
 
 ### 2.5 Adaptar core-rules.md a stack
 
