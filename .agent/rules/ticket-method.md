@@ -3,6 +3,10 @@
 > **Nao carregado automaticamente.** O ponteiro obrigatorio vive em `process-rules.md`
 > ("Metodo de Trabalho por Ticket"); este ficheiro e o detalhe, aberto ao iniciar um ticket
 > `M` ou `L`. Manter aqui — e nao nas rules carregadas — para o contexto do agente ficar enxuto.
+>
+> Este ficheiro sao as **instrucoes**: o que fazer, em que ordem, e onde parar. O **porque** de
+> cada regra, o que custa, e as medicoes que a sustentam vivem em
+> **`src/docs/ticket-method-why.md`** — leitura de humano, uma vez, nao a cada ticket.
 
 ## Em uma linha
 
@@ -13,11 +17,10 @@ Seis fases: **explicar antes de fazer** (0) · desenvolver (1) · um loop com cr
 O criterio diz o que conta como achado; **nao** diz quando o ciclo acaba. Isso e sempre uma
 decisao do utilizador (Fases 2 e 3).
 
-E ha, depois do commit, algo que **nao e do agente e nao se numera: usar** o que mudou. (Nao
-lhe chamo fase nem passagem de proposito — as fases sao seis, 0 a 5, e "passagem" ja significa
-uma volta da Fase 3.) Nao e
-um remate opcional — sao **tres instrumentos que apanham classes diferentes**, e o terceiro e
-o unico que apanha uma decisao errada:
+E ha, depois do commit, algo que **nao e do agente e nao se numera: usar** o que mudou — nao
+lhe chamo fase nem passagem de proposito, porque as fases sao seis (0 a 5) e "passagem" ja
+significa uma volta da Fase 3. Nao e um remate opcional: sao **tres instrumentos que apanham
+classes diferentes**, e o terceiro e o unico que apanha uma decisao errada:
 
 | Instrumento | Apanha |
 |-------------|--------|
@@ -25,8 +28,8 @@ o unico que apanha uma decisao errada:
 | A Fase 4 (leitor independente) | o que **nao consegues ver por teres escrito** |
 | **Usar** (nao e do agente) | o que **decidiste mal** — inclui o que nunca chegou a existir |
 
-Detalhe mais abaixo, em _"A fase que nao e do agente"_. Saltar as tres nao e ir mais rapido:
-e trocar tres tipos de deteccao por um.
+Saltar as tres nao e ir mais rapido: e trocar tres tipos de deteccao por um. O detalhe de cada
+um, com as medicoes, esta em **`src/docs/ticket-method-why.md`**.
 
 O que escala com o tamanho do ticket sao tres delas — a **Fase 0** (do chat ao ficheiro com
 alternativas), a **Fase 3** (quantas passagens esperar) e a **Fase 4** (se corre). As outras
@@ -39,25 +42,22 @@ nao vale numa mudanca de texto.
 
 ---
 
-## De onde vem cada regra
+## Duas coisas diferentes: harness e loop
 
-Nenhuma foi inventada em abstracto. Cada uma veio de um erro **que aconteceu** — metade neste
-repo (marcadas `T`, de template) e metade num projeto construido a partir dele (`P`), que e a
-razao de estarem aqui: sao as que qualquer projeto repete.
+- **Harness** — o que o *runtime* faz por nos, deterministicamente: permissoes, hooks,
+  subagentes, comandos. **O agente pode esquecer uma regra do `CLAUDE.md`; um hook nao
+  esquece.** Neste template: `.claude/settings.json` (fronteira de permissoes),
+  `.claude/hooks/` (nega antes de acontecer), `.claude/agents/` (leitores independentes).
+- **Loop** — fechar o ciclo para o trabalho continuar: as Fases 2 e 3, e um `/loop` se a
+  ferramenta o tiver.
 
-| Erro real | Regra que ficou | |
-|-----------|-----------------|-|
-| Um `tail -1` mostrou `125 passed` e engoliu o `1 failed` | **Nunca filtrar** o sumario de uma corrida (Fase 2) | `P` |
-| Uma assercao passava com o defeito no ecra — um `toHaveCount(0)` cumpre-se no primeiro instante em que a contagem e zero | Cada teste novo nasce com o seu **controlo negativo** (Fase 1) | `P` |
-| Duas passagens de `/review` seguidas nao encontraram nada, por serem a mesma checklist | Cada passagem **declara o angulo** antes de correr (Fase 3) | `P` |
-| Uma varredura reportou `39/39` medindo **3 sitios de 21**: o padrao so via `warn(`, e o verificador emitia por um wrapper `flag()` | Cobertura de mutacao **derivada por script**, nunca contada a mao (Fase 1) | `T` |
-| Um check de seguranca — o que obriga a pedir autorizacao antes de `git commit`/`push` — podia ser desligado com a suite **toda verde** | O **leitor independente** da Fase 4 e obrigatorio num `L` ou no nucleo do dominio | `T` |
-| Faltava um verificador **inteiro**: um placeholder esquecido no bootstrap nao avisava ninguem | **Usar** o que se construiu — nenhuma revisao encontra codigo que nao existe | `T` |
-| Seis passagens minhas declararam o trabalho limpo; uma leitura independente achou tres defeitos ALTO em 16 minutos | "Validei e esta limpo" **nao e informacao** quando o validador e o autor | `T` |
-| Um `npx prettier` num projeto sem prettier inflou um diff para `+225/-99` | **Nao reformatar o que o ticket nao toca** (Fase 1) | `P` |
+**A ordem importa: sem harness solido, um loop so amplifica erros.** Um ciclo automatico sobre
+uma regra que vive em prosa repete o esquecimento mais depressa.
 
-> Num projeto derivado, **substitui estas linhas pelas tuas**. A tabela vale pelos erros que
-> *tu* cometeste: sao esses que a tua equipa reconhece e por isso respeita.
+> **Nota de portabilidade**: hooks sao **so-Claude Code**. Por isso, neste template, cada
+> verificacao vive num script em `.agent/scripts/` — universal, corre em qualquer agente e no
+> CI — e o hook e um **ponteiro fino** que a chama automaticamente. A verificacao e para todos;
+> o automatismo e so-Claude. Nas outras ferramentas corre-se o script, e o CI e a rede final.
 
 ## Fase 0 — Explicar, e esperar
 
@@ -77,6 +77,12 @@ Depois **espera-se pela aprovacao**.
 
 **O plano nao e garantia.** Um plano escrito pode estar errado, e estara. Serve para o erro
 ficar visivel cedo, nao para o impedir.
+
+**Auditar o plano antes de o ler** (`L`, ou toca no nucleo do dominio): o subagente
+`plan-auditor` julga a **metade verificavel** — satisfaz os criterios de aceitacao?, mantem-se
+no ambito?, as provas propostas provam algo?, replica algum precedente do repo? Read-only de
+proposito: **um auditor que pode editar o que audita nao e auditor.** Nao substitui a tua
+leitura; poupa-te a lê-lo quando esta obviamente incompleto.
 
 ## Fase 1 — Desenvolver
 
@@ -100,11 +106,8 @@ o numero ser derivado e nao contado a mao.
 observado por algum teste. Nada mais. Nao diz nada sobre os avisos que **nunca foram
 escritos**, e e ai que vivem os defeitos piores.
 
-> Mediu-se as duas coisas na mesma sessao. O `check-backlog.mjs` tinha **12/12** sitios
-> cobertos **e**, ao mesmo tempo, respondia `Backlog vazio — nada a validar` com exit `0` a um
-> backlog com tres items cujas seccoes tinham sido renomeadas. A cobertura estava perfeita; o
-> aviso que faltava nem existia para ser coberto. Foi um **angulo** da Fase 3 (acoplamento)
-> que o apanhou, nao a varredura. Cobertura de mutacao e um piso, nao um teto.
+> **Cobertura de mutacao e um piso, nao um teto** — o que ela prova, e o caso medido em que
+> 12/12 convivia com um aviso que nem existia, estao em `src/docs/ticket-method-why.md`.
 
 ## Fase 2 — O loop que a maquina fecha
 
@@ -120,6 +123,15 @@ cada teste novo com o seu controlo negativo vermelho
 `1 failed`. Um `| grep` mostra a linha que procuravas e esconde o aviso que nao previas. E
 cuidado com o exit code do pipe: em `zsh` o `PIPESTATUS` nao existe, logo `cmd | tail` seguido
 de `$?` reporta o `tail`, nao o `cmd`.
+
+Um loop cujo objetivo e "ficar verde" tem uma **solucao degenerada: enfraquecer o teste** (ver
+`AP4`). Tres invariantes, e nenhuma e opcional:
+
+- O veredicto assenta no **exit code** do runner, nunca numa regex sobre o output.
+- A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
+- A superficie de teste (testes **e** configuracao do runner) nao muda durante o loop:
+  `node .agent/scripts/check-test-surface.mjs` — e no Claude Code o hook nega a escrita antes
+  de acontecer.
 
 Ao chegar as 5, **parar e apresentar** o que falha e o que ja se tentou — e e o mesmo
 ponto de decisao da Fase 3: o agente nao decide sozinho abandonar nem insistir. O
@@ -177,13 +189,8 @@ sinal de que os angulos declarados eram variacoes do mesmo.
 | mais um ciclo | nova passagem, com um **angulo novo declarado** — nunca repetir a checklist |
 | corrigir X por inteiro primeiro | volta-se a Fase 2 so em X, e depois reavalia-se |
 
-> **"A ultima passagem nao encontrou nada" nao e "esta limpo".** Nesta sessao mediu-se as
-> duas faces. Cinco de seis passagens renderam num ticket `L`, e declarar "rendimento
-> decrescente" a quarta estava errado — a quinta encontrou tanto como a segunda, porque mudou
-> de **angulo**. Mas tambem: a ronda que nao encontrou nada **nao** foi o fim — a passagem
-> seguinte, de **uso** (ver mais abaixo), achou um defeito de desenho que nenhuma das cinco
-> revisoes viu. Por isso a ausencia de achados encerra a *passagem*, nunca o *ciclo*: quem
-> encerra o ciclo e o utilizador, informado do que ainda nao foi olhado.
+> **"Nao encontrou nada" nao e "esta limpo"** — as duas faces disto foram medidas; ver
+> `src/docs/ticket-method-why.md`.
 
 ## Fase 4 — O leitor independente
 
@@ -226,39 +233,6 @@ E o Git pergunta-se **um passo por vez**: commit, depois push, depois PR, depois
 "avanca" cobre o passo em causa e **nao os seguintes**.
 
 ---
-
-## A fase que nao e do agente: usar
-
-Depois de cada ticket, **uma passagem a usar o que mudou**. Num produto com UI, e abrir o
-ecra; numa lib, e consumi-la de fora; num template, e criar um projeto a partir dele.
-
-Isto nao e opcional nem cosmetico, e a medicao e especifica. Numa sessao real:
-
-- **A revisao** (Fases 2-3, seis passagens) encontrou 22 defeitos — todos em codigo escrito
-  minutos antes.
-- **O leitor independente** (Fase 4) encontrou, em dezasseis minutos, tres defeitos ALTO que
-  as seis passagens nao viram — incluindo um check de seguranca que podia ser desligado com a
-  suite toda verde. A revisao falhou ai porque quem escreveu o teste **sabe o que ele queria
-  dizer**.
-- **Usar** encontrou o que nao existia: simular o bootstrap revelou que faltava um verificador
-  inteiro (nenhuma revisao podia encontrar codigo ausente); converter o repo para CRLF revelou
-  dois testes que nao afirmavam nada; e correr um gate de CI a serio revelou que ele passava
-  com zero verificacoes.
-
-Nenhum destes tres substitui os outros. O erro nao e escolher mal — e escolher so um.
-
-## O que custa
-
-Aplicado por inteiro a tudo, multiplica o tempo por ticket por **2 a 3**. E por isso que tres
-fases escalam por tamanho: sem escala, o metodo e abandonado a segunda semana.
-
-A **Fase 4** e a unica com um custo grande e mensuravel. Medido neste repo: uma passagem sobre
-dois commits (33 ficheiros) consumiu **~168k tokens** e 16 minutos, e devolveu tres defeitos
-ALTO que seis passagens minhas nao viram — um deles a fronteira de seguranca. E cara e vale a
-pena onde a tabela da Fase 4 diz que corre; nao vale num `S`.
-
-O resto e quase gratis em tempo de maquina: os controlos negativos correm com a suite, e a
-varredura de mutacao custa minutos **uma vez** por alteracao a um verificador, nao por commit.
 
 ## O que o metodo nao faz
 

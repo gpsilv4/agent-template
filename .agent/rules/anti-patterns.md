@@ -76,6 +76,33 @@
   suite num **projeto derivado** e nao so no template. Um teste verde num sitio e vermelho no
   outro nao esta a afirmar o que diz.
 
+## AP4 — O loop que fica verde enfraquecendo o teste
+
+- **Origem**: o desenho de um loop de correcao automatica num projeto real.
+- **Anti-padrao**: um loop com o objetivo _"ficar verde"_ tem uma **solucao degenerada** —
+  enfraquecer o teste em vez de corrigir o codigo. Tres formas, por ordem de subtileza:
+  apagar a assercao; marcar `it.skip`/`xit`/`@pytest.mark.skip`; e **estreitar a selecao do
+  runner** (`include`, `testMatch`, `-k`), que remove falhas igualmente bem e nao toca em
+  nenhum ficheiro de teste.
+- **Correto**: **retirar a capacidade**, nao pedir contencao. Durante um loop de correcao:
+  1. O veredicto assenta no **exit code** do runner. Nunca numa regex sobre o output — uma
+     versao assim dava APROVADO quando o output nao era parseavel (import quebrado, timeout,
+     runner ausente).
+  2. Congelar os testes **e a configuracao** do runner. Congelar so os testes nao basta.
+  3. Nao ha loop sem falha inicial: se a suite ja esta verde, o loop nao arranca.
+  4. Perguntar ao **git** o que mudou desde a baseline — e **abortar** se o git falhar, em vez
+     de tratar a resposta vazia como "nada mudou".
+  5. A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
+  6. Procurar marcas de enfraquecimento **so na superficie congelada** — senao um
+     `.skip(offset)` de paginacao em codigo de producao da falso positivo.
+- **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>` — compara o
+  diff contra a baseline e reprova se a superficie de teste foi enfraquecida. No Claude Code,
+  o hook `.claude/hooks/guard-test-surface.mjs` nega a escrita antes de ela acontecer.
+
+> **O limite honesto**: quem corre o loop pode desligar o guard, e a mensagem de negacao ate
+> diz como. Isto torna a batota **visivel e trabalhosa**, nao impossivel. A autoridade que o
+> agente nao alcanca e o **CI**: um job que falha se a contagem de testes descer face a base.
+
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
 > um bug teu revelar.

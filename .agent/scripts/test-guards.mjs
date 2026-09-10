@@ -119,6 +119,27 @@ test("G1: rules geradas no bootstrap dao SKIP visivel", null, {
   includes: ["SKIP  .agent/rules/business-logic.md", "SKIP  .agent/rules/pages-architecture.md"],
 });
 
+// --- Guard 1b: orcamento das rules de REFERENCIA (nao carregadas) -------------
+// Nao tinham limite nenhum, e uma delas chegou aos 16 KB sem nada avisar — apesar de ser
+// reaberta por inteiro a cada ticket `M`/`L`.
+test("G1b: referencia acima do maximo avisa", (dir) => {
+  appendFileSync(file(dir, ".agent/rules/ticket-method.md"), "x".repeat(21000));
+}, { code: 1, includes: ["ticket-method.md", "referencia demasiado grande"] });
+
+test("G1b: referencia maior que uma rule carregada da NOTE, nao WARN", (dir) => {
+  // NOTE nao e WARN: o exit fica 0 e o aviso e informativo. So a NOTE prova que o limiar
+  // intermedio existe — sem este teste, colapsar os dois limiares passava despercebido.
+  writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(13000));
+}, { code: 0, includes: ["scripts-guide.md", "maior que uma rule carregada"] });
+
+test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
+  for (const f of ["sync-docs", "ticket-method", "scripts-guide"]) {
+    try { rmSync(file(dir, `.agent/rules/${f}.md`)); } catch {}
+  }
+  // `code: 0`: um SKIP nao e um WARN. O que este teste afirma e que o guard **diz** que nao
+  // correu, em vez de desaparecer em silencio — a regra de "todo o skip e visivel".
+}, { code: 0, includes: ["SKIP  Guard 1b"] });
+
 // --- Guard 2: paridade CLAUDE/GEMINI ------------------------------------------
 test("G2: divergencia de conteudo avisa", (dir) => {
   // Normalizar os dois primeiro: se o repo ja divergir no baseline, o aviso nao seria

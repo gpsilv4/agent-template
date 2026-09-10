@@ -16,22 +16,23 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 2. [ ] `CLAUDE.md` — referencias a `.agent/` files corretas
 3. [ ] `GEMINI.md` — **espelho** de `CLAUDE.md` (atualizar **em par** — so difere a sintaxe `@[...]`). Verificar paridade: `node .agent/scripts/check-doc-versions.mjs`
 4. [ ] `.agent/rules/` — todas as regras refletem o estado atual do codigo (e dentro do orcamento de bytes)
-5. [ ] `.agent/rules/ticket-method.md` — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
+5. [ ] `.agent/rules/scripts-guide.md` — se acrescentaste ou alteraste um verificador (`.agent/scripts/`) ou um hook (`.claude/hooks/`): o detalhe vive la, e nao nas rules carregadas, porque o orcamento de bytes ja foi excedido a serio quando vivia
+6. [ ] `.agent/rules/ticket-method.md` (instrucoes) **e** `src/docs/ticket-method-why.md` (evidencia: de onde veio a regra, o que custa) — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
    **Renumerar ou mudar o ambito de uma fase obriga a atualizar quem a cita por numero**: `process-rules.md`
    (ponteiro + "Ao iniciar um item"), `/plan` (Fase 0), `/debug` (Fase 0+1), `/refactor` (Fase 0+4), `/review` (Fase 3)
-6. [ ] `.agent/context/session.md` — estado da sessao atual
-7. [ ] `.agent/context/task.md` — tarefas atualizadas
-8. [ ] `.agent/context/backlog.md` + `.agent/context/backlog-archive.md`:
+7. [ ] `.agent/context/session.md` — estado da sessao atual
+8. [ ] `.agent/context/task.md` — tarefas atualizadas
+9. [ ] `.agent/context/backlog.md` + `.agent/context/backlog-archive.md`:
    - [ ] Trabalho feito fora do sprint esta registado com ID?
    - [ ] Contadores + barra de progresso corretos? (correr `node .agent/scripts/check-backlog.mjs`)
    - [ ] Linha **Proximo:** atualizada?
    - [ ] Items fechados movidos para `backlog-archive.md`; ordem das seccoes respeitada (🎯 -> 📚)?
-9. [ ] `.agent/context/decisions.md` — novas decisoes registadas (arquivar as antigas se > ~150 linhas, ver Regra de Arquivamento)
-10. [ ] `.agent/context/walkthrough.md` — se houve feature/fix user-facing (arquivar se > ~200 linhas)
-11. [ ] `.agent/context/audit-history.md` — se correste `/audit`: baseline datada acrescentada? (acumulado, **nao** importado)
-12. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
-13. [ ] `.agent/workflows/` — workflows refletem processos atuais
-14. [ ] `.agent/scripts/` — scripts e targets atualizados.
+10. [ ] `.agent/context/decisions.md` — novas decisoes registadas (arquivar as antigas se > ~150 linhas, ver Regra de Arquivamento)
+11. [ ] `.agent/context/walkthrough.md` — se houve feature/fix user-facing (arquivar se > ~200 linhas)
+12. [ ] `.agent/context/audit-history.md` — se correste `/audit`: baseline datada acrescentada? (acumulado, **nao** importado)
+13. [ ] `.agent/context/implementation_plan.md` — se houve novo plano
+14. [ ] `.agent/workflows/` — workflows refletem processos atuais
+15. [ ] `.agent/scripts/` — scripts e targets atualizados.
     **Verificador novo ou alterado?** Entao (a) tem o seu `test-*.mjs` com controlos negativos,
     (b) esta registado em `PARES` no `mutation-sweep.mjs` com o seu `sinal` de reprovacao, e
     (c) `node .agent/scripts/mutation-sweep.mjs` sai 0. A varredura reprova de proposito um
@@ -42,17 +43,17 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
     (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
     permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre
-15. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
-16. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
-17. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
-18. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
-19. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
-20. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
-21. [ ] `.github/dependabot.yml` — schedule e labels corretos
-22. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
-23. [ ] `SECURITY.md` — politica de disclosure atualizada
-24. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
-25. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+16. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
+17. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
+18. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
+19. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
+20. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
+21. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
+22. [ ] `.github/dependabot.yml` — schedule e labels corretos
+23. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
+24. [ ] `SECURITY.md` — politica de disclosure atualizada
+25. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
+26. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
 
