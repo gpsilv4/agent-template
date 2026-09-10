@@ -41,11 +41,19 @@
 
 ## Pendentes sem Sprint
 
-> Items aprovados no backlog mas ainda nao atribuidos a um sprint.
+> Items aprovados no backlog mas ainda nao atribuidos a um sprint. A coluna **Nota** diz
+> **porque** esta parqueado e o que o desbloqueia (ex: "precisa de dados reais", "depende do
+> F12", "valor por confirmar") — sem isso, um item volta a ser discutido de zero cada vez que
+> se planeia um sprint.
+>
+> **Prioridade nao se escreve aqui nem no sprint.** No sprint, a `Ordem` **e** a prioridade;
+> uma coluna de urgencia ao lado dela seriam dois campos a ter de concordar a mao, sem nada a
+> verifica-los — e ao primeiro reordenar o documento passa a mentir (ver `AP1`). Nesta tabela
+> nao ha ordem porque a decisao ainda nao foi tomada: o que falta e a **razao**, nao um rotulo.
 
-| ID | Descricao | Esforco |
-|----|-----------|---------|
-| | | |
+| ID | Descricao | Esforco | Nota |
+|----|-----------|---------|------|
+| | | | |
 
 ---
 
