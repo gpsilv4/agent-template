@@ -105,7 +105,10 @@ const PARES = [
   {
     alvo: ".agent/scripts/check-test-surface.mjs",
     suite: ".agent/scripts/test-test-surface.mjs",
-    sinal: /(?<![\w.$])warn\(/,
+    // `fatal(` entra ao lado do `warn(`: os tres sitios de "nao consegui medir" eram
+    // `console.log` + `process.exit` soltos, logo ficavam fora desta contagem e a varredura
+    // anunciava cobertura completa a medir metade. Ver a nota no cabecalho do `fatal`.
+    sinal: /(?<![\w.$])(?:warn|fatal)\(/,
     neutro: "(() => {})(",
   },
   {

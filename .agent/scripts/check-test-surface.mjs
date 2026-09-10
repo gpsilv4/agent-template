@@ -83,6 +83,17 @@ const warn = (m) => {
   problemas++;
 };
 const ok = (m) => console.log(`  OK    ${m}`);
+/** Nao consegui medir: avisa e sai `!= 0` na hora. Existe como FUNCAO e nao como
+ *  `console.log` + `process.exit` soltos porque a varredura de mutacao procura sitios de
+ *  aviso por nome: escritos a mao, tres destes ficavam fora da contagem e a varredura
+ *  anunciava "cobertura completa" a medir metade dos sitios — o mesmo defeito que um
+ *  wrapper `flag()` ja tinha causado neste repo. */
+const fatal = (m, extra) => {
+  console.log(`  WARN  ${m}`);
+  if (extra) console.log(extra);
+  console.log("");
+  process.exit(1);
+};
 
 console.log("\n=== Test Surface Check ===\n");
 
@@ -92,7 +103,12 @@ let base = process.argv[2];
 try {
   if (!base) {
     const head = git(["symbolic-ref", "--short", "HEAD"]);
-    const principal = ["main", "master", "develop"].find((b) => {
+    // Os remote-tracking refs entram na lista, e nao por elegancia: num projeto **derivado**
+    // acabado de clonar, o branch de trabalho e `fix/...` e nao existe `main` LOCAL — so
+    // `origin/main`. Sem estes candidatos o verificador nao conseguia medir e saia `!= 0` no
+    // dia 1 de cada consumidor, com uma mensagem que nao dizia o que fazer. Medido a correr
+    // o bootstrap: e a classe do `AP3` (verde no template, vermelho no derivado).
+    const principal = ["main", "master", "develop", "origin/main", "origin/master", "origin/develop", "origin/HEAD"].find((b) => {
       try {
         git(["rev-parse", "--verify", `${b}^{commit}`]);
         return true;
@@ -101,17 +117,19 @@ try {
       }
     });
     if (!principal) {
-      console.log("  WARN  nao encontrei um branch principal (main/master/develop) para servir de baseline");
-      console.log("        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>\n");
-      process.exit(1);
+      fatal(
+        "nao encontrei um branch principal (main/master/develop, local ou em origin/) para servir de baseline",
+        "        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>"
+      );
     }
     base = head === principal ? `${principal}^` : git(["merge-base", principal, "HEAD"]);
   }
   git(["rev-parse", "--verify", `${base}^{commit}`]);
 } catch (err) {
-  console.log(`  WARN  baseline "${base ?? "(auto)"}" nao resolve: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-  console.log("        sem baseline nao ha medicao — e uma medicao ausente nao e um OK\n");
-  process.exit(1);
+  fatal(
+    `baseline "${base ?? "(auto)"}" nao resolve: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
+    "        sem baseline nao ha medicao — e uma medicao ausente nao e um OK"
+  );
 }
 console.log(`  baseline: ${base}\n`);
 
@@ -125,8 +143,7 @@ try {
   // coincidem (arvore limpa), logo nao ha perda.
   alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
 } catch (err) {
-  console.log(`  WARN  o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}\n`);
-  process.exit(1);
+  fatal(`o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
 }
 
 const tocados = alterados.filter(naSuperficie);
@@ -139,9 +156,19 @@ if (tocados.length === 0) {
     // Com `--unified=0`, EDITAR uma linha que ja tinha um `skip` aparece como linha
     // acrescentada — e dava falso positivo em qualquer alteracao a um teste ja desativado.
     // O que interessa e se a marca ficou MAIS frequente.
+    // As marcas contam-se com o conteudo das STRINGS retirado. Uma marca dentro de aspas e
+    // **dados**, nao uma diretiva: a suite deste proprio verificador tem `test.skip(...)`
+    // dentro de fixtures, e sem isto ela sinalizava-se a si mesma — medido a correr o gate
+    // num projeto derivado. Uma desativacao a serio (`it.skip(`) fica sempre FORA das aspas,
+    // logo continua a contar; e `test("nome"` tambem, porque a chamada nao esta entre aspas.
+    // Os escapes contam: um `\'` dentro de uma string desalinhava um emparelhamento ingenuo
+    // e a marca seguinte ficava exposta. Medido na propria suite deste verificador, que tem
+    // fixtures com aspas escapadas — o gate sinalizava-a a si mesmo num projeto derivado.
+    const semStrings = (t) =>
+      t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
     const conta = (texto, re) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
-      return (texto.match(g) || []).length;
+      return (semStrings(texto).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".

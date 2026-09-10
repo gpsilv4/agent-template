@@ -42,8 +42,12 @@ function commit(dir, msg) {
 }
 
 function corre(dir, base) {
+  // `base` vazio => corre SEM argumento, que e o unico modo em que a auto-deteccao da
+  // baseline esta sob teste. Antes, um `mutate` que devolvesse `null` caia no `?? base` do
+  // harness e o teste passava com a baseline explicita — verde sem afirmar nada.
+  const args = [join(dir, ".agent/scripts/check-test-surface.mjs"), ...(base ? [base] : [])];
   try {
-    return { code: 0, out: execFileSync("node", [join(dir, ".agent/scripts/check-test-surface.mjs"), base], { cwd: dir, encoding: "utf8" }) };
+    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8" }) };
   } catch (err) {
     return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -186,6 +190,63 @@ test("arvore: apagar um teste SEM commitar e detetado", (dir) => {
   rmSync(join(dir, "tests/exemplo.test.js"));
   // de proposito sem commit
 }, { code: 1, includes: ["APAGADO"] });
+
+// --- O dia 1 de um projeto DERIVADO ------------------------------------------
+// Um clone tem o branch de trabalho e `origin/main`, mas nao `main` LOCAL. Sem os candidatos
+// remote-tracking o verificador nao conseguia medir e saia `!= 0` em todo o projeto derivado
+// — verde no template, vermelho no consumidor. E o `AP3`.
+
+test("derivado: sem main LOCAL mas com origin/main, consegue medir", (dir) => {
+  // Simular um clone: renomear o branch e criar o ref remoto a apontar para a baseline.
+  const sha = git(dir, ["rev-parse", "HEAD"]);
+  git(dir, ["branch", "-m", "main", "fix/algo"]);
+  git(dir, ["update-ref", "refs/remotes/origin/main", sha]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  commit(dir, "enfraquecer");
+  return ""; // string vazia => corre SEM argumento: e a auto-deteccao que esta sob teste
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+// --- Uma marca dentro de aspas e dados, nao uma diretiva ---------------------
+// Medido num projeto derivado: a suite DESTE verificador tem `test.skip(...)` dentro de
+// fixtures, e o gate sinalizava-a a si propria — exit 1 em trabalho legitimo.
+
+test("marca dentro de uma STRING nao e enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("soma", () => { expect(1 + 1).toBe(2); });\n' +
+    'test("fixture", () => { const fonte = \'test.skip("x", () => {});\'; expect(fonte).toBeTruthy(); });\n');
+  commit(dir, "fixture com a marca em string");
+}, { code: 0 });
+
+test("marca FORA das aspas continua a ser apanhada", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  commit(dir, "skip a serio");
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+test("marca depois de aspas ESCAPADAS nao e enfraquecimento", (dir) => {
+  // Um `\\"` dentro de uma string desalinha um emparelhamento ingenuo e expoe a marca
+  // seguinte. Foi assim que a suite deste verificador se sinalizou a si mesma.
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("soma", () => { expect(1).toBe(1); });\n' +
+    'const doc = "escreve \\"test.skip(\\" para desativar";\n');
+  commit(dir, "fixture com aspas escapadas");
+}, { code: 0 });
+
+// --- "Nao consegui medir" tem de REPROVAR, nao dar OK ------------------------
+// A varredura de mutacao apontou estes dois sitios como descobertos: um verificador que nao
+// sabe responder e o caso mais perigoso, porque o exit 0 parece uma aprovacao.
+
+test("nao consegue medir: sem branch principal nem origin/ REPROVA", (dir) => {
+  git(dir, ["branch", "-m", "main", "trabalho"]);
+  return ""; // corre sem baseline: e a auto-deteccao que falha
+}, { code: 1, includes: ["nao encontrei um branch principal"] });
+
+test("nao consegue medir: index corrompido REPROVA em vez de dar OK", (dir, base) => {
+  // O `rev-parse` nao le o index, logo a baseline resolve; o `git diff` le, e falha. E a
+  // unica forma deterministica de separar "a baseline nao resolve" de "nao consigo listar".
+  writeFileSync(join(dir, ".git/index"), "isto nao e um index valido");
+  return base;
+}, { code: 1, includes: ["nao conseguiu listar as alteracoes"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
