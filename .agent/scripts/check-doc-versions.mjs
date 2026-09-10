@@ -225,6 +225,51 @@ const CARREGADO_MAX = 52000;
 }
 
 
+// --- Guard 1d: as Fronteiras copiadas nos ponteiros finos ---
+// O `.cursor/rules/*.mdc` e o `.github/copilot-instructions.md` sao ponteiros para o
+// `AGENTS.md`. Mas **nao esta verificado** que o Cursor e o Copilot SIGAM um ponteiro em
+// markdown — o Claude Code segue `@imports` porque e uma funcionalidade dele; os outros podem
+// simplesmente ler o ficheiro que lhes e dado. Se nao seguirem, esses agentes recebiam um mapa
+// de pastas e **zero regras**.
+//
+// A resposta e nao depender disso: as Fronteiras estao copiadas nos dois ficheiros. Copia
+// significa divergencia, logo este guard compara-as com a do `CLAUDE.md`. A duplicacao aqui e
+// **forcada** (cada tool le so o seu ficheiro), e a regra do repo para duplicacao forcada e
+// verifica-la, nao proibi-la — a mesma logica dos contadores do backlog.
+{
+  const fronteirasDe = (c) => {
+    const m = /^## Fronteiras \(prioridade maxima\)\n\n([\s\S]*?)\n\n>/m.exec(c.replace(/\r\n/g, "\n"));
+    return m ? m[1].trim() : null;
+  };
+  const raiz = read("CLAUDE.md");
+  const base = raiz === null ? null : fronteirasDe(raiz);
+  const PONTEIROS = [".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
+  if (base === null) {
+    skip("Guard 1d — sem CLAUDE.md ou sem bloco de Fronteiras para comparar");
+  } else {
+    let vistos = 0;
+    for (const f of PONTEIROS) {
+      const c = read(f);
+      if (c === null) {
+        skip(`${f} — ponteiro ausente (o tool correspondente nao esta configurado)`);
+        continue;
+      }
+      const copia = fronteirasDe(c);
+      if (copia === null) {
+        warn(`${f} nao tem o bloco "## Fronteiras" — um tool que nao siga o ponteiro para AGENTS.md fica sem regra nenhuma`);
+      } else if (copia !== base) {
+        warn(`${f}: as Fronteiras divergem do CLAUDE.md — a copia envelheceu`);
+      } else {
+        ok(`${f} = Fronteiras iguais ao CLAUDE.md`);
+      }
+      vistos++;
+    }
+    if (vistos === 0) skip("Guard 1d — nenhum ponteiro fino presente");
+    else guardsRun++;
+  }
+}
+
+
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
 // Gemini usa `@[path]`, Claude/Cursor usa `@path`. Normalizar antes de comparar
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.
