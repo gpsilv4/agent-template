@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -41,6 +41,17 @@ function repo(branch, sub) {
   execFileSync("git", ["init", "-q", "-b", branch], { cwd: alvo });
   execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "x"], { cwd: alvo });
   return dir;
+}
+
+/** Escreve, **commita** e volta a modificar — para o `git status --porcelain` devolver ` M`
+ *  (nao-staged) e nao `??`. Todos os testes anteriores criavam ficheiros NOVOS, cuja linha
+ *  comeca por `??`; era por isso que 33 testes verdes conviviam com o bug do `.trim()`. */
+function commitarEModificar(dir, rel, conteudo = "# depois\n") {
+  mkdirSync(dirname(join(dir, rel)), { recursive: true });
+  writeFileSync(join(dir, rel), "# antes\n");
+  execFileSync("git", ["add", rel], { cwd: dir });
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "add"], { cwd: dir });
+  writeFileSync(join(dir, rel), conteudo);
 }
 
 function corre(payload) {
@@ -184,6 +195,48 @@ test("permite um heredoc que MENCIONA o comando sem o executar", () => {
   }
 });
 
+// --- Mencionar nao e executar (medido: 5 falsos positivos em 5) --------------
+// O guard negava qualquer texto que CONTIVESSE o comando. Nao era teorico: bloqueou a
+// escrita dos seus proprios testes duas vezes, e um `echo` do comando numa string. Agora
+// exige `git` em **posicao de comando** e retira as strings entre aspas antes de decidir.
+for (const [nome, cmd] of [
+  ["echo do comando numa string", 'echo "git commit -m x"'],
+  ["grep por force-push na documentacao", 'grep -rn "git push --force" docs/'],
+  ["printf com o comando no texto", 'printf "corre git commit\\n"'],
+  ["pipe para grep do comando", 'cat README | grep "git commit"'],
+  ["awk com o comando no padrao", "awk '/git commit/' f.txt"],
+]) {
+  test(`permite ${nome} (menciona, nao executa)`, () => {
+    const d = repo("main");
+    try {
+      const r = corre({ tool_input: { command: cmd }, cwd: d });
+      eq(r.decisao, "allow", nome);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+// E o inverso: as aspas nao podem esconder um comando VERDADEIRO. Em `-m "texto"` sobra
+// `git commit -m `, que continua a casar.
+test("nega commit com mensagem entre aspas (as aspas nao escondem o comando)", () => {
+  const d = repo("main");
+  try {
+    eq(corre({ tool_input: { command: 'git commit -m "uma mensagem com espacos"' }, cwd: d }).decisao, "deny", "mensagem");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("nega quando o comando vem depois de um separador de shell", () => {
+  const d = repo("main");
+  try {
+    eq(corre({ tool_input: { command: "cd . && git commit -m x" }, cwd: d }).decisao, "deny", "separador");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
 // --- Contrato de saida: um hook avariado nao bloqueia --------------------------
 test("payload invalido nao bloqueia (sai allow, nao rebenta)", () => {
   const out = execFileSync("node", [HOOK], { input: "isto nao e json", encoding: "utf8" });
@@ -313,6 +366,72 @@ test("stop: NAO corre os testes (so reporta)", () => {
     contem(ctx, "nao corri nada");
     // Um hook de fim de turno que corresse suites seria desligado. O tempo e a prova.
     if (ms > 3000) throw new Error(`demorou ${ms}ms — parece estar a correr algo`);
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// --- A coluna de estado nao e para comer (bug do `.trim()`) -------------------
+// O `git status --porcelain` poe um ESPACO na coluna de quem nao esta staged: ` M path`.
+// Trimar o output inteiro come esse espaco na PRIMEIRA linha e desloca o caminho um
+// caractere. Nenhum teste apanhava porque todos criavam ficheiros novos (`??`).
+
+test("stop: a primeira linha modificada nao perde o ponto do caminho", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/core-rules.md");
+    // Unico ficheiro sujo => e a primeira linha do porcelain, com ` M`.
+    contem(correNoCwd(STOP, d).ctx, "check-doc-versions.mjs");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("session: o caminho da primeira linha modificada aparece inteiro", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/core-rules.md");
+    // Com o ponto: antes da correcao saia `agent/rules/...` e esta assercao ficava vermelha.
+    contem(correNoCwd(SESSION, d).ctx, ".agent/rules/core-rules.md");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("stop: a divida sub-reportada era silenciosa — reporta os DOIS ficheiros", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/core-rules.md");
+    commitarEModificar(d, ".agent/rules/anti-patterns.md");
+    // Duas rules sujas => a linha diz "2 ficheiros". Antes da correcao a primeira escapava
+    // a regra e a linha dizia o nome de UM so — divida a menos, sem aviso nenhum.
+    contem(correNoCwd(STOP, d).ctx, "2 ficheiros");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// --- A marca de "ja disse isto" pertence ao repo medido ------------------------
+test("stop: a marca fica no repo medido, nao no repo do hook", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/core-rules.md");
+    correNoCwd(STOP, d);
+    if (!existsSync(join(d, ".claude/state/stop-verify.last")))
+      throw new Error("a marca nao ficou no repo medido — vai calar avisos de outro repo");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("stop: divida identica cala-se; divida diferente volta a falar", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/core-rules.md");
+    if (correNoCwd(STOP, d).vazio) throw new Error("a primeira vez tem de falar");
+    if (!correNoCwd(STOP, d).vazio) throw new Error("divida identica devia calar-se");
+    commitarEModificar(d, ".agent/scripts/mutation-sweep.mjs", "// muda\n");
+    if (correNoCwd(STOP, d).vazio) throw new Error("divida NOVA tem de voltar a falar");
   } finally {
     rmSync(d, { recursive: true, force: true });
   }

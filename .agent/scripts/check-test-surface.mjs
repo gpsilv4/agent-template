@@ -12,7 +12,7 @@
  *
  * O QUE ISTO E E O QUE NAO E: e uma verificacao **universal** — so precisa de `node` e `git`,
  * logo qualquer agente a corre e o CI corre-a para todos. No Claude Code existe tambem um
- * hook que **nega a escrita antes de acontecer** (`.claude/hooks/guard-test-surface.mjs`);
+ * passo a correr — **nao** existe hook a negar a escrita de testes;
  * noutras ferramentas isto e o equivalente que se corre.
  *
  * Uso:

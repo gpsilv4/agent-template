@@ -21,6 +21,8 @@ coverage/
 .vercel
 .turbo
 .claude/settings.local.json
+# Estado local dos hooks — memoria desta maquina, nao do repo
+.claude/state/
 
 # OS / logs
 .DS_Store

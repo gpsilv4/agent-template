@@ -24,10 +24,16 @@ import { readFileSync } from "fs";
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
 const PROTEGIDOS = new Set(["main", "master", "develop"]);
 
+// `git` tem de estar em POSICAO DE COMANDO: no inicio, ou depois de um separador de shell
+// (`;`, `&&`, `||`, `|`, `(`, nova linha), com atribuicoes de ambiente opcionais pelo meio.
+// Sem isto, qualquer texto que MENCIONE o comando era negado — e o falso positivo nao e
+// teorico: media-se 5 em 5 (`echo "git commit"`, `grep "git push --force" docs/`, um `awk`
+// sobre um ficheiro). O guard chegou a bloquear a escrita dos seus proprios testes.
+const CMD = String.raw`(?:^|[;&|(\n]|&&|\|\|)\s*(?:\w+=\S*\s+)*git\b`;
 /** Verbos que alteram a historia ou o remoto. */
-const DESTRUTIVO = /\bgit\b[^\n;|&]*\b(commit|push|merge|rebase|reset\s+--hard)\b/;
+const DESTRUTIVO = new RegExp(CMD + String.raw`[^\n;|&]*\b(?:commit|push|merge|rebase|reset\s+--hard)\b`);
 /** Force-push e negado em QUALQUER branch. */
-const FORCE = /\bgit\b[^\n;|&]*\bpush\b[^\n;|&]*(--force(?!-with-lease)|(?<![\w-])-f(?![\w-]))/;
+const FORCE = new RegExp(CMD + String.raw`[^\n;|&]*\bpush\b[^\n;|&]*(?:--force(?!-with-lease)|(?<![\w-])-f(?![\w-]))`);
 
 function ler() {
   try {
@@ -75,9 +81,16 @@ try {
   const cmd = payload?.tool_input?.command;
   if (typeof cmd !== "string" || !cmd.trim()) process.exit(0);
 
-  // Um heredoc que MENCIONA o comando nao o executa. Cortar o corpo dos heredocs antes de
-  // decidir, senao uma mensagem de commit que cite `git push --force` era negada.
-  const semHeredoc = cmd.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^\s*\2\s*$/gm, "");
+  // Texto que MENCIONA o comando nao o executa. Retirar, por esta ordem:
+  //   1. corpos de heredoc — uma mensagem de commit que cite `push --force` nao e um push;
+  //   2. strings entre aspas — `echo "..."`, `grep "..."`, e a propria mensagem de `-m "..."`.
+  // Retirar as aspas nao esconde um comando verdadeiro: em `git commit -m "texto"` sobra
+  // `git commit -m `, que continua a casar. Esconde precisamente o caso em que o comando e
+  // um ARGUMENTO de outro programa.
+  const semHeredoc = cmd
+    .replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^\s*\2\s*$/gm, "")
+    .replace(/'[^']*'/g, "''")
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""');
 
   if (FORCE.test(semHeredoc)) {
     negar("Force-push negado em qualquer branch. Se e mesmo necessario, usa --force-with-lease e faz o push a mao, fora do agente.");

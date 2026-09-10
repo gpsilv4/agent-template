@@ -29,10 +29,17 @@
 
 ## A regra que os liga
 
-Cada verificador tem de ter **a sua suite de testes negativos** e **a sua entrada em `PARES`**
-no `mutation-sweep.mjs`. A varredura reprova com `SEM PAR` um `check-*.mjs` que exista no disco
-e nao esteja registado — nao a silenciar, registar. E reprova com `SEM SUITE` uma entrada sem
-testes: um verificador nao verificado nao da confianca, da a aparencia dela.
+Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua
+entrada em `PARES`** no `mutation-sweep.mjs`. A varredura reprova com `SEM PAR` um
+`check-*.mjs`, um `guards/*.mjs` ou um `.claude/hooks/*.mjs` que exista no disco e nao esteja
+registado — nao a silenciar, registar. E reprova com `SEM SUITE` uma entrada sem testes: um
+verificador nao verificado nao da confianca, da a aparencia dela.
+
+Os hooks entraram nesta regra depois de se notar que estavam **fora** dela: sao codigo de
+enforcement com sitios de decisao, e um hook errado e pior que um guard errado porque corre
+**antes** de cada ferramenta. O `sinal` de um guard-hook e a `negar(` — e exclui a *definicao*
+da funcao, porque mutar uma definicao da erro de sintaxe e a suite ficaria vermelha pela razao
+errada, contando como cobertura o que nao e.
 
 ## Universal vs so-Claude
 

@@ -95,13 +95,33 @@
   5. A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
   6. Procurar marcas de enfraquecimento **so na superficie congelada** — senao um
      `.skip(offset)` de paginacao em codigo de producao da falso positivo.
-- **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>` — compara o
-  diff contra a baseline e reprova se a superficie de teste foi enfraquecida. No Claude Code,
-  o hook `.claude/hooks/guard-test-surface.mjs` nega a escrita antes de ela acontecer.
+- **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>` — compara
+  **contagens** contra a baseline e reprova se a superficie foi enfraquecida.
 
-> **O limite honesto**: quem corre o loop pode desligar o guard, e a mensagem de negacao ate
-> diz como. Isto torna a batota **visivel e trabalhosa**, nao impossivel. A autoridade que o
+> **O limite honesto**: e um passo a correr, **nao** uma barreira — nao ha hook a negar a
+> escrita de testes, e quem corre o loop pode simplesmente nao o correr. A autoridade que o
 > agente nao alcanca e o **CI**: um job que falha se a contagem de testes descer face a base.
+
+---
+
+## AP5 — `.trim()` no output de um comando cujas colunas significam algo
+
+- **Origem**: o hook `stop-verify` sub-reportava a divida **em silencio**, com 33 testes verdes.
+- **Anti-padrao**: `.trim()` ao output **inteiro** de um comando de colunas fixas. No
+  `git status --porcelain` a coluna de estado de um ficheiro nao-staged e um **espaco**
+  (` M path`): trimar o output come esse espaco **so na primeira linha**, e o `slice(3)`
+  seguinte leva um caractere do caminho — `.agent/x` chega como `agent/x`. O caminho deixa de
+  casar com qualquer regra e o ficheiro desaparece da analise sem erro nenhum.
+- **Correto**: cortar **so** o que sobra no fim — `.replace(/\n+$/, "")` — e trimar por linha,
+  nunca em bloco. Em geral: nao normalizar espacos de um formato onde o espaco e dado.
+- **Detecao em review**: o instrumento fiavel e o **teste** — exercitar **as duas formas** de
+  linha: um ficheiro novo (`?? path`, sem espaco) **e** um commitado-e-modificado (` M path`,
+  com espaco). Era so a primeira que os testes montavam, e o bug conviveu com a suite verde.
+  Grep secundario: `grep -rn 'execFileSync(.*)\.trim()\|}).trim()' .agent .claude` — sinaliza
+  **todo** output de comando que se trima, e o revisor confirma se aquele output tem espaco
+  significativo (`git status --porcelain` tem; `symbolic-ref` nao). Medido: apanha os dois
+  sitios do bug **e** um trim legitimo — um falso positivo barato e preferivel a um grep que
+  falha o defeito, que foi o que a primeira versao desta linha fazia.
 
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que

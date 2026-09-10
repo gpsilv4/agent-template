@@ -37,7 +37,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     (b) esta registado em `PARES` no `mutation-sweep.mjs` com o seu `sinal` de reprovacao, e
     (c) `node .agent/scripts/mutation-sweep.mjs` sai 0. A varredura reprova de proposito um
     verificador sem suite — nao a silenciar, escrever a suite.
-    **Guard extraido para `guards/*.mjs`?** A entrada em `PARES` e obrigatoria: os avisos
+    **Guard extraido para `guards/*.mjs`, ou hook novo em `.claude/hooks/`?** A entrada em `PARES` e obrigatoria: os avisos
     passam a viver no modulo, e sem ela a varredura cobre so o ficheiro de entrada e reporta
     100% a mentir. A soma dos sitios antes e depois de um refactor tem de ser a MESMA.
     **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
