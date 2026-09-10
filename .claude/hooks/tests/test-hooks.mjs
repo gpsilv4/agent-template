@@ -437,7 +437,7 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
   }
 });
 
-// --- BYPASSES: as 23 formas que uma leitura independente encontrou ------------
+// --- BYPASSES: as 28 formas que uma leitura independente encontrou ------------
 // A versao anterior deste hook procurava os verbos PERIGOSOS com uma regex de posicao de
 // comando, e tinha 100% de cobertura de mutacao (2/2 sitios) — com 23 formas de a contornar.
 // A cobertura media que cada aviso EXISTENTE e observado; nao mede os que faltam. Esta tabela
@@ -478,6 +478,21 @@ const BYPASSES = [
   ["restore descarta trabalho", "git restore ."],
   ["clean apaga ficheiros", "git clean -fd"],
   ["checkout sem -b pode descartar", "git checkout -- ."],
+  // Achados de uma segunda leitura independente: o verbo esta em SEGUROS e a FLAG e que
+  // destroi. O primeiro faz o que `reset --hard` faz, e a versao com blocklist negava-o.
+  ["switch -C reposiciona o branch atual", "git switch -C main HEAD~1"],
+  ["checkout -B reposiciona um branch existente", "git checkout -B main HEAD~1"],
+  ["branch -f move um branch protegido", "git branch -f master HEAD~1"],
+  ["branch -D apaga um branch protegido", "git branch -D develop"],
+  ["fetch com refspec escreve refs locais", "git fetch . HEAD:master"],
+  ["stash drop destroi", "git stash drop"],
+  ["tag -d apaga uma tag", "git tag -d v1.0.0"],
+  ["reflog expire destroi a rede de recuperacao", "git reflog expire --expire=now --all"],
+  ["remote set-url muda o destino do push", "git remote set-url origin git@x:y.git"],
+  ["config --unset apaga configuracao", "git config --unset user.email"],
+  ["add -p e interativo (um hook nao responde)", "git add -p"],
+  ["pull SEM --ff-only pode criar merge commit", "git pull origin main"],
+  ["push de um branch, mesmo com --tags", "git push origin main --tags"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -515,7 +530,19 @@ const LEGITIMOS = [
   ["heredoc com o texto la dentro", "cat <<'EOF'\ngit commit -m x\nEOF"],
   ["comentario", "# git commit -m x"],
   ["nome de ficheiro parecido", "cat git-commit-notes.md"],
-  ["push com --force-with-lease NAO e force-push cru", "git switch -c x && git status"],
+  ["encadeado de dois verbos seguros", "git switch -c x && git status"],
+  // A4: o procedimento de release do PROPRIO repo (deploy.md, CONTRIBUTING.md,
+  // process-rules.md) corre em `main`. Negar isso punha o guard contra a documentacao.
+  ["pull --ff-only (procedimento de release)", "git pull --ff-only origin main"],
+  ["push so de tags (procedimento de release)", "git push origin --tags"],
+  ["push --follow-tags", "git push --follow-tags"],
+  // B3: nao fazem nada; negar e ruido.
+  ["git sozinho", "git"],
+  ["git --version", "git --version"],
+  ["git --help", "git --help"],
+  ["stash list e leitura", "git stash list"],
+  ["notes list e leitura", "git notes list"],
+  ["submodule status e leitura", "git submodule status"],
 ];
 
 for (const [nome, comando] of LEGITIMOS) {
@@ -537,6 +564,10 @@ const FORCES = [
   ["flags juntas", "git push -uf origin main"],
   ["refspec com +", "git push origin +main:main"],
   ["atraves de eval", 'eval "git push --force"'],
+  // M1: apagar um branch remoto destroi tanto como um force-push, e escapava.
+  ["refspec vazia apaga o remoto", "git push origin :main"],
+  ["--delete apaga o remoto", "git push origin --delete main"],
+  ["--mirror forca tudo e apaga o que falta", "git push --mirror origin"],
 ];
 for (const [nome, comando] of FORCES) {
   test(`force-push (branch nao protegido): ${nome}`, () => {

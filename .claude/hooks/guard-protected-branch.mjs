@@ -12,12 +12,21 @@
  *
  * ALLOWLIST, NAO BLOCKLIST. A primeira versao procurava os verbos PERIGOSOS
  * (`commit|push|merge|rebase|reset --hard`) com uma regex de posicao de comando. Uma leitura
- * independente encontrou **23 formas de a contornar** — `eval git commit`, `sh -c "..."`,
+ * independente encontrou 23 formas de a contornar, e a medicao completa deu **28** — `eval
+ * git commit`, `sh -c "..."`,
  * backticks, `/usr/bin/git`, `xargs git`, `{ }`, `if`, `!`, e quatro criadas pela propria
  * correcao anterior (retirar as aspas fazia `eval "git commit"` escapar). A licao nao e que
  * faltavam padroes: e que a lista de formas perigosas **nao tem fim**, logo uma blocklist
- * falha ABERTA. A lista de verbos **seguros** e finita e enumeravel, logo esta versao falha
- * FECHADA: num branch protegido, o que nao se reconhece como seguro e negado.
+ * falha ABERTA. A lista de verbos **seguros** e finita e enumeravel, logo o VERBO passa a
+ * falhar fechado: num branch protegido, o verbo que nao se reconhece como seguro e negado.
+ *
+ * O QUE CONTINUA A FALHAR ABERTO, e nao vale a pena esconder: para chegar ao verbo e preciso
+ * primeiro reconhecer que o segmento e uma invocacao do `git`, e isso depende da lista
+ * `WRAPPERS`, que **e** uma blocklist. Passam `flock l git commit`, `su - u -c "git commit"`,
+ * `ssh host git commit`, `GIT_PAGER='git commit' git log` e `git -c core.pager='git commit'
+ * log`. Fechar isto exigiria negar qualquer `git` em qualquer posicao e recuperar depois os
+ * `echo`/`grep` legitimos — mais falsos positivos do que valor, para um modelo de ameaca que
+ * e a distracao. **So o verbo falha fechado**; a posicao de comando, nao.
  *
  * O QUE ISTO NAO E: nao e uma fronteira de seguranca. O modelo de ameaca e a **distracao** —
  * quem esquece que esta em `main` escreve `git commit -m "..."` na forma simples. Quem quiser
@@ -47,15 +56,54 @@ const SEGUROS = new Set([
   "status", "log", "diff", "show", "branch", "tag", "remote", "fetch", "switch", "stash",
   "rev-parse", "rev-list", "symbolic-ref", "merge-base", "describe", "blame", "shortlog",
   "ls-files", "ls-tree", "ls-remote", "cat-file", "grep", "reflog", "add", "config", "help",
-  "version", "init", "clone", "worktree", "bisect", "name-rev", "count-objects", "cherry",
-  "whatchanged", "diff-tree", "diff-index", "check-ignore", "check-attr", "var", "show-ref",
-  "for-each-ref", "verify-commit", "verify-tag", "fsck", "archive", "bundle", "format-patch",
-  "shortlog", "range-diff", "difftool", "annotate", "citool", "gui", "instaweb", "web--browse",
+  "version", "init", "clone", "worktree", "name-rev", "count-objects", "cherry", "whatchanged",
+  "diff-tree", "diff-index", "diff-files", "check-ignore", "check-attr", "var", "show-ref",
+  "show-branch", "for-each-ref", "verify-commit", "verify-tag", "fsck", "archive", "bundle",
+  "format-patch", "range-diff", "annotate", "notes", "submodule",
+  // Estes dois so passam na forma exigida (ver `FORMA_EXIGIDA`).
+  "pull", "push",
+  // FORA de proposito: `difftool` (`-x <cmd>`) e `bisect` (`bisect run <cmd>`) correm comandos
+  // arbitrarios; `gui`/`citool`/`instaweb`/`web--browse` abrem processos interativos.
 ]);
 
-/** `checkout` so e seguro na forma que CRIA um branch: sem `-b`/`-B` pode descartar
- *  trabalho (`git checkout -- .`), e o verbo nao distingue branch de caminho. */
-const CHECKOUT_CRIA = /(?<![\w-])-[bB](?![\w-])/;
+/** Um verbo seguro pode ser destrutivo pela FLAG. Medido numa revisao independente:
+ *  `git switch -C main`, `git checkout -B main`, `git branch -f master`, `git branch -D
+ *  develop` e `git fetch . HEAD:master` passavam todos — e o primeiro faz o que o
+ *  `reset --hard` faz, que a versao anterior negava. Cada entrada aqui e uma forma que torna
+ *  inseguro um verbo que esta em `SEGUROS`. */
+const FORMAS_INSEGURAS = {
+  switch: /^(?:-C|--force|--discard-changes)$/,
+  branch: /^(?:-f|--force|-[dD]|--delete|-[mMcC]|--move|--copy)$/,
+  tag: /^(?:-d|--delete|-f|--force)$/,
+  stash: /^(?:drop|clear|pop|apply)$/,
+  reflog: /^(?:expire|delete)$/,
+  remote: /^(?:remove|rm|set-url|rename|prune|add)$/,
+  worktree: /^(?:remove|prune|move)$/,
+  config: /^(?:--unset|--unset-all|--remove-section|--rename-section)$/,
+  submodule: /^(?:update|deinit|add|sync|set-url)$/,
+  notes: /^(?:add|append|edit|remove|prune|copy)$/,
+  fetch: /:|^\+/, // refspec escreve refs locais: `git fetch . HEAD:master`
+  add: /^(?:-i|--interactive|-p|--patch)$/, // interativos: um hook nao tem como responder
+};
+
+/** `checkout` so e seguro na forma que cria um branch NOVO (`-b`). O `-B` **reposiciona** um
+ *  branch existente — entrava por engano na versao anterior. Sem `-b` pode descartar trabalho
+ *  (`git checkout -- .`), e o verbo nao distingue branch de caminho. */
+const CHECKOUT_CRIA = /(?<![\w-])-b(?![\w-])/;
+const CHECKOUT_REPOSICIONA = /(?<![\w-])-B(?![\w-])/;
+
+/** Verbos que exigem uma forma para serem seguros (nao basta faltar-lhes a forma insegura).
+ *  Existe porque o `deploy.md`, o `CONTRIBUTING.md` e o `process-rules.md` deste repo mandam
+ *  correr `git pull` e `git push origin --tags` em `main`: negar isso punha o guard em
+ *  contradicao com o procedimento de release documentado — e um falso positivo que bloqueia
+ *  trabalho documentado custa tanto como um bypass. */
+const FORMA_EXIGIDA = {
+  pull: (args) => args.includes("--ff-only"),
+  push: (args) =>
+    (args.includes("--tags") || args.includes("--follow-tags")) &&
+    args.filter((a) => !a.startsWith("-")).length <= 1 && // no maximo o nome do remoto
+    !args.some((a) => a.includes(":")),
+};
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
  *  regex de posicao de comando: cada entrada em falta era um bypass. */
@@ -136,13 +184,37 @@ function invocacoes(texto) {
 /** Force-push: `--force`, `-f`, ou um refspec com `+` a frente (`git push origin +main`). */
 function eForce(inv) {
   if (inv.verbo !== "push") return false;
-  return inv.args.some((a) => a === "--force" || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a) || /^\+.+/.test(a)) ||
-    inv.args.some((a) => a.startsWith("--force=") );
+  return inv.args.some(
+    (a) =>
+      a === "--force" ||
+      a.startsWith("--force=") ||
+      /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a) ||
+      /^\+.+/.test(a) ||
+      // Apagar um branch remoto destroi tanto como um force-push, e escapava: `:main`,
+      // `--delete main`, e `--mirror` (forca todos os refs e apaga os que faltam localmente).
+      a === "--mirror" ||
+      a === "--delete" ||
+      a === "-d" ||
+      /^:.+/.test(a)
+  );
 }
 
-const seguro = (inv) =>
-  inv.verbo !== null &&
-  (SEGUROS.has(inv.verbo) || (inv.verbo === "checkout" && CHECKOUT_CRIA.test(inv.seg)));
+/** Sem verbo identificavel: `git`, `git --version`, `git --help` nao fazem nada e negar isso
+ *  e ruido; qualquer outra coisa (`git $VERBO`) **nao** e segura — e a parte que falha fechada. */
+function semVerboEInofensivo(inv) {
+  const resto = inv.seg.replace(/^[\s\S]*?(?:^|\/|\s)git(?![\w.-])/, "").trim();
+  return resto === "" || /^(?:--version|--help|-h)$/.test(resto);
+}
+
+function seguro(inv) {
+  if (inv.verbo === null) return semVerboEInofensivo(inv);
+  if (inv.verbo === "checkout") return CHECKOUT_CRIA.test(inv.seg) && !CHECKOUT_REPOSICIONA.test(inv.seg);
+  if (!SEGUROS.has(inv.verbo)) return false;
+  const exigida = FORMA_EXIGIDA[inv.verbo];
+  if (exigida) return exigida(inv.args);
+  const insegura = FORMAS_INSEGURAS[inv.verbo];
+  return !(insegura && inv.args.some((a) => insegura.test(a)));
+}
 
 /** Diretorios que o comando visita: o `cwd` do payload mais cada `-C`, `--git-dir`, `cd` e
  *  `pushd`. Sem nenhuma pista, o `cwd` do proprio hook — nunca lista vazia, que PERMITIA. */
@@ -151,8 +223,12 @@ function diretorios(cmd, cwd) {
   for (const m of cmd.matchAll(/(?:-C|--git-dir=?|--work-tree=?)\s*("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
   for (const m of cmd.matchAll(/(?:^|[;&|(\n]\s*)(?:cd|pushd)\s+("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
   if (cwd) dirs.push(cwd);
-  if (!dirs.length) dirs.push(process.cwd());
-  return [...new Set(dirs.filter((d) => d && !d.startsWith("-")))];
+  // O filtro corre ANTES do fallback: com ele depois, um comando cuja unica pista de
+  // diretorio comece por `-` (`git commit -C -m x`) e sem `cwd` no payload dava lista vazia
+  // e PERMITIA — o mesmo defeito que o fallback existe para fechar, mais estreito.
+  const validos = dirs.filter((d) => d && !d.startsWith("-"));
+  if (!validos.length) validos.push(process.cwd());
+  return [...new Set(validos)];
 }
 
 function branchDe(dir) {
