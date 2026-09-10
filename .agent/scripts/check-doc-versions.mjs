@@ -149,8 +149,14 @@ for (const f of BOOTSTRAP_RULES) {
 // sessao**; uma de referencia entra **por ticket**, logo pode ser maior. Mas passar do tamanho
 // de uma rule carregada e sinal de que a referencia esta a virar manual — e a partir de 20 KB
 // deixa de ser lida e passa a ser consultada por `grep`, o que e outra coisa.
+// O gate esta a 14000 e nao a 20000 por uma razao medida: o ficheiro que motivou este guard
+// tinha **16239 bytes** e, com o gate em 20000, passava com um NOTE e exit `0` — o guard nao
+// teria apanhado aquilo para que foi criado. O tamanho de trabalho de uma referencia neste
+// repo e ~12 KB (o `ticket-method.md` vive nos 11958), logo 14000 da margem real e reprova o
+// caso conhecido. Acima de 20000 a mensagem e mais dura; o gate e o mesmo.
 const REF_NOTE_BYTES = 12000;
-const REF_MAX_BYTES = 20000;
+const REF_MAX_BYTES = 14000;
+const REF_ABANDONO_BYTES = 20000;
 const CARREGADAS = new Set([...REQUIRED_RULES, ...BOOTSTRAP_RULES]);
 const refs = (listDir(".agent/rules", ".md") || []).filter((f) => !CARREGADAS.has(`${f}.md`));
 if (refs.length === 0) {
@@ -161,8 +167,10 @@ if (refs.length === 0) {
     const c = read(file);
     if (c === null) continue;
     const bytes = Buffer.byteLength(c.replace(/\r\n/g, "\n"), "utf8");
-    if (bytes > REF_MAX_BYTES) {
-      warn(`${file} = ${bytes} bytes > ${REF_MAX_BYTES} — referencia demasiado grande para ser lida; separar instrucoes de evidencia (esta e para src/docs/)`);
+    if (bytes > REF_ABANDONO_BYTES) {
+      warn(`${file} = ${bytes} bytes > ${REF_ABANDONO_BYTES} — a este tamanho deixa de ser lida e passa a ser consultada por grep, que e outra coisa; separar instrucoes de evidencia (a evidencia e para src/docs/)`);
+    } else if (bytes > REF_MAX_BYTES) {
+      warn(`${file} = ${bytes} bytes > ${REF_MAX_BYTES} — referencia grande demais para ser reaberta a cada ticket; separar instrucoes de evidencia (a evidencia e para src/docs/)`);
     } else if (bytes > REF_NOTE_BYTES) {
       note(`${file} = ${bytes} bytes (maior que uma rule carregada; considerar separar)`);
     } else {

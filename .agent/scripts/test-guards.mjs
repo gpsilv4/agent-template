@@ -122,9 +122,15 @@ test("G1: rules geradas no bootstrap dao SKIP visivel", null, {
 // --- Guard 1b: orcamento das rules de REFERENCIA (nao carregadas) -------------
 // Nao tinham limite nenhum, e uma delas chegou aos 16 KB sem nada avisar — apesar de ser
 // reaberta por inteiro a cada ticket `M`/`L`.
-test("G1b: referencia acima do maximo avisa", (dir) => {
+test("G1b: referencia nos 16 KB REPROVA — o caso que criou o guard", (dir) => {
+  // 16239 bytes e o tamanho exato que passou despercebido. Com o gate em 20000 isto dava
+  // NOTE e exit 0: o guard existia e nao apanhava aquilo para que foi feito.
+  writeF(dir, ".agent/rules/ticket-method.md", "# m\n\n" + "x".repeat(16239));
+}, { code: 1, includes: ["ticket-method.md", "grande demais para ser reaberta"] });
+
+test("G1b: referencia acima dos 20 KB avisa com a mensagem mais dura", (dir) => {
   appendFileSync(file(dir, ".agent/rules/ticket-method.md"), "x".repeat(21000));
-}, { code: 1, includes: ["ticket-method.md", "referencia demasiado grande"] });
+}, { code: 1, includes: ["ticket-method.md", "deixa de ser lida"] });
 
 test("G1b: referencia maior que uma rule carregada da NOTE, nao WARN", (dir) => {
   // NOTE nao e WARN: o exit fica 0 e o aviso e informativo. So a NOTE prova que o limiar
