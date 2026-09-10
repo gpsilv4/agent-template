@@ -30,8 +30,13 @@ export function registar() {
 // para 25 e as quatro citacoes em prosa ficaram em 24 sem nada notar.
 const SYNC = ".agent/rules/sync-docs.md";
 
+/** Quantos pontos tem a checklist NA FIXTURE. Estes testes tinham o numero fixo e ficaram
+ *  vermelhos quando a checklist cresceu — o mesmo defeito que o guard que eles testam existe
+ *  para apanhar. O harness aceita expectativas devolvidas pela mutacao. */
+const nPontos = (dir) => (readF(dir, SYNC).match(/^\d+\. \[ \]/gm) || []).length;
+
 test("G12a: numeracao com salto avisa", (dir) => {
-  // 25 pontos escritos 1..24 e depois "26." — o erro tipico ao inserir um ponto no meio.
+  // O ultimo ponto reescrito com o numero seguinte — o erro tipico ao inserir um no meio.
   writeF(dir, SYNC, readF(dir, SYNC).replace(/^25\. \[ \]/m, "26. [ ]"));
 }, { code: 1, includes: ["numeracao da checklist quebrada", 'ponto #25 esta escrito como "26."'] });
 
@@ -45,27 +50,32 @@ test("G12a: checklist sem pontos avisa", (dir) => {
 }, { code: 1, includes: ["nao tem pontos de checklist"] });
 
 test("G12b: citacao desatualizada avisa (o defeito original)", (dir) => {
-  // Exatamente o estado em que o repo estava: checklist a 25, prosa a 24.
+  // O estado em que o repo estava: a prosa uma unidade atras da checklist.
+  const n = nPontos(dir);
   writeF(dir, ".agent/rules/process-rules.md",
-    readF(dir, ".agent/rules/process-rules.md").replace("(25 pontos)", "(24 pontos)"));
-}, { code: 1, includes: ['diz "(24 pontos" mas a checklist de sync-docs.md tem 25'] });
+    readF(dir, ".agent/rules/process-rules.md").replace(`(${n} pontos)`, `(${n - 1} pontos)`));
+  return { includes: [`diz "(${n - 1} pontos" mas a checklist de sync-docs.md tem ${n}`] };
+}, { code: 1 });
 
 test("G12b: ponto novo sem atualizar a prosa avisa", (dir) => {
   // O inverso: cresce a checklist e ninguem toca nas citacoes.
-  writeF(dir, SYNC, readF(dir, SYNC) + "\n26. [ ] ponto novo\n");
-}, { code: 1, includes: ['diz "(25 pontos" mas a checklist de sync-docs.md tem 26'] });
+  const n2 = nPontos(dir);
+  writeF(dir, SYNC, readF(dir, SYNC) + `\n${n2 + 1}. [ ] ponto novo\n`);
+  return { includes: [`diz "(${n2} pontos" mas a checklist de sync-docs.md tem ${n2 + 1}`] };
+}, { code: 1 });
 
 test("G12b: '(N pontos' de OUTRA contagem nao e falso positivo", (dir) => {
   // O relatorio de fecho de sprint tem 6 pontos e e citado com a mesma forma. Uma versao
   // anterior deste guard reclamava dele. A linha nao menciona sync-docs, logo nao conta.
   writeF(dir, "src/docs/agent-guide.md",
     readF(dir, "src/docs/agent-guide.md") + "\n> relatorio de fecho (6 pontos — ver process-rules.md)\n");
-}, { code: 0, includes: ['citacao(oes) de "(N pontos" coerentes com 25'] });
+return { includes: [`citacao(oes) de "(N pontos" coerentes com ${nPontos(dir)}`] };
+  }, { code: 0 });
 
 test("G12b: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => {
   for (const f of [".agent/rules/process-rules.md", ".agent/workflows/review.md",
                    ".agent/workflows/deploy.md", "src/docs/agent-guide.md"]) {
-    writeF(dir, f, readF(dir, f).replace(/\(25 pontos/g, "(a checklist"));
+    writeF(dir, f, readF(dir, f).replace(/\(\d+ pontos/g, "(a checklist"));
   }
 }, { code: 1, includes: ["nenhum ficheiro cita o tamanho da checklist"] });
 
@@ -101,8 +111,13 @@ test("G12c: metodo sem cabecalhos `## Fase N` avisa", (dir) => {
 }, { code: 1, includes: ["nao tem cabecalhos `## Fase N`"] });
 
 test("G12c: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => {
-  for (const f of [".agent/rules/process-rules.md", METODO, "src/docs/agent-guide.md"]) {
-    writeF(dir, f, readF(dir, f).replace(/(\d+|Seis|seis)\s+fases/g, "as etapas"));
+  // Tambem o `README.md` e tambem a forma INGLESA: o guard passou a bilingue porque o
+  // `.agent/` esta em portugues e o README em ingles, e uma citacao inglesa errada
+  // ("5-phase" com o metodo a ter 6) passava por todos os guards.
+  for (const f of [".agent/rules/process-rules.md", METODO, "src/docs/agent-guide.md", "README.md"]) {
+    writeF(dir, f, readF(dir, f)
+      .replace(/(\d+|Seis|seis)\s+fases/g, "as etapas")
+      .replace(/(\d+)[- ]\s*phases?\b/gi, "as etapas"));
   }
 }, { code: 1, includes: ["nenhum ficheiro cita o numero de fases"] });
 

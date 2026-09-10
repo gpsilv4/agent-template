@@ -20,7 +20,7 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 1. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (25 pontos)
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (26 pontos)
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` — sem WARN
 - [ ] **`.agent/context/session.md`** limpo — tarefas concluidas e proximos passos atualizados?
 - [ ] **Testes dos guards** passam (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`)?

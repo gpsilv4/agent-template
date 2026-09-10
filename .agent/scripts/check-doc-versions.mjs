@@ -140,6 +140,38 @@ for (const f of BOOTSTRAP_RULES) {
   else guardsRun++;
 }
 
+// --- Guard 1b: orcamento das rules NAO carregadas ---
+// O Guard 1 orcamenta so as rules importadas. As de referencia (`sync-docs`, `ticket-method`,
+// `scripts-guide`) nao tinham limite NENHUM — e uma delas chegou aos 16 KB sem nada avisar,
+// apesar de ser reaberta por inteiro a cada ticket `M`/`L`.
+//
+// Os limiares nao sao os mesmos de proposito: uma rule carregada entra no contexto a **cada
+// sessao**; uma de referencia entra **por ticket**, logo pode ser maior. Mas passar do tamanho
+// de uma rule carregada e sinal de que a referencia esta a virar manual — e a partir de 20 KB
+// deixa de ser lida e passa a ser consultada por `grep`, o que e outra coisa.
+const REF_NOTE_BYTES = 12000;
+const REF_MAX_BYTES = 20000;
+const CARREGADAS = new Set([...REQUIRED_RULES, ...BOOTSTRAP_RULES]);
+const refs = (listDir(".agent/rules", ".md") || []).filter((f) => !CARREGADAS.has(`${f}.md`));
+if (refs.length === 0) {
+  skip("Guard 1b — nao ha rules de referencia em .agent/rules");
+} else {
+  for (const nome of refs) {
+    const file = `.agent/rules/${nome}.md`;
+    const c = read(file);
+    if (c === null) continue;
+    const bytes = Buffer.byteLength(c.replace(/\r\n/g, "\n"), "utf8");
+    if (bytes > REF_MAX_BYTES) {
+      warn(`${file} = ${bytes} bytes > ${REF_MAX_BYTES} — referencia demasiado grande para ser lida; separar instrucoes de evidencia (esta e para src/docs/)`);
+    } else if (bytes > REF_NOTE_BYTES) {
+      note(`${file} = ${bytes} bytes (maior que uma rule carregada; considerar separar)`);
+    } else {
+      ok(`${file} = ${bytes} bytes (referencia)`);
+    }
+  }
+  guardsRun++;
+}
+
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
 // Gemini usa `@[path]`, Claude/Cursor usa `@path`. Normalizar antes de comparar
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.

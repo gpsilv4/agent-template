@@ -4,7 +4,7 @@
 [![CI](https://github.com/gpsilv4/agent-template/actions/workflows/ci.yml/badge.svg)](https://github.com/gpsilv4/agent-template/actions/workflows/ci.yml)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://conventionalcommits.org)
 
-Reusable GitHub Template for configuring AI agents (Claude Code, Gemini, Cursor, Copilot) in software projects.
+Reusable GitHub Template for configuring AI agents in software projects — **pick the one you prefer**: Claude Code, Gemini CLI, Cursor, GitHub Copilot or ChatGPT/Codex. Each loads its own entry file; all of them read the same source of truth in `.agent/`.
 
 > **Nota / Note**: Documentation inside `.agent/` and `src/docs/` is written in **Portuguese (PT-PT)** as it was designed for Portuguese-speaking teams. The BOOTSTRAP process allows the AI to adapt all content to any language during setup.
 
@@ -14,7 +14,7 @@ Reusable GitHub Template for configuring AI agents (Claude Code, Gemini, Cursor,
 
 ### The Problem
 
-AI coding agents (Claude Code, Gemini, Cursor, Copilot) are powerful but **stateless** — they forget your project's rules, architecture, business logic, and conventions between sessions. Without persistent context, you repeat yourself constantly: "use SWR not useEffect", "files under 400 lines", "never commit without asking", etc.
+AI coding agents (Claude Code, Gemini CLI, Cursor, Copilot, ChatGPT/Codex) are powerful but **stateless** — they forget your project's rules, architecture, business logic, and conventions between sessions. Without persistent context, you repeat yourself constantly: "use SWR not useEffect", "files under 400 lines", "never commit without asking", etc.
 
 ### The Solution
 
@@ -23,7 +23,7 @@ This template gives your AI agent a **persistent brain** via the `.agent/` folde
 - **Rules** — coding standards, business logic, page architecture (the AI reads these before every action)
 - **Workflows** — step-by-step processes for planning, debugging, reviewing, deploying (the AI follows these like checklists)
 - **Context** — session state, decisions, backlog, release history (the AI picks up where the last session left off)
-- **Scripts** — automation tools (bundle size checker, etc.)
+- **Scripts** — verifiable automation: doc guards, backlog counters, bundle sizes, and the negative-test suites that prove each guard actually warns. Node only, no dependencies, no `package.json`
 
 Plus **DevOps best practices** via `.github/`:
 
@@ -55,7 +55,8 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
-│   └── ticket-method.md        <- Per-ticket 5-phase method (NOT loaded; on-demand)
+│   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
+│   └── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
 ├── context/
 │   ├── session.md              <- Current session state
 │   ├── task.md                 <- Tasks in progress
@@ -86,13 +87,15 @@ When you open a new AI session in any project using this template, the agent **a
     ├── guards/                 <- Guard modules split out of the entry point
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
-    │   ├── derived-counts.mjs  <- Guards 12/12c/12d: counts cited in prose, recomputed
+    │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed (bilingual)
     │   └── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
+    ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (AP4)
+    ├── test-test-surface.mjs   <- Negative tests for it (real git repos as fixtures)
     ├── test-guards.mjs         <- Entry point for the doc-guard suites (no deps, no package.json)
     ├── test-harness.mjs        <- Shared sandbox + test() + summary
     ├── tests-settings.mjs      <- Guard 11 tests (mirrors guards/settings.mjs)
-    ├── tests-derived-counts.mjs<- Guards 12/12c/12d tests
+    ├── tests-derived-counts.mjs<- Guards 12/12c/12d/12e tests
     ├── tests-placeholders.mjs  <- Guard 13 tests (simulates a completed bootstrap)
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
@@ -107,6 +110,7 @@ When you open a new AI session in any project using this template, the agent **a
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.md           <- Template para reportar bugs
 │   └── feature_request.md      <- Template para pedir features
+├── copilot-instructions.md     <- Thin pointer to AGENTS.md (the file Copilot loads)
 ├── pull_request_template.md    <- Checklist obrigatoria em cada PR
 ├── dependabot.yml              <- Updates automaticos de dependencias
 └── CODEOWNERS                  <- Reviewers automaticos por ficheiro
@@ -114,15 +118,21 @@ When you open a new AI session in any project using this template, the agent **a
 .claude/                        <- Native Claude Code layer (optional; other tools ignore it)
 ├── settings.json              <- Project permissions (deny secrets, allow safe scripts)
 ├── commands/                  <- Real slash commands (/plan, /review, ...) wrapping .agent/workflows/
-└── agents/                    <- Subagents: code-reviewer (read-only), debugger
+├── hooks/                     <- PreToolUse guards: DENY before the tool runs (Claude-only)
+│   ├── guard-protected-branch.mjs  <- No commit/push on main/master/develop; no force-push
+│   └── tests/test-hooks.mjs        <- 16 cases: real git repos, real payloads
+└── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
 
 .gemini/                        <- Native Gemini CLI layer
 └── commands/                  <- Same slash commands as .claude/, in TOML (wrap .agent/workflows/)
 
+.cursor/                        <- Native Cursor layer
+└── rules/project.mdc          <- Thin pointer to AGENTS.md (Cursor does NOT load CLAUDE.md)
+
 .editorconfig                   <- Formatting config (2-space indent, LF)
 .nvmrc                          <- Node version pinning (matches CI)
 AGENTS.md                       <- Cross-tool entry point (ChatGPT/Codex, Windsurf, Zed, ...)
-CLAUDE.md                       <- Entry point for Claude Code / Cursor
+CLAUDE.md                       <- Entry point for Claude Code
 CODE_OF_CONDUCT.md              <- Contributor Covenant
 CONTRIBUTING.md                 <- Dev workflow, commit format, PR process
 GEMINI.md                       <- Entry point for Google Gemini
@@ -131,6 +141,7 @@ README.md                       <- This file
 SECURITY.md                     <- Vulnerability disclosure policy
 src/docs/
 ├── agent-guide.md              <- Guide for .agent/ and .github/
+├── ticket-method-why.md        <- Where each rule came from, what it costs, what was measured
 └── CHANGELOG.md                <- Changelog template
 ```
 
@@ -362,10 +373,16 @@ Full guide in [CONTRIBUTING.md](CONTRIBUTING.md) and `.agent/rules/process-rules
 
 ## Maintenance
 
-When you evolve rules in a project and want to propagate to the template:
-1. Update the file in the template repo
-2. Existing projects are **not** affected (already customized)
-3. To propagate: manual cherry-pick of generic files
+**Template -> your projects.** Run **`/upgrade`** in the derived project
+(`.agent/workflows/upgrade.md`). It decides by **file category**, never by a list of names, and
+never touches `.agent/context/`. If the project has `.agent/.template-version` (written at
+bootstrap) it diffs only what changed since; if not, it detects which capabilities are missing
+instead of diffing — and writes the marker, so the next upgrade is cheap.
+
+**Your projects -> template.** A rule that proved itself in a real project is worth more than
+one invented here. Update the file in the template repo, then add the row to the propagation
+matrix in `.agent/rules/sync-docs.md` so `/upgrade` knows the category. Existing projects are
+never modified in place.
 
 ## Contributing
 

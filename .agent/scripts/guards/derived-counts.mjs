@@ -72,7 +72,7 @@ if (syncDocs) {
       // tem 6). So conta como citacao DESTA checklist se a mesma linha falar de sync-docs.
       for (const linha of c.split("\n")) {
         if (!linha.includes("sync-docs")) continue;
-        const m = /\((\d+)\s+pontos/.exec(linha);
+        const m = /\((\d+)\s+(?:pontos|points)/i.exec(linha);
         if (!m) continue;
         citacoes++;
         if (Number(m[1]) !== total) {
@@ -126,7 +126,10 @@ if (metodo) {
       const c = read(f);
       if (c === null) continue;
       for (const linha of c.split("\n")) {
-        const digito = /(\d+)\s+fases/i.exec(linha);
+        // Bilingue de proposito: o `.agent/` esta em portugues mas o `README.md` esta em
+        // ingles, logo um padrao so-portugues deixava passar tudo o que estivesse la — e
+        // deixou: o README dizia "5-phase" com o metodo a ter 6 fases, e nenhum guard o viu.
+        const digito = /(\d+)[- ]\s*(?:fases|phases|phase)\b/i.exec(linha);
         const palavra = /\b(tres|quatro|cinco|seis|sete|oito)\s+fases/i.exec(linha);
         if (!digito && !palavra) continue;
         citacoes++;
@@ -179,7 +182,7 @@ if (metodo) {
       const c = read(f);
       if (c === null) continue;
       for (const linha of c.split("\n")) {
-        const m = /(\d+)\s+guards\s+numerados/.exec(linha);
+        const m = /(\d+)\s+(?:guards\s+numerados|numbered\s+guards)/i.exec(linha);
         if (!m) continue;
         cit++;
         if (Number(m[1]) !== numerados.size) {

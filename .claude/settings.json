@@ -45,7 +45,22 @@
       "Bash(npm run lint:*)",
       "Bash(npm run build)",
       "Bash(npm run test)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "Bash(node .agent/scripts/check-test-surface.mjs)",
+      "Bash(node .claude/hooks/tests/test-hooks.mjs)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-protected-branch.mjs\""
+          }
+        ]
+      }
     ]
   }
 }

@@ -103,6 +103,12 @@ const PARES = [
     neutro: "(() => {})(",
   },
   {
+    alvo: ".agent/scripts/check-test-surface.mjs",
+    suite: ".agent/scripts/test-test-surface.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-bundle-sizes.mjs",
     suite: ".agent/scripts/test-bundle-sizes.mjs",
     // Unico par opcional: um projeto sem bundler pode apagar este verificador. Todos os
