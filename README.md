@@ -324,7 +324,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 |-------|--------------------|----------------|--------------|
 | Claude Code | `CLAUDE.md` (+ `.claude/`) | native (all of them) | Used throughout this template's own development |
 | Google Gemini CLI | `GEMINI.md` | native (`.gemini/commands/`) | Entry file and wrappers checked by Guards 2, 6, 7, 10 |
-| GitHub Copilot | `.github/copilot-instructions.md` | no | File shipped and points to `AGENTS.md`; **not exercised in a real Copilot session** |
+| GitHub Copilot | `.github/copilot-instructions.md` | no | **Exercised in a real Copilot session** (maintainer, 2026-09-10): Copilot loads the file and answers from the project's rules |
 | Cursor | `.cursor/rules/*.mdc` | no | Same — shipped, pointing to `AGENTS.md`; **not exercised in a real Cursor session** |
 | ChatGPT / Codex | `AGENTS.md` | no | Same — `AGENTS.md` is its documented convention; **not exercised** |
 | Windsurf, Zed, others | `AGENTS.md` (if supported) | no | Unverified — check your tool's docs for which file it loads |
@@ -333,6 +333,15 @@ Branch protection rules (require status checks, block force push) require **GitH
 > while listing `CLAUDE.md` as their entry file — which neither tool loads, and no such test
 > had been run. The columns above say what was actually done. If you exercise one of the
 > unverified rows, a PR correcting it is welcome.
+>
+> **How to exercise a row properly.** Since the **Fronteiras** block is now inlined in
+> `.github/copilot-instructions.md` and `.cursor/rules/project.mdc` (so those tools get the
+> non-negotiable rules even if they don't follow references), a tool answering *"what's the
+> branch rule?"* proves it **reads its entry file** — but not that it **follows the pointer**
+> to `AGENTS.md` and `.agent/`. To test the pointer, ask something that lives only deeper, for
+> example *"which state-management library must I use for data fetching, and why not
+> `useEffect`?"* (that's in `.agent/rules/core-rules.md` and nowhere else). If the answer is
+> vague, the tool needs content inlined rather than referenced.
 
 > **Why multiple entry files?** Claude Code parses `@file`, Gemini needs `@[file]` brackets, and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
 
