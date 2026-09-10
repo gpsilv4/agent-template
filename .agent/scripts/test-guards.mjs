@@ -138,6 +138,24 @@ test("G1b: referencia maior que uma rule carregada da NOTE, nao WARN", (dir) => 
   writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(13000));
 }, { code: 0, includes: ["scripts-guide.md", "maior que uma rule carregada"] });
 
+// --- Guard 1d: as Fronteiras copiadas nos ponteiros finos ---------------------
+// A copia existe porque nao esta verificado que o Cursor e o Copilot SIGAM um ponteiro em
+// markdown. Copia significa divergencia, logo e comparada.
+
+test("G1d: Fronteiras divergentes no ponteiro do Cursor avisam", (dir) => {
+  const f = ".cursor/rules/project.mdc";
+  writeF(dir, f, readF(dir, f).replace("- **Nunca**:", "- **Nunca (versao antiga)**:"));
+}, { code: 1, includes: ["project.mdc", "divergem do CLAUDE.md"] });
+
+test("G1d: ponteiro sem o bloco de Fronteiras avisa", (dir) => {
+  const f = ".github/copilot-instructions.md";
+  writeF(dir, f, readF(dir, f).replace("## Fronteiras (prioridade maxima)", "## Outra coisa"));
+}, { code: 1, includes: ["copilot-instructions.md", "sem regra nenhuma"] });
+
+test("G1d: ponteiro ausente da SKIP visivel, nao silencio", (dir) => {
+  rmSync(file(dir, ".cursor/rules/project.mdc"));
+}, { code: 0, includes: ["SKIP  .cursor/rules/project.mdc"] });
+
 // --- Guard 1c: o TOTAL carregado a cada sessao --------------------------------
 // O Guard 1 orcamenta ficheiro a ficheiro; ninguem orcamentava a soma, e e a soma que o
 // agente paga por sessao. Os ficheiros extra ficam ABAIXO do limite por ficheiro de

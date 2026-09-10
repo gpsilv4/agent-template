@@ -8,6 +8,17 @@ alwaysApply: true
 O Cursor carrega as regras de `.cursor/rules/*.mdc`; nao carrega `CLAUDE.md`.
 Este ficheiro existe para o ligar a fonte unica de verdade.
 
+## Fronteiras (prioridade maxima)
+
+- **Sempre**: TypeScript estrito (`any` proibido, ficheiros ~400 linhas); UI em {{UI_LANGUAGE}}, codigo/commits em ingles (Conventional Commits); antes de commit, correr `.agent/rules/sync-docs.md` + os guards (`.agent/scripts/`).
+- **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
+- **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
+
+> Este bloco e uma **copia** do `CLAUDE.md`, de proposito: se o teu tool nao seguir o
+> ponteiro para o `AGENTS.md`, estas tres linhas sao o minimo que nao pode faltar. O Guard 1d
+> (`.agent/scripts/check-doc-versions.mjs`) reprova se as copias divergirem — a duplicacao e
+> forcada (cada tool le so o seu ficheiro), logo e verificada em vez de proibida.
+
 Le e segue **`AGENTS.md`** na raiz. Em resumo:
 
 - `.agent/rules/` — regras sempre validas (codigo, processo, anti-padroes)
