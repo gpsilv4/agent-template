@@ -70,15 +70,9 @@ jobs:
       # - name: Bundle Sizes
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
-      # Uncomment to run doc guards: rules byte-budget, CLAUDE/GEMINI parity,
-      # workflow<->wrapper + workflow-list parity, CHANGELOG/package.json version,
-      # banned terms, and (opt-in) dependency versions
-      # - name: Doc Guards
-      #   run: node .agent/scripts/check-doc-versions.mjs
-
-      # Uncomment to validate backlog counters/progress bar and detect duplicate IDs
-      # - name: Backlog Check
-      #   run: node .agent/scripts/check-backlog.mjs
+      # NAO por os doc guards nem o backlog aqui: este job tem
+      # `if: has_pkg == 'true'` e salta num template sem app, logo eles nunca correriam.
+      # Vivem no job `guard-tests`, que corre sempre.
 
 
   unit-tests:
@@ -157,6 +151,15 @@ jobs:
       # A autoridade que o agente nao alcanca (AP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
+      # Os doc guards e o backlog correm **aqui** e nao no job `quality`: aquele tem
+      # `if: has_pkg == 'true'` e salta por inteiro num template sem app, logo os guards
+      # ficavam testados (pelas suites acima) e nunca **aplicados**. E o mesmo padrao que o
+      # `check-test-surface` tinha: documentado em todo o lado e corrido por nada. Nenhum dos
+      # dois precisa de `package.json` nem de configuracao.
+      - name: Doc guards — orcamento de bytes, paridades, contagens derivadas
+        run: node .agent/scripts/check-doc-versions.mjs
+      - name: Backlog — contadores, barra de progresso e IDs duplicados
+        run: node .agent/scripts/check-backlog.mjs
       - name: Test surface — nao enfraquecida desde a base do PR
         if: github.event_name == 'pull_request'
         # `HEAD^1` e nao `base.sha`: o checkout de um PR e o **merge ref**, cujo pai 1 e a
