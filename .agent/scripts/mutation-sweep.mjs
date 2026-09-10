@@ -255,7 +255,15 @@ try {
     }
 
     const linhas = src.split("\n");
-    const sitios = linhas.map((l, i) => (sinal.test(l) ? i : -1)).filter((i) => i !== -1);
+    // Linhas de COMENTARIO nao sao sitios de aviso. Sem isto, um comentario que MENCIONE o
+    // sinal (`... reportados pelo fatal() daqui`) contava como sitio, a mutacao nao mudava
+    // comportamento nenhum, a suite ficava verde e a varredura dizia INCOMPLETA — mandava
+    // escrever um teste para um sitio que nao existe. Aconteceu de facto neste repo, uma
+    // linha depois de eu ter escrito o comentario.
+    const comentario = (l) => /^\s*(?:\/\/|\*|\/\*)/.test(l);
+    const sitios = linhas
+      .map((l, i) => (sinal.test(l) && !comentario(l) ? i : -1))
+      .filter((i) => i !== -1);
 
     // `sitios` e indexado por LINHA e o `replace` nao e global, logo duas chamadas de aviso
     // na mesma linha contam como uma: a segunda nunca e desligada isoladamente e herda a

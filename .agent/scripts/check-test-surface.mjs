@@ -99,7 +99,16 @@ function git(args) {
   // `core.quotepath=false`: sem isto o git escapa caminhos nao-ASCII
   // (`"tests/\303\251.test.js"`), o `existsSync` desse literal falha e um ficheiro que
   // ninguem apagou e reportado como APAGADO — o gate fechava por razao errada.
-  return execFileSync("git", ["-c", "core.quotepath=false", ...args], { cwd: ROOT, encoding: "utf8" }).trim();
+  // `stderr: "ignore"`: um `git show <base>:<ficheiro-novo>` falha de proposito (e assim que
+  // se descobre que o ficheiro nao existia na baseline), e o `fatal: ...` do git ia para o
+  // log. Uma corrida VERDE com uma linha que parece erro treina quem a le a ignorar o output
+  // — apareceu no primeiro CI deste gate. Os erros que importam sobem por excecao e sao
+  // reportados pelo `fatal()` daqui.
+  return execFileSync("git", ["-c", "core.quotepath=false", ...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
 }
 
 let problemas = 0;
