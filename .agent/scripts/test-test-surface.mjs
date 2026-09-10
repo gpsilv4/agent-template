@@ -12,7 +12,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -145,8 +145,9 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
 });
 
 // --- Os globs tem de ver as suites que ESTE repo nomeia pelo prefixo ----------
-// Medido antes da correcao: todas as suites deste repo menos uma eram invisiveis, e apagar
-// todas dava "superficie de teste intacta" com exit 0.
+// Medido antes da correcao: quase todas as suites deste repo eram invisiveis aos globs, e
+// apagar todas dava "superficie de teste intacta" com exit 0. (A fracao exata nao se escreve
+// — foi escrita errada tres vezes; conta-se com `git ls-files`.)
 
 test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
   writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
@@ -317,6 +318,71 @@ test("workflow COM steps de teste continua a ser medido por contagem", (dir) => 
   commit(dir, "apagar um");
   return ref;
 }, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+
+// --- As formas que nao movem nenhuma contagem obvia ---------------------------
+// Achados de uma terceira leitura independente. Todos passavam com exit 0.
+
+test("neutralizar um step do CI com `|| true` e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs || true\n");
+  commit(dir, "neutralizar");
+  return ref;
+}, { code: 1, includes: ["|| true"] });
+
+test("`continue-on-error: true` num step e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        continue-on-error: true\n");
+  commit(dir, "continue-on-error");
+  return ref;
+}, { code: 1, includes: ["continue-on-error"] });
+
+test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
+  // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
+  // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "const failures = [];\nif (failures.length) {\n  process.exit(1);\n}\n");
+  commit(dir, "harness");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "const failures = [];\nif (false) {\n  process.exit(1);\n}\n");
+  commit(dir, "desligar o veredicto");
+  return ref;
+}, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
+
+test("despromover um warn a note num guard e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".agent/scripts/guards"), { recursive: true });
+  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nwarn("b");\n');
+  commit(dir, "guard com dois avisos");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nnote("b");\n');
+  commit(dir, "despromover um");
+  return ref;
+}, { code: 1, includes: ["sitios de aviso: 2 -> 1"] });
+
+// --- O AP2 aplicado ao proprio verificador -----------------------------------
+test("TEST_GLOBS que nao casam nada na baseline REPROVAM, em vez de dizer intacta", (dir) => {
+  const p = join(dir, ".agent/scripts/check-test-surface.mjs");
+  const s = readFileSync(p, "utf8");
+  const i = s.indexOf("const TEST_GLOBS = [");
+  const j = s.indexOf("];", i);
+  writeFileSync(p, s.slice(0, i) + "const TEST_GLOBS = [/__nunca_casa__/" + s.slice(j));
+}, { code: 1, includes: ["nao casam nenhum ficheiro de teste"] });
+
+test("nao consegue medir: arvore da baseline ausente REPROVA", (dir) => {
+  // O commit resolve (`rev-parse --verify` le o objeto commit) mas o `ls-tree` precisa da
+  // ARVORE. Apagar o objeto solto da arvore separa "nao ha superficie" de "nao consegui
+  // ler" — a distincao que o `AP2` exige.
+  const tree = git(dir, ["rev-parse", "HEAD^{tree}"]);
+  rmSync(join(dir, ".git/objects", tree.slice(0, 2), tree.slice(2)), { force: true });
+  return "HEAD";
+}, { code: 1, includes: ["nao conseguiu listar os ficheiros da baseline"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

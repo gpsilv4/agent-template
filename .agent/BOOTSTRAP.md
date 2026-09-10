@@ -367,7 +367,8 @@ senao ele mede zero e passa:
 > `node .agent/scripts/check-test-surface.mjs "$(git rev-list --max-parents=0 HEAD)"`.
 >
 > Se disser `superficie de teste intacta`, os `TEST_GLOBS` nao veem os teus testes — foi
-> exatamente o que aconteceu neste template, onde quase todas as suites eram invisiveis. E se disser
+> exatamente o que aconteceu neste template, onde os globs por omissao nao viam a forma como
+> quase todas as suites daqui se chamam. E se disser
 > `intacta` depois de esvaziares as **assercoes** (em vez de apagar o ficheiro), o problema
 > esta nas `CONTAGENS`: mediam `expect(`/`assert(` num repo cujo vocabulario era
 > `includes:`/`eq(`, logo contavam zero — e zero nao desce.

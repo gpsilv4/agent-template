@@ -86,6 +86,28 @@ const BYPASSES = [
   ["add -p e interativo (um hook nao responde)", "git add -p"],
   ["pull SEM --ff-only pode criar merge commit", "git pull origin main"],
   ["push de um branch, mesmo com --tags", "git push origin main --tags"],
+  // Terceira leitura independente. Duas classes: (a) apagar um ref nao protegido branqueava
+  // o comando inteiro, logo bastava juntar-lhe um push do `main`; (b) flags agrupadas e
+  // aderentes escapavam a comparacoes por igualdade.
+  ["apagar fix/x E empurrar main", "git push origin :fix/x main"],
+  ["--delete depois do ref (a flag e global)", "git push origin main --delete fix/x"],
+  ["apagar fix/x E empurrar HEAD:main", "git push origin :fix/x HEAD:main"],
+  ["--delete com src:dst", "git push origin --delete main:x"],
+  ["branch -Df agrupado", "git branch -Df old"],
+  ["switch -Cmain aderente", "git switch -Cmain"],
+  ["tag -df agrupado", "git tag -df v1"],
+  ["checkout -B reposiciona (nao cria)", "git checkout -B main HEAD~1"],
+  // O verbo vem de fora e o comando era declarado inofensivo.
+  ["substituicao de comando apaga o verbo", "git $(echo commit) -m x"],
+  ["backtick apaga o verbo", "git `printf commit` -m x"],
+  ["xargs sem verbo (vem do stdin)", "echo commit | xargs git"],
+  // Redireção a cabeca: forma valida de shell que escondia a invocacao inteira.
+  ["redireção antes do comando", ">out.txt git commit -m x"],
+  ["stderr redirecionado antes do comando", "2>err.log git push"],
+  // Valor de opcao de wrapper que nao e um numero.
+  ["sudo com -u", "sudo -u me git commit -m x"],
+  ["env com -u", "env -u VAR git commit"],
+  ["timeout com -s", "timeout -s KILL 5 git push"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -141,6 +163,20 @@ const LEGITIMOS = [
   // primeira coisa que bloqueou foi exatamente esta limpeza — medido, nao imaginado.
   ["apagar um branch de feature no remoto", "git push origin --delete fix/algo"],
   ["apagar um branch de feature por refspec", "git push origin :fix/algo"],
+  // Falsos positivos medidos na terceira leitura: sub-verbos comparados contra QUALQUER
+  // argumento (a palavra `apply` numa mensagem), `fetch` a disparar com URLs, e a forma
+  // aderente do `-b`.
+  ["remote add", "git remote add upstream https://x/y.git"],
+  ["remote prune", "git remote prune origin"],
+  ["submodule update", "git submodule update --init --recursive"],
+  ["fetch por URL https", "git fetch https://github.com/o/r main"],
+  ["fetch por URL ssh", "git fetch git@github.com:o/r.git"],
+  ["stash apply restaura, nao destroi", "git stash apply"],
+  ["stash push com 'apply' na mensagem", 'git stash push -m "apply later"'],
+  ["checkout -bfeature (forma aderente)", "git checkout -bfeature"],
+  ["apagar feature com -dv agrupado", "git push -dv origin fix/algo"],
+  ["mencionar depois de um wrapper nao e executar", "sudo -u me echo git commit"],
+  ["notes add acrescenta", "git notes add -m x"],
 ];
 
 for (const [nome, comando] of LEGITIMOS) {
@@ -167,6 +203,8 @@ const FORCES = [
   ["--delete apaga o remoto protegido", "git push origin --delete main"],
   ["--delete com a flag antes do remoto", "git push --delete origin master"],
   ["--mirror forca tudo e apaga o que falta", "git push --mirror origin"],
+  ["-dv agrupado apaga o remoto protegido", "git push -dv origin main"],
+  ["-d isolado", "git push -d origin master"],
 ];
 for (const [nome, comando] of FORCES) {
   test(`force-push (branch nao protegido): ${nome}`, () => {

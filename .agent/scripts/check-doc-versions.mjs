@@ -197,8 +197,23 @@ if (refs.length === 0) {
 //
 // A lista de ficheiros vem dos `@imports` do proprio `CLAUDE.md`, e nao escrita a mao:
 // acrescentar um import passa automaticamente a contar.
-const CARREGADO_NOTE = 44000;
-const CARREGADO_MAX = 52000;
+// Os limiares estao reconciliados com o orcamento POR FICHEIRO, e nao escolhidos a olho —
+// uma leitura independente mostrou que a primeira versao (NOTE 44000 / MAX 52000) reprovava
+// um projeto derivado normal no dia 1. A aritmetica:
+//
+//   CLAUDE.md                      ~3 700
+//   3 rules do template (Guard 1)  ate 36 000  (12 000 x 3)
+//   2 rules de dominio (Guard 1)   ate 24 000  (12 000 x 2, geradas no bootstrap)
+//   .agent/context/*               ~4 700
+//   ----------------------------------------
+//   pior caso que o Guard 1 permite  ~68 400
+//
+// Medido: o template nu esta nos 39 803, e um derivado com rules de dominio modestas
+// (5,6 KB + 4,7 KB) chega aos **49 468** — que a versao anterior ja marcava com NOTE e a
+// 2,5 KB do gate. O NOTE fica em 56 000 e o gate em 64 000: da folga a um projeto real,
+// continua **abaixo** do pior caso do Guard 1 (logo ainda vincula), e apanha drift a serio.
+const CARREGADO_NOTE = 56000;
+const CARREGADO_MAX = 64000;
 {
   const raiz = read("CLAUDE.md");
   if (raiz === null) {

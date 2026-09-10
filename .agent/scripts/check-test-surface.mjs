@@ -40,13 +40,14 @@ const TEST_GLOBS = [
   /_test\.py$/i,
   /(^|\/)test_[^/]+\.py$/i,
   // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
-  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: **todas as suites
-  // deste repo menos uma** eram invisiveis, e apagar TODAS dava "superficie intacta" com
-  // exit 0 — um gate a afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**, que e como quase todas as
+  // deste repo se chamam. Apagar TODAS dava "superficie intacta" com exit 0 — um gate a
+  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
   //
-  // (A versao anterior desta nota dizia "9 das 10". O numero envelheceu na mesma sessao, ao
-  // dividir-se uma suite em duas — `AP1` aplicado a um comentario. Aqui a fracao nao se
-  // escreve: conta-se com `git ls-files | grep -E 'tests?[-_]'`.)
+  // **A fracao nao se escreve aqui.** Foi escrita tres vezes e esteve errada tres vezes: "9
+  // das 10" envelheceu ao dividir-se uma suite em duas; "todas menos uma" tambem estava
+  // errada (duas eram visiveis, pela pasta `tests/`). Conta-se, nao se cita:
+  //   git ls-files | grep -E '(^|/)tests?[-_][^/]+\.mjs$|(^|/)tests?/[^/]+\.mjs$'
   /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
 // Configuracao **opaca**: mexer nela pode estreitar a selecao de testes de uma forma que
@@ -71,6 +72,12 @@ const CONFIG_GLOBS = [
 const CONFIG_CONTAVEIS = [
   /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
   /(^|\/)mutation-sweep\.mjs$/,
+  // Os instrumentos de medida tambem: o glob de prefixo exige `test`/`tests` no INICIO do
+  // nome, logo os `check-*.mjs`, os `guards/*.mjs` e o harness ficavam fora da superficie
+  // congelada — e desligar um aviso deles enfraquece a verificacao sem tocar num teste.
+  /(^|\/)check-[^/]+\.mjs$/,
+  /(^|\/)guards\/[^/]+\.mjs$/,
+  /(^|\/)test-harness\.mjs$/,
 ];
 
 // O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
@@ -81,8 +88,8 @@ const CONTAGENS = [
   { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
   { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
   { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
-  // O vocabulario DESTE repo. Sem estas tres linhas a contagem de assercoes era **zero em
-  // todas as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
+  // O vocabulario DESTE repo. Sem estas linhas a contagem de assercoes era **zero em todas
+  // as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
   // esvaziar os `includes: [...]` de `test-guards.mjs` passava com `sem marcas de
   // enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que o projeto nao
   // usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
@@ -98,12 +105,35 @@ const CONTAGENS = [
   // a outra forma apanhou-o.
   { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
+  // A forma mais eficaz de enfraquecer TODAS as suites de uma vez nao move nenhuma das
+  // contagens acima: trocar `if (failures.length) {` por `if (false) {` no harness desliga o
+  // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
+  // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
+  // do runner"), que este verificador nao protegia.
+  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))" },
+  // Contar o `process.exit(1)` NAO basta: o ataque medido nao o apaga, torna-o
+  // **inalcancavel** (`if (failures.length) {` -> `if (false) {`), e a contagem nao se move.
+  // O que desaparece e a **referencia a contagem de falhas** — e essa desce.
+  { re: /\b(?:failures|falhas|problemas)\.length/, msg: "referencias a contagem de falhas" },
+  // Os proprios verificadores estao na superficie (ver `CONFIG_CONTAVEIS`): despromover um
+  // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
+  // variante do `AP1` que este repo documenta.
+  { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
 ];
 
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
 // congelada — nunca no codigo de producao, senao um `.skip(offset)` de paginacao ou um
 // `only` de uma query dao falso positivo.
 const MARCAS = [
+  // Neutralizar um step de teste **sem o apagar**: a contagem de steps nao se move e nenhuma
+  // marca de `skip` aparece. Medido: `|| true` num step do `ci.yml` passava com exit 0. As
+  // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
+  { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
+  { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
+  { re: /^\s*if:\s*(?!github\.event_name == 'pull_request')/m, msg: "condicao `if:` acrescentada" },
+  // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
+  // forma canonica de desligar um veredicto sem apagar nada.
+  { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
   { re: /\b(?:it|test|describe|context)\.(?:skip|only|todo)\b/, msg: "seleccao/desativacao de teste" },
   { re: /\b(?:xit|xdescribe|xtest)\b/, msg: "teste desativado (x-prefixo)" },
   { re: /@pytest\.mark\.(?:skip|xfail)\b/, msg: "marca pytest de skip/xfail" },
@@ -146,6 +176,7 @@ const fatal = (m, extra) => {
 };
 
 console.log("\n=== Test Surface Check ===\n");
+
 
 // A baseline: argumento explicito, ou a base do branch atual. **Falhar se nao resolver** —
 // um `git` que nao responde nao autoriza um veredicto de "nada mudou".
@@ -191,6 +222,33 @@ try {
   );
 }
 console.log(`  baseline: ${base}\n`);
+
+// A superficie tem de ter existido **na baseline**. Se os `TEST_GLOBS` nao casavam nada la —
+// o estado de um projeto derivado ate alguem seguir o `BOOTSTRAP.md` §2.4 — este verificador
+// imprimia `superficie de teste intacta` e saia `0`, **para sempre**, sobre uma suite apagada.
+// E o `AP2` aplicado a si mesmo, e a unica mitigacao era prosa.
+//
+// Olha para a BASELINE e nao para o disco de proposito: apagar o unico ficheiro de teste
+// deixa o disco sem superficie, mas isso e **enfraquecimento** e tem a sua propria mensagem
+// (`APAGADO`). O que este bloco distingue e "os globs nunca viram nada" — ma configuracao.
+// A primeira versao media o disco e roubava a mensagem ao caso do APAGADO; dois testes
+// existentes apanharam-no.
+{
+  let naBaseline = [];
+  try {
+    naBaseline = git(["ls-tree", "-r", "--name-only", base]).split("\n").filter(Boolean);
+  } catch (err) {
+    fatal(`o git nao conseguiu listar os ficheiros da baseline: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+  }
+  const superficie = naBaseline.filter((f) => TEST_GLOBS.some((r) => r.test(f)));
+  if (superficie.length === 0) {
+    fatal(
+      `os TEST_GLOBS nao casam nenhum ficheiro de teste em ${base} — nao ha superficie para medir`,
+      "        adaptar TEST_GLOBS a stack deste projeto (ver BOOTSTRAP.md, 'Adaptar o check-test-surface.mjs')"
+    );
+  }
+  console.log(`  superficie na baseline: ${superficie.length} ficheiro(s)\n`);
+}
 
 const eConfigOpaca = (f) => CONFIG_GLOBS.some((r) => r.test(f));
 const naSuperficie = (f) =>
