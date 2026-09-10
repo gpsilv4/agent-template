@@ -99,10 +99,22 @@ const CHECKOUT_REPOSICIONA = /(?<![\w-])-B(?![\w-])/;
  *  trabalho documentado custa tanto como um bypass. */
 const FORMA_EXIGIDA = {
   pull: (args) => args.includes("--ff-only"),
-  push: (args) =>
-    (args.includes("--tags") || args.includes("--follow-tags")) &&
-    args.filter((a) => !a.startsWith("-")).length <= 1 && // no maximo o nome do remoto
-    !args.some((a) => a.includes(":")),
+  push: (args) => {
+    // (a) So tags: e o procedimento de release, que corre em `main`.
+    const soTags =
+      (args.includes("--tags") || args.includes("--follow-tags")) &&
+      args.filter((a) => !a.startsWith("-")).length <= 1 && // no maximo o nome do remoto
+      !args.some((a) => a.includes(":"));
+    if (soTags) return true;
+    // (b) So apaga refs NAO protegidos. Um `git push origin --delete fix/algo` estando em
+    // `main` nao toca no `main` — julga-se o que o comando EMPURRA, nao onde se esta. Sem
+    // isto, limpar um branch mergeado (que as regras deste repo mandam fazer) era negado, e
+    // foi a primeira coisa que este hook bloqueou depois de eu o "corrigir". O caso perigoso
+    // (`--delete main`) e apanhado antes, pelo `eForce`.
+    const apagados = refsApagados(args);
+    if (apagados.length && !apagados.some((r) => PROTEGIDOS.has(r))) return true;
+    return false;
+  },
 };
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
@@ -182,22 +194,45 @@ function invocacoes(texto) {
 }
 
 /** Force-push: `--force`, `-f`, ou um refspec com `+` a frente (`git push origin +main`). */
+/** Force-push e o que o iguala. `--force`, `-f`, refspec com `+` e `--mirror` sao sempre
+ *  destrutivos. **Apagar um ref so conta se o alvo for um branch PROTEGIDO**: `git push
+ *  origin --delete fix/algo` num branch ja mergeado e rotina — e e o que as regras deste
+ *  repo mandam fazer depois de um merge. A primeira versao negava qualquer `--delete`, e a
+ *  primeira coisa que bloqueou foi eu a limpar um branch mergeado. */
 function eForce(inv) {
   if (inv.verbo !== "push") return false;
-  return inv.args.some(
-    (a) =>
-      a === "--force" ||
-      a.startsWith("--force=") ||
-      /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a) ||
-      /^\+.+/.test(a) ||
-      // Apagar um branch remoto destroi tanto como um force-push, e escapava: `:main`,
-      // `--delete main`, e `--mirror` (forca todos os refs e apaga os que faltam localmente).
-      a === "--mirror" ||
-      a === "--delete" ||
-      a === "-d" ||
-      /^:.+/.test(a)
-  );
+  const args = inv.args;
+  if (
+    args.some(
+      (a) =>
+        a === "--force" ||
+        a.startsWith("--force=") ||
+        /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a) ||
+        /^\+.+/.test(a) ||
+        // `--mirror` forca todos os refs e apaga os que faltam localmente: nao ha alvo unico
+        // a inspecionar, logo nega sempre.
+        a === "--mirror"
+    )
+  ) {
+    return true;
+  }
+  return refsApagados(args).some((r) => PROTEGIDOS.has(r));
 }
+
+/** Refs que um `git push` apagaria: `--delete <ref>...` ou uma refspec `:<ref>`. */
+function refsApagados(args) {
+  const out = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--delete" || args[i] === "-d") {
+      for (let j = i + 1; j < args.length; j++) if (!args[j].startsWith("-")) out.push(args[j]);
+      continue;
+    }
+    const m = /^:(.+)$/.exec(args[i]);
+    if (m) out.push(m[1]);
+  }
+  return out.map((r) => r.replace(/^refs\/heads\//, "").replace(/^.*:/, ""));
+}
+
 
 /** Sem verbo identificavel: `git`, `git --version`, `git --help` nao fazem nada e negar isso
  *  e ruido; qualquer outra coisa (`git $VERBO`) **nao** e segura — e a parte que falha fechada. */

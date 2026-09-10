@@ -136,6 +136,11 @@ const LEGITIMOS = [
   ["stash list e leitura", "git stash list"],
   ["notes list e leitura", "git notes list"],
   ["submodule status e leitura", "git submodule status"],
+  // Apagar um branch de feature JA MERGEADO e rotina, e e o que as regras deste repo mandam
+  // fazer depois de um merge. A primeira versao do `eForce` negava qualquer `--delete`, e a
+  // primeira coisa que bloqueou foi exatamente esta limpeza — medido, nao imaginado.
+  ["apagar um branch de feature no remoto", "git push origin --delete fix/algo"],
+  ["apagar um branch de feature por refspec", "git push origin :fix/algo"],
 ];
 
 for (const [nome, comando] of LEGITIMOS) {
@@ -158,8 +163,9 @@ const FORCES = [
   ["refspec com +", "git push origin +main:main"],
   ["atraves de eval", 'eval "git push --force"'],
   // M1: apagar um branch remoto destroi tanto como um force-push, e escapava.
-  ["refspec vazia apaga o remoto", "git push origin :main"],
-  ["--delete apaga o remoto", "git push origin --delete main"],
+  ["refspec vazia apaga o remoto protegido", "git push origin :main"],
+  ["--delete apaga o remoto protegido", "git push origin --delete main"],
+  ["--delete com a flag antes do remoto", "git push --delete origin master"],
   ["--mirror forca tudo e apaga o que falta", "git push --mirror origin"],
 ];
 for (const [nome, comando] of FORCES) {

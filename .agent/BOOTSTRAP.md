@@ -339,9 +339,9 @@ const BANNED = [
 ];
 ```
 
-Correr antes de commit e apos merge de PRs do Dependabot. Opt-in no CI (descomentar em `ci.yml`).
+Correr antes de commit e apos merge de PRs do Dependabot. **Corre no CI** no job `guard-tests` (que nao depende de `package.json`).
 
-> O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; opt-in no CI.
+> O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; **corre no CI** no job `guard-tests`.
 
 #### Adaptar o `check-test-surface.mjs` a stack
 
