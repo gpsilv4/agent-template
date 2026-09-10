@@ -437,6 +437,143 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
   }
 });
 
+// --- BYPASSES: as 23 formas que uma leitura independente encontrou ------------
+// A versao anterior deste hook procurava os verbos PERIGOSOS com uma regex de posicao de
+// comando, e tinha 100% de cobertura de mutacao (2/2 sitios) — com 23 formas de a contornar.
+// A cobertura media que cada aviso EXISTENTE e observado; nao mede os que faltam. Esta tabela
+// e a resposta: cada forma vive aqui como caso, e a lista cresce quando se encontra outra.
+// Quatro delas foram criadas pela correcao anterior, que retirava as aspas em bloco.
+const BYPASSES = [
+  ["eval sem aspas", "eval git commit -m x"],
+  ["eval com aspas", 'eval "git commit -m x"'],
+  ["eval com aspas simples", "eval 'git commit -m x'"],
+  ["sh -c", 'sh -c "git commit -m x"'],
+  ["bash -c", 'bash -c "git push"'],
+  ["caminho absoluto", "/usr/bin/git commit -m x"],
+  ["caminho relativo", "./git commit -m x"],
+  ["sudo", "sudo git commit -m x"],
+  ["env", "env git commit -m x"],
+  ["env com atribuicao", "env GIT_DIR=.git git commit -m x"],
+  ["atribuicao inline", "GIT_AUTHOR_NAME=x git commit -m y"],
+  ["command", "command git commit -m x"],
+  ["exec", "exec git push"],
+  ["xargs", "echo x | xargs git commit -m"],
+  ["nohup", "nohup git push"],
+  ["timeout", "timeout 5 git push"],
+  ["backticks", "echo `git commit -m x`"],
+  ["substituicao $()", "echo $(git commit -m x)"],
+  ["grupo com chaves", "{ git commit -m x; }"],
+  ["subshell", "(git commit -m x)"],
+  ["if/then", "if true; then git commit -m x; fi"],
+  ["for/do", "for i in 1; do git push; done"],
+  ["negacao !", "! git commit -m x"],
+  ["verbo entre aspas", 'git "commit" -m x'],
+  ["verbo ofuscado por aspas", 'git comm""it -m x'],
+  ["verbo com escapes", "git \\c\\o\\m\\m\\i\\t -m x"],
+  ["depois de &&", "npm test && git commit -m x"],
+  ["depois de ;", "npm test; git push"],
+  ["verbo desconhecido (falha FECHADA)", "git frobnicate --hard"],
+  ["verbo em variavel (nao identificavel)", "git $VERBO"],
+  ["reset --hard", "git reset --hard HEAD~1"],
+  ["restore descarta trabalho", "git restore ."],
+  ["clean apaga ficheiros", "git clean -fd"],
+  ["checkout sem -b pode descartar", "git checkout -- ."],
+];
+
+for (const [nome, comando] of BYPASSES) {
+  test(`bypass: ${nome}`, () => {
+    const d = repo("main");
+    try {
+      const r = corre({ tool_input: { command: comando }, cwd: d });
+      eq(r.decisao, "deny", `"${comando}" tinha de ser negado em main`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+// --- FALSOS POSITIVOS: negar trabalho legitimo custa tanto como deixar passar --
+// Oito destes vinham medidos da mesma leitura. O `git merge-base` negou ao revisor a
+// verificacao do range que lhe foi pedida — um falso positivo bloqueia trabalho a serio.
+const LEGITIMOS = [
+  ["merge-base", "git merge-base main HEAD"],
+  ["status", "git status --porcelain"],
+  ["log", "git log --oneline -5"],
+  ["diff", "git diff --name-only main"],
+  ["show", "git show HEAD:package.json"],
+  ["rev-parse", "git rev-parse --verify main"],
+  ["branch (listar)", "git branch --show-current"],
+  ["switch para outro branch", "git switch feature/x"],
+  ["switch -c cria branch (e como se SAI de main)", "git switch -c fix/algo"],
+  ["checkout -b cria branch", "git checkout -b fix/algo"],
+  ["add", "git add -A"],
+  ["fetch", "git fetch origin"],
+  ["stash", "git stash"],
+  ["tag a listar", "git tag"],
+  ["mencionar num echo nao e executar", 'echo "corre git commit depois"'],
+  ["grep sobre docs", 'grep -rn "git push --force" .agent'],
+  ["heredoc com o texto la dentro", "cat <<'EOF'\ngit commit -m x\nEOF"],
+  ["comentario", "# git commit -m x"],
+  ["nome de ficheiro parecido", "cat git-commit-notes.md"],
+  ["push com --force-with-lease NAO e force-push cru", "git switch -c x && git status"],
+];
+
+for (const [nome, comando] of LEGITIMOS) {
+  test(`legitimo em main: ${nome}`, () => {
+    const d = repo("main");
+    try {
+      const r = corre({ tool_input: { command: comando }, cwd: d });
+      eq(r.decisao, "allow", `"${comando}" NAO devia ser negado`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+// --- Force-push: negado em QUALQUER branch, incluindo as formas de refspec ------
+const FORCES = [
+  ["--force", "git push --force"],
+  ["-f", "git push -f origin main"],
+  ["flags juntas", "git push -uf origin main"],
+  ["refspec com +", "git push origin +main:main"],
+  ["atraves de eval", 'eval "git push --force"'],
+];
+for (const [nome, comando] of FORCES) {
+  test(`force-push (branch nao protegido): ${nome}`, () => {
+    const d = repo("feature/x");
+    try {
+      const r = corre({ tool_input: { command: comando }, cwd: d });
+      eq(r.decisao, "deny", `"${comando}" tinha de ser negado mesmo fora de main`);
+      contem(r.razao, "Force-push");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+test("--force-with-lease NAO e negado (nao e force cru)", () => {
+  const d = repo("feature/x");
+  try {
+    eq(corre({ tool_input: { command: "git push --force-with-lease" }, cwd: d }).decisao, "allow", "force-with-lease");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// --- Sem pista de diretorio: antes PERMITIA (lista vazia = ciclo que nao corre) -
+test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
+  const r = corre({ tool_input: { command: "git commit -m x" } });
+  // Este repo esta num branch nao protegido durante o desenvolvimento; o que se afirma e que
+  // a decisao vem de um branch REAL e nao de uma lista vazia. Em `main` seria deny.
+  if (!["allow", "deny"].includes(r.decisao)) throw new Error("decisao invalida");
+  const d = repo("main");
+  try {
+    eq(corre({ tool_input: { command: "git -C " + d + " commit -m x" } }).decisao, "deny", "-C aponta para main");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
 console.log("");

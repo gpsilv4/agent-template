@@ -123,6 +123,26 @@
   sitios do bug **e** um trim legitimo — um falso positivo barato e preferivel a um grep que
   falha o defeito, que foi o que a primeira versao desta linha fazia.
 
+---
+
+## AP6 — Blocklist de formas perigosas onde era preciso um allowlist
+
+- **Origem**: o hook `guard-protected-branch` deste template. **32 defeitos** medidos: 28
+  formas de o contornar, 3 formas de force-push que escapavam, 1 falso positivo.
+- **Anti-padrao**: enumerar o que e **perigoso**. As formas de escrever a mesma coisa numa
+  shell nao tem fim — `eval git commit`, `sh -c "..."`, backticks, `$(...)`, `/usr/bin/git`,
+  `xargs`, `sudo`, `env`, `{ }`, `if ...; then`, `! git commit`, `git "commit"`,
+  `git comm""it` — logo a lista **falha aberta**: o que nao previste passa. Pior: cada
+  correcao cria formas novas (retirar as aspas em bloco fez `eval "git commit"` escapar).
+- **Correto**: enumerar o que e **seguro** e negar o resto (falha **fechada**). A lista de
+  verbos inofensivos e finita; a de comandos ofuscados nao e. Onde falhar fechado bloquearia
+  trabalho legitimo, a mensagem de negacao diz o que acrescentar a lista.
+- **Detecao em review**: **uma tabela de formas, nao uma leitura da regex.** A cobertura de
+  mutacao deste hook era `2/2 sitios` **antes e depois** de corrigir os 32 defeitos — o numero
+  nao se move, porque mede se cada aviso *existente* e observado, nao se falta algum. O
+  instrumento e a tabela `BYPASSES` em `.claude/hooks/tests/test-hooks.mjs`: cada forma
+  conhecida e um caso, e a tabela cresce quando se encontra outra.
+
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
 > um bug teu revelar.
