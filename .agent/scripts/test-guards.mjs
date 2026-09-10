@@ -138,6 +138,32 @@ test("G1b: referencia maior que uma rule carregada da NOTE, nao WARN", (dir) => 
   writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(13000));
 }, { code: 0, includes: ["scripts-guide.md", "maior que uma rule carregada"] });
 
+// --- Guard 1c: o TOTAL carregado a cada sessao --------------------------------
+// O Guard 1 orcamenta ficheiro a ficheiro; ninguem orcamentava a soma, e e a soma que o
+// agente paga por sessao. Os ficheiros extra ficam ABAIXO do limite por ficheiro de
+// proposito: se um deles o excedesse, o Guard 1 tambem avisava e a assercao passava a ser
+// satisfeita por outra verificacao — o `AP1`.
+
+test("G1c: total carregado acima do maximo avisa, com cada ficheiro dentro do seu limite", (dir) => {
+  const extra = "x".repeat(11000);
+  let claude = readF(dir, "CLAUDE.md");
+  let gemini = readF(dir, "GEMINI.md");
+  for (const n of ["extra1", "extra2"]) {
+    writeF(dir, `.agent/rules/${n}.md`, `# ${n}\n\n${extra}`);
+    claude += `\n@.agent/rules/${n}.md\n`;
+    gemini += `\n@.agent/rules/${n}.md\n`;
+  }
+  writeF(dir, "CLAUDE.md", claude);
+  writeF(dir, "GEMINI.md", gemini);
+}, { code: 1, includes: ["contexto carregado", "> 52000"] });
+
+test("G1c: sem CLAUDE.md da SKIP visivel, nao silencio", (dir) => {
+  // `anyOut` e nao `includes`: sem `CLAUDE.md` outros guards avisam (paridade, imports), logo
+  // o exit e 1 e as linhas WARN nao contem o SKIP. O que se afirma aqui e que o guard **diz**
+  // que nao correu, em vez de desaparecer — a regra de "todo o skip e visivel".
+  rmSync(file(dir, "CLAUDE.md"));
+}, { code: 1, anyOut: ["SKIP  Guard 1c"] });
+
 test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
   for (const f of ["sync-docs", "ticket-method", "scripts-guide"]) {
     try { rmSync(file(dir, `.agent/rules/${f}.md`)); } catch {}

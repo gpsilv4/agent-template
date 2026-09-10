@@ -156,7 +156,23 @@ function test(name, mutate, expect) {
     if (expect.code === 0) {
       if (novos.length) problems.push(`nao devia acrescentar avisos; acrescentou ${novos.length}: ${novos[0]}`);
     } else {
-      if (novos.length === 0) problems.push("devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum");
+      if (novos.length === 0) {
+        // Dizer PORQUE nao ha aviso novo. A causa mais comum nao e o guard: e o repo ja
+        // estar a avisar disto **antes** da mutacao, e ai o teste diferencial nao tem como
+        // ver nada de novo. Medido num projeto derivado meio-atualizado: dois testes do
+        // Guard 12d falhavam com esta mensagem sem que ela dissesse que a culpa era do
+        // BOOTSTRAP.md do projeto estar desalinhado. Sem esta explicacao, quem le vai
+        // procurar o defeito no guard.
+        const esperados = [...(expect.includes ?? []), ...(extra.includes ?? [])];
+        const jaNoBaseline = esperados.filter((t) => [...base].some((w) => w.includes(chaveWarn(t))));
+        problems.push(
+          jaNoBaseline.length
+            ? `devia acrescentar um aviso novo e nao acrescentou: o baseline JA avisava disto ` +
+                `(${jaNoBaseline[0]}). Corrigir o repo antes de correr a suite — o teste e ` +
+                `diferencial e nao tem como ver como novo um aviso que ja la estava`
+            : "devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum"
+        );
+      }
       if (code === 0) problems.push("devia sair != 0");
     }
     // CAUSA-RAIZ de quatro rondas de defeitos: `out.includes(...)` nao olha ao NIVEL da

@@ -146,9 +146,10 @@
   numero nao se move, porque mede se cada aviso *existente* e observado, nao se falta algum.
   (Medido na mesma sessao, ja com os hooks registados em `PARES`; nao e reproduzivel a partir
   de um commit anterior a esse registo.) O instrumento e a tabela `BYPASSES` em
-  `.claude/hooks/tests/test-hooks.mjs`: cada forma conhecida e um caso, e a tabela cresce
-  quando se encontra outra — cresceu **22 casos** numa segunda leitura, ja depois de a
-  primeira ter fechado 28.
+  `.claude/hooks/tests/tests-bypasses.mjs`: cada forma conhecida e um caso, e a tabela cresce
+  quando se encontra outra. A primeira leitura fechou 28 formas; a **segunda encontrou mais 22
+  defeitos** no resultado dessa correcao. O tamanho da tabela nao se cita em prosa — foi
+  escrito errado duas vezes no mesmo dia.
 
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
