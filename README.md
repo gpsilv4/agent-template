@@ -118,9 +118,11 @@ When you open a new AI session in any project using this template, the agent **a
 .claude/                        <- Native Claude Code layer (optional; other tools ignore it)
 ├── settings.json              <- Project permissions (deny secrets, allow safe scripts)
 ├── commands/                  <- Real slash commands (/plan, /review, ...) wrapping .agent/workflows/
-├── hooks/                     <- PreToolUse guards: DENY before the tool runs (Claude-only)
-│   ├── guard-protected-branch.mjs  <- No commit/push on main/master/develop; no force-push
-│   └── tests/test-hooks.mjs        <- 16 cases: real git repos, real payloads
+├── hooks/                     <- Runtime enforcement, before/after the tool (Claude-only)
+│   ├── guard-protected-branch.mjs  <- DENY commit/push on protected branches; no force-push
+│   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work
+│   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
+│   └── tests/test-hooks.mjs        <- 26 cases: real git repos, real payloads
 └── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
 
 .gemini/                        <- Native Gemini CLI layer
