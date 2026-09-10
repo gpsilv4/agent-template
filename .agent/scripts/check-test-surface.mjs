@@ -55,7 +55,11 @@ const TEST_GLOBS = [
 const CONFIG_GLOBS = [
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
-  /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
+  // `pytest.ini`/`tox.ini` sao **so** configuracao de teste: qualquer alteracao merece
+  // confirmacao. O `pyproject.toml` e o `setup.cfg` nao — misturam deps e versao com a
+  // selecao de testes, logo passam para `CONFIG_CONTAVEIS` (um bump de versao dava exit 1
+  // em qualquer projeto Python, medido).
+  /(^|\/)(pytest\.ini|tox\.ini)$/i,
   /(^|\/)\.mocharc\./i,
 ];
 
@@ -78,6 +82,7 @@ const CONFIG_CONTAVEIS = [
   /(^|\/)check-[^/]+\.mjs$/,
   /(^|\/)guards\/[^/]+\.mjs$/,
   /(^|\/)test-harness\.mjs$/,
+  /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
 ];
 
 // O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
@@ -98,6 +103,9 @@ const CONTAGENS = [
   { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
   { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
   { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
+  // `test.each([...])` com a tabela esvaziada para `[]` mantem o `test(` e nao corre nada —
+  // a mesma forma do `includes: []`. So as tabelas NAO VAZIAS contam.
+  { re: /\.each\s*\(\s*\[[^\]]/, msg: "tabelas `each` nao vazias" },
   // A2: a "configuracao do runner" deste repo conta-se assim.
   // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
@@ -105,6 +113,9 @@ const CONTAGENS = [
   // a outra forma apanhou-o.
   { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
+  // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
+  // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
+  { re: /^\s*(?:testpaths|addopts|python_files|python_classes|python_functions)\s*=/m, msg: "selecao de testes do pytest" },
   // A forma mais eficaz de enfraquecer TODAS as suites de uma vez nao move nenhuma das
   // contagens acima: trocar `if (failures.length) {` por `if (false) {` no harness desliga o
   // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
@@ -136,6 +147,10 @@ const MARCAS = [
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
   { re: /\b(?:it|test|describe|context)\.(?:skip|only|todo)\b/, msg: "seleccao/desativacao de teste" },
   { re: /\b(?:xit|xdescribe|xtest)\b/, msg: "teste desativado (x-prefixo)" },
+  // `skipIf`/`runIf`/`failing` do vitest: o `\b` do padrao acima falha antes do `If`, logo
+  // `it.skipIf(true)` passava. E `concurrent.skip` tem o modificador pelo meio.
+  { re: /\b(?:it|test|describe|context)\.(?:skipIf|runIf|failing)\b/, msg: "desativacao condicional (skipIf/runIf/failing)" },
+  { re: /\b(?:it|test|describe|context)\.(?:concurrent|sequential|extend)\.(?:skip|only|todo)\b/, msg: "skip/only com modificador pelo meio" },
   { re: /@pytest\.mark\.(?:skip|xfail)\b/, msg: "marca pytest de skip/xfail" },
   { re: /\.(?:skip|only)\s*\(\s*\)/, msg: "skip()/only() sem argumento" },
   { re: /\b(?:pytest\.skip|unittest\.skip)\b/, msg: "skip programatico" },
@@ -261,6 +276,11 @@ try {
   // antes de commit" nao media exatamente o que estava a ser commitado. No CI as duas formas
   // coincidem (arvore limpa), logo nao ha perda.
   alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
+  // Os NAO RASTREADOS nao aparecem no `git diff`, logo a afirmacao "compara com a arvore de
+  // trabalho" so valia para caminhos rastreados: um `vitest.config.ts` novo que estreitasse a
+  // selecao passava sem aviso enquanto nao fosse ao `git add`. Uniao com os untracked.
+  const naoRastreados = git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  alterados = [...new Set([...alterados, ...naoRastreados])];
 } catch (err) {
   fatal(`o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
 }
@@ -283,21 +303,50 @@ if (tocados.length === 0) {
     // Os escapes contam: um `\'` dentro de uma string desalinhava um emparelhamento ingenuo
     // e a marca seguinte ficava exposta. Medido na propria suite deste verificador, que tem
     // fixtures com aspas escapadas — o gate sinalizava-a a si mesmo num projeto derivado.
+    // Duas correcoes de uma leitura independente:
+    //   - os COMENTARIOS saem primeiro. Um apostrofo num comentario (`// don't skip`)
+    //     emparelhava com o proximo da linha e apagava o que estivesse pelo meio. E comentar
+    //     um teste **e** enfraquece-lo, logo tira-lo faz a contagem descer, que e o correto.
+    //   - o backtick passa a ser limitado a LINHA (`[^`\\\n]`). Um backtick solitario apagava
+    //     tudo ate ao proximo, atravessando linhas — e neste repo os comentarios sao densos
+    //     em identificadores entre backticks.
+    const semComentarios = (t) => t.replace(/^[ \t]*(?:\/\/|\*\/?|\/\*).*$/gm, "");
     const semStrings = (t) =>
-      t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
+      semComentarios(t).replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\\n]|\\.)*`/g, '""');
     const conta = (texto, re) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
       return (semStrings(texto).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".
+    // M8: distinguir "nao existia na baseline" de "nao consegui ler".
+    //
+    // A versao anterior lia qualquer falha do `git show` como "ficheiro novo". Num clone
+    // parcial (`--filter=blob:none`) ou com o objeto ausente isso corria nas duas direcoes
+    // erradas ao mesmo tempo: `antes = ""` fazia com que nada pudesse **descer** (exit 0
+    // sobre uma suite esvaziada) e, ao mesmo tempo, qualquer `skip` **pre-existente** contava
+    // como acrescentado (falso positivo). E o `AP2`: "nao ha nada" nao e "nao consegui ler".
     let antes = "";
     let existiaAntes = true;
-    try {
-      antes = git(["show", `${base}:${f}`]);
-    } catch {
-      existiaAntes = false; // ficheiro novo desde a baseline: zero marcas antes, e correto
-    }
+    // `ls-tree` e nao `cat-file -e`: o `-e` resolve o caminho **e** verifica o blob, logo
+    // falhava nas duas situacoes e nao as separava. O `ls-tree` le so a arvore — responde
+    // "o caminho existia na baseline?" sem depender de o conteudo estar disponivel.
+    const existeNaBaseline = (() => {
+      try {
+        return git(["ls-tree", "--name-only", base, "--", f]).trim() !== "";
+      } catch {
+        return false;
+      }
+    })();
+    if (existeNaBaseline) antes = git(["show", `${base}:${f}`]);
+    else existiaAntes = false; // ausente da baseline: zero marcas antes, e correto
+    // Sem `try` em volta do `show`, de proposito. Para um ficheiro chegar aqui tem de estar
+    // na lista do `git diff base`, e o diff **ja leu os dois blobs** para os comparar: se o
+    // blob da baseline nao existisse, o diff falhava primeiro e o `fatal` de "nao conseguiu
+    // listar as alteracoes" ja teria disparado. Uma versao anterior punha aqui um `fatal`
+    // proprio para o caso do clone parcial; tentei alcanca-lo com um teste e nao e
+    // alcancavel. Codigo de defesa que nenhum teste pode cobrir e peso morto — e a varredura
+    // de mutacao reprova-o, com razao.
     let agora = "";
     const noDisco = join(ROOT, f);
     if (existsSync(noDisco)) {
