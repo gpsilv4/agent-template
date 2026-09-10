@@ -96,9 +96,10 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 10. Sincronizacao de Conhecimento (Docs Sync)
 
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (26 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
-- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`): `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs` e `test-mutation-sweep.mjs` — sem eles, um guard partido parece um guard a passar
+- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/` ou `.claude/hooks/`): `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` — sem eles, um guard partido parece um guard a passar
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
+- [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `AP4`)
 
 ## 11. Leitor Independente (Fase 4)
 

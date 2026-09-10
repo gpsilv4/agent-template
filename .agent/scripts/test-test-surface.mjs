@@ -140,6 +140,53 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
   excludes: ["Superficie de teste nao enfraquecida"],
 });
 
+// --- Os globs tem de ver as suites que ESTE repo nomeia pelo prefixo ----------
+// Medido antes da correcao: 9 das 10 suites deste repo eram invisiveis, e apagar todas
+// dava "superficie de teste intacta" com exit 0.
+
+test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
+  writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  commit(dir, "add suite com nome de prefixo");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, ".agent/scripts/test-guards.mjs"));
+  return ref;
+}, { code: 1, includes: ["test-guards.mjs", "APAGADO"] });
+
+test("glob: suite nomeada tests-x.mjs (plural) tambem", (dir) => {
+  writeFileSync(join(dir, ".agent/scripts/tests-settings.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  commit(dir, "add suite plural");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, ".agent/scripts/tests-settings.mjs"));
+  return ref;
+}, { code: 1, includes: ["tests-settings.mjs", "APAGADO"] });
+
+// --- Esvaziar nao deixa marca de `skip` para tras (invariante 5 do AP4) -------
+
+test("contagem: casos de teste apagados sem nenhuma marca reprovam", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"), "// suite esvaziada, sem skip nenhum\n");
+  commit(dir, "esvaziar");
+}, { code: 1, includes: ["casos de teste: 1 -> 0", "assercoes: 1 -> 0"] });
+
+test("contagem: acrescentar testes NAO e enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", () => { expect(1).toBe(1); });\ntest("b", () => { expect(2).toBe(2); });\n');
+  commit(dir, "mais testes");
+}, { code: 0 });
+
+// --- Medir a arvore de trabalho: "correr antes de commit" tem de medir algo ---
+// Com `${base}..HEAD` o verificador ignorava tudo o que nao estivesse commitado, ou seja
+// exatamente o que se estava a preparar para commitar.
+
+test("arvore: enfraquecer SEM commitar e detetado", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  // de proposito sem commit
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+test("arvore: apagar um teste SEM commitar e detetado", (dir) => {
+  rmSync(join(dir, "tests/exemplo.test.js"));
+  // de proposito sem commit
+}, { code: 1, includes: ["APAGADO"] });
+
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
 console.log("");

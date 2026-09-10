@@ -23,8 +23,9 @@ Producao (main branch + {{BACKEND}} PROD)
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (26 pontos)
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` — sem WARN
 - [ ] **`.agent/context/session.md`** limpo — tarefas concluidas e proximos passos atualizados?
-- [ ] **Testes dos guards** passam (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`)?
+- [ ] **Testes dos guards** passam (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs`)?
 - [ ] Se algum `check-*.mjs` mudou neste ciclo: `node .agent/scripts/mutation-sweep.mjs` exit 0?
+- [ ] **Superficie de teste**: `node .agent/scripts/check-test-surface.mjs` exit 0 (nenhum teste apagado nem desativado desde a base)?
 - [ ] **`.agent/context/backlog.md`** + **`backlog-archive.md`** — items concluidos movidos para o Historico, contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - Se a documentacao nao foi atualizada, fazer **ANTES** de continuar o deploy.
 

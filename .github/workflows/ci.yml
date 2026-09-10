@@ -133,7 +133,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
+      # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
+      # logo um clone raso dava uma falha falsa em vez de uma medicao.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -149,6 +154,12 @@ jobs:
         run: node .agent/scripts/test-test-surface.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
+      # A autoridade que o agente nao alcanca (AP4): se a superficie de teste encolher face a
+      # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
+      # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
+      - name: Test surface — nao enfraquecida desde a base do PR
+        if: github.event_name == 'pull_request'
+        run: node .agent/scripts/check-test-surface.mjs "${{ github.event.pull_request.base.sha }}"
       # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (dezenas de sitios),
       # logo custa minutos, nao segundos. Fica opt-in: correr localmente apos mexer num
       # verificador. Se a quiseres no CI, descomenta e sobe o timeout-minutes deste job.

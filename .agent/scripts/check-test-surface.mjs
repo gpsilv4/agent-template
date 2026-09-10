@@ -24,8 +24,9 @@
  */
 
 import { execFileSync } from "child_process";
+import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
+import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -38,12 +39,27 @@ const TEST_GLOBS = [
   /\.(test|spec)\.[cm]?[jt]sx?$/i,
   /_test\.py$/i,
   /(^|\/)test_[^/]+\.py$/i,
+  // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
+  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: 9 das 10 suites deste
+  // repo eram invisiveis, e apagar TODAS dava "superficie intacta" com exit 0 — um gate a
+  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
 const CONFIG_GLOBS = [
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
   /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
   /(^|\/)\.mocharc\./i,
+];
+
+// O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
+// deixar nenhuma marca de `skip` para trás. Sem isto, cortar uma suite de 328 para 62 linhas
+// passava com exit 0. Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que
+// os nomes contados sejam os que o projeto **usa** para declarar um teste e uma assercao.
+const CONTAGENS = [
+  { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
+  { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
+  { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes" },
 ];
 
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
@@ -103,7 +119,11 @@ const naSuperficie = (f) => TEST_GLOBS.some((r) => r.test(f)) || CONFIG_GLOBS.so
 
 let alterados;
 try {
-  alterados = git(["diff", "--name-only", `${base}..HEAD`]).split("\n").filter(Boolean);
+  // `${base}` e nao `${base}..HEAD`: compara a baseline com a **arvore de trabalho**. Com
+  // `..HEAD` o verificador ignorava tudo o que nao estivesse commitado — ou seja, "correr
+  // antes de commit" nao media exatamente o que estava a ser commitado. No CI as duas formas
+  // coincidem (arvore limpa), logo nao ha perda.
+  alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
 } catch (err) {
   console.log(`  WARN  o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}\n`);
   process.exit(1);
@@ -133,9 +153,10 @@ if (tocados.length === 0) {
       existiaAntes = false; // ficheiro novo desde a baseline: zero marcas antes, e correto
     }
     let agora = "";
-    try {
-      agora = git(["show", `HEAD:${f}`]);
-    } catch {
+    const noDisco = join(ROOT, f);
+    if (existsSync(noDisco)) {
+      agora = readFileSync(noDisco, "utf8");
+    } else {
       // Estava na baseline e ja nao esta em HEAD: foi APAGADO. E a forma mais brutal de
       // enfraquecer, e merece nome proprio. (Um ficheiro ausente das DUAS arvores nao pode
       // aparecer no `git diff`, logo nao ha terceiro caso.)
@@ -143,8 +164,13 @@ if (tocados.length === 0) {
       continue;
     }
     const achadas = MARCAS.filter((m) => conta(agora, m.re) > conta(antes, m.re));
-    if (achadas.length) {
-      warn(`${f}: ${achadas.map((a) => a.msg).join(", ")} acrescentado(s) desde ${base}`);
+    const desceram = CONTAGENS.filter((c) => conta(agora, c.re) < conta(antes, c.re));
+    const notas = [
+      ...achadas.map((a) => `${a.msg} acrescentado(s)`),
+      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
+    ];
+    if (notas.length) {
+      warn(`${f}: ${notas.join("; ")} desde ${base}`);
     } else if (config) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
     } else {
