@@ -26,7 +26,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 
 export function registar({ test, corre, repo, eq, contem }) {
-// --- BYPASSES: as 28 formas que uma leitura independente encontrou ------------
+// --- BYPASSES: as formas conhecidas de contornar o guard ---------------------
+// Sem numero de propósito: escrever o tamanho da tabela em prosa foi errado duas vezes no
+// mesmo dia (dizia 28 com 47 casos). O que nao envelhece sao os EVENTOS: a primeira leitura
+// independente encontrou 23 formas, a medicao completa dessa ronda deu 28 formas + 3 de
+// force-push + 1 falso positivo, e a segunda leitura encontrou mais 22 defeitos.
 // A versao anterior deste hook procurava os verbos PERIGOSOS com uma regex de posicao de
 // comando, e tinha 100% de cobertura de mutacao (2/2 sitios) — com 23 formas de a contornar.
 // A cobertura media que cada aviso EXISTENTE e observado; nao mede os que faltam. Esta tabela

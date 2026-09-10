@@ -188,6 +188,43 @@ if (refs.length === 0) {
   guardsRun++;
 }
 
+// --- Guard 1c: o TOTAL carregado a cada sessao ---
+// O Guard 1 orcamenta ficheiro a ficheiro e o 1b as referencias. Ninguem orcamentava a
+// **soma** — e e a soma que o agente paga a cada sessao. Medido quando este guard nasceu:
+// 39803 bytes (~10k tokens) entre o `CLAUDE.md` e os seus `@imports`, com o
+// `anti-patterns.md` a ter subido de 6840 para 10339 numa unica sessao. Cinco ficheiros
+// podem estar todos abaixo de 12000 e a soma crescer sem nada avisar.
+//
+// A lista de ficheiros vem dos `@imports` do proprio `CLAUDE.md`, e nao escrita a mao:
+// acrescentar um import passa automaticamente a contar.
+const CARREGADO_NOTE = 44000;
+const CARREGADO_MAX = 52000;
+{
+  const raiz = read("CLAUDE.md");
+  if (raiz === null) {
+    skip("Guard 1c — sem CLAUDE.md");
+  } else {
+    const bytesDe = (c) => Buffer.byteLength(c.replace(/\r\n/g, "\n"), "utf8");
+    let total = bytesDe(raiz);
+    const ausentes = [];
+    for (const m of raiz.matchAll(/^@(\S+)/gm)) {
+      const c = read(m[1]);
+      if (c === null) ausentes.push(m[1]);
+      else total += bytesDe(c);
+    }
+    const nota = ausentes.length ? ` (${ausentes.length} import(s) gerado(s) no bootstrap ainda ausente(s))` : "";
+    if (total > CARREGADO_MAX) {
+      warn(`contexto carregado = ${total} bytes > ${CARREGADO_MAX}${nota} — arquivar historico inerte ou mover evidencia para src/docs/`);
+    } else if (total > CARREGADO_NOTE) {
+      note(`contexto carregado = ${total} bytes (perto do limite ${CARREGADO_MAX})${nota}`);
+    } else {
+      ok(`contexto carregado = ${total} bytes${nota}`);
+    }
+    guardsRun++;
+  }
+}
+
+
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
 // Gemini usa `@[path]`, Claude/Cursor usa `@path`. Normalizar antes de comparar
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.
