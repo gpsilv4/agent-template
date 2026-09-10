@@ -7,7 +7,8 @@
  * NAO e um entry point: o `test-guards.mjs` importa e chama `registar()`, para a ordem dos
  * testes ser explicita em vez de depender da ordem de avaliacao dos imports.
  */
-import { rmSync } from "fs";
+import { readdirSync, rmSync } from "fs";
+import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./test-harness.mjs";
 
@@ -127,7 +128,35 @@ test("G12c: metodo ausente da SKIP visivel, nao silencio", (dir) => {
     for (const f of ["check-doc-versions.mjs", "guards/settings.mjs", "guards/versions.mjs",
                      "guards/derived-counts.mjs", "guards/placeholders.mjs"]) {
       writeF(dir, `.agent/scripts/${f}`,
-        readF(dir, `.agent/scripts/${f}`).replace(/^\/\/ --- Guard (\d+[a-z]?):/gm, "// --- Verificacao:"));
+        readF(dir, `.agent/scripts/${f}`).replace(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm, "// --- Verificacao:"));
     }
   }, { code: 1, includes: ["nao encontrei nenhum cabecalho"] });
+
+  // --- 12d: citacao apagada (o ramo que faltava) -----------------------------
+  // Os guards 12b/12c avisam quando `citacoes === 0`; o 12d nao tinha esse ramo, logo
+  // apagar a citacao fazia-o passar em silencio — sem OK e sem WARN — enquanto `guardsRun`
+  // continuava a conta-lo. Achado da Fase 4.
+  test("G12d: citacao do numero de guards apagada avisa", (dir) => {
+    writeF(dir, ".agent/BOOTSTRAP.md",
+      readF(dir, ".agent/BOOTSTRAP.md").replace(/\d+ guards numerados/, "muitos guards"));
+  }, { code: 1, includes: ["nenhum ficheiro cita o numero de guards numerados"] });
+
+  // --- 12e: contagem de workflows/comandos ----------------------------------
+  // Quarta instancia do padrao: "11 workflows" e "11 commands" ficaram atras quando o
+  // /upgrade fez 12. O numero ja estava calculado nos guards 6/7/9, so nao era comparado.
+  test("G12e: citacao desatualizada do numero de workflows avisa", (dir) => {
+    writeF(dir, "README.md", readF(dir, "README.md") + "\n\nO template traz 99 workflows.\n");
+  }, { code: 1, includes: ['diz "99 workflows" mas existem'] });
+
+  test("G12e: citacao apagada avisa", (dir) => {
+    for (const f of ["README.md", ".agent/BOOTSTRAP.md"]) {
+      writeF(dir, f, readF(dir, f).replace(/(\d+)\s+(workflows|comandos|commands)\b/gi, "os workflows"));
+    }
+  }, { code: 1, includes: ["nenhum ficheiro cita o numero de workflows"] });
+
+  test("G12e: pasta de workflows vazia avisa", (dir) => {
+    for (const f of readdirSync(join(dir, ".agent/workflows"))) {
+      if (f.endsWith(".md")) rmSync(join(dir, ".agent/workflows", f));
+    }
+  }, { code: 1, includes: ["nao encontrei workflows em .agent/workflows"] });
 }

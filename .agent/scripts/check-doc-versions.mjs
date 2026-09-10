@@ -109,7 +109,10 @@ const RULES_MAX_BYTES = 12000;
 function checkRuleBytes(file) {
   const content = read(file);
   if (content === null) return null;
-  const bytes = Buffer.byteLength(content, "utf8");
+  // Normalizar CRLF antes de medir: um clone com `core.autocrlf=true` acrescenta um byte por
+  // linha, e `process-rules.md` mudava de OK para NOTE so por isso — o gate passava a depender
+  // da plataforma de quem o corre em vez do conteudo. Este e o numero que o agente carrega.
+  const bytes = Buffer.byteLength(content.replace(/\r\n/g, "\n"), "utf8");
   if (content.trim() === "") {
     warn(`${file} = ${bytes} bytes mas esta VAZIO — e uma rule importada em CLAUDE.md/GEMINI.md`);
     return bytes;

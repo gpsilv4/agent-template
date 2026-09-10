@@ -142,7 +142,7 @@ Guarda as respostas — vais precisar delas para preencher todos os placeholders
 Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo**:
 
 - **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
-- **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 11 workflows + ritual de backlog/sprint + guards.
+- **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 12 workflows + ritual de backlog/sprint + guards.
 
 > Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `sync-docs.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
 
@@ -312,7 +312,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 14 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 16 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que

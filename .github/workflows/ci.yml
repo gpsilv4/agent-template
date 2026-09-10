@@ -145,7 +145,7 @@ jobs:
         run: node .agent/scripts/test-backlog.mjs
       - name: Mutation sweep — negative tests
         run: node .agent/scripts/test-mutation-sweep.mjs
-      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (~50 sitios),
+      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (dezenas de sitios),
       # logo custa minutos, nao segundos. Fica opt-in: correr localmente apos mexer num
       # verificador. Se a quiseres no CI, descomenta e sobe o timeout-minutes deste job.
       # - name: Mutation sweep — cada aviso tem de ficar vermelho

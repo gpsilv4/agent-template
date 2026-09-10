@@ -7,10 +7,10 @@
  * A fixture tem de simular um projeto JA bootstrapado, senao o guard salta — e um teste que
  * passa por o guard nao correr nao afirma nada.
  */
-import { readdirSync } from "fs";
+import { readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, readF, writeF } from "./test-harness.mjs";
+import { test, readF, writeF, file } from "./test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -50,7 +50,18 @@ const bootstrapado = (dir) => {
 
 export function registar() {
   // --- Guard 13: placeholders esquecidos -------------------------------------
-  test("G13: sem bootstrap da SKIP visivel (placeholders sao esperados)", null, {
+  // O teste controla a sua PROPRIA pre-condicao: apaga o `business-logic.md` da fixture.
+  // A versao anterior passava `null` como mutacao e assumia que o ficheiro nao existia —
+  // verdade no template nu, **falsa em qualquer projeto derivado**, onde o bootstrap o gera.
+  // Resultado: a suite passava aqui e falhava no primeiro dia de cada consumidor. Um teste
+  // que depende do ambiente em vez de o montar nao esta a afirmar o que diz.
+  test("G13: sem bootstrap da SKIP visivel (placeholders sao esperados)", (dir) => {
+    try {
+      rmSync(file(dir, ".agent/rules/business-logic.md"));
+    } catch {
+      /* no template nu ja nao existe — e o estado que este teste quer */
+    }
+  }, {
     code: 0,
     includes: ["SKIP  Guard 13 (placeholders) — bootstrap ainda nao correu"],
   });
@@ -85,8 +96,10 @@ export function registar() {
   test("G13: BOOTSTRAP.md e README.md documentam placeholders e nao contam", (dir) => {
     bootstrapado(dir);
     // Estes dois citam `{{...}}` por design; se contassem, todo projeto derivado avisaria.
+    // ACRESCENTAR, nao substituir: reescrever o `BOOTSTRAP.md` apagava as citacoes que os
+    // guards 12d/12e verificam, e o teste falhava por um aviso sem relacao com o Guard 13.
     for (const f of [".agent/BOOTSTRAP.md", "README.md"]) {
-      try { writeF(dir, f, `# doc\n\nSubstituir ${ph("HOSTING")} e ${ph("YEAR")}.\n`); } catch {}
+      try { writeF(dir, f, readF(dir, f) + `\n\nSubstituir ${ph("HOSTING")} e ${ph("YEAR")}.\n`); } catch {}
     }
   }, { code: 0, includes: ["sem placeholders esquecidos"], excludes: ["  WARN  "] });
 }

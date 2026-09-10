@@ -28,7 +28,7 @@
  *   node .agent/scripts/mutation-sweep.mjs --only=backlog     # so um (ao mexer nele)
  *   node .agent/scripts/mutation-sweep.mjs --list             # so contar, sem correr
  *
- * CUSTO: recorre a suite inteira por sitio. ~50 sitios = minutos. Correr apos mexer num
+ * CUSTO: recorre a suite inteira por sitio. dezenas de sitios = minutos. Correr apos mexer num
  * verificador, nao a cada commit. Opt-in no CI (ver `.github/workflows/ci.yml`).
  */
 
@@ -39,6 +39,15 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** Lista os ficheiros de uma pasta do repo; `[]` se nao existir. */
+function listarDir(rel) {
+  try {
+    return readdirSync(join(ROOT, rel), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
 
 // Cada verificador tem de ter a sua suite E declarar como sinaliza um problema — nem todos
 // sinalizam da mesma forma, e um regex global daria "0 sitios, nada a varrer" a um
@@ -132,6 +141,28 @@ const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.slice("--only=".length) : null;
 
 let falhou = false;
+
+// DESCOBERTA: `PARES` e mantido a mao, logo um verificador novo entrava no repo sem rede
+// nenhuma — e a documentacao afirmava, em quatro sitios, que a varredura o detetava. Nao
+// detetava: o ramo `SEM SUITE` so dispara para uma entrada de `PARES` com `suite` nula, o que
+// exige que alguem a tenha acrescentado. Isto varre o disco e reprova o que nao esta na lista.
+// E o mesmo raciocinio do `ALVO AUSENTE`, na direcao inversa.
+if (!only) {
+  const noDisco = [
+    // A convencao do repo: verificadores sao `check-*.mjs` e os seus modulos vivem em
+    // `guards/`. Este ficheiro nao entra na descoberta — ja esta em `PARES`, e incluir-se
+    // fazia a sua propria fixture de teste (que substitui `PARES`) reprovar.
+    ...listarDir(".agent/scripts").filter((f) => /^check-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
+    ...listarDir(".agent/scripts/guards").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/guards/${f}`),
+  ];
+  const registados = new Set(PARES.map((p) => p.alvo));
+  for (const f of noDisco) {
+    if (!registados.has(f)) {
+      console.log(`  SEM PAR  ${f} nao esta em PARES — verificador novo entra sem rede nenhuma`);
+      falhou = true;
+    }
+  }
+}
 
 const selecionados = only ? PARES.filter((p) => p.alvo.includes(only)) : PARES;
 if (only && selecionados.length === 0) {
