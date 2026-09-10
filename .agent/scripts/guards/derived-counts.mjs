@@ -135,12 +135,14 @@ if (metodo) {
         const digito = /(\d+)[- ]\s*(?:fases|phases|phase)\b/i.exec(linha);
         const palavra = /\b(tres|quatro|cinco|seis|sete|oito)\s+fases/i.exec(linha);
         if (!digito && !palavra) continue;
-        // ANCORA: "N fases" nem sempre e o TOTAL. "tres fases escalam por tamanho" fala de
-        // tres DAS fases e e prosa correta — sem ancora o guard pedia para a reescrever, e o
-        // caminho de menor resistencia passava a ser enganar o regex. As citacoes reais do
-        // total trazem sempre o intervalo ao lado: "0-5", "(0 a 5)", "(0)". Sem intervalo na
-        // linha, nao e uma afirmacao sobre o total — nao e da conta deste guard.
-        if (!/\b0\s*(?:a|to|ate|-|–)\s*\d\b|\(0\)/i.test(linha)) continue;
+        // ANCORA (so a forma por PALAVRA): "N fases" nem sempre e o TOTAL — "tres fases
+        // escalam por tamanho" fala de tres DAS fases e e prosa correta. As citacoes reais do
+        // total trazem o intervalo ao lado ("0-5", "(0 a 5)", "(0)").
+        // A forma com DIGITO fica sem ancora de proposito: "6 fases"/"5-phase" e sempre uma
+        // afirmacao sobre o total, e exigir-lhe o intervalo abria um falso negativo real —
+        // reescrever o README para `6-phase method` sem `0-5` saia da cobertura em silencio,
+        // que e o defeito que este guard foi criado para apanhar.
+        if (!digito && !/\b0\s*(?:a|to|ate|-|–)\s*\d\b|\(0\)/i.test(linha)) continue;
         citacoes++;
         const escrito = digito ? Number(digito[1]) : null;
         const esperadoPalavra = PALAVRA[total];

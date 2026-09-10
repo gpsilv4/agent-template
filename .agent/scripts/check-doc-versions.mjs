@@ -149,12 +149,20 @@ for (const f of BOOTSTRAP_RULES) {
 // sessao**; uma de referencia entra **por ticket**, logo pode ser maior. Mas passar do tamanho
 // de uma rule carregada e sinal de que a referencia esta a virar manual — e a partir de 20 KB
 // deixa de ser lida e passa a ser consultada por `grep`, o que e outra coisa.
-// O gate esta a 14000 e nao a 20000 por uma razao medida: o ficheiro que motivou este guard
-// tinha **16239 bytes** e, com o gate em 20000, passava com um NOTE e exit `0` — o guard nao
-// teria apanhado aquilo para que foi criado. O tamanho de trabalho de uma referencia neste
-// repo e ~12 KB (o `ticket-method.md` vive nos 11958), logo 14000 da margem real e reprova o
-// caso conhecido. Acima de 20000 a mensagem e mais dura; o gate e o mesmo.
-const REF_NOTE_BYTES = 12000;
+// O gate esta a 14000 e nao a 20000 por uma razao medida: o pico historico de uma rule de
+// referencia neste repo e **14259 bytes** (`ticket-method.md`, commit `92b745d`), e com o
+// gate em 20000 passava com um NOTE e exit `0` — o guard nao apanhava aquilo para que foi
+// criado. A 14000 reprova-o por 259 bytes.
+//
+// (Uma versao anterior deste comentario dizia 16239 bytes. Uma leitura independente varreu o
+// historico: esse tamanho nunca existiu num ficheiro commitado. Um numero escrito a mao a
+// justificar um limiar e o `AP1` aplicado a um comentario.)
+//
+// O NOTE esta a 12500 e nao a 12000 porque o tamanho de trabalho de uma referencia aqui e
+// ~12 KB (o `ticket-method.md` vive nos 11958): com o NOTE em 12000 a proxima frase que se
+// acrescentasse a esse ficheiro produzia ruido. Acima de 20000 a mensagem e mais dura; o
+// gate e o mesmo.
+const REF_NOTE_BYTES = 12500;
 const REF_MAX_BYTES = 14000;
 const REF_ABANDONO_BYTES = 20000;
 const CARREGADAS = new Set([...REQUIRED_RULES, ...BOOTSTRAP_RULES]);

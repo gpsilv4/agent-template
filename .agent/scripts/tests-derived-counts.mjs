@@ -127,8 +127,13 @@ test("G12c: metodo ausente da SKIP visivel, nao silencio", (dir) => {
 
 // --- A ancora do 12c: "N fases" nem sempre e o TOTAL -------------------------
 // Sem ancora, o guard mandava reescrever prosa CORRETA — e o caminho de menor resistencia
-// para o agente passava a ser enganar o regex. A frase abaixo e real: esta no
-// `src/docs/ticket-method-why.md`, e so nao disparava porque `src/docs` nao era varrido.
+// para o agente passava a ser enganar o regex.
+//
+// A frase abaixo e inspirada numa real do `src/docs/ticket-method-why.md`, mas **la** ela
+// esta partida em duas linhas ("...que tres" / "fases escalam...") e o guard itera linha a
+// linha, logo nunca disparava — uma versao anterior deste comentario dizia o contrario, e
+// uma leitura independente desmontou-a. O teste tem de a montar numa SO linha, e num
+// ficheiro que o guard ja varria antes, senao nao afirma nada.
 
 test("G12c: \"tres fases escalam\" nao e citacao do total (sem intervalo na linha)", (dir) => {
   // Num ficheiro que o guard JA varria antes desta correcao — senao o teste ficava verde

@@ -98,9 +98,12 @@
 - **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>` — compara
   **contagens** contra a baseline e reprova se a superficie foi enfraquecida.
 
-> **O limite honesto**: e um passo a correr, **nao** uma barreira — nao ha hook a negar a
-> escrita de testes, e quem corre o loop pode simplesmente nao o correr. A autoridade que o
-> agente nao alcanca e o **CI**: um job que falha se a contagem de testes descer face a base.
+> **O limite honesto**, em duas partes. Primeiro: e um passo a correr, **nao** uma barreira —
+> nao ha hook a negar a escrita de testes, e quem corre o loop pode simplesmente nao o correr.
+> A autoridade que o agente nao alcanca e o **CI**: um job que falha se a contagem descer face
+> a base. Segundo: as contagens medem **volume, nao forca**. Manter os casos e trocar as
+> assercoes por triviais (`eq(1, 1)`) nao move nenhuma contagem. O gate fecha o degrau
+> grosseiro — apagar, desativar, esvaziar, estreitar o runner — e nao substitui ler o diff.
 
 ---
 
@@ -119,9 +122,10 @@
   com espaco). Era so a primeira que os testes montavam, e o bug conviveu com a suite verde.
   Grep secundario: `grep -rn 'execFileSync(.*)\.trim()\|}).trim()' .agent .claude` — sinaliza
   **todo** output de comando que se trima, e o revisor confirma se aquele output tem espaco
-  significativo (`git status --porcelain` tem; `symbolic-ref` nao). Medido: apanha os dois
-  sitios do bug **e** um trim legitimo — um falso positivo barato e preferivel a um grep que
-  falha o defeito, que foi o que a primeira versao desta linha fazia.
+  significativo (`git status --porcelain` tem; `symbolic-ref` nao). Quando os dois sitios do
+  bug ainda existiam, apanhava-os; hoje devolve so trims legitimos, e e assim que se espera
+  que devolva. Um falso positivo barato e preferivel a um grep que falha o defeito, que foi o
+  que a primeira versao desta linha fazia.
 
 ---
 
@@ -138,10 +142,13 @@
   verbos inofensivos e finita; a de comandos ofuscados nao e. Onde falhar fechado bloquearia
   trabalho legitimo, a mensagem de negacao diz o que acrescentar a lista.
 - **Detecao em review**: **uma tabela de formas, nao uma leitura da regex.** A cobertura de
-  mutacao deste hook era `2/2 sitios` **antes e depois** de corrigir os 32 defeitos — o numero
-  nao se move, porque mede se cada aviso *existente* e observado, nao se falta algum. O
-  instrumento e a tabela `BYPASSES` em `.claude/hooks/tests/test-hooks.mjs`: cada forma
-  conhecida e um caso, e a tabela cresce quando se encontra outra.
+  mutacao deste hook deu `2/2 sitios` na versao com os defeitos **e** na versao corrigida — o
+  numero nao se move, porque mede se cada aviso *existente* e observado, nao se falta algum.
+  (Medido na mesma sessao, ja com os hooks registados em `PARES`; nao e reproduzivel a partir
+  de um commit anterior a esse registo.) O instrumento e a tabela `BYPASSES` em
+  `.claude/hooks/tests/test-hooks.mjs`: cada forma conhecida e um caso, e a tabela cresce
+  quando se encontra outra — cresceu **22 casos** numa segunda leitura, ja depois de a
+  primeira ter fechado 28.
 
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
