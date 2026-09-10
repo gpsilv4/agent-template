@@ -41,6 +41,14 @@
   (A versao anterior desta entrada trazia o numero de sitios escrito a mao. Envelheceu na
   primeira alteracao ao verificador, e a receita ao lado nunca chegava a esse numero —
   por isso o numero passou a ser derivado por um script.)
+- **A forma mais teimosa: numeros em prosa e em mensagens de commit.** Numa unica sessao o
+  mesmo numero foi escrito errado **quatro vezes** — "9 das 10 suites" (envelheceu ao dividir
+  uma suite), "todas menos uma" (eram 2 de 11), "as 28 formas" (a tabela tinha 47), e
+  "34 -> 48 casos" numa mensagem de commit (eram 47). Uma mensagem de commit e **imutavel**:
+  um numero errado la fica errado para sempre. Regra: **nao escrever contagens que nao se
+  derivaram no momento**. Ou se corre o comando e se cola o resultado, ou se escreve o comando
+  em vez do numero. O que nao envelhece sao os **eventos** ("a leitura encontrou 22 defeitos"),
+  porque descrevem o passado; contagens descrevem o presente, e o presente muda.
 
 ## AP2 — Zero resultados lido como zero problemas
 
