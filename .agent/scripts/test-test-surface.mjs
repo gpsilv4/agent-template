@@ -12,7 +12,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -145,8 +145,9 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
 });
 
 // --- Os globs tem de ver as suites que ESTE repo nomeia pelo prefixo ----------
-// Medido antes da correcao: todas as suites deste repo menos uma eram invisiveis, e apagar
-// todas dava "superficie de teste intacta" com exit 0.
+// Medido antes da correcao: quase todas as suites deste repo eram invisiveis aos globs, e
+// apagar todas dava "superficie de teste intacta" com exit 0. (A fracao exata nao se escreve
+// — foi escrita errada tres vezes; conta-se com `git ls-files`.)
 
 test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
   writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
@@ -317,6 +318,144 @@ test("workflow COM steps de teste continua a ser medido por contagem", (dir) => 
   commit(dir, "apagar um");
   return ref;
 }, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+
+// --- As formas que nao movem nenhuma contagem obvia ---------------------------
+// Achados de uma terceira leitura independente. Todos passavam com exit 0.
+
+test("neutralizar um step do CI com `|| true` e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs || true\n");
+  commit(dir, "neutralizar");
+  return ref;
+}, { code: 1, includes: ["|| true"] });
+
+test("`continue-on-error: true` num step e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        continue-on-error: true\n");
+  commit(dir, "continue-on-error");
+  return ref;
+}, { code: 1, includes: ["continue-on-error"] });
+
+test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
+  // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
+  // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "const failures = [];\nif (failures.length) {\n  process.exit(1);\n}\n");
+  commit(dir, "harness");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "const failures = [];\nif (false) {\n  process.exit(1);\n}\n");
+  commit(dir, "desligar o veredicto");
+  return ref;
+}, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
+
+test("despromover um warn a note num guard e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".agent/scripts/guards"), { recursive: true });
+  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nwarn("b");\n');
+  commit(dir, "guard com dois avisos");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nnote("b");\n');
+  commit(dir, "despromover um");
+  return ref;
+}, { code: 1, includes: ["sitios de aviso: 2 -> 1"] });
+
+// --- O AP2 aplicado ao proprio verificador -----------------------------------
+test("TEST_GLOBS que nao casam nada na baseline REPROVAM, em vez de dizer intacta", (dir) => {
+  const p = join(dir, ".agent/scripts/check-test-surface.mjs");
+  const s = readFileSync(p, "utf8");
+  const i = s.indexOf("const TEST_GLOBS = [");
+  const j = s.indexOf("];", i);
+  writeFileSync(p, s.slice(0, i) + "const TEST_GLOBS = [/__nunca_casa__/" + s.slice(j));
+}, { code: 1, includes: ["nao casam nenhum ficheiro de teste"] });
+
+test("nao consegue medir: arvore da baseline ausente REPROVA", (dir) => {
+  // O commit resolve (`rev-parse --verify` le o objeto commit) mas o `ls-tree` precisa da
+  // ARVORE. Apagar o objeto solto da arvore separa "nao ha superficie" de "nao consegui
+  // ler" — a distincao que o `AP2` exige.
+  const tree = git(dir, ["rev-parse", "HEAD^{tree}"]);
+  rmSync(join(dir, ".git/objects", tree.slice(0, 2), tree.slice(2)), { force: true });
+  return "HEAD";
+}, { code: 1, includes: ["nao conseguiu listar os ficheiros da baseline"] });
+
+// --- `pyproject.toml` traz muito mais que a selecao de testes ----------------
+// Medido: com ele em `CONFIG_GLOBS`, um bump de versao ou de dependencias dava exit 1 em
+// qualquer projeto Python — a mesma classe de falso positivo que ja se removeu para os
+// workflows do `.github/`.
+
+test("pyproject: bump de versao/deps NAO e enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "pyproject.toml"),
+    '[project]\nname = "x"\nversion = "0.1.0"\n\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n');
+  commit(dir, "pyproject");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "pyproject.toml"),
+    '[project]\nname = "x"\nversion = "0.2.0"\ndependencies = ["httpx"]\n\n[tool.pytest.ini_options]\ntestpaths = ["tests"]\n');
+  commit(dir, "bump");
+  return ref;
+}, { code: 0 });
+
+test("pyproject: estreitar o testpaths E enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "pyproject.toml"),
+    '[tool.pytest.ini_options]\ntestpaths = ["tests"]\naddopts = "-ra"\n');
+  commit(dir, "pyproject");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "pyproject.toml"), '[tool.pytest.ini_options]\naddopts = "-ra"\n');
+  commit(dir, "estreitar");
+  return ref;
+}, { code: 1, includes: ["selecao de testes do pytest: 2 -> 1"] });
+
+// --- Os quatro que faltavam da terceira leitura -------------------------------
+
+test("untracked: um config novo que estreita a selecao NAO escapa", (dir) => {
+  // `git diff` nao lista nao-rastreados, logo isto passava sem aviso enquanto nao fosse ao
+  // `git add` — e a afirmacao "compara com a arvore de trabalho" so valia para rastreados.
+  writeFileSync(join(dir, "vitest.config.ts"), 'export default { test: { include: ["tests/so-um.test.js"] } };\n');
+  // de proposito SEM git add
+}, { code: 1, includes: ["vitest.config.ts"] });
+
+test("blob da baseline ausente REPROVA (e nao trata o ficheiro como novo)", (dir) => {
+  // Apagar o objeto do blob: o `git diff` tambem precisa dele para comparar, logo falha
+  // primeiro — e o que se afirma e que o verificador **reprova por nao conseguir medir**, em
+  // vez de tratar o ficheiro como novo e dar exit 0 sobre uma suite esvaziada.
+  const blob = git(dir, ["rev-parse", "HEAD:tests/exemplo.test.js"]);
+  rmSync(join(dir, ".git/objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test("soma", () => { expect(1).toBe(1); });\n');
+  return "HEAD";
+}, { code: 1, includes: ["nao conseguiu listar as alteracoes"] });
+
+test("skipIf do vitest e apanhado (o \\b falhava antes do If)", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test.skipIf(true)("soma", () => { expect(1 + 1).toBe(2); });\n');
+  commit(dir, "skipIf");
+}, { code: 1, includes: ["skipIf"] });
+
+test("tabela `each` esvaziada faz a contagem descer", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test.each([[1], [2]])("caso %i", (n) => { expect(n).toBeTruthy(); });\n');
+  commit(dir, "each com tabela");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test.each([])("caso %i", (n) => { expect(n).toBeTruthy(); });\n');
+  commit(dir, "esvaziar a tabela");
+  return ref;
+}, { code: 1, includes: ["tabelas `each` nao vazias: 1 -> 0"] });
+
+test("apostrofo num comentario nao dessincroniza a contagem", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    "// nota: don't skip isto\ntest(\"a\", () => { expect(1).toBe(1); });\ntest(\"b\", () => { expect(2).toBe(2); });\n");
+  commit(dir, "com comentario");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    "// nota: don't skip isto, e nao mexer\ntest(\"a\", () => { expect(1).toBe(1); });\ntest(\"b\", () => { expect(2).toBe(2); });\n");
+  commit(dir, "editar o comentario");
+  return ref;
+}, { code: 0 });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

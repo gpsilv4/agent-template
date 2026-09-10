@@ -40,13 +40,14 @@ const TEST_GLOBS = [
   /_test\.py$/i,
   /(^|\/)test_[^/]+\.py$/i,
   // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
-  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: **todas as suites
-  // deste repo menos uma** eram invisiveis, e apagar TODAS dava "superficie intacta" com
-  // exit 0 — um gate a afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**, que e como quase todas as
+  // deste repo se chamam. Apagar TODAS dava "superficie intacta" com exit 0 — um gate a
+  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
   //
-  // (A versao anterior desta nota dizia "9 das 10". O numero envelheceu na mesma sessao, ao
-  // dividir-se uma suite em duas — `AP1` aplicado a um comentario. Aqui a fracao nao se
-  // escreve: conta-se com `git ls-files | grep -E 'tests?[-_]'`.)
+  // **A fracao nao se escreve aqui.** Foi escrita tres vezes e esteve errada tres vezes: "9
+  // das 10" envelheceu ao dividir-se uma suite em duas; "todas menos uma" tambem estava
+  // errada (duas eram visiveis, pela pasta `tests/`). Conta-se, nao se cita:
+  //   git ls-files | grep -E '(^|/)tests?[-_][^/]+\.mjs$|(^|/)tests?/[^/]+\.mjs$'
   /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
 // Configuracao **opaca**: mexer nela pode estreitar a selecao de testes de uma forma que
@@ -54,7 +55,11 @@ const TEST_GLOBS = [
 const CONFIG_GLOBS = [
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
-  /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
+  // `pytest.ini`/`tox.ini` sao **so** configuracao de teste: qualquer alteracao merece
+  // confirmacao. O `pyproject.toml` e o `setup.cfg` nao — misturam deps e versao com a
+  // selecao de testes, logo passam para `CONFIG_CONTAVEIS` (um bump de versao dava exit 1
+  // em qualquer projeto Python, medido).
+  /(^|\/)(pytest\.ini|tox\.ini)$/i,
   /(^|\/)\.mocharc\./i,
 ];
 
@@ -71,6 +76,13 @@ const CONFIG_GLOBS = [
 const CONFIG_CONTAVEIS = [
   /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
   /(^|\/)mutation-sweep\.mjs$/,
+  // Os instrumentos de medida tambem: o glob de prefixo exige `test`/`tests` no INICIO do
+  // nome, logo os `check-*.mjs`, os `guards/*.mjs` e o harness ficavam fora da superficie
+  // congelada — e desligar um aviso deles enfraquece a verificacao sem tocar num teste.
+  /(^|\/)check-[^/]+\.mjs$/,
+  /(^|\/)guards\/[^/]+\.mjs$/,
+  /(^|\/)test-harness\.mjs$/,
+  /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
 ];
 
 // O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
@@ -81,8 +93,8 @@ const CONTAGENS = [
   { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
   { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
   { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
-  // O vocabulario DESTE repo. Sem estas tres linhas a contagem de assercoes era **zero em
-  // todas as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
+  // O vocabulario DESTE repo. Sem estas linhas a contagem de assercoes era **zero em todas
+  // as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
   // esvaziar os `includes: [...]` de `test-guards.mjs` passava com `sem marcas de
   // enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que o projeto nao
   // usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
@@ -91,6 +103,9 @@ const CONTAGENS = [
   { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
   { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
   { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
+  // `test.each([...])` com a tabela esvaziada para `[]` mantem o `test(` e nao corre nada —
+  // a mesma forma do `includes: []`. So as tabelas NAO VAZIAS contam.
+  { re: /\.each\s*\(\s*\[[^\]]/, msg: "tabelas `each` nao vazias" },
   // A2: a "configuracao do runner" deste repo conta-se assim.
   // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
@@ -98,14 +113,44 @@ const CONTAGENS = [
   // a outra forma apanhou-o.
   { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
+  // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
+  // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
+  { re: /^\s*(?:testpaths|addopts|python_files|python_classes|python_functions)\s*=/m, msg: "selecao de testes do pytest" },
+  // A forma mais eficaz de enfraquecer TODAS as suites de uma vez nao move nenhuma das
+  // contagens acima: trocar `if (failures.length) {` por `if (false) {` no harness desliga o
+  // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
+  // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
+  // do runner"), que este verificador nao protegia.
+  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))" },
+  // Contar o `process.exit(1)` NAO basta: o ataque medido nao o apaga, torna-o
+  // **inalcancavel** (`if (failures.length) {` -> `if (false) {`), e a contagem nao se move.
+  // O que desaparece e a **referencia a contagem de falhas** — e essa desce.
+  { re: /\b(?:failures|falhas|problemas)\.length/, msg: "referencias a contagem de falhas" },
+  // Os proprios verificadores estao na superficie (ver `CONFIG_CONTAVEIS`): despromover um
+  // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
+  // variante do `AP1` que este repo documenta.
+  { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
 ];
 
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
 // congelada — nunca no codigo de producao, senao um `.skip(offset)` de paginacao ou um
 // `only` de uma query dao falso positivo.
 const MARCAS = [
+  // Neutralizar um step de teste **sem o apagar**: a contagem de steps nao se move e nenhuma
+  // marca de `skip` aparece. Medido: `|| true` num step do `ci.yml` passava com exit 0. As
+  // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
+  { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
+  { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
+  { re: /^\s*if:\s*(?!github\.event_name == 'pull_request')/m, msg: "condicao `if:` acrescentada" },
+  // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
+  // forma canonica de desligar um veredicto sem apagar nada.
+  { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
   { re: /\b(?:it|test|describe|context)\.(?:skip|only|todo)\b/, msg: "seleccao/desativacao de teste" },
   { re: /\b(?:xit|xdescribe|xtest)\b/, msg: "teste desativado (x-prefixo)" },
+  // `skipIf`/`runIf`/`failing` do vitest: o `\b` do padrao acima falha antes do `If`, logo
+  // `it.skipIf(true)` passava. E `concurrent.skip` tem o modificador pelo meio.
+  { re: /\b(?:it|test|describe|context)\.(?:skipIf|runIf|failing)\b/, msg: "desativacao condicional (skipIf/runIf/failing)" },
+  { re: /\b(?:it|test|describe|context)\.(?:concurrent|sequential|extend)\.(?:skip|only|todo)\b/, msg: "skip/only com modificador pelo meio" },
   { re: /@pytest\.mark\.(?:skip|xfail)\b/, msg: "marca pytest de skip/xfail" },
   { re: /\.(?:skip|only)\s*\(\s*\)/, msg: "skip()/only() sem argumento" },
   { re: /\b(?:pytest\.skip|unittest\.skip)\b/, msg: "skip programatico" },
@@ -146,6 +191,7 @@ const fatal = (m, extra) => {
 };
 
 console.log("\n=== Test Surface Check ===\n");
+
 
 // A baseline: argumento explicito, ou a base do branch atual. **Falhar se nao resolver** —
 // um `git` que nao responde nao autoriza um veredicto de "nada mudou".
@@ -192,6 +238,33 @@ try {
 }
 console.log(`  baseline: ${base}\n`);
 
+// A superficie tem de ter existido **na baseline**. Se os `TEST_GLOBS` nao casavam nada la —
+// o estado de um projeto derivado ate alguem seguir o `BOOTSTRAP.md` §2.4 — este verificador
+// imprimia `superficie de teste intacta` e saia `0`, **para sempre**, sobre uma suite apagada.
+// E o `AP2` aplicado a si mesmo, e a unica mitigacao era prosa.
+//
+// Olha para a BASELINE e nao para o disco de proposito: apagar o unico ficheiro de teste
+// deixa o disco sem superficie, mas isso e **enfraquecimento** e tem a sua propria mensagem
+// (`APAGADO`). O que este bloco distingue e "os globs nunca viram nada" — ma configuracao.
+// A primeira versao media o disco e roubava a mensagem ao caso do APAGADO; dois testes
+// existentes apanharam-no.
+{
+  let naBaseline = [];
+  try {
+    naBaseline = git(["ls-tree", "-r", "--name-only", base]).split("\n").filter(Boolean);
+  } catch (err) {
+    fatal(`o git nao conseguiu listar os ficheiros da baseline: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
+  }
+  const superficie = naBaseline.filter((f) => TEST_GLOBS.some((r) => r.test(f)));
+  if (superficie.length === 0) {
+    fatal(
+      `os TEST_GLOBS nao casam nenhum ficheiro de teste em ${base} — nao ha superficie para medir`,
+      "        adaptar TEST_GLOBS a stack deste projeto (ver BOOTSTRAP.md, 'Adaptar o check-test-surface.mjs')"
+    );
+  }
+  console.log(`  superficie na baseline: ${superficie.length} ficheiro(s)\n`);
+}
+
 const eConfigOpaca = (f) => CONFIG_GLOBS.some((r) => r.test(f));
 const naSuperficie = (f) =>
   TEST_GLOBS.some((r) => r.test(f)) || eConfigOpaca(f) || CONFIG_CONTAVEIS.some((r) => r.test(f));
@@ -203,6 +276,11 @@ try {
   // antes de commit" nao media exatamente o que estava a ser commitado. No CI as duas formas
   // coincidem (arvore limpa), logo nao ha perda.
   alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
+  // Os NAO RASTREADOS nao aparecem no `git diff`, logo a afirmacao "compara com a arvore de
+  // trabalho" so valia para caminhos rastreados: um `vitest.config.ts` novo que estreitasse a
+  // selecao passava sem aviso enquanto nao fosse ao `git add`. Uniao com os untracked.
+  const naoRastreados = git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  alterados = [...new Set([...alterados, ...naoRastreados])];
 } catch (err) {
   fatal(`o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
 }
@@ -225,21 +303,50 @@ if (tocados.length === 0) {
     // Os escapes contam: um `\'` dentro de uma string desalinhava um emparelhamento ingenuo
     // e a marca seguinte ficava exposta. Medido na propria suite deste verificador, que tem
     // fixtures com aspas escapadas — o gate sinalizava-a a si mesmo num projeto derivado.
+    // Duas correcoes de uma leitura independente:
+    //   - os COMENTARIOS saem primeiro. Um apostrofo num comentario (`// don't skip`)
+    //     emparelhava com o proximo da linha e apagava o que estivesse pelo meio. E comentar
+    //     um teste **e** enfraquece-lo, logo tira-lo faz a contagem descer, que e o correto.
+    //   - o backtick passa a ser limitado a LINHA (`[^`\\\n]`). Um backtick solitario apagava
+    //     tudo ate ao proximo, atravessando linhas — e neste repo os comentarios sao densos
+    //     em identificadores entre backticks.
+    const semComentarios = (t) => t.replace(/^[ \t]*(?:\/\/|\*\/?|\/\*).*$/gm, "");
     const semStrings = (t) =>
-      t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
+      semComentarios(t).replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\\n]|\\.)*`/g, '""');
     const conta = (texto, re) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
       return (semStrings(texto).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".
+    // M8: distinguir "nao existia na baseline" de "nao consegui ler".
+    //
+    // A versao anterior lia qualquer falha do `git show` como "ficheiro novo". Num clone
+    // parcial (`--filter=blob:none`) ou com o objeto ausente isso corria nas duas direcoes
+    // erradas ao mesmo tempo: `antes = ""` fazia com que nada pudesse **descer** (exit 0
+    // sobre uma suite esvaziada) e, ao mesmo tempo, qualquer `skip` **pre-existente** contava
+    // como acrescentado (falso positivo). E o `AP2`: "nao ha nada" nao e "nao consegui ler".
     let antes = "";
     let existiaAntes = true;
-    try {
-      antes = git(["show", `${base}:${f}`]);
-    } catch {
-      existiaAntes = false; // ficheiro novo desde a baseline: zero marcas antes, e correto
-    }
+    // `ls-tree` e nao `cat-file -e`: o `-e` resolve o caminho **e** verifica o blob, logo
+    // falhava nas duas situacoes e nao as separava. O `ls-tree` le so a arvore — responde
+    // "o caminho existia na baseline?" sem depender de o conteudo estar disponivel.
+    const existeNaBaseline = (() => {
+      try {
+        return git(["ls-tree", "--name-only", base, "--", f]).trim() !== "";
+      } catch {
+        return false;
+      }
+    })();
+    if (existeNaBaseline) antes = git(["show", `${base}:${f}`]);
+    else existiaAntes = false; // ausente da baseline: zero marcas antes, e correto
+    // Sem `try` em volta do `show`, de proposito. Para um ficheiro chegar aqui tem de estar
+    // na lista do `git diff base`, e o diff **ja leu os dois blobs** para os comparar: se o
+    // blob da baseline nao existisse, o diff falhava primeiro e o `fatal` de "nao conseguiu
+    // listar as alteracoes" ja teria disparado. Uma versao anterior punha aqui um `fatal`
+    // proprio para o caso do clone parcial; tentei alcanca-lo com um teste e nao e
+    // alcancavel. Codigo de defesa que nenhum teste pode cobrir e peso morto — e a varredura
+    // de mutacao reprova-o, com razao.
     let agora = "";
     const noDisco = join(ROOT, f);
     if (existsSync(noDisco)) {

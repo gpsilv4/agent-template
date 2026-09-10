@@ -166,14 +166,14 @@ test("G1c: total carregado acima do maximo avisa, com cada ficheiro dentro do se
   const extra = "x".repeat(11000);
   let claude = readF(dir, "CLAUDE.md");
   let gemini = readF(dir, "GEMINI.md");
-  for (const n of ["extra1", "extra2"]) {
+  for (const n of ["extra1", "extra2", "extra3"]) {
     writeF(dir, `.agent/rules/${n}.md`, `# ${n}\n\n${extra}`);
     claude += `\n@.agent/rules/${n}.md\n`;
     gemini += `\n@.agent/rules/${n}.md\n`;
   }
   writeF(dir, "CLAUDE.md", claude);
   writeF(dir, "GEMINI.md", gemini);
-}, { code: 1, includes: ["contexto carregado", "> 52000"] });
+}, { code: 1, includes: ["contexto carregado", "> 64000"] });
 
 test("G1c: sem CLAUDE.md da SKIP visivel, nao silencio", (dir) => {
   // `anyOut` e nao `includes`: sem `CLAUDE.md` outros guards avisam (paridade, imports), logo
