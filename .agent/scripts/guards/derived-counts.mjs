@@ -24,6 +24,10 @@ function ficheirosComProsa(listDir) {
     "AGENTS.md",
     "README.md",
     "CONTRIBUTING.md",
+    // O `BOOTSTRAP.md` entra na lista COMUM: o 12d ja o acrescentava com um `.concat()` a
+    // parte e o 12e nao, logo uma citacao do numero de workflows ali passava. Unificado para
+    // os quatro guards varrerem o mesmo conjunto.
+    ".agent/BOOTSTRAP.md",
   ];
 }
 
@@ -150,7 +154,7 @@ if (metodo) {
 }
 
 
-  // --- 12d: o numero de guards numerados e dado DERIVADO ---
+  // --- Guard 12d: o numero de guards numerados e dado DERIVADO ---
   // Terceira instancia do mesmo padrao (checklist, fases, e agora isto): o `BOOTSTRAP.md`
   // dizia "11 guards numerados" quando existiam 14. O numero era mantido a mao.
   const fontes = [
@@ -161,14 +165,17 @@ if (metodo) {
   for (const f of fontes) {
     const c = read(f);
     if (c === null) continue;
-    for (const m of c.matchAll(/^\/\/ --- Guard (\d+[a-z]?):/gm)) numerados.add(m[1]);
+    // `^\\s*` e `(?:Guard )?`: a versao anterior exigia coluna 0 e a palavra "Guard", logo o
+    // proprio 12d (indentado, escrito `// --- Guard 12d:`) nao se contava, e reindentar um
+    // cabecalho — a limpeza obvia depois do refactor verbatim — derrubava a contagem.
+    for (const m of c.matchAll(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm)) numerados.add(m[1]);
   }
   if (numerados.size === 0) {
     warn("nao encontrei nenhum cabecalho `// --- Guard N:` — os guards mudaram de formato?");
   } else {
     let cit = 0;
     let mal = 0;
-    for (const f of ficheirosComProsa(listDir).concat([".agent/BOOTSTRAP.md"])) {
+    for (const f of ficheirosComProsa(listDir)) {
       const c = read(f);
       if (c === null) continue;
       for (const linha of c.split("\n")) {
@@ -181,7 +188,42 @@ if (metodo) {
         }
       }
     }
-    if (cit > 0 && mal === 0) ok(`${cit} citacao(oes) de "N guards numerados" coerentes com ${numerados.size}`);
+    if (cit === 0) {
+      // Os guards 12b e 12c tem este ramo; o 12d nao tinha, logo apagar a citacao fazia o
+      // guard passar em silencio — sem OK e sem WARN — enquanto `guardsRun` continuava a
+      // contar. Um guard que nao verifica nada tem de o dizer.
+      warn("nenhum ficheiro cita o numero de guards numerados — a referencia desapareceu?");
+    } else if (mal === 0) {
+      ok(`${cit} citacao(oes) de "N guards numerados" coerentes com ${numerados.size}`);
+    }
+  }
+  guardsRun++;
+
+  // --- Guard 12e: o numero de workflows/comandos e dado DERIVADO ---
+  // Quarta instancia do padrao. `11 workflows` e `11 commands` ficaram atras quando o
+  // `/upgrade` fez 12 — e o numero ja estava calculado nos guards 6/7/9, so nao era comparado
+  // com a prosa.
+  const nWorkflows = (listDir(".agent/workflows", ".md") || []).length;
+  if (nWorkflows === 0) {
+    warn("nao encontrei workflows em .agent/workflows — a pasta mudou de sitio?");
+  } else {
+    let cit = 0;
+    let mal = 0;
+    for (const f of ficheirosComProsa(listDir)) {
+      const c = read(f);
+      if (c === null) continue;
+      for (const linha of c.split("\n")) {
+        const m = /(\d+)\s+(workflows|comandos|commands)\b/i.exec(linha);
+        if (!m) continue;
+        cit++;
+        if (Number(m[1]) !== nWorkflows) {
+          warn(`${f} diz "${m[1]} ${m[2]}" mas existem ${nWorkflows} workflows`);
+          mal++;
+        }
+      }
+    }
+    if (cit === 0) warn("nenhum ficheiro cita o numero de workflows — a referencia desapareceu?");
+    else if (mal === 0) ok(`${cit} citacao(oes) de "N workflows/comandos" coerentes com ${nWorkflows}`);
   }
   guardsRun++;
 

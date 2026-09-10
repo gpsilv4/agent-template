@@ -328,7 +328,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 `.claude/` (slash commands, subagents, `settings.json`) is read **only by Claude Code** — other tools ignore it. But **no logic lives there**: each command is a thin wrapper that says *"read and follow `.agent/workflows/<name>.md`"*. The workflows, rules, and context all live in `.agent/`, which **every agent reads**.
 
 - **Claude Code**: `/plan`, `/review`, etc. are typed slash commands; the permission boundary and subagents apply.
-- **Gemini CLI**: the same 11 commands ship as `.gemini/commands/*.toml`.
+- **Gemini CLI**: the same 12 commands ship as `.gemini/commands/*.toml`.
 - **Any other agent**: ask *"run /plan"* or *"follow `.agent/workflows/plan.md`"* — the identical file.
 
 **What you do lose outside Claude Code**, stated plainly rather than waved away:

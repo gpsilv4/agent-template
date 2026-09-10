@@ -61,6 +61,21 @@
   identico ao da raiz) e **num clone com CRLF** (`core.autocrlf=true` em Windows): um patch
   ou regex com `"\n"` literal deixa de casar e o teste passa a nao afirmar nada.
 
+## AP3 — Teste que depende do estado do repo em vez de o montar
+
+- **Origem**: o teste do Guard 13 neste template.
+- **Anti-padrao**: uma assercao que so e verdadeira no estado **atual** do repo, sem a fixture
+  a montar essa condicao. O teste do Guard 13 afirmava que ele **salta**, passando `null` como
+  mutacao — verdade no template nu, onde o ficheiro que dispara o guard nao existe, e **falsa
+  em qualquer projeto derivado**, onde o bootstrap o cria. A suite passava aqui e falhava no
+  primeiro dia de cada consumidor.
+- **Correto**: a fixture **cria ou apaga** aquilo de que a assercao depende. Se o teste precisa
+  que um ficheiro nao exista, apaga-o; se precisa que exista, escreve-o. Nunca herdar do repo.
+- **Detecao em review**: procurar testes com mutacao vazia — `grep -n 'test(.*, null,' <suite>`
+  — e, por cada um, perguntar _"o que e que isto assume sobre o repo?"_. E, sobretudo: correr a
+  suite num **projeto derivado** e nao so no template. Um teste verde num sitio e vermelho no
+  outro nao esta a afirmar o que diz.
+
 > Esta entrada vem do template. Aplica-se a qualquer projeto que escreva testes de
 > verificadores; se o teu projeto nao tiver nenhum, podes substitui-la pela primeira que
 > um bug teu revelar.

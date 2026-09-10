@@ -21,10 +21,13 @@
 // `.agent/BOOTSTRAP.md` e `README.md` DOCUMENTAM os placeholders — citam-nos por design.
 const DOCUMENTAM = new Set([".agent/BOOTSTRAP.md", "README.md"]);
 
-// Falsos positivos que nao sao placeholders do template:
-//   `${{ ... }}`  expressoes do GitHub Actions
-//   `{{args}}`    argumentos dos command templates do Gemini
-const FALSOS = /\$\{\{[^}]*\}\}|\{\{args\}\}/g;
+// Falsos positivos: expressoes do GitHub Actions, `${{ ... }}`. O caso que importa e
+// `${{VAR}}` — maiusculas, sem espacos e sem ponto — porque e o unico que o padrao de
+// placeholder abaixo tambem casaria. Formas como `${{ secrets.TOKEN }}` nunca casariam
+// (tem ponto e espacos), logo nao dependem desta constante.
+// A alternativa `{{args}}` dos command templates do Gemini foi removida por ser morta:
+// `PLACEHOLDER` so casa `[A-Z_]+` e `args` e minusculo.
+const FALSOS = /\$\{\{[^}]*\}\}/g;
 
 const PLACEHOLDER = /\{\{([A-Z_]+)\}\}/g;
 
@@ -47,6 +50,11 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir }) {
     "LICENSE",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
+    // Estes dois entram nos alvos DE PROPOSITO: sem eles na lista, o filtro `DOCUMENTAM`
+    // nunca corria (0 execucoes em 146 testes) e o teste que dizia cobri-lo passava porque
+    // os ficheiros nunca eram lidos — AP1. Agora o filtro e que os exclui, e isso e testavel.
+    ".agent/BOOTSTRAP.md",
+    "README.md",
     // Pontos de entrada que o Copilot e o Cursor carregam. Nao estavam aqui quando foram
     // criados, logo um placeholder esquecido neles passava — e sao os primeiros ficheiros
     // que essas ferramentas leem.

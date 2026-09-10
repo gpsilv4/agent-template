@@ -60,6 +60,10 @@ const FIXTURE_PATHS = [
   ".cursor/rules",
   ".github/copilot-instructions.md",
   ".gemini/commands",
+  // O `README.md` e um dos `LIVING_DOCS` do Guard 4. Sem ele na fixture, o guard emitia um
+  // skip de "ficheiro nao encontrado" a cada corrida e nunca varria um dos seis ficheiros
+  // que promete varrer.
+  "README.md",
   "CLAUDE.md",
   "GEMINI.md",
   "AGENTS.md",
@@ -170,8 +174,19 @@ function test(name, mutate, expect) {
     for (const s of expect.anyOut ?? []) {
       if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
     }
+    // `excludes` tambem tem de ser DIFERENCIAL, pela mesma razao que o `includes`: era
+    // testado contra o output absoluto, logo um WARN de baseline sem relacao nenhuma —
+    // por exemplo o orcamento de bytes num projeto que acrescentou regras de dominio as
+    // rules, que e o uso normal — fazia falhar testes de CRLF e de placeholders, apontando
+    // o diagnostico para o sitio errado. Uma linha que ja estava no baseline nao e culpa
+    // desta mutacao.
     for (const s of [...(expect.excludes ?? []), ...(extra.excludes ?? [])]) {
-      if (out.includes(s)) problems.push(`output NAO devia conter "${s}"`);
+      if (!out.includes(s)) continue;
+      const novaOcorrencia = out
+        .split("\n")
+        .filter((l) => l.includes(s))
+        .some((l) => !base.has(chaveWarn(l)));
+      if (novaOcorrencia) problems.push(`output NAO devia conter "${s}" (ocorrencia nova, nao de baseline)`);
     }
     if (problems.length) {
       failures.push({ name, problems, out });
@@ -225,6 +240,15 @@ function syntheticSandbox() {
   for (const r of ["core-rules", "process-rules", "anti-patterns"]) {
     w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n`);
   }
+  // O `BOOTSTRAP.md` da fixture cita as contagens que os guards 12d/12e recalculam. Os
+  // numeros sao DERIVADOS do que esta fixture acabou de copiar/escrever — fixa-los aqui
+  // envelheceria a cada guard ou workflow novo, que e o defeito que esses guards existem
+  // para apanhar.
+  const nGuards = new Set(
+    [GUARD, ...(existsSync(join(ROOT, GUARD_MODULES)) ? readdirSync(join(ROOT, GUARD_MODULES)).map((f) => `${GUARD_MODULES}/${f}`) : [])]
+      .flatMap((f) => [...readFileSync(join(ROOT, f), "utf8").matchAll(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm)].map((m) => m[1]))
+  ).size;
+  w(".agent/BOOTSTRAP.md", `# Bootstrap\n\nO checker corre ${nGuards} guards numerados.\nO template traz 1 workflows.\n`);
   w(".agent/workflows/plan.md", "# /plan\n");
   w(".claude/commands/plan.md", "---\ndescription: x\n---\n\nLer `.agent/workflows/plan.md`.\n");
   w(".gemini/commands/plan.toml", 'description = "x"\nprompt = "Le .agent/workflows/plan.md"\n');
@@ -269,8 +293,18 @@ console.log("\n=== Testes dos Doc Guards ===\n");
 // saltar testes quando nao esta), captura-se o conjunto de WARN do baseline UMA vez e
 // tudo se afirma por diferenca. Assim os 64 testes correm sempre e o veredicto e sobre
 // o guard, nao sobre o estado do repo.
+/** Chave de comparacao de um aviso, com os NUMEROS normalizados.
+ *
+ *  Sem isto, a comparacao diferencial era fragil a qualquer mensagem que carregue um numero:
+ *  um teste que acrescenta bytes a uma rule muda o aviso do orcamento de `= 12868 bytes` para
+ *  `= 12915 bytes`, e o texto exato deixava de casar o baseline — o aviso aparecia como NOVO e
+ *  o teste falhava a apontar para o sitio errado (foi o que quebrou quatro testes de CRLF e de
+ *  placeholders num projeto com rules maiores, que e o uso normal).
+ *
+ *  O que se quer saber e se apareceu um aviso de tipo NOVO, nao se um numero mudou de valor. */
+const chaveWarn = (l) => l.trim().replace(/\d+/g, "N");
 const warnsOf = (out) =>
-  new Set(out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).map((l) => l.trim()));
+  new Set(out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).map(chaveWarn));
 let baselineWarns;
 let syntheticBaselineWarns;
 {

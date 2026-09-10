@@ -100,9 +100,14 @@ test("cwd: [controlo negativo] com ROOT = cwd, o guard TEM de falhar", (dir) => 
 });
 
 // --- Guard 1: orcamento de bytes e rules obrigatorias -------------------------
+// `synthetic: true`: a fixture sintetica escreve rules minimas, logo o aviso de orcamento e
+// genuinamente NOVO. Com a copia do repo, um projeto derivado cujas rules ja excedam o limite
+// — o `core-rules.md` do template esta a 11507 de 12000 e o template manda-lhe acrescentar
+// regras de dominio — ja tem esse aviso no baseline, e a assercao diferencial (corretamente)
+// nao ve nada de novo. O teste falhava sem que nada estivesse errado.
 test("G1: rule acima do maximo de bytes avisa", (dir) => {
-  appendFileSync(file(dir, ".agent/rules/core-rules.md"), "x".repeat(5000));
-}, { code: 1, includes: ["core-rules.md", "bytes >"] });
+  appendFileSync(file(dir, ".agent/rules/core-rules.md"), "x".repeat(15000));
+}, { code: 1, synthetic: true, includes: ["core-rules.md", "bytes >"] });
 
 test("G1: rule obrigatoria ausente avisa (nao passa em silencio)", (dir) => {
   rmSync(file(dir, ".agent/rules/anti-patterns.md"));
@@ -185,9 +190,17 @@ test("G4: termo banido e apanhado em TODOS os ficheiros, nao so no primeiro", (d
   writeF(dir, GUARD, g);
 }, { code: 1, includes: ["CLAUDE.md:", "GEMINI.md:", "termo de teste"] });
 
-test("G4: lista BANNED vazia da SKIP visivel", null, {
+// A fixture ESVAZIA o `BANNED`, em vez de assumir que o repo o tem vazio: um projeto
+// derivado que use a feature (e ela existe para isso) tornava esta pre-condicao falsa — AP3.
+test("G4: lista BANNED vazia da SKIP visivel", (dir) => {
+  const g = readF(dir, GUARD).replace(/const BANNED = \[[\s\S]*?\];/, "const BANNED = [];");
+  if (g === readF(dir, GUARD)) throw new Error("nao encontrei o array BANNED no GUARD");
+  writeF(dir, GUARD, g);
+}, {
   code: 0,
-  includes: ["SKIP  Guard 4"],
+  // A mensagem INTEIRA, e nao o prefixo `SKIP  Guard 4`: o guard tem um segundo skip
+  // ("Guard 4 em <ficheiro> — ficheiro nao encontrado") que satisfazia a assercao sozinho.
+  includes: ["SKIP  Guard 4 (termos banidos) — lista BANNED vazia"],
 });
 
 // --- Guard 5: .nvmrc ----------------------------------------------------------

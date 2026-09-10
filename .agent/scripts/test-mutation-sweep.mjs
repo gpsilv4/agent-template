@@ -53,7 +53,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU");
 console.log("ok");
 `;
 
-function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false } = {}) {
+function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -73,6 +73,11 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
     );
   }
   if (!semAlvo) writeFileSync(join(dir, ".agent/scripts/fake-check.mjs"), check);
+  if (verificadorSemPar) {
+    // Nome que casa a convencao `check-*.mjs` e ausente de `PARES`: e o cenario de alguem
+    // acrescentar um verificador ao repo e esquecer o registo.
+    writeFileSync(join(dir, ".agent/scripts/check-orfao.mjs"), 'const warn=(m)=>console.log(m);\nif(process.env.X)warn("a");\n');
+  }
 
   writeFileSync(
     join(dir, ".agent/scripts/fake-test.mjs"),
@@ -200,6 +205,21 @@ test("dois avisos na mesma linha reprovam em vez de herdar cobertura",
   includes: ["LINHA AMBIGUA", "2 avisos na mesma linha", "separa-los para cada um ser medido"],
   // Sem INCOMPLETA no output, a LINHA AMBIGUA e a unica coisa que pode fazer o exit != 0.
   excludes: ["Cobertura de mutacao completa", "INCOMPLETA  .agent"],
+});
+
+// --- Verificador no disco e ausente de PARES (achado da Fase 4) --------------
+// A documentacao afirmava, em quatro sitios, que a varredura reprovava um verificador sem
+// suite. Nao reprovava: o ramo `SEM SUITE` so dispara para uma entrada de `PARES` com
+// `suite` nula, o que exige que alguem a tenha acrescentado. Um `check-*.mjs` novo entrava
+// no repo sem rede e a prosa garantia o contrario.
+test("verificador no disco e ausente de PARES reprova", { verificadorSemPar: true }, ["--list"], {
+  code: 1,
+  includes: ["SEM PAR", "check-orfao.mjs", "sem rede nenhuma"],
+});
+
+test("com todos os verificadores registados, nao ha SEM PAR", {}, ["--list"], {
+  code: 0,
+  excludes: ["SEM PAR"],
 });
 
 // --- Contratos que nao se podem perder ---------------------------------------

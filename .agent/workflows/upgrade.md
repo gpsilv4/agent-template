@@ -20,6 +20,10 @@ nenhum. Apresentar sempre: o que se traz, o que se ignora, e o diff de tudo o qu
 cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 ```
 
+> **E preciso um clone local do template.** Os comandos abaixo usam `git -C "$TPL"` ou
+> `cd "$TPL"`, que exigem um **diretorio** — uma URL falha com `cannot change to '...'`. Se so
+> tiveres a URL: `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
+
 Isto decide o modo. Os dois sao validos; o segundo e o normal em projetos criados antes de a
 marca existir.
 
@@ -28,10 +32,13 @@ marca existir.
 O ficheiro traz o commit do template de onde este projeto nasceu (ou da ultima atualizacao).
 
 ```bash
-TPL=<caminho-ou-url-do-template>
+TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 SHA=$(grep -oE '\b[0-9a-f]{7,40}\b' .agent/.template-version | head -1)
-git -C "$TPL" log --oneline "$SHA"..main          # o que mudou desde entao
-git -C "$TPL" diff --stat "$SHA"..main            # e em que ficheiros
+# Sem baseline NAO se faz diff — cai-se no Modo B em vez de comparar contra `HEAD` por acidente.
+: "${SHA:?marca ilegivel — usar o Modo B}"
+BR=$(git -C "$TPL" symbolic-ref --short HEAD)
+git -C "$TPL" log --oneline "$SHA".."$BR"          # o que mudou desde entao
+git -C "$TPL" diff --stat "$SHA".."$BR"            # e em que ficheiros
 ```
 
 Trabalhar **so** sobre esses ficheiros. E o modo preciso: nao propoe nada que o projeto ja
@@ -46,7 +53,7 @@ Em vez disso, **detetar capacidades**: por cada coisa que o template tem, verifi
 projeto a tem, e so entao propor. Perguntas em vez de diffs:
 
 ```bash
-TPL=<caminho-ou-url-do-template>
+TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 # 1. Que ficheiros o template tem que este projeto nao tem?
 (cd "$TPL" && git ls-files) | while read -r f; do [ -e "$f" ] || echo "AUSENTE: $f"; done
 # 2. Que scripts de verificacao existem em cada lado?
@@ -63,7 +70,7 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 | Categoria | O que fazer | Porque |
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
-| `.agent/scripts/*.mjs` | Copia limpa, **preservando** as constantes de configuracao deste projeto (`TARGETS` no bundle checker, `CHECKS` e `BANNED` nos doc guards) e substituindo os placeholders | Os verificadores sao genericos; so a configuracao e do projeto |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`) | Copia limpa, **preservando** as constantes deste projeto: `TARGETS` em `check-bundle-sizes.mjs`, `BANNED` em `check-doc-versions.mjs` e `CHECKS` em **`guards/versions.mjs`** — mudou de ficheiro quando os guards foram divididos, e um glob `*.mjs` sem `**` nao o apanha. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
 | `.agent/rules/` acumuladas (`anti-patterns`) | **Acrescentar** entradas novas; nunca substituir o ficheiro | O projeto tem anti-padroes proprios, derivados dos seus bugs |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Se o projeto nao as customizou, copia; se customizou, integrar a mao | Misturam regra generica com decisoes do projeto |
@@ -71,6 +78,10 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao do projeto; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
 | `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`). Nao substituir o CI do projeto | O CI do projeto pode ter passos proprios |
 | `.claude/settings.json` | Trazer regras de `deny`/`ask` novas; **acrescentar** ao `allow` os scripts novos | O `allow` do projeto reflete o que ele corre |
+| `.claude/agents/*` | Copia se ausentes. **Sao load-bearing**: a Fase 4 exige o subagente `code-reviewer` | Sem eles a Fase 4 nao corre no Claude Code |
+| `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
+| `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template deve espelhar o `/review` deste projeto | Governance: metade e do projeto |
+| **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
@@ -95,11 +106,16 @@ ser identico. E, se alguem no projeto trabalha em Windows, confirmar num clone c
 ## 4. Gravar o novo ponto de partida
 
 ```bash
-TPL=<caminho-ou-url-do-template>
+TPL=<caminho-para-um-CLONE-LOCAL-do-template>
+# `--verify ...^{commit}` e obrigatorio: sem ele, `rev-parse main` num template cujo branch
+# principal se chame `master` IMPRIME a palavra "main" e grava uma marca invalida. O upgrade
+# seguinte extrai um SHA vazio, o `git log ""..main` vira `HEAD..main` (vazio) e o workflow
+# reporta "nada a trazer" — falha silenciosa, na direcao perigosa.
+BR=$(git -C "$TPL" symbolic-ref --short HEAD)                # nao assumir `main`
+SHA=$(git -C "$TPL" rev-parse --verify "$BR^{commit}") || { echo "FALHOU: sem commit em $BR"; exit 1; }
 printf 'template: %s\ncommit: %s\ndata: %s\n' \
   "$(git -C "$TPL" remote get-url origin 2>/dev/null || echo "$TPL")" \
-  "$(git -C "$TPL" rev-parse main)" \
-  "$(date +%F)" > .agent/.template-version
+  "$SHA" "$(date +%F)" > .agent/.template-version
 ```
 
 Sem isto, o proximo `/upgrade` cai outra vez no Modo B. **E o unico passo que torna o
