@@ -40,22 +40,37 @@ const TEST_GLOBS = [
   /_test\.py$/i,
   /(^|\/)test_[^/]+\.py$/i,
   // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
-  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: 9 das 10 suites deste
-  // repo eram invisiveis, e apagar TODAS dava "superficie intacta" com exit 0 — um gate a
-  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: **todas as suites
+  // deste repo menos uma** eram invisiveis, e apagar TODAS dava "superficie intacta" com
+  // exit 0 — um gate a afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  //
+  // (A versao anterior desta nota dizia "9 das 10". O numero envelheceu na mesma sessao, ao
+  // dividir-se uma suite em duas — `AP1` aplicado a um comentario. Aqui a fracao nao se
+  // escreve: conta-se com `git ls-files | grep -E 'tests?[-_]'`.)
   /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
+// Configuracao **opaca**: mexer nela pode estreitar a selecao de testes de uma forma que
+// nenhuma contagem apanha, logo qualquer alteracao pede confirmacao humana.
 const CONFIG_GLOBS = [
-  // O que seleciona os testes NESTE repo nao e um `vitest.config`: e a lista de steps do
-  // `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step do CI desliga uma
-  // suite inteira sem tocar em nenhum ficheiro de teste — e o invariante 2 do `AP4`, que o
-  // cabecalho deste ficheiro cita e nao cumpria.
-  /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
-  /(^|\/)mutation-sweep\.mjs$/,
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
   /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
   /(^|\/)\.mocharc\./i,
+];
+
+// Configuracao **contavel**: o que seleciona os testes NESTE repo nao e um `vitest.config`,
+// e a lista de steps do `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step
+// do CI desliga uma suite inteira sem tocar em nenhum ficheiro de teste (invariante 2 do
+// `AP4`). Estes entram na superficie mas **nunca** dao o aviso generico de "confirmar": o que
+// deles interessa mede-se por contagem.
+//
+// A separacao nao e cosmetica. Na primeira versao estavam em `CONFIG_GLOBS` e qualquer
+// alteracao a QUALQUER workflow do `.github/` — `dependabot-auto-merge.yml`, `e2e.yml`, que
+// nao correm teste nenhum — dava WARN e exit 1. Medido num projeto derivado: dois falsos
+// positivos que fechavam o gate.
+const CONFIG_CONTAVEIS = [
+  /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
+  /(^|\/)mutation-sweep\.mjs$/,
 ];
 
 // O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
@@ -67,9 +82,10 @@ const CONTAGENS = [
   { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
   { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
   // O vocabulario DESTE repo. Sem estas tres linhas a contagem de assercoes era **zero em
-  // 10 das 10 suites**, e esvaziar os 55 `includes: [...]` de `test-guards.mjs` passava com
-  // `sem marcas de enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que
-  // o projeto nao usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
+  // todas as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
+  // esvaziar os `includes: [...]` de `test-guards.mjs` passava com `sem marcas de
+  // enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que o projeto nao
+  // usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
   // `\[[^\]]` e nao `\[`: o ataque medido foi trocar `includes: ["x"]` por `includes: []`,
   // que mantem o `includes: [` e portanto a contagem. So os arrays NAO VAZIOS contam.
   { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
@@ -176,7 +192,9 @@ try {
 }
 console.log(`  baseline: ${base}\n`);
 
-const naSuperficie = (f) => TEST_GLOBS.some((r) => r.test(f)) || CONFIG_GLOBS.some((r) => r.test(f));
+const eConfigOpaca = (f) => CONFIG_GLOBS.some((r) => r.test(f));
+const naSuperficie = (f) =>
+  TEST_GLOBS.some((r) => r.test(f)) || eConfigOpaca(f) || CONFIG_CONTAVEIS.some((r) => r.test(f));
 
 let alterados;
 try {
@@ -194,7 +212,7 @@ if (tocados.length === 0) {
   ok(`superficie de teste intacta (${alterados.length} ficheiro(s) alterado(s), nenhum na superficie)`);
 } else {
   for (const f of tocados) {
-    const config = CONFIG_GLOBS.some((r) => r.test(f));
+    const config = eConfigOpaca(f);
     // Comparar a CONTAGEM de cada marca entre a baseline e agora, e nao as linhas do diff.
     // Com `--unified=0`, EDITAR uma linha que ja tinha um `skip` aparece como linha
     // acrescentada — e dava falso positivo em qualquer alteracao a um teste ja desativado.

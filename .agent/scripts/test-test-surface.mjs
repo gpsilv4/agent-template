@@ -145,8 +145,8 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
 });
 
 // --- Os globs tem de ver as suites que ESTE repo nomeia pelo prefixo ----------
-// Medido antes da correcao: 9 das 10 suites deste repo eram invisiveis, e apagar todas
-// dava "superficie de teste intacta" com exit 0.
+// Medido antes da correcao: todas as suites deste repo menos uma eram invisiveis, e apagar
+// todas dava "superficie de teste intacta" com exit 0.
 
 test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
   writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
@@ -291,6 +291,32 @@ test("nao consegue medir: detached HEAD diz o que se passa, nao culpa a baseline
   git(dir, ["checkout", "-q", "--detach", "HEAD"]);
   return ""; // sem baseline: e a auto-deteccao que tem de explicar-se
 }, { code: 1, includes: ["detached"] });
+
+// --- Um workflow que nao corre testes nao e configuracao de runner -----------
+// Medido num projeto derivado: com todos os `.github/workflows/*.yml` em `CONFIG_GLOBS`,
+// mexer no `dependabot-auto-merge.yml` ou no `e2e.yml` dava WARN e exit 1. Dois falsos
+// positivos a fechar o gate por ficheiros que nao selecionam teste nenhum.
+
+test("workflow do CI sem steps de teste nao pede confirmacao", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/deploy.yml"), "jobs:\n  d:\n    steps:\n      - run: echo deploy\n");
+  commit(dir, "workflow sem testes");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/deploy.yml"), "jobs:\n  d:\n    steps:\n      - run: echo outra coisa\n");
+  commit(dir, "mexer nele");
+  return ref;
+}, { code: 0 });
+
+test("workflow COM steps de teste continua a ser medido por contagem", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n      - run: node b-test.mjs\n");
+  commit(dir, "ci com dois steps");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "apagar um");
+  return ref;
+}, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
