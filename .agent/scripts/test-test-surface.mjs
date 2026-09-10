@@ -42,8 +42,12 @@ function commit(dir, msg) {
 }
 
 function corre(dir, base) {
+  // `base` vazio => corre SEM argumento, que e o unico modo em que a auto-deteccao da
+  // baseline esta sob teste. Antes, um `mutate` que devolvesse `null` caia no `?? base` do
+  // harness e o teste passava com a baseline explicita — verde sem afirmar nada.
+  const args = [join(dir, ".agent/scripts/check-test-surface.mjs"), ...(base ? [base] : [])];
   try {
-    return { code: 0, out: execFileSync("node", [join(dir, ".agent/scripts/check-test-surface.mjs"), base], { cwd: dir, encoding: "utf8" }) };
+    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8" }) };
   } catch (err) {
     return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -139,6 +143,154 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
   includes: ["nao resolve"],
   excludes: ["Superficie de teste nao enfraquecida"],
 });
+
+// --- Os globs tem de ver as suites que ESTE repo nomeia pelo prefixo ----------
+// Medido antes da correcao: 9 das 10 suites deste repo eram invisiveis, e apagar todas
+// dava "superficie de teste intacta" com exit 0.
+
+test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
+  writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  commit(dir, "add suite com nome de prefixo");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, ".agent/scripts/test-guards.mjs"));
+  return ref;
+}, { code: 1, includes: ["test-guards.mjs", "APAGADO"] });
+
+test("glob: suite nomeada tests-x.mjs (plural) tambem", (dir) => {
+  writeFileSync(join(dir, ".agent/scripts/tests-settings.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  commit(dir, "add suite plural");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, ".agent/scripts/tests-settings.mjs"));
+  return ref;
+}, { code: 1, includes: ["tests-settings.mjs", "APAGADO"] });
+
+// --- Esvaziar nao deixa marca de `skip` para tras (invariante 5 do AP4) -------
+
+test("contagem: casos de teste apagados sem nenhuma marca reprovam", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"), "// suite esvaziada, sem skip nenhum\n");
+  commit(dir, "esvaziar");
+}, { code: 1, includes: ["casos de teste: 1 -> 0", "assercoes (expect/assert): 1 -> 0"] });
+
+test("contagem: acrescentar testes NAO e enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", () => { expect(1).toBe(1); });\ntest("b", () => { expect(2).toBe(2); });\n');
+  commit(dir, "mais testes");
+}, { code: 0 });
+
+// --- Medir a arvore de trabalho: "correr antes de commit" tem de medir algo ---
+// Com `${base}..HEAD` o verificador ignorava tudo o que nao estivesse commitado, ou seja
+// exatamente o que se estava a preparar para commitar.
+
+test("arvore: enfraquecer SEM commitar e detetado", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  // de proposito sem commit
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+test("arvore: apagar um teste SEM commitar e detetado", (dir) => {
+  rmSync(join(dir, "tests/exemplo.test.js"));
+  // de proposito sem commit
+}, { code: 1, includes: ["APAGADO"] });
+
+// --- O dia 1 de um projeto DERIVADO ------------------------------------------
+// Um clone tem o branch de trabalho e `origin/main`, mas nao `main` LOCAL. Sem os candidatos
+// remote-tracking o verificador nao conseguia medir e saia `!= 0` em todo o projeto derivado
+// — verde no template, vermelho no consumidor. E o `AP3`.
+
+test("derivado: sem main LOCAL mas com origin/main, consegue medir", (dir) => {
+  // Simular um clone: renomear o branch e criar o ref remoto a apontar para a baseline.
+  const sha = git(dir, ["rev-parse", "HEAD"]);
+  git(dir, ["branch", "-m", "main", "fix/algo"]);
+  git(dir, ["update-ref", "refs/remotes/origin/main", sha]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  commit(dir, "enfraquecer");
+  return ""; // string vazia => corre SEM argumento: e a auto-deteccao que esta sob teste
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+// --- Uma marca dentro de aspas e dados, nao uma diretiva ---------------------
+// Medido num projeto derivado: a suite DESTE verificador tem `test.skip(...)` dentro de
+// fixtures, e o gate sinalizava-a a si propria — exit 1 em trabalho legitimo.
+
+test("marca dentro de uma STRING nao e enfraquecimento", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("soma", () => { expect(1 + 1).toBe(2); });\n' +
+    'test("fixture", () => { const fonte = \'test.skip("x", () => {});\'; expect(fonte).toBeTruthy(); });\n');
+  commit(dir, "fixture com a marca em string");
+}, { code: 0 });
+
+test("marca FORA das aspas continua a ser apanhada", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test.skip("soma", () => { expect(1 + 1).toBe(2); });\n');
+  commit(dir, "skip a serio");
+}, { code: 1, includes: ["seleccao/desativacao de teste"] });
+
+test("marca depois de aspas ESCAPADAS nao e enfraquecimento", (dir) => {
+  // Um `\\"` dentro de uma string desalinha um emparelhamento ingenuo e expoe a marca
+  // seguinte. Foi assim que a suite deste verificador se sinalizou a si mesma.
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("soma", () => { expect(1).toBe(1); });\n' +
+    'const doc = "escreve \\"test.skip(\\" para desativar";\n');
+  commit(dir, "fixture com aspas escapadas");
+}, { code: 0 });
+
+// --- "Nao consegui medir" tem de REPROVAR, nao dar OK ------------------------
+// A varredura de mutacao apontou estes dois sitios como descobertos: um verificador que nao
+// sabe responder e o caso mais perigoso, porque o exit 0 parece uma aprovacao.
+
+test("nao consegue medir: sem branch principal nem origin/ REPROVA", (dir) => {
+  git(dir, ["branch", "-m", "main", "trabalho"]);
+  return ""; // corre sem baseline: e a auto-deteccao que falha
+}, { code: 1, includes: ["nao encontrei um branch principal"] });
+
+test("nao consegue medir: index corrompido REPROVA em vez de dar OK", (dir, base) => {
+  // O `rev-parse` nao le o index, logo a baseline resolve; o `git diff` le, e falha. E a
+  // unica forma deterministica de separar "a baseline nao resolve" de "nao consigo listar".
+  writeFileSync(join(dir, ".git/index"), "isto nao e um index valido");
+  return base;
+}, { code: 1, includes: ["nao conseguiu listar as alteracoes"] });
+
+// --- O vocabulario de assercao DESTE repo, e a configuracao que o seleciona --------
+// Duas provas de uma segunda leitura independente. A primeira era o defeito mais caro: a
+// contagem de assercoes media `expect(`/`assert(`, que aparecem **zero vezes** nas 10 suites
+// deste repo, logo esvaziar 55 `includes: [...]` passava com exit 0.
+
+test("assercao: esvaziar um includes: [...] faz a contagem descer", (dir) => {
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", null, { code: 1, includes: ["x"] });\ntest("b", null, { code: 1, includes: ["y"] });\n');
+  commit(dir, "suite com assercoes em dados");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "tests/exemplo.test.js"),
+    'test("a", null, { code: 1, includes: [] });\ntest("b", null, { code: 1, includes: [] });\n');
+  commit(dir, "esvaziar as assercoes");
+  return ref;
+}, { code: 1, includes: ["assercoes (includes/excludes): 2 -> 0"] });
+
+test("config: apagar um step de teste do CI faz a contagem descer", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n      - run: node b-test.mjs\n");
+  commit(dir, "ci com dois steps");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "apagar um step");
+  return ref;
+}, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+
+test("config: apagar um par da varredura faz a contagem descer", (dir) => {
+  mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
+  writeFileSync(join(dir, ".agent/scripts/mutation-sweep.mjs"),
+    'const PARES = [\n  { alvo: "a.mjs" },\n  { alvo: "b.mjs" },\n];\n');
+  commit(dir, "dois pares");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/mutation-sweep.mjs"), 'const PARES = [\n  { alvo: "a.mjs" },\n];\n');
+  commit(dir, "um par");
+  return ref;
+}, { code: 1, includes: ["pares alvo/suite da varredura: 2 -> 1"] });
+
+test("nao consegue medir: detached HEAD diz o que se passa, nao culpa a baseline", (dir) => {
+  git(dir, ["checkout", "-q", "--detach", "HEAD"]);
+  return ""; // sem baseline: e a auto-deteccao que tem de explicar-se
+}, { code: 1, includes: ["detached"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

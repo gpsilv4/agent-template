@@ -12,7 +12,7 @@
  *
  * O QUE ISTO E E O QUE NAO E: e uma verificacao **universal** — so precisa de `node` e `git`,
  * logo qualquer agente a corre e o CI corre-a para todos. No Claude Code existe tambem um
- * hook que **nega a escrita antes de acontecer** (`.claude/hooks/guard-test-surface.mjs`);
+ * passo a correr — **nao** existe hook a negar a escrita de testes;
  * noutras ferramentas isto e o equivalente que se corre.
  *
  * Uso:
@@ -24,8 +24,9 @@
  */
 
 import { execFileSync } from "child_process";
+import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
-import { dirname, resolve } from "path";
+import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -38,12 +39,49 @@ const TEST_GLOBS = [
   /\.(test|spec)\.[cm]?[jt]sx?$/i,
   /_test\.py$/i,
   /(^|\/)test_[^/]+\.py$/i,
+  // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
+  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**. Medido: 9 das 10 suites deste
+  // repo eram invisiveis, e apagar TODAS dava "superficie intacta" com exit 0 — um gate a
+  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
 const CONFIG_GLOBS = [
+  // O que seleciona os testes NESTE repo nao e um `vitest.config`: e a lista de steps do
+  // `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step do CI desliga uma
+  // suite inteira sem tocar em nenhum ficheiro de teste — e o invariante 2 do `AP4`, que o
+  // cabecalho deste ficheiro cita e nao cumpria.
+  /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
+  /(^|\/)mutation-sweep\.mjs$/,
   /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
   /(^|\/)(conftest|factories)\.py$/i,
   /(^|\/)(pytest\.ini|tox\.ini|setup\.cfg|pyproject\.toml)$/i,
   /(^|\/)\.mocharc\./i,
+];
+
+// O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
+// deixar nenhuma marca de `skip` para trás. Sem isto, cortar uma suite de 328 para 62 linhas
+// passava com exit 0. Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que
+// os nomes contados sejam os que o projeto **usa** para declarar um teste e uma assercao.
+const CONTAGENS = [
+  { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
+  { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
+  { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
+  // O vocabulario DESTE repo. Sem estas tres linhas a contagem de assercoes era **zero em
+  // 10 das 10 suites**, e esvaziar os 55 `includes: [...]` de `test-guards.mjs` passava com
+  // `sem marcas de enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que
+  // o projeto nao usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
+  // `\[[^\]]` e nao `\[`: o ataque medido foi trocar `includes: ["x"]` por `includes: []`,
+  // que mantem o `includes: [` e portanto a contagem. So os arrays NAO VAZIOS contam.
+  { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
+  { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
+  { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
+  // A2: a "configuracao do runner" deste repo conta-se assim.
+  // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
+  // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
+  // forma YAML/JS equivalente (`- run:` inline, `{ alvo: ... }` na mesma linha). Um teste com
+  // a outra forma apanhou-o.
+  { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
+  { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
 ];
 
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
@@ -58,7 +96,19 @@ const MARCAS = [
 ];
 
 function git(args) {
-  return execFileSync("git", args, { cwd: ROOT, encoding: "utf8" }).trim();
+  // `core.quotepath=false`: sem isto o git escapa caminhos nao-ASCII
+  // (`"tests/\303\251.test.js"`), o `existsSync` desse literal falha e um ficheiro que
+  // ninguem apagou e reportado como APAGADO — o gate fechava por razao errada.
+  // `stderr: "ignore"`: um `git show <base>:<ficheiro-novo>` falha de proposito (e assim que
+  // se descobre que o ficheiro nao existia na baseline), e o `fatal: ...` do git ia para o
+  // log. Uma corrida VERDE com uma linha que parece erro treina quem a le a ignorar o output
+  // — apareceu no primeiro CI deste gate. Os erros que importam sobem por excecao e sao
+  // reportados pelo `fatal()` daqui.
+  return execFileSync("git", ["-c", "core.quotepath=false", ...args], {
+    cwd: ROOT,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
 }
 
 let problemas = 0;
@@ -67,6 +117,17 @@ const warn = (m) => {
   problemas++;
 };
 const ok = (m) => console.log(`  OK    ${m}`);
+/** Nao consegui medir: avisa e sai `!= 0` na hora. Existe como FUNCAO e nao como
+ *  `console.log` + `process.exit` soltos porque a varredura de mutacao procura sitios de
+ *  aviso por nome: escritos a mao, tres destes ficavam fora da contagem e a varredura
+ *  anunciava "cobertura completa" a medir metade dos sitios — o mesmo defeito que um
+ *  wrapper `flag()` ja tinha causado neste repo. */
+const fatal = (m, extra) => {
+  console.log(`  WARN  ${m}`);
+  if (extra) console.log(extra);
+  console.log("");
+  process.exit(1);
+};
 
 console.log("\n=== Test Surface Check ===\n");
 
@@ -75,8 +136,22 @@ console.log("\n=== Test Surface Check ===\n");
 let base = process.argv[2];
 try {
   if (!base) {
+    // Detached HEAD tratado explicitamente: o `symbolic-ref` lanca, o catch de baixo
+    // apanhava-o e dizia `baseline "(auto)" nao resolve`, o que atribui a culpa a coisa
+    // errada. Quem esta em detached tem de passar o ref, e a mensagem tem de o dizer.
+    if (git(["rev-parse", "--abbrev-ref", "HEAD"]) === "HEAD") {
+      fatal(
+        "HEAD esta detached, logo nao ha branch de onde derivar a baseline",
+        "        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>"
+      );
+    }
     const head = git(["symbolic-ref", "--short", "HEAD"]);
-    const principal = ["main", "master", "develop"].find((b) => {
+    // Os remote-tracking refs entram na lista, e nao por elegancia: num projeto **derivado**
+    // acabado de clonar, o branch de trabalho e `fix/...` e nao existe `main` LOCAL — so
+    // `origin/main`. Sem estes candidatos o verificador nao conseguia medir e saia `!= 0` no
+    // dia 1 de cada consumidor, com uma mensagem que nao dizia o que fazer. Medido a correr
+    // o bootstrap: e a classe do `AP3` (verde no template, vermelho no derivado).
+    const principal = ["main", "master", "develop", "origin/main", "origin/master", "origin/develop", "origin/HEAD"].find((b) => {
       try {
         git(["rev-parse", "--verify", `${b}^{commit}`]);
         return true;
@@ -85,17 +160,19 @@ try {
       }
     });
     if (!principal) {
-      console.log("  WARN  nao encontrei um branch principal (main/master/develop) para servir de baseline");
-      console.log("        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>\n");
-      process.exit(1);
+      fatal(
+        "nao encontrei um branch principal (main/master/develop, local ou em origin/) para servir de baseline",
+        "        passar um ref explicito: node .agent/scripts/check-test-surface.mjs <ref>"
+      );
     }
     base = head === principal ? `${principal}^` : git(["merge-base", principal, "HEAD"]);
   }
   git(["rev-parse", "--verify", `${base}^{commit}`]);
 } catch (err) {
-  console.log(`  WARN  baseline "${base ?? "(auto)"}" nao resolve: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
-  console.log("        sem baseline nao ha medicao — e uma medicao ausente nao e um OK\n");
-  process.exit(1);
+  fatal(
+    `baseline "${base ?? "(auto)"}" nao resolve: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
+    "        sem baseline nao ha medicao — e uma medicao ausente nao e um OK"
+  );
 }
 console.log(`  baseline: ${base}\n`);
 
@@ -103,10 +180,13 @@ const naSuperficie = (f) => TEST_GLOBS.some((r) => r.test(f)) || CONFIG_GLOBS.so
 
 let alterados;
 try {
-  alterados = git(["diff", "--name-only", `${base}..HEAD`]).split("\n").filter(Boolean);
+  // `${base}` e nao `${base}..HEAD`: compara a baseline com a **arvore de trabalho**. Com
+  // `..HEAD` o verificador ignorava tudo o que nao estivesse commitado — ou seja, "correr
+  // antes de commit" nao media exatamente o que estava a ser commitado. No CI as duas formas
+  // coincidem (arvore limpa), logo nao ha perda.
+  alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
 } catch (err) {
-  console.log(`  WARN  o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}\n`);
-  process.exit(1);
+  fatal(`o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
 }
 
 const tocados = alterados.filter(naSuperficie);
@@ -119,9 +199,19 @@ if (tocados.length === 0) {
     // Com `--unified=0`, EDITAR uma linha que ja tinha um `skip` aparece como linha
     // acrescentada — e dava falso positivo em qualquer alteracao a um teste ja desativado.
     // O que interessa e se a marca ficou MAIS frequente.
+    // As marcas contam-se com o conteudo das STRINGS retirado. Uma marca dentro de aspas e
+    // **dados**, nao uma diretiva: a suite deste proprio verificador tem `test.skip(...)`
+    // dentro de fixtures, e sem isto ela sinalizava-se a si mesma — medido a correr o gate
+    // num projeto derivado. Uma desativacao a serio (`it.skip(`) fica sempre FORA das aspas,
+    // logo continua a contar; e `test("nome"` tambem, porque a chamada nao esta entre aspas.
+    // Os escapes contam: um `\'` dentro de uma string desalinhava um emparelhamento ingenuo
+    // e a marca seguinte ficava exposta. Medido na propria suite deste verificador, que tem
+    // fixtures com aspas escapadas — o gate sinalizava-a a si mesmo num projeto derivado.
+    const semStrings = (t) =>
+      t.replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
     const conta = (texto, re) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
-      return (texto.match(g) || []).length;
+      return (semStrings(texto).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".
@@ -133,9 +223,10 @@ if (tocados.length === 0) {
       existiaAntes = false; // ficheiro novo desde a baseline: zero marcas antes, e correto
     }
     let agora = "";
-    try {
-      agora = git(["show", `HEAD:${f}`]);
-    } catch {
+    const noDisco = join(ROOT, f);
+    if (existsSync(noDisco)) {
+      agora = readFileSync(noDisco, "utf8");
+    } else {
       // Estava na baseline e ja nao esta em HEAD: foi APAGADO. E a forma mais brutal de
       // enfraquecer, e merece nome proprio. (Um ficheiro ausente das DUAS arvores nao pode
       // aparecer no `git diff`, logo nao ha terceiro caso.)
@@ -143,9 +234,18 @@ if (tocados.length === 0) {
       continue;
     }
     const achadas = MARCAS.filter((m) => conta(agora, m.re) > conta(antes, m.re));
-    if (achadas.length) {
-      warn(`${f}: ${achadas.map((a) => a.msg).join(", ")} acrescentado(s) desde ${base}`);
-    } else if (config) {
+    const desceram = CONTAGENS.filter((c) => conta(agora, c.re) < conta(antes, c.re));
+    const notas = [
+      ...achadas.map((a) => `${a.msg} acrescentado(s)`),
+      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
+    ];
+    // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
+    // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
+    // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
+    const contavel = CONTAGENS.some((c) => conta(antes, c.re) > 0);
+    if (notas.length) {
+      warn(`${f}: ${notas.join("; ")} desde ${base}`);
+    } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
     } else {
       ok(`${f} alterado, sem marcas de enfraquecimento`);

@@ -15,7 +15,11 @@
 - **Backlog Checker** (`.agent/scripts/check-backlog.mjs`): Trata os contadores do Resumo e a barra de progresso do backlog como dados derivados — recalcula-os a partir das tabelas (items abertos em `backlog.md` + fechados em `backlog-archive.md`) e avisa se divergirem; deteta tambem IDs duplicados. Caminhos ancorados a raiz do repo (nao ao cwd) e **ficheiro ausente reprova** — um gate que nao consegue validar nao pode sair `0`. Correr antes de commit; opt-in no CI.
 - **Test Surface Checker** (`.agent/scripts/check-test-surface.mjs`): responde a "a superficie de teste foi enfraquecida desde a baseline?" — testes apagados, `skip`/`only` acrescentados, ou a **configuracao do runner** estreitada (que remove falhas sem tocar num teste). Compara **contagens** entre as duas versoes, nao linhas do diff. Sai `!= 0` tambem quando **nao consegue medir**. Ver `AP4`.
 - **Hooks** (`.claude/hooks/`, **so-Claude Code**): o agente pode esquecer uma regra do `CLAUDE.md`; um hook nao esquece. Saem `0` em tudo excepto na negacao explicita — um hook avariado nunca bloqueia trabalho legitimo. Testes em `.claude/hooks/tests/test-hooks.mjs`.
-  - `guard-protected-branch` (`PreToolUse`/`Bash`) — **nega** commit/push/reset em branch protegido e force-push em qualquer sitio. O alvo vem do `cwd` do payload **e de todos os `-C`/`cd` do comando**: ler so o texto deixava passar `cd sub` numa chamada e `git commit` na seguinte.
+  - `guard-protected-branch` (`PreToolUse`/`Bash`) — num branch protegido **permite so os verbos seguros** do `git` e **nega o resto**, incluindo o que nao consegue identificar; force-push (e o que o iguala: `--mirror`, `--delete`, `:refspec`) e negado em qualquer branch. E um **allowlist** de proposito: a versao com blocklist tinha 32 defeitos medidos — ver `AP6`. Tres detalhes que so aparecem quando se mede:
+    - **A forma conta, nao so o verbo** (`FORMAS_INSEGURAS`): `switch -C main` faz o que `reset --hard` faz, e `branch -f`/`branch -D`/`fetch . HEAD:master` reescrevem ou apagam um branch protegido. O verbo esta em `SEGUROS` e a flag e que destroi.
+    - **Alguns verbos exigem uma forma** (`FORMA_EXIGIDA`): `pull --ff-only` e `push --tags` passam porque o procedimento de release deste repo (`deploy.md`, `CONTRIBUTING.md`) corre em `main`; nega-los punha o guard contra a documentacao, e um falso positivo que bloqueia trabalho documentado custa tanto como um bypass.
+    - **So o verbo falha fechado.** Chegar ao verbo depende da lista `WRAPPERS`, que **e** uma blocklist: `flock`, `su -c`, `ssh host git commit` e `GIT_PAGER='git commit' git log` passam. Esta escrito no cabecalho do hook e nao se finge o contrario.
+    O alvo vem do `cwd` do payload **e de todos os `-C`/`--git-dir`/`cd`/`pushd` do comando**; sem pista valida cai no `cwd` do hook (lista vazia **permitia**). A tabela `BYPASSES` na suite e a lista viva: cresceu 28 casos numa leitura e **mais 22 na seguinte** — acrescentar uma quando aparecer.
   - `session-context` (`SessionStart`) — afirma o estado real (branch, o que esta por commitar, PRs abertos) em vez de o deixar inferir. Deliberadamente **curto**: entra no contexto a cada sessao.
   - `stop-verify` (`Stop`) — diz que suite ficou **em divida** para os ficheiros tocados. Nao corre nada: um hook de fim de turno que corresse suites seria desligado.
   - Ambos usam `git status --untracked-files=all`, porque sem isso o git **colapsa diretorios** nao rastreados e um ficheiro novo em pasta nova aparece como a pasta.
@@ -29,10 +33,17 @@
 
 ## A regra que os liga
 
-Cada verificador tem de ter **a sua suite de testes negativos** e **a sua entrada em `PARES`**
-no `mutation-sweep.mjs`. A varredura reprova com `SEM PAR` um `check-*.mjs` que exista no disco
-e nao esteja registado — nao a silenciar, registar. E reprova com `SEM SUITE` uma entrada sem
-testes: um verificador nao verificado nao da confianca, da a aparencia dela.
+Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua
+entrada em `PARES`** no `mutation-sweep.mjs`. A varredura reprova com `SEM PAR` um
+`check-*.mjs`, um `guards/*.mjs` ou um `.claude/hooks/*.mjs` que exista no disco e nao esteja
+registado — nao a silenciar, registar. E reprova com `SEM SUITE` uma entrada sem testes: um
+verificador nao verificado nao da confianca, da a aparencia dela.
+
+Os hooks entraram nesta regra depois de se notar que estavam **fora** dela: sao codigo de
+enforcement com sitios de decisao, e um hook errado e pior que um guard errado porque corre
+**antes** de cada ferramenta. O `sinal` de um guard-hook e a `negar(` — e exclui a *definicao*
+da funcao, porque mutar uma definicao da erro de sintaxe e a suite ficaria vermelha pela razao
+errada, contando como cobertura o que nao e.
 
 ## Universal vs so-Claude
 

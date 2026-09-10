@@ -125,6 +125,33 @@ test("G12c: metodo ausente da SKIP visivel, nao silencio", (dir) => {
   rmSync(file(dir, METODO));
 }, { code: 0, includes: ["SKIP  Guard 12c"] });
 
+// --- A ancora do 12c: "N fases" nem sempre e o TOTAL -------------------------
+// Sem ancora, o guard mandava reescrever prosa CORRETA — e o caminho de menor resistencia
+// para o agente passava a ser enganar o regex.
+//
+// A frase abaixo e inspirada numa real do `src/docs/ticket-method-why.md`, mas **la** ela
+// esta partida em duas linhas ("...que tres" / "fases escalam...") e o guard itera linha a
+// linha, logo nunca disparava — uma versao anterior deste comentario dizia o contrario, e
+// uma leitura independente desmontou-a. O teste tem de a montar numa SO linha, e num
+// ficheiro que o guard ja varria antes, senao nao afirma nada.
+
+test("G12c: \"tres fases escalam\" nao e citacao do total (sem intervalo na linha)", (dir) => {
+  // Num ficheiro que o guard JA varria antes desta correcao — senao o teste ficava verde
+  // pela razao errada (ficheiro nao lido) em vez de pela ancora. Medido: sem a ancora este
+  // teste fica vermelho; com ela, verde.
+  writeF(dir, ".agent/workflows/review.md",
+    readF(dir, ".agent/workflows/review.md") +
+      "\nE por isso que tres fases escalam por tamanho: sem escala, o metodo e abandonado.\n");
+}, { code: 0, excludes: ['diz "tres fases"'] });
+
+test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
+  // Duas coisas ao mesmo tempo: a ancora nao suprime uma afirmacao a mais sobre o total,
+  // e o `src/docs` passou a ser enumerado do disco (antes era um ficheiro escrito a mao,
+  // logo qualquer doc novo ali ficava fora do alcance dos guards).
+  writeF(dir, "src/docs/ticket-method-why.md",
+    "# porque\n\nO metodo tem 5 fases (0 a 5), e nenhuma se salta.\n");
+}, { code: 1, includes: ["ticket-method-why.md", "5 fases"] });
+
 
   // --- 12d: contagem de guards numerados ------------------------------------
   // Terceira instancia do padrao: o BOOTSTRAP.md dizia "11 guards numerados" com 14 a

@@ -53,7 +53,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU");
 console.log("ok");
 `;
 
-function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false } = {}) {
+function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -71,6 +71,12 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
       'if (alvo.includes("mau")) warn("encontrei \'mau\'");',
       'if (alvo.includes("mau")) { warn("encontrei \'mau\'"); warn("extra"); }'
     );
+  }
+  if (sinalEmComentario) {
+    // Um COMENTARIO que menciona o sinal. Contado como sitio, a mutacao nao muda
+    // comportamento nenhum, a suite fica verde e a varredura dizia INCOMPLETA — mandava
+    // escrever um teste para um sitio que nao existe. Aconteceu neste repo.
+    check = check.replace("const warn", "// nota: os erros sobem e sao reportados por warn(\nconst warn");
   }
   if (!semAlvo) writeFileSync(join(dir, ".agent/scripts/fake-check.mjs"), check);
   if (verificadorSemPar) {
@@ -246,6 +252,15 @@ test("--only com correspondencia varre so esse alvo", {}, ["--only=fake-check"],
 });
 
 // --- Resumo ------------------------------------------------------------------
+// `segundoSitio: false` para o unico sitio descoberto possivel ser o comentario: com o
+// sitio "zzz" da fixture por omissao, a INCOMPLETA disparava por ele e a assercao ficava
+// satisfeita por outra verificacao — o `AP1`.
+test("sinal mencionado num COMENTARIO nao conta como sitio", { sinalEmComentario: true, segundoSitio: false }, [], {
+  code: 0,
+  includes: ["Cobertura de mutacao completa"],
+  excludes: ["INCOMPLETA"],
+});
+
 console.log("");
 console.log(`  ${passed} passaram, ${failures.length} falharam.`);
 console.log("");

@@ -130,8 +130,8 @@ Um loop cujo objetivo e "ficar verde" tem uma **solucao degenerada: enfraquecer 
 - O veredicto assenta no **exit code** do runner, nunca numa regex sobre o output.
 - A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
 - A superficie de teste (testes **e** configuracao do runner) nao muda durante o loop:
-  `node .agent/scripts/check-test-surface.mjs` — e no Claude Code o hook nega a escrita antes
-  de acontecer.
+  `node .agent/scripts/check-test-surface.mjs`, a correr como passo — nao ha hook que a
+  impeca.
 
 Ao chegar as 5, **parar e apresentar** o que falha e o que ja se tentou — e e o mesmo
 ponto de decisao da Fase 3: o agente nao decide sozinho abandonar nem insistir. O

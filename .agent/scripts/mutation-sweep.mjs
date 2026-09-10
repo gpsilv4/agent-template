@@ -105,7 +105,35 @@ const PARES = [
   {
     alvo: ".agent/scripts/check-test-surface.mjs",
     suite: ".agent/scripts/test-test-surface.mjs",
-    sinal: /(?<![\w.$])warn\(/,
+    // `fatal(` entra ao lado do `warn(`: os tres sitios de "nao consegui medir" eram
+    // `console.log` + `process.exit` soltos, logo ficavam fora desta contagem e a varredura
+    // anunciava cobertura completa a medir metade. Ver a nota no cabecalho do `fatal`.
+    sinal: /(?<![\w.$])(?:warn|fatal)\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // O sinal de um guard-hook e a negacao. Mutar `negar(` deixa o hook a permitir tudo em
+    // silencio, que e exatamente a falha que uma suite tem de apanhar.
+    alvo: ".claude/hooks/guard-protected-branch.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e
+    // mutar uma definicao da erro de sintaxe — a suite ficava vermelha pela razao errada e a
+    // varredura contava-o como cobertura. So os sitios de CHAMADA sao mutacoes com sentido.
+    sinal: /(?<![\w.$])(?<!function\s)negar\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // Estes dois nao negam: informam. O seu sinal e o `console.log` do payload — mutado, o
+    // hook fica mudo, e uma suite que afirme o conteudo tem de ficar vermelha.
+    alvo: ".claude/hooks/session-context.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    alvo: ".claude/hooks/stop-verify.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
     neutro: "(() => {})(",
   },
   {
@@ -160,6 +188,11 @@ if (!only) {
     // fazia a sua propria fixture de teste (que substitui `PARES`) reprovar.
     ...listarDir(".agent/scripts").filter((f) => /^check-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
     ...listarDir(".agent/scripts/guards").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/guards/${f}`),
+    // Os hooks tambem: sao codigo de enforcement com sitios de decisao, e estavam fora da
+    // regra que o template impoe a todos os verificadores ("cada um com a sua suite"). Um
+    // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard
+    // errado, porque corre ANTES de cada ferramenta.
+    ...listarDir(".claude/hooks").filter((f) => f.endsWith(".mjs")).map((f) => `.claude/hooks/${f}`),
   ];
   const registados = new Set(PARES.map((p) => p.alvo));
   for (const f of noDisco) {
@@ -222,7 +255,15 @@ try {
     }
 
     const linhas = src.split("\n");
-    const sitios = linhas.map((l, i) => (sinal.test(l) ? i : -1)).filter((i) => i !== -1);
+    // Linhas de COMENTARIO nao sao sitios de aviso. Sem isto, um comentario que MENCIONE o
+    // sinal (`... reportados pelo fatal() daqui`) contava como sitio, a mutacao nao mudava
+    // comportamento nenhum, a suite ficava verde e a varredura dizia INCOMPLETA — mandava
+    // escrever um teste para um sitio que nao existe. Aconteceu de facto neste repo, uma
+    // linha depois de eu ter escrito o comentario.
+    const comentario = (l) => /^\s*(?:\/\/|\*|\/\*)/.test(l);
+    const sitios = linhas
+      .map((l, i) => (sinal.test(l) && !comentario(l) ? i : -1))
+      .filter((i) => i !== -1);
 
     // `sitios` e indexado por LINHA e o `replace` nao e global, logo duas chamadas de aviso
     // na mesma linha contam como uma: a segunda nunca e desligada isoladamente e herda a

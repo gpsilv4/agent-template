@@ -46,7 +46,8 @@
       "Bash(npm run build)",
       "Bash(npm run test)",
       "Bash(npm run test:*)",
-      "Bash(node .agent/scripts/check-test-surface.mjs)",
+      "Bash(node .agent/scripts/check-test-surface.mjs:*)",
+      "Bash(node .agent/scripts/test-test-surface.mjs)",
       "Bash(node .claude/hooks/tests/test-hooks.mjs)",
       "Bash(node .claude/hooks/session-context.mjs)",
       "Bash(node .claude/hooks/stop-verify.mjs)"

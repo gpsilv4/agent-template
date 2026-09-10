@@ -23,7 +23,11 @@ import { execFileSync } from "child_process";
 const MAX_FICHEIROS = 12; // acima disto, so a contagem — a lista deixa de informar
 
 function git(args) {
-  return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  // `.replace(/\n+$/)` e NAO `.trim()`: no `git status --porcelain` a coluna de estado do
+  // ficheiro **nao staged** e um espaco (` M path`), logo `.trim()` come o espaco da PRIMEIRA
+  // linha e desloca o caminho um caractere — `.agent/x` chegava como `agent/x`. Media-se: o
+  // caminho aparecia sem o ponto e (no `stop-verify`) nao casava com regra nenhuma.
+  return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).replace(/\n+$/, "");
 }
 
 /** Silencioso por omissao: um passo que falha nao impede os outros de informar. */

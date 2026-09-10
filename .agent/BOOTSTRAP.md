@@ -343,6 +343,35 @@ Correr antes de commit e apos merge de PRs do Dependabot. Opt-in no CI (descomen
 
 > O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; opt-in no CI.
 
+#### Adaptar o `check-test-surface.mjs` a stack
+
+Este verificador responde a "a superficie de teste foi enfraquecida desde a baseline?" (ver
+`AP4`). Tres listas no topo do ficheiro tem de reconhecer o **vocabulario do teu projeto**,
+senao ele mede zero e passa:
+
+- **`TEST_GLOBS`** — onde vivem os testes. Cobre `tests/`, `*.test.ts`, `test_*.py` e
+  `test-*.mjs`/`tests-*.mjs`. Se a tua stack nomeia de outra forma, acrescenta.
+- **`CONFIG_GLOBS`** — a configuracao que **seleciona** os testes (`vitest.config.ts`,
+  `pytest.ini`, ...). Congelar so os testes nao basta: estreitar o `include` do runner remove
+  falhas sem tocar num teste.
+- **`CONTAGENS`** — os nomes com que o projeto declara um teste e uma assercao. Se usas um
+  harness proprio (`check(`, `assertThat(`), acrescenta-o: e o que impede esvaziar uma suite
+  sem deixar nenhuma marca de `skip` para tras.
+
+> **Como confirmar que nao mede zero**: apaga uma suite (sem commitar) e corre
+> `node .agent/scripts/check-test-surface.mjs`. Tem de dizer **`APAGADO`** e sair `!= 0`.
+>
+> Confirma a **mensagem**, nao so o exit code: num repo com um unico commit a baseline
+> automatica (`main^`) nao existe e o verificador sai `1` a dizer `baseline ... nao resolve`,
+> que e outra coisa. Nesse caso passa a baseline a mao:
+> `node .agent/scripts/check-test-surface.mjs "$(git rev-list --max-parents=0 HEAD)"`.
+>
+> Se disser `superficie de teste intacta`, os `TEST_GLOBS` nao veem os teus testes — foi
+> exatamente o que aconteceu neste template, onde 9 das 10 suites eram invisiveis. E se disser
+> `intacta` depois de esvaziares as **assercoes** (em vez de apagar o ficheiro), o problema
+> esta nas `CONTAGENS`: mediam `expect(`/`assert(` num repo cujo vocabulario era
+> `includes:`/`eq(`, logo contavam zero — e zero nao desce.
+
 ### 2.5 Adaptar core-rules.md a stack
 
 Dependendo da stack (pergunta 5), ajustar seccoes especificas:
@@ -457,7 +486,8 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
-- [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs` e `test-mutation-sweep.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
+- [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS` nao casam com a tua stack e o gate esta a medir zero
 - [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o
   `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
