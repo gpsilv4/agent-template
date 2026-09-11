@@ -369,6 +369,21 @@ test("`if: github.event_name == 'pull_request'` NAO e enfraquecimento", (dir) =>
   return ref;
 }, { code: 0, excludes: ["condicao `if:`"] });
 
+// O CONTROLO do controlo: a excecao tem de excluir **so** o gating em `pull_request`. Gated a
+// `push`, o step deixa de correr em PRs — e isso E enfraquecimento. A primeira correcao desta
+// entrada ancorava em `github.event_name` e excluia os dois, porque no texto normalizado
+// `'pull_request'` e `'push'` sao a mesma string; foi o que obrigou a flag `cru`.
+test("`if: github.event_name == 'push'` E enfraquecimento (deixa de correr em PRs)", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: github.event_name == 'push'\n");
+  commit(dir, "gated a push");
+  return ref;
+}, { code: 1, includes: ["condicao `if:`"] });
+
 test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
   // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
   // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.
@@ -381,6 +396,29 @@ test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
   commit(dir, "desligar o veredicto");
   return ref;
 }, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
+
+test("consolidar varios `process.exit(1)` num helper NAO e enfraquecimento", (dir) => {
+  // Medido num projeto derivado: contar ocorrencias penalizava um refactor legitimo (tres
+  // `console.log` + `process.exit(1)` passaram a um helper, 3 -> 1, e dava WARN). O
+  // invariante e "tem de existir um caminho de saida != 0", nao "tem de haver os mesmos".
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "if (a) { process.exit(1); }\nif (b) { process.exit(1); }\nif (c) { process.exit(1); }\n");
+  commit(dir, "tres saidas");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    "const fatal = () => process.exit(1);\nif (a) fatal();\nif (b) fatal();\nif (c) fatal();\n");
+  commit(dir, "consolidar num helper");
+  return ref;
+}, { code: 0 });
+
+test("apagar o unico `process.exit(1)` E enfraquecimento", (dir) => {
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { process.exit(1); }\n");
+  commit(dir, "com veredicto");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { console.log('ha falhas'); }\n");
+  commit(dir, "sem veredicto");
+  return ref;
+}, { code: 1, includes: ["veredicto do runner"] });
 
 test("despromover um warn a note num guard e enfraquecimento", (dir) => {
   mkdirSync(join(dir, ".agent/scripts/guards"), { recursive: true });

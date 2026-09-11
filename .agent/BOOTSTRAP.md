@@ -424,7 +424,17 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)
 
-- **`AGENTS.md`**: entry point cross-tool (Cursor, Windsurf, Copilot). O sweep de placeholders (2.1) preenche-o; verificar que reflete a stack e a descricao.
+- **`AGENTS.md`**: entry point cross-tool (Cursor, Windsurf, Copilot, ChatGPT/Codex). O sweep de placeholders (2.1) preenche-o; verificar que reflete a stack e a descricao.
+- **`.github/copilot-instructions.md`** e **`.cursor/rules/project.mdc`**: os ficheiros que o
+  Copilot e o Cursor carregam **automaticamente** — cada tool le so o seu. Sao ponteiros para o
+  `AGENTS.md` **mais uma copia inline do bloco "Fronteiras"**, porque nao esta verificado que
+  esses tools sigam uma referencia em markdown; sem a copia, um deles que nao a siga ficava com
+  um mapa de pastas e **zero regras**.
+  > **Se adaptares as Fronteiras no `CLAUDE.md`** — e um projeto que nao seja TypeScript **tem**
+  > de o fazer (`any` proibido, ~400 linhas) — **adapta as duas copias no mesmo passo**. O
+  > **Guard 1d** compara-as e reprova se divergirem: e uma duplicacao **forcada** (cada tool le
+  > so o seu ficheiro), logo e verificada em vez de proibida. O sweep de placeholders da 2.1 ja
+  > cobre o `{{UI_LANGUAGE}}` nas tres; o que ele nao apanha e uma **edicao** de conteudo.
 - **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
@@ -480,6 +490,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
+- [ ] **As Fronteiras iguais nos tres sitios** (`CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`)? O **Guard 1d** verifica-o — se adaptaste o bloco num, adapta nos outros dois
 - [ ] **`README.md` substituido** pelo README do projeto (nao a capa do template nem o badge do repo do template)?
 - [ ] **`.github/CODEOWNERS`** sem `{{GITHUB_OWNER}}` (`grep "{{" .github/CODEOWNERS` -> zero linhas)?
 - [ ] `.github/workflows/ci.yml` configurado com triggers e scripts corretos?

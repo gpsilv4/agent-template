@@ -121,7 +121,13 @@ const CONTAGENS = [
   // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
   // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
   // do runner"), que este verificador nao protegia.
-  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))" },
+  // `zero: true` — so conta como enfraquecimento se chegar a **zero**, nao se apenas descer.
+  // Consolidar tres `console.log` + `process.exit(1)` num helper faz a contagem cair de 3 para
+  // 1 e e um refactor legitimo; medido num projeto derivado, dava WARN. O invariante real nao
+  // e "nao pode descer", e **"o runner tem de ter um caminho de saida != 0"**. Apagar o unico
+  // `process.exit(1)` continua apanhado; as outras duas deteccoes (a referencia a contagem de
+  // falhas, e a condicao literalmente falsa) cobrem o ataque de o tornar inalcancavel.
+  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))", zero: true },
   // Contar o `process.exit(1)` NAO basta: o ataque medido nao o apaga, torna-o
   // **inalcancavel** (`if (failures.length) {` -> `if (false) {`), e a contagem nao se move.
   // O que desaparece e a **referencia a contagem de falhas** — e essa desce.
@@ -153,7 +159,12 @@ const MARCAS = [
   // uso para que a excecao foi escrita — levava a contagem de 4 para 5 e dava exit 1.
   // Agora ancora em `github.event_name`, que sobrevive ao `semStrings`, e o `[ \t]*` **dentro**
   // do lookahead e o que impede o recuo a largura zero de a contornar.
-  { re: /^[ \t]*if:[ \t]*(?![ \t]*github\.event_name\b)/m, msg: "condicao `if:`" },
+  // `cru: true` e o que torna a excecao possivel: ela cita um literal, e no texto
+  // normalizado `'pull_request'` e `'push'` sao indistinguiveis. Assim so o gating em
+  // `pull_request` e excluido — um step gated a `push` **conta**, porque deixa de correr em
+  // PRs, e isso e enfraquecimento. O `[ \t]*` dentro do lookahead impede o recuo a largura
+  // zero de o contornar.
+  { re: /^[ \t]*if:[ \t]*(?![ \t]*github\.event_name == 'pull_request')/m, msg: "condicao `if:`", cru: true },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
@@ -325,9 +336,15 @@ if (tocados.length === 0) {
     const semComentarios = (t) => t.replace(/^[ \t]*(?:\/\/|\*\/?|\/\*).*$/gm, "");
     const semStrings = (t) =>
       semComentarios(t).replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\\n]|\\.)*`/g, '""');
-    const conta = (texto, re) => {
+    // `cru`: a entrada opta por ver o texto **sem** as strings retiradas. Existe porque uma
+    // excecao que precisa de citar um literal nao pode viver no texto normalizado — o
+    // `semStrings` transforma `'pull_request'` e `'push'` na MESMA string, e ai a excecao ou
+    // exclui os dois ou nenhum. Excluir os dois esconde um enfraquecimento a serio (um step
+    // gated a `push` deixa de correr em PRs). Usar so quando a entrada cita um literal; por
+    // omissao as strings saem, que e o que protege as fixtures.
+    const conta = (texto, re, cru = false) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
-      return (semStrings(texto).match(g) || []).length;
+      return ((cru ? texto : semStrings(texto)).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".
@@ -370,8 +387,12 @@ if (tocados.length === 0) {
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;
     }
-    const achadas = MARCAS.filter((m) => conta(agora, m.re) > conta(antes, m.re));
-    const desceram = CONTAGENS.filter((c) => conta(agora, c.re) < conta(antes, c.re));
+    const achadas = MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
+    const desceram = CONTAGENS.filter((c) => {
+      const a = conta(antes, c.re, c.cru);
+      const d = conta(agora, c.re, c.cru);
+      return c.zero ? a > 0 && d === 0 : d < a;
+    });
     const notas = [
       ...achadas.map((a) => `${a.msg} acrescentado(s)`),
       ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
@@ -379,7 +400,7 @@ if (tocados.length === 0) {
     // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
     // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
     // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
-    const contavel = CONTAGENS.some((c) => conta(antes, c.re) > 0);
+    const contavel = CONTAGENS.some((c) => conta(antes, c.re, c.cru) > 0);
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
     } else if (config && !contavel) {
