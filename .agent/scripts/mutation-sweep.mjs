@@ -30,6 +30,28 @@
  *
  * CUSTO: recorre a suite inteira por sitio. dezenas de sitios = minutos. Correr apos mexer num
  * verificador, nao a cada commit. Opt-in no CI (ver `.github/workflows/ci.yml`).
+ *
+ * O QUE ESTA VARREDURA **NAO** COBRE, e vale saber antes de confiar nela: ela muta **sitios
+ * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** —
+ * `MARCAS`, `CONTAGENS`, `TEST_GLOBS`, `CONFIG_GLOBS`, `CONFIG_CONTAVEIS` no
+ * `check-test-surface.mjs` — nao sao sitios: um padrao que nunca casa nada passa aqui com a
+ * suite verde, porque o `warn()` continua a ser disparado por outro padrao da mesma tabela.
+ *
+ * Isto nao e teorico. Uma excecao escrita numa dessas entradas esteve **morta desde que foi
+ * escrita** (duas falhas empilhadas: um `\s*` a recuar a largura zero, e o `semStrings` a
+ * apagar o literal citado), com esta varredura verde do principio ao fim. So apareceu quando
+ * alguem correu o `/upgrade` num projeto real e levou um aviso onde a excecao prometia
+ * silencio.
+ *
+ * **Consequencia, e e uma obrigacao:** cada entrada de tabela de padroes precisa do **seu
+ * caso na suite** — um que exija que ela case, e, se tiver excecao, um que exija que ela
+ * exclua. A varredura nao substitui isso.
+ *
+ * Medido no `check-test-surface.mjs`: das 39 entradas de padrao, **15 podem ser desligadas
+ * com a suite verde** (metade sao globs de stacks que este repo nao usa — Python, mocha — e
+ * que um projeto derivado usa). Alargar a varredura as entradas e possivel e mecanicamente
+ * identico ao que ela ja faz; custa ~7 min por corrida e exige escrever esses 15 casos
+ * primeiro, senao ela passa a reprovar de origem.
  */
 
 import { readFileSync, writeFileSync, mkdtempSync, cpSync, rmSync, readdirSync } from "fs";

@@ -254,6 +254,17 @@ function syntheticSandbox() {
   }
 
   for (const r of ["core-rules", "process-rules", "anti-patterns"]) {
+    // O `anti-patterns.md` da fixture **define** os anti-padroes que os scripts copiados para
+    // ca citam. Sem isso, o Guard 15 (referencias que resolvem) reprovava a fixture "limpa
+    // por construcao": os proprios comentarios dos verificadores citam anti-padroes, e o
+    // guard varre os `.agent/scripts/` — incluindo-se a si mesmo. A lista e **derivada** do
+    // ficheiro real, para nao envelhecer quando se acrescentar um anti-padrao novo.
+    if (r === "anti-patterns") {
+      const real = readFileSync(join(ROOT, ".agent/rules/anti-patterns.md"), "utf8");
+      const entradas = [...real.matchAll(/^#{2,3}\s+(AP\d+\b.*)$/gm)].map((m) => `## ${m[1]}`);
+      w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n\n${entradas.join("\n\n")}\n`);
+      continue;
+    }
     w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n`);
   }
   // O `BOOTSTRAP.md` da fixture cita as contagens que os guards 12d/12e recalculam. Os

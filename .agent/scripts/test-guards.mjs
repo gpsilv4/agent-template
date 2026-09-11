@@ -156,24 +156,63 @@ test("G1d: ponteiro ausente da SKIP visivel, nao silencio", (dir) => {
   rmSync(file(dir, ".cursor/rules/project.mdc"));
 }, { code: 0, includes: ["SKIP  .cursor/rules/project.mdc"] });
 
+// --- Guard 15: as referencias a anti-padroes resolvem -------------------------
+// Uma citacao errada e pior do que nenhuma: manda o leitor a uma entrada REAL com outro
+// significado, e nada no ecra a denuncia. Aconteceu num projeto derivado, ao trazer os
+// scripts do template num upgrade.
+
+// O numero e montado em duas partes de proposito: o Guard 15 varre os `.agent/scripts/`,
+// **inclusive as suites**, logo o literal escrito aqui seria apanhado como citacao morta no
+// repo real. Assim ele existe so no ficheiro que a fixture escreve, que e onde o teste o
+// quer. (Excluir as suites da varredura era a alternativa, e perdia dez citacoes legitimas
+// que vivem nelas — medido.)
+const AP_INEXISTENTE = "AP" + "99";
+test("G15: citacao de um anti-padrao que nao existe avisa", (dir) => {
+  const f = ".agent/rules/core-rules.md";
+  writeF(dir, f, readF(dir, f) + `\n> Ver ${AP_INEXISTENTE} para o detalhe.\n`);
+}, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em anti-patterns.md"] });
+
+test("G15: entrada escrita com `###` tambem conta como definida", (dir) => {
+  // Tolerancia aos dois niveis: as entradas deste repo usam `##`, um derivado pode usar
+  // `###`, e o guard nao pode passar a dizer que o anti-padrao desapareceu por isso.
+  const f = ".agent/rules/anti-patterns.md";
+  writeF(dir, f, readF(dir, f).replace(/^## AP/gm, "### AP"));
+}, { code: 0, excludes: ["nao existe em anti-patterns.md"] });
+
+test("G15: sem anti-patterns.md da SKIP visivel, nao silencio", (dir) => {
+  rmSync(file(dir, ".agent/rules/anti-patterns.md"));
+}, { code: 1, anyOut: ["SKIP  Guard 15"] });
+
 // --- Guard 1c: o TOTAL carregado a cada sessao --------------------------------
 // O Guard 1 orcamenta ficheiro a ficheiro; ninguem orcamentava a soma, e e a soma que o
 // agente paga por sessao. Os ficheiros extra ficam ABAIXO do limite por ficheiro de
 // proposito: se um deles o excedesse, o Guard 1 tambem avisava e a assercao passava a ser
 // satisfeita por outra verificacao — o `AP1`.
 
-test("G1c: total carregado acima do maximo avisa, com cada ficheiro dentro do seu limite", (dir) => {
-  const extra = "x".repeat(11000);
+test("G1c: contexto acima do maximo avisa (as rules nao contam — tem dono proprio)", (dir) => {
+  // Os ficheiros extra vao para `.agent/context/` e nao para `.agent/rules/`: o 1c orcamenta
+  // **so** o contexto. Se a fixture engordasse rules, media o Guard 1 e nao este — e era
+  // exactamente a mistura que o guard deixou de fazer.
+  const extra = "x".repeat(17000);
   let claude = readF(dir, "CLAUDE.md");
   let gemini = readF(dir, "GEMINI.md");
   for (const n of ["extra1", "extra2", "extra3"]) {
-    writeF(dir, `.agent/rules/${n}.md`, `# ${n}\n\n${extra}`);
-    claude += `\n@.agent/rules/${n}.md\n`;
-    gemini += `\n@.agent/rules/${n}.md\n`;
+    writeF(dir, `.agent/context/${n}.md`, `# ${n}\n\n${extra}`);
+    claude += `\n@.agent/context/${n}.md\n`;
+    gemini += `\n@.agent/context/${n}.md\n`;
   }
   writeF(dir, "CLAUDE.md", claude);
   writeF(dir, "GEMINI.md", gemini);
-}, { code: 1, includes: ["contexto carregado", "> 64000"] });
+}, { code: 1, includes: ["contexto carregado", "> 48000"] });
+
+test("G1c: engordar uma RULE nao dispara o 1c (dispara o Guard 1, que e o dono)", (dir) => {
+  // O controlo do ponto anterior: sem ele, o 1c podia continuar a somar as rules e o teste
+  // acima passava igual.
+  writeF(dir, ".agent/rules/core-rules.md", "# core\n\n" + "y".repeat(13000));
+  // `excludes: ["> 48000"]` e nao `["contexto carregado ="]`: essa linha aparece SEMPRE (e a
+  // linha OK do guard), logo excluir-la nunca poderia passar. O que se afirma e que o aviso
+  // de orcamento de CONTEXTO nao disparou — quem disparou foi o Guard 1, o dono da rule.
+}, { code: 1, includes: ["core-rules.md"], excludes: ["> 48000"] });
 
 test("G1c: sem CLAUDE.md da SKIP visivel, nao silencio", (dir) => {
   // `anyOut` e nao `includes`: sem `CLAUDE.md` outros guards avisam (paridade, imports), logo
