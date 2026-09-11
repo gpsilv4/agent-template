@@ -85,18 +85,25 @@ When you open a new AI session in any project using this template, the agent **a
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── guards/                 <- Guard modules split out of the entry point
+    │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed (bilingual)
-    │   └── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
+    │   ├── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
+    │   └── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (AP7)
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (AP4)
+    ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear
     ├── test-test-surface.mjs   <- Negative tests for it (real git repos as fixtures)
+    ├── test-surface-harness.mjs<- Its sandbox (a real git repo) + test() + summary
+    ├── tests-surface-marks.mjs <- The weakening marks: `|| true`, `if:`, unreachable verdict
     ├── test-guards.mjs         <- Entry point for the doc-guard suites (no deps, no package.json)
     ├── test-harness.mjs        <- Shared sandbox + test() + summary
     ├── tests-settings.mjs      <- Guard 11 tests (mirrors guards/settings.mjs)
     ├── tests-derived-counts.mjs<- Guards 12/12c/12d/12e tests
     ├── tests-placeholders.mjs  <- Guard 13 tests (simulates a completed bootstrap)
+    ├── tests-anti-patterns.mjs <- Guard 15 tests (fixture derives its own definitions)
+    ├── tests-budgets.mjs       <- Series-1 guard tests (mirrors guards/budgets.mjs)
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red

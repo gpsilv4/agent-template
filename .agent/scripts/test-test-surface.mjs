@@ -11,74 +11,10 @@
  *   node .agent/scripts/test-test-surface.mjs
  */
 
-import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, copyFileSync } from "fs";
-import { tmpdir } from "os";
-import { fileURLToPath } from "url";
-import { dirname, resolve, join } from "path";
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
-
-const git = (dir, args) =>
-  execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-
-/** Repo com um teste "saudavel" commitado; devolve `{ dir, base }`. */
-function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "surface-test-"));
-  mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
-  mkdirSync(join(dir, "tests"), { recursive: true });
-  copyFileSync(CHECKER, join(dir, ".agent/scripts/check-test-surface.mjs"));
-  writeFileSync(join(dir, "tests/exemplo.test.js"), 'test("soma", () => { expect(1 + 1).toBe(2); });\n');
-  git(dir, ["init", "-q", "-b", "main"]);
-  git(dir, ["add", "-A"]);
-  git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "base"]);
-  return { dir, base: git(dir, ["rev-parse", "HEAD"]) };
-}
-
-function commit(dir, msg) {
-  git(dir, ["add", "-A"]);
-  git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", msg]);
-}
-
-function corre(dir, base) {
-  // `base` vazio => corre SEM argumento, que e o unico modo em que a auto-deteccao da
-  // baseline esta sob teste. Antes, um `mutate` que devolvesse `null` caia no `?? base` do
-  // harness e o teste passava com a baseline explicita — verde sem afirmar nada.
-  const args = [join(dir, ".agent/scripts/check-test-surface.mjs"), ...(base ? [base] : [])];
-  try {
-    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8" }) };
-  } catch (err) {
-    return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
-  }
-}
-
-let passed = 0;
-const falhas = [];
-function test(nome, mutate, expect) {
-  const { dir, base } = sandbox();
-  try {
-    const ref = mutate ? mutate(dir, base) ?? base : base;
-    const { code, out } = corre(dir, ref);
-    const problemas = [];
-    if (code !== expect.code) problemas.push(`exit ${code}, esperado ${expect.code}`);
-    // Afirmar contra as linhas WARN quando se espera reprovacao: um `includes` sobre o output
-    // inteiro seria satisfeito por uma linha OK com o mesmo nome de ficheiro.
-    const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
-    for (const s of expect.includes ?? []) if (!alvo.includes(s)) problemas.push(`${expect.code === 0 ? "output" : "linhas WARN"} devia conter "${s}"`);
-    for (const s of expect.excludes ?? []) if (out.includes(s)) problemas.push(`output NAO devia conter "${s}"`);
-    if (problemas.length) {
-      falhas.push({ nome, problemas, out });
-      console.log(`  FAIL  ${nome}`);
-      for (const p of problemas) console.log(`          ${p}`);
-    } else {
-      passed++;
-      console.log(`  PASS  ${nome}`);
-    }
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+import { test, commit, git, resumo } from "./test-surface-harness.mjs";
+import { registar as registarMarcas } from "./tests-surface-marks.mjs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
+import { join } from "path";
 
 console.log("\n=== Testes do Test Surface Checker ===\n");
 
@@ -293,6 +229,68 @@ test("nao consegue medir: detached HEAD diz o que se passa, nao culpa a baseline
   return ""; // sem baseline: e a auto-deteccao que tem de explicar-se
 }, { code: 1, includes: ["detached"] });
 
+// --- O ficheiro que DEFINE as marcas nao se aplica a si mesmo ---------------------
+// Os padroes com alternacao casam-se a si mesmos, logo o ficheiro das tabelas sinalizava-se
+// por existir. As MARCAS deixaram de se lhe aplicar — mas as CONTAGENS aplicam-se, e o par
+// abaixo prova as duas metades: sem a segunda, excluir o ficheiro por completo passaria.
+test("as MARCAS nao se aplicam ao ficheiro que as define", (dir) => {
+  // A entrada nova vai como CODIGO e nao como comentario. A primeira versao deste teste
+  // punha-a num comentario, e o contador tira comentarios antes de medir: ficava verde com a
+  // exclusao ligada **e** desligada — nao afirmava nada, que e o `AP1`. Apanhado pelo
+  // controlo negativo, nao pela leitura.
+  writeFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"),
+    readFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"), "utf8") +
+      "\nconst EXTRA = [{ re: /\\b(?:xit|xdescribe|xtest)\\b/, msg: \"x\" }];\nexport { EXTRA };\n");
+  commit(dir, "acrescentar uma marca ao detetor");
+}, { code: 0, excludes: ["  WARN  "] });
+
+test("esvaziar as tabelas de padroes REPROVA (as CONTAGENS aplicam-se)", (dir) => {
+  // Desligar o detetor sem tocar em nenhum teste: as tabelas viram um par de arrays vazios.
+  writeFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"),
+    "const CONTAGENS = [];\nconst MARCAS = [];\nexport { CONTAGENS, MARCAS };\n");
+  commit(dir, "esvaziar as tabelas");
+}, { code: 1, includes: ["surface-patterns.mjs"] });
+
+// --- Mover != apagar: o invariante e sobre o TOTAL --------------------------------
+// O `AP4` diz "a contagem de testes nao desce" — a contagem, ou seja o total da superficie. A
+// comparacao era so por ficheiro, e por isso punia uma **extracao**: mover testes para um
+// modulo novo, que e o que o `core-rules.md` manda fazer acima das 500 linhas, lia-se como
+// perda no ficheiro de origem e fechava o gate. Um gate que reprova a limpeza que o projeto
+// exige ensina a ignorar o gate.
+//
+// O par e obrigatorio: sozinho, o primeiro teste ficaria verde com a verificacao de totais
+// **desligada por completo** (nunca reprovar tambem passa), e e o segundo que o impede.
+const doisFicheiros = (dir, a, b) => {
+  writeFileSync(join(dir, "tests/a.test.js"), a);
+  writeFileSync(join(dir, "tests/b.test.js"), b);
+};
+const DOIS = 'test("um", () => { expect(1).toBe(1); });\ntest("dois", () => { expect(2).toBe(2); });\n';
+const UM = 'test("um", () => { expect(1).toBe(1); });\n';
+
+test("mover um teste entre ficheiros da NOTE, nao WARN (o total aguenta)", (dir) => {
+  doisFicheiros(dir, DOIS, UM);
+  commit(dir, "dois ficheiros");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  // O total mantem-se em 3 casos e 3 assercoes: um caso muda de ficheiro, e mais nada.
+  doisFicheiros(dir, UM, DOIS);
+  commit(dir, "mover um caso de a para b");
+  return ref;
+}, {
+  code: 0,
+  includes: ["movido, nao perdido", "Superficie de teste nao enfraquecida"],
+  excludes: ["  WARN  "],
+});
+
+test("apagar um teste sem o mover REPROVA (o total desce)", (dir) => {
+  doisFicheiros(dir, DOIS, UM);
+  commit(dir, "dois ficheiros");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  // Mesma descida no `a.test.js` do teste anterior, e o `b.test.js` NAO recebe nada: 3 -> 2.
+  doisFicheiros(dir, UM, UM);
+  commit(dir, "apagar um caso");
+  return ref;
+}, { code: 1, includes: ["tests/a.test.js", "casos de teste: 2 -> 1"] });
+
 // --- Um workflow que nao corre testes nao e configuracao de runner -----------
 // Medido num projeto derivado: com todos os `.github/workflows/*.yml` em `CONFIG_GLOBS`,
 // mexer no `dependabot-auto-merge.yml` ou no `e2e.yml` dava WARN e exit 1. Dois falsos
@@ -320,115 +318,8 @@ test("workflow COM steps de teste continua a ser medido por contagem", (dir) => 
 }, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
 
 // --- As formas que nao movem nenhuma contagem obvia ---------------------------
-// Achados de uma terceira leitura independente. Todos passavam com exit 0.
-
-test("neutralizar um step do CI com `|| true` e enfraquecimento", (dir) => {
-  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-  commit(dir, "ci");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs || true\n");
-  commit(dir, "neutralizar");
-  return ref;
-}, { code: 1, includes: ["|| true"] });
-
-test("`continue-on-error: true` num step e enfraquecimento", (dir) => {
-  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-  commit(dir, "ci");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".github/workflows/ci.yml"),
-    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        continue-on-error: true\n");
-  commit(dir, "continue-on-error");
-  return ref;
-}, { code: 1, includes: ["continue-on-error"] });
-
-test("uma condicao `if:` qualquer num step e enfraquecimento", (dir) => {
-  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-  commit(dir, "ci");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".github/workflows/ci.yml"),
-    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: false\n");
-  commit(dir, "gate");
-  return ref;
-}, { code: 1, includes: ["condicao `if:`"] });
-
-// O CONTROLO que faltava, e e ele que prova a excecao: sem este caso, ela pode estar escrita
-// e nao excluir nada — foi exactamente o que aconteceu. Duas falhas empilhadas mantiveram-na
-// morta (o `\s*` a recuar a largura zero, e o `semStrings` a apagar o literal citado) e a
-// varredura de mutacao nao as via, porque uma entrada de tabela nao e um sitio de aviso.
-test("`if: github.event_name == 'pull_request'` NAO e enfraquecimento", (dir) => {
-  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-  commit(dir, "ci");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".github/workflows/ci.yml"),
-    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: github.event_name == 'pull_request'\n");
-  commit(dir, "gate por evento");
-  return ref;
-}, { code: 0, excludes: ["condicao `if:`"] });
-
-// O CONTROLO do controlo: a excecao tem de excluir **so** o gating em `pull_request`. Gated a
-// `push`, o step deixa de correr em PRs — e isso E enfraquecimento. A primeira correcao desta
-// entrada ancorava em `github.event_name` e excluia os dois, porque no texto normalizado
-// `'pull_request'` e `'push'` sao a mesma string; foi o que obrigou a flag `cru`.
-test("`if: github.event_name == 'push'` E enfraquecimento (deixa de correr em PRs)", (dir) => {
-  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-  commit(dir, "ci");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".github/workflows/ci.yml"),
-    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: github.event_name == 'push'\n");
-  commit(dir, "gated a push");
-  return ref;
-}, { code: 1, includes: ["condicao `if:`"] });
-
-test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
-  // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
-  // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
-    "const failures = [];\nif (failures.length) {\n  process.exit(1);\n}\n");
-  commit(dir, "harness");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
-    "const failures = [];\nif (false) {\n  process.exit(1);\n}\n");
-  commit(dir, "desligar o veredicto");
-  return ref;
-}, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
-
-test("consolidar varios `process.exit(1)` num helper NAO e enfraquecimento", (dir) => {
-  // Medido num projeto derivado: contar ocorrencias penalizava um refactor legitimo (tres
-  // `console.log` + `process.exit(1)` passaram a um helper, 3 -> 1, e dava WARN). O
-  // invariante e "tem de existir um caminho de saida != 0", nao "tem de haver os mesmos".
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
-    "if (a) { process.exit(1); }\nif (b) { process.exit(1); }\nif (c) { process.exit(1); }\n");
-  commit(dir, "tres saidas");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
-    "const fatal = () => process.exit(1);\nif (a) fatal();\nif (b) fatal();\nif (c) fatal();\n");
-  commit(dir, "consolidar num helper");
-  return ref;
-}, { code: 0 });
-
-test("apagar o unico `process.exit(1)` E enfraquecimento", (dir) => {
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { process.exit(1); }\n");
-  commit(dir, "com veredicto");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { console.log('ha falhas'); }\n");
-  commit(dir, "sem veredicto");
-  return ref;
-}, { code: 1, includes: ["veredicto do runner"] });
-
-test("despromover um warn a note num guard e enfraquecimento", (dir) => {
-  mkdirSync(join(dir, ".agent/scripts/guards"), { recursive: true });
-  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nwarn("b");\n');
-  commit(dir, "guard com dois avisos");
-  const ref = git(dir, ["rev-parse", "HEAD"]);
-  writeFileSync(join(dir, ".agent/scripts/guards/x.mjs"), 'warn("a");\nnote("b");\n');
-  commit(dir, "despromover um");
-  return ref;
-}, { code: 1, includes: ["sitios de aviso: 2 -> 1"] });
+// Movidas para `tests-surface-marks.mjs`: sao as mais numerosas e passavam este ficheiro do
+// flag das 500 linhas. Registadas no fim.
 
 // --- O AP2 aplicado ao proprio verificador -----------------------------------
 test("TEST_GLOBS que nao casam nada na baseline REPROVAM, em vez de dizer intacta", (dir) => {
@@ -521,15 +412,6 @@ test("apostrofo num comentario nao dessincroniza a contagem", (dir) => {
   return ref;
 }, { code: 0 });
 
-console.log("");
-console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
-console.log("");
-if (falhas.length) {
-  for (const { nome, out } of falhas) {
-    console.log(`--- output de "${nome}" ---`);
-    console.log(out);
-  }
-  console.log("  Ha testes do test-surface checker a falhar.\n");
-  process.exit(1);
-}
-console.log("  Todos os testes do test-surface checker passaram.\n");
+registarMarcas();
+
+resumo();

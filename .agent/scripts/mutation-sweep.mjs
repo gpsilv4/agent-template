@@ -125,6 +125,23 @@ const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // Modulo dos orcamentos de bytes (guards 1/1b/1c/1d), extraido do check-doc-versions.mjs
+    // pela mesma razao que o de baixo: o ficheiro de entrada passou o flag das 500 linhas.
+    alvo: ".agent/scripts/guards/budgets.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // Modulo do Guard 15, extraido do check-doc-versions.mjs quando este passou o flag das
+    // 500 linhas. A suite e a mesma do ficheiro de origem: o `tests-anti-patterns.mjs` corre
+    // por importacao a partir dela, nao por si.
+    alvo: ".agent/scripts/guards/anti-patterns.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-test-surface.mjs",
     suite: ".agent/scripts/test-test-surface.mjs",
     // `fatal(` entra ao lado do `warn(`: os tres sitios de "nao consegui medir" eram

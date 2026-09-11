@@ -17,7 +17,10 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 3. [ ] `GEMINI.md` — **espelho** de `CLAUDE.md` (atualizar **em par** — so difere a sintaxe `@[...]`). Verificar paridade: `node .agent/scripts/check-doc-versions.mjs`
 4. [ ] `.agent/rules/` — todas as regras refletem o estado atual do codigo (e dentro do orcamento de bytes)
 5. [ ] `.agent/rules/scripts-guide.md` — se acrescentaste ou alteraste um verificador (`.agent/scripts/`) ou um hook (`.claude/hooks/`): o detalhe vive la, e nao nas rules carregadas, porque o orcamento de bytes ja foi excedido a serio quando vivia
-6. [ ] `.agent/rules/ticket-method.md` (instrucoes) **e** `src/docs/ticket-method-why.md` (evidencia: de onde veio a regra, o que custa) — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
+6. [ ] **Pares rule/evidencia** — as instrucoes vivem na rule carregada, a historia no ficheiro
+   nao-carregado, e as duas atualizam-se **juntas**: `.agent/rules/anti-patterns.md` **e**
+   `src/docs/anti-patterns-why.md` (ao acrescentar ou reescrever um anti-padrao: os quatro
+   campos na rule, a evidencia no `-why`). Idem `.agent/rules/ticket-method.md` (instrucoes) **e** `src/docs/ticket-method-why.md` (evidencia: de onde veio a regra, o que custa) — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
    **Renumerar ou mudar o ambito de uma fase obriga a atualizar quem a cita por numero**: `process-rules.md`
    (ponteiro + "Ao iniciar um item"), `/plan` (Fase 0), `/debug` (Fase 0+1), `/refactor` (Fase 0+4), `/review` (Fase 3)
 7. [ ] `.agent/context/session.md` — estado da sessao atual

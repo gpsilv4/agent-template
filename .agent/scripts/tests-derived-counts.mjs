@@ -167,10 +167,20 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   }, { code: 1, includes: ["guards numerados\" mas existem"] });
 
   test("G12d: cabecalhos `// --- Guard N:` em outro formato avisam", (dir) => {
-    for (const f of ["check-doc-versions.mjs", "guards/settings.mjs", "guards/versions.mjs",
-                     "guards/derived-counts.mjs", "guards/placeholders.mjs"]) {
-      writeF(dir, `.agent/scripts/${f}`,
-        readF(dir, `.agent/scripts/${f}`).replace(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm, "// --- Verificacao:"));
+    // A lista e DERIVADA do disco, exactamente como o guard a deriva (`listDir` sobre
+    // `guards/`). Estava escrita a mao com cinco nomes, e ao extrair dois guards novos para
+    // `guards/` os cabecalhos deles sobreviviam a mutacao: `numerados.size > 0`, o aviso nao
+    // disparava, e o teste falhava a apontar para o guard em vez de para a sua propria
+    // fixture. Uma lista de ficheiros escrita a mao ao lado de um `listDir` envelhece no
+    // primeiro ficheiro novo — e o `AP1`.
+    const fontes = [
+      ".agent/scripts/check-doc-versions.mjs",
+      ...readdirSync(file(dir, ".agent/scripts/guards"))
+        .filter((f) => f.endsWith(".mjs"))
+        .map((f) => `.agent/scripts/guards/${f}`),
+    ];
+    for (const f of fontes) {
+      writeF(dir, f, readF(dir, f).replace(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm, "// --- Verificacao:"));
     }
   }, { code: 1, includes: ["nao encontrei nenhum cabecalho"] });
 
