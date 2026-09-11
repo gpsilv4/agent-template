@@ -35,9 +35,14 @@ main branch              ->  git push  ->  {{HOSTING}} PRODUCAO
 ```bash
 git clone <repo-url>
 cd {{PROJECT_SLUG}}
-nvm use          # usa a versao Node definida em .nvmrc
+nvm use                              # usa a versao Node definida em .nvmrc
+git config core.hooksPath .githooks  # liga os hooks do git (versionados)
 npm install
 ```
+
+> O `core.hooksPath` e **por clone**: o git nao versiona `.git/hooks`, logo nao ha forma de o
+> ligar automaticamente. Sem ele o `commit-msg` nao corre e a regra de mensagens limpas passa a
+> ser so prosa. Confirmar com `git config core.hooksPath` (tem de devolver `.githooks`).
 
 Antes de comecar a desenvolver, ler `CONTRIBUTING.md` para workflow, commit format e PR process.
 

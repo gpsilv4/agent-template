@@ -142,6 +142,17 @@ const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O hook `commit-msg` do git. Nao vive em `.claude/hooks/` porque nao e so-Claude-Code: e
+    // o git que o corre, logo vale para qualquer ferramenta e qualquer pessoa. O `sinal` e o
+    // `console.error(` — e por ai que ele explica a recusa antes de sair `!= 0`.
+    alvo: ".githooks/commit-msg",
+    suite: ".agent/scripts/test-commit-msg.mjs",
+    // : sem isto o padrao casava a DEFINICAO, e mutar uma definicao da erro
+    // de sintaxe — a suite ficava vermelha pela razao errada e contava como cobertura.
+    sinal: /(?<![\w.$])(?<!function\s)recusar\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-test-surface.mjs",
     suite: ".agent/scripts/test-test-surface.mjs",
     // `fatal(` entra ao lado do `warn(`: os tres sitios de "nao consegui medir" eram
@@ -232,6 +243,11 @@ if (!only) {
     // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard
     // errado, porque corre ANTES de cada ferramenta.
     ...listarDir(".claude/hooks").filter((f) => f.endsWith(".mjs")).map((f) => `.claude/hooks/${f}`),
+    // E o `.githooks/`, pela mesma razao: codigo de enforcement que corre antes de um commit
+    // ficar escrito. Sem esta linha, um hook novo ali entrava sem par e sem suite — que e o
+    // buraco que esta descoberta existe para nao ter. Os ficheiros nao tem extensao (o git
+    // exige o nome exacto do evento), logo nao ha filtro por sufixo.
+    ...listarDir(".githooks").map((f) => `.githooks/${f}`),
   ];
   const registados = new Set(PARES.map((p) => p.alvo));
   for (const f of noDisco) {

@@ -90,7 +90,10 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 - [ ] Correr os `grep` de detecao de **cada entrada** de `.agent/rules/anti-patterns.md` sobre o diff
 - [ ] Algum achado -> corrigir, ou justificar por escrito porque nao se aplica
+- [ ] Duvida sobre o que uma deteccao apanha, ou porque a entrada existe? -> `src/docs/anti-patterns-why.md`
+      (evidencia e receitas por inteiro; **nao** carregado, abrir so quando faz falta)
 - [ ] O trabalho revelou um padrao evitavel novo? -> propor entrada nova em `anti-patterns.md`
+      **e** a seccao correspondente no `anti-patterns-why.md` (as duas andam em par)
 
 ## 9. Testes
 

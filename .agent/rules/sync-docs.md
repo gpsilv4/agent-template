@@ -56,6 +56,10 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 23. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 24. [ ] `SECURITY.md` — politica de disclosure atualizada
 25. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
+25b. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
+    em `PARES` no `mutation-sweep.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
+    do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no
+    `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
 26. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)

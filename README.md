@@ -83,6 +83,7 @@ When you open a new AI session in any project using this template, the agent **a
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
 └── scripts/
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
+    ├── test-commit-msg.mjs     <- Negative tests for the .githooks/commit-msg hook
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── guards/                 <- Guard modules split out of the entry point
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
@@ -151,6 +152,7 @@ SECURITY.md                     <- Vulnerability disclosure policy
 src/docs/
 ├── agent-guide.md              <- Guide for .agent/ and .github/
 ├── ticket-method-why.md        <- Where each rule came from, what it costs, what was measured
+├── anti-patterns-why.md        <- Evidence behind each anti-pattern: what it cost, how it was caught
 └── CHANGELOG.md                <- Changelog template
 ```
 

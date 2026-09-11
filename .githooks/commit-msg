@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/**
+ * Hook `commit-msg`: nenhuma mensagem de commit atribui codigo a uma IA — {{PROJECT_NAME}}
+ *
+ * PORQUE EXISTE: o `process-rules.md` diz "NUNCA adicionar `Co-Authored-By` (de qualquer agente
+ * IA)" desde sempre, e um agente escreveu-o na mesma. Uma mensagem de commit e **imutavel**
+ * depois de mergeada: e a categoria de erro onde a prosa custa mais e corrige menos.
+ *
+ * PORQUE UM HOOK DO GIT, E NAO UM DO CLAUDE CODE: um `PreToolUse` inspecciona a linha de
+ * comando, logo ve `git commit -m "..."` e **nao** ve `git commit -F ficheiro` sem abrir o
+ * ficheiro — e foi exactamente por `-F` que a regra foi violada. Este hook recebe a mensagem
+ * **final**, venha ela de `-m`, `-F`, `--amend`, `-c`, do editor ou de um squash. E vale para
+ * qualquer ferramenta e qualquer pessoa, nao so para um agente.
+ *
+ * COMO SE LIGA (uma vez por clone — o git nao versiona `.git/hooks`):
+ *
+ *     git config core.hooksPath .githooks
+ *
+ * O `/setup` e o `BOOTSTRAP.md` mandam correr isto. Quem nao o correr fica sem a rede: e a
+ * mesma limitacao honesta que o `AP4` descreve para o gate da superficie de teste — a
+ * autoridade que nao depende de configuracao local e o **CI**.
+ *
+ * BLOCKLIST, E DE PROPOSITO — o `AP6` diz que um allowlist falha fechado e e preferivel, mas
+ * aqui o allowlist nao existe: nao ha forma de enumerar os humanos legitimos, e um
+ * `Co-Authored-By` de uma pessoa **tem** de passar. Logo enumera-se o que e IA. A lista falha
+ * aberta por construcao: um modelo novo com nome novo passa ate alguem o acrescentar. Esta
+ * escrita para ser facil de estender, e a mensagem de recusa diz onde.
+ */
+
+import { readFileSync } from "fs";
+
+/** Recusa o commit: imprime e sai `!= 0`. Existe como FUNCAO e nao como `console.error` +
+ *  `process.exit` soltos pela mesma razao que o `fatal()` dos verificadores deste repo — a
+ *  varredura de mutacao procura sitios por nome, e dezasseis `console.error` soltos faziam-na
+ *  contar cada linha de formatacao como um sitio a cobrir. Medido: `7/16`, com as nove por
+ *  cobrir a serem linhas em branco. Com uma funcao, os sitios sao as DECISOES. */
+function recusar(titulo, detalhe = []) {
+  console.error("");
+  console.error(`  ${titulo}`);
+  console.error("");
+  for (const l of detalhe) console.error(`  ${l}`);
+  console.error("");
+  process.exit(1);
+}
+
+const caminho = process.argv[2];
+// Sem argumento nao ha nada para ler. Reprovar, e nao deixar passar: um hook que "nao
+// conseguiu medir" a dizer OK e o `AP2` aplicado a si proprio.
+if (!caminho) recusar("commit-msg: o git nao passou o ficheiro da mensagem — nao consigo verificar.");
+
+let msg = "";
+try {
+  msg = readFileSync(caminho, "utf8");
+} catch (err) {
+  recusar(`commit-msg: nao consegui ler ${caminho}: ${err.message}`);
+}
+
+// Os comentarios do git (`#` no inicio da linha) nao entram na mensagem final, logo tambem nao
+// entram aqui — senao o texto de ajuda do proprio git podia disparar o hook.
+const linhas = msg
+  .split("\n")
+  .filter((l) => !/^\s*#/.test(l));
+
+/** Nomes que identificam uma ferramenta de IA. Acrescentar aqui quando aparecer outro. */
+const IA =
+  /claude|anthropic|chatgpt|openai|gpt-[0-9]|copilot|gemini|\bbard\b|cursor|codeium|windsurf|devin|aider|sourcegraph|cody|llama|mistral|deepseek|\bgrok\b/i;
+
+/** Formas conhecidas de atribuir autoria numa mensagem de commit. */
+const FORMAS = [
+  {
+    // O trailer canonico. So reprova quando o valor **e** uma IA: um co-autor humano passa.
+    re: /^\s*co-authored-by:\s*(.+)$/i,
+    valor: (m) => m[1],
+    nome: "trailer `Co-Authored-By`",
+  },
+  {
+    re: /^\s*(?:signed-off-by|assisted-by|generated-by|authored-by):\s*(.+)$/i,
+    valor: (m) => m[1],
+    nome: "trailer de autoria",
+  },
+  {
+    // "Generated with X", "Made with X", com ou sem o emoji e com ou sem link markdown.
+    re: /(?:generated|created|made|written|built)\s+(?:with|by)\s+(.+)$/i,
+    valor: (m) => m[1],
+    nome: "linha de \"generated with\"",
+  },
+  {
+    // O emoji de robo sozinho ja e atribuicao: nenhum commit deste repo precisa dele.
+    re: /(🤖)/u,
+    valor: (m) => m[1],
+    nome: "emoji de robo",
+  },
+];
+
+const achados = [];
+for (const [i, linha] of linhas.entries()) {
+  for (const f of FORMAS) {
+    const m = linha.match(f.re);
+    if (!m) continue;
+    const valor = f.valor(m);
+    // O emoji nao precisa de casar um nome de IA; os trailers precisam, senao um co-autor
+    // humano era recusado.
+    if (f.nome !== "emoji de robo" && !IA.test(valor)) continue;
+    achados.push({ n: i + 1, linha: linha.trim(), forma: f.nome });
+  }
+}
+
+if (achados.length === 0) process.exit(0);
+
+recusar("COMMIT RECUSADO — a mensagem atribui o trabalho a uma ferramenta de IA.", [
+  ...achados.flatMap((a) => [`  linha ${a.n} (${a.forma}):`, `    ${a.linha}`]),
+  "",
+  "A regra esta em `.agent/rules/process-rules.md` (Regra de Git): commits limpos, so com",
+  "o conteudo descritivo da alteracao. Uma mensagem de commit e imutavel depois de mergeada",
+  "— por isso isto reprova aqui, e nao no review.",
+  "",
+  "Apagar as linhas acima e repetir o commit.",
+  "Falso positivo (um co-autor humano cujo nome casa a lista)? A lista de nomes de IA vive",
+  "no topo de `.githooks/commit-msg` — ajustar la, e nao com --no-verify.",
+]);
