@@ -12,9 +12,12 @@
 
 ---
 
-<!-- Exemplo (substituir/remover no bootstrap — este e ilustrativo, nao especifico do projeto):
+<!-- Exemplo (substituir/remover no bootstrap — este e ilustrativo, nao especifico do projeto).
+     Usa `##`, o mesmo nivel das entradas reais: com `###` um `grep '^### AP'` devolvia **so**
+     este exemplo e dava a impressao de que existia apenas o AP1 — aconteceu de facto a quem
+     correu o `/upgrade`, e cegava qualquer verificacao escrita contra o nivel errado.
 
-### AP1 — `useEffect` para data fetching
+## AP1 — `useEffect` para data fetching
 
 - **Origem**: B3 (dados desatualizados apos navegacao)
 - **Anti-padrao**: `useEffect(() => { fetch(...).then(setState) }, [])` para dados do backend.

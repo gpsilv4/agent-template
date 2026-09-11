@@ -188,57 +188,69 @@ if (refs.length === 0) {
   guardsRun++;
 }
 
-// --- Guard 1c: o TOTAL carregado a cada sessao ---
-// O Guard 1 orcamenta ficheiro a ficheiro e o 1b as referencias. Ninguem orcamentava a
-// **soma** — e e a soma que o agente paga a cada sessao. Medido quando este guard nasceu:
-// 39803 bytes (~10k tokens) entre o `CLAUDE.md` e os seus `@imports`, com o
-// `anti-patterns.md` a ter subido de 6840 para 10339 numa unica sessao. Cinco ficheiros
-// podem estar todos abaixo de 12000 e a soma crescer sem nada avisar.
+// --- Guard 1c: o CONTEXTO carregado a cada sessao ---
+// Orcamenta **so** os `@imports` de `.agent/context/`. As rules tem dono proprio — o Guard 1
+// orcamenta cada uma a 12 000 — e o contexto nao tem dono nenhum: e a metade que cresce
+// sozinha. Somar as duas num total unico media dois problemas com remedios diferentes num
+// numero que nao apontava para nenhum deles.
 //
-// A lista de ficheiros vem dos `@imports` do proprio `CLAUDE.md`, e nao escrita a mao:
-// acrescentar um import passa automaticamente a contar.
-// Os limiares estao reconciliados com o orcamento POR FICHEIRO, e nao escolhidos a olho —
-// uma leitura independente mostrou que a primeira versao (NOTE 44000 / MAX 52000) reprovava
-// um projeto derivado normal no dia 1. A aritmetica:
+// O total unico anterior (64 000) era **inalcancavel por construcao**, e isso apareceu ao
+// correr o `/upgrade` num projeto real: cinco rules, cada uma dentro do que o Guard 1 lhes
+// permite, mais o `CLAUDE.md`, dao 63 680 — sobravam **320 bytes** para os seis ficheiros de
+// contexto (o proprio template usa 5 352). Um projeto que cumprisse o Guard 1 por inteiro nao
+// podia cumprir o 1c, e a unica saida era subir o limiar: a solucao degenerada que este repo
+// existe para impedir.
 //
-//   CLAUDE.md                      ~3 700
-//   3 rules do template (Guard 1)  ate 36 000  (12 000 x 3)
-//   2 rules de dominio (Guard 1)   ate 24 000  (12 000 x 2, geradas no bootstrap)
-//   .agent/context/*               ~4 700
-//   ----------------------------------------
-//   pior caso que o Guard 1 permite  ~68 400
-//
-// Medido: o template nu esta nos 39 803, e um derivado com rules de dominio modestas
-// (5,6 KB + 4,7 KB) chega aos **49 468** — que a versao anterior ja marcava com NOTE e a
-// 2,5 KB do gate. O NOTE fica em 56 000 e o gate em 64 000: da folga a um projeto real,
-// continua **abaixo** do pior caso do Guard 1 (logo ainda vincula), e apanha drift a serio.
-const CARREGADO_NOTE = 56000;
-const CARREGADO_MAX = 64000;
+// O TETO E DERIVADO dos limites de arquivamento que a `process-rules.md` ja impoe, e nao do
+// tamanho que os ficheiros tem hoje — calibrar pelo presente e escrever "esta bem assim".
+// `decisions` ~150 linhas (~12k) + `walkthrough` ~200 (~16k) + os tres substituidos a cada
+// feature (~6k) dao ~34k antes do backlog; o backlog ativo de um projeto real leva isso aos
+// ~48k. Um projeto derivado ajusta estes numeros a partir das suas proprias regras.
+const CONTEXTO_NOTE = 36000;
+const CONTEXTO_MAX = 48000;
 {
   const raiz = read("CLAUDE.md");
   if (raiz === null) {
     skip("Guard 1c — sem CLAUDE.md");
   } else {
     const bytesDe = (c) => Buffer.byteLength(c.replace(/\r\n/g, "\n"), "utf8");
-    let total = bytesDe(raiz);
+    let contexto = 0;
+    let outros = bytesDe(raiz);
+    let vistos = 0;
     const ausentes = [];
     for (const m of raiz.matchAll(/^@(\S+)/gm)) {
       const c = read(m[1]);
-      if (c === null) ausentes.push(m[1]);
-      else total += bytesDe(c);
+      if (c === null) {
+        ausentes.push(m[1]);
+        continue;
+      }
+      if (m[1].startsWith(".agent/context/")) {
+        contexto += bytesDe(c);
+        vistos++;
+      } else {
+        outros += bytesDe(c);
+      }
     }
     const nota = ausentes.length ? ` (${ausentes.length} import(s) gerado(s) no bootstrap ainda ausente(s))` : "";
-    if (total > CARREGADO_MAX) {
-      warn(`contexto carregado = ${total} bytes > ${CARREGADO_MAX}${nota} — arquivar historico inerte ou mover evidencia para src/docs/`);
-    } else if (total > CARREGADO_NOTE) {
-      note(`contexto carregado = ${total} bytes (perto do limite ${CARREGADO_MAX})${nota}`);
+    if (vistos === 0) {
+      // Zero imports de contexto e legitimo (um projeto pode nao os importar), mas tem de o
+      // DIZER: um orcamento que mede zero nao pode sair como "esta bem" — e o `AP2`.
+      skip(`Guard 1c — nenhum @import de .agent/context/ em CLAUDE.md${nota}`);
     } else {
-      ok(`contexto carregado = ${total} bytes${nota}`);
+      if (contexto > CONTEXTO_MAX) {
+        warn(`contexto carregado = ${contexto} bytes > ${CONTEXTO_MAX}${nota} — arquivar historico inerte ou mover evidencia para src/docs/`);
+      } else if (contexto > CONTEXTO_NOTE) {
+        note(`contexto carregado = ${contexto} bytes (perto do limite ${CONTEXTO_MAX})${nota}`);
+      } else {
+        ok(`contexto carregado = ${contexto} bytes${nota}`);
+      }
+      // A outra metade continua visivel, sem gate proprio: o custo por sessao e a soma, e
+      // esconde-la seria trocar um numero que nao apontava para nada por nenhum numero.
+      note(`  ...dos quais rules + CLAUDE.md = ${outros} bytes; total por sessao = ${contexto + outros}`);
+      guardsRun++;
     }
-    guardsRun++;
   }
 }
-
 
 // --- Guard 1d: as Fronteiras copiadas nos ponteiros finos ---
 // O `.cursor/rules/*.mdc` e o `.github/copilot-instructions.md` sao ponteiros para o
@@ -525,6 +537,87 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir });
+
+// --- Guard 15: as referencias a anti-padroes RESOLVEM ---
+// Uma citacao de anti-padrao errada e pior do que nenhuma: manda o leitor a uma entrada
+// REAL, que confirma uma leitura que nao e a do autor, e nada no ecra a denuncia. Copiar
+// prosa entre repos volta a acontecer — um `/upgrade` traz dezenas de citacoes de uma vez, e
+// os numeros de um projeto derivado nao sao os do template. Aconteceu de facto: num consumidor
+// deste template, mais de vinte citacoes trazidas pelos scripts passaram a apontar para
+// entradas existentes com outro significado.
+//
+// No template este guard esta sempre verde (todas resolvem). O valor dele e nos derivados —
+// que e para quem o template existe.
+//
+// Nota para quem editar este comentario: ele **entra na varredura**. Nao citar numeros
+// concretos aqui, ou o guard reprova-se a si mesmo.
+{
+  const ap = read(".agent/rules/anti-patterns.md");
+  if (ap === null) {
+    skip("Guard 15 (referencias a anti-padroes) — sem .agent/rules/anti-patterns.md");
+  } else {
+    // Comentarios HTML fora: o exemplo ilustrativo do template nao e uma definicao.
+    const semComentarios = ap.replace(/<!--[\s\S]*?-->/g, "");
+    // `#{2,3}`: as entradas deste repo usam `##`, e um derivado pode usar `###`.
+    const existentes = new Set([...semComentarios.matchAll(/^#{2,3}\s+AP(\d+)\b/gm)].map((m) => m[1]));
+    const alvos = [
+      ...(listDir(".agent/rules", ".md") ?? []).map((n) => `.agent/rules/${n}.md`),
+      ...(listDir(".agent/workflows", ".md") ?? []).map((n) => `.agent/workflows/${n}.md`),
+      ...(listDir(".agent/scripts", ".mjs") ?? []).map((n) => `.agent/scripts/${n}.mjs`),
+      ...(listDir(".agent/scripts/guards", ".mjs") ?? []).map((n) => `.agent/scripts/guards/${n}.mjs`),
+      ...(listDir(".agent/context", ".md") ?? []).map((n) => `.agent/context/${n}.md`),
+      ...(listDir("src/docs", ".md") ?? []).map((n) => `src/docs/${n}.md`),
+      // `.claude/` entra: os hooks, as suites deles e os subagentes tambem citam
+      // anti-padroes, e deixa-los de fora era medir a maioria das citacoes em vez de todas —
+      // a lacuna silenciosa que este guard existe para nao ter.
+      ...(listDir(".claude/agents", ".md") ?? []).map((n) => `.claude/agents/${n}.md`),
+      ...(listDir(".claude/hooks", ".mjs") ?? []).map((n) => `.claude/hooks/${n}.mjs`),
+      ...(listDir(".claude/hooks/tests", ".mjs") ?? []).map((n) => `.claude/hooks/tests/${n}.mjs`),
+      "CLAUDE.md",
+      "GEMINI.md",
+      "AGENTS.md",
+      ".agent/BOOTSTRAP.md",
+      // O `README.md` entra por medicao: tinha uma citacao fora do alcance da primeira
+      // versao desta lista, e e o ficheiro mais lido do repo — uma citacao morta ali engana
+      // mais que em qualquer outro sitio.
+      "README.md",
+      "CONTRIBUTING.md",
+    ];
+    let citacoes = 0;
+    let mortas = 0;
+    for (const alvo of alvos) {
+      const c = read(alvo);
+      if (c === null) continue;
+      c.split("\n").forEach((linha, i) => {
+        for (const m of linha.matchAll(/\bAP(\d+)\b/g)) {
+          citacoes++;
+          if (!existentes.has(m[1])) {
+            warn(`${alvo}:${i + 1}: cita AP${m[1]}, que nao existe em anti-patterns.md`);
+            mortas++;
+          }
+        }
+      });
+    }
+    // Projeto sem anti-padroes ainda (acabado de arrancar) e legitimo: SKIP visivel. Ja um
+    // ficheiro COM entradas e ZERO citacoes significa que as referencias se perderam.
+    if (existentes.size === 0 && citacoes === 0) {
+      skip("Guard 15 — sem anti-padroes definidos e sem citacoes");
+    } else if (citacoes === 0) {
+      // `note` e nao `warn`, por duas razoes que apontam na mesma direcao. Primeira: um
+      // projeto derivado que acabou de escrever o seu primeiro anti-padrao tem zero citacoes
+      // **legitimamente** — um gate ali seria falso positivo no dia 1. Segunda: o caso e
+      // inalcancavel por teste neste repo (os proprios verificadores citam anti-padroes, e o
+      // guard varre-os), e um `warn` que nenhum teste pode cobrir e peso morto que a
+      // varredura de mutacao reprova, com razao. Informa sem bloquear.
+      note("nenhum ficheiro cita um anti-padrao — verificar se as referencias se perderam");
+      guardsRun++;
+    } else {
+      if (mortas === 0) ok(`${citacoes} referencia(s) a anti-padroes resolvem (${existentes.size} definidos)`);
+      guardsRun++;
+    }
+  }
+}
+
 
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---
 // Extraidos para `guards/versions.mjs`. Configurar o `CHECKS` la.

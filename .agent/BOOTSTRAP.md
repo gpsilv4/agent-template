@@ -312,7 +312,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 19 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 20 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -424,7 +424,17 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)
 
-- **`AGENTS.md`**: entry point cross-tool (Cursor, Windsurf, Copilot). O sweep de placeholders (2.1) preenche-o; verificar que reflete a stack e a descricao.
+- **`AGENTS.md`**: entry point cross-tool (Cursor, Windsurf, Copilot, ChatGPT/Codex). O sweep de placeholders (2.1) preenche-o; verificar que reflete a stack e a descricao.
+- **`.github/copilot-instructions.md`** e **`.cursor/rules/project.mdc`**: os ficheiros que o
+  Copilot e o Cursor carregam **automaticamente** — cada tool le so o seu. Sao ponteiros para o
+  `AGENTS.md` **mais uma copia inline do bloco "Fronteiras"**, porque nao esta verificado que
+  esses tools sigam uma referencia em markdown; sem a copia, um deles que nao a siga ficava com
+  um mapa de pastas e **zero regras**.
+  > **Se adaptares as Fronteiras no `CLAUDE.md`** — e um projeto que nao seja TypeScript **tem**
+  > de o fazer (`any` proibido, ~400 linhas) — **adapta as duas copias no mesmo passo**. O
+  > **Guard 1d** compara-as e reprova se divergirem: e uma duplicacao **forcada** (cada tool le
+  > so o seu ficheiro), logo e verificada em vez de proibida. O sweep de placeholders da 2.1 ja
+  > cobre o `{{UI_LANGUAGE}}` nas tres; o que ele nao apanha e uma **edicao** de conteudo.
 - **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
@@ -480,6 +490,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
+- [ ] **As Fronteiras iguais nos tres sitios** (`CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`)? O **Guard 1d** verifica-o — se adaptaste o bloco num, adapta nos outros dois
 - [ ] **`README.md` substituido** pelo README do projeto (nao a capa do template nem o badge do repo do template)?
 - [ ] **`.github/CODEOWNERS`** sem `{{GITHUB_OWNER}}` (`grep "{{" .github/CODEOWNERS` -> zero linhas)?
 - [ ] `.github/workflows/ci.yml` configurado com triggers e scripts corretos?

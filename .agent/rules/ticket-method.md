@@ -154,6 +154,11 @@ Angulos (adaptar ao dominio no bootstrap; os de UI nao servem a uma CLI ou a uma
 | Com UI | modo correcao · leitor de ecra · so teclado · rede lenta · telemovel deitado |
 | Sem UI | clone fresco · toolchain diferente · o agente le isto a letra · acoplamento entre ficheiros |
 
+> **O angulo mais barato, e o que mais rendeu:** **correr os comandos que a documentacao manda
+> correr.** Nao reler a receita — executa-la. Tres leituras independentes nao viram o que uma
+> corrida das receitas do `BOOTSTRAP.md` apanhou em minutos. Um snippet partido nao se ve a
+> ler: da zero resultados, que e indistinguivel de "esta tudo bem" (`AP2`).
+
 **Quantas esperar** (para orcamentar, nao para cumprir):
 
 | Ticket | Passagens tipicas | Ponto de decisao |

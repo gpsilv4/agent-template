@@ -121,7 +121,13 @@ const CONTAGENS = [
   // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
   // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
   // do runner"), que este verificador nao protegia.
-  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))" },
+  // `zero: true` — so conta como enfraquecimento se chegar a **zero**, nao se apenas descer.
+  // Consolidar tres `console.log` + `process.exit(1)` num helper faz a contagem cair de 3 para
+  // 1 e e um refactor legitimo; medido num projeto derivado, dava WARN. O invariante real nao
+  // e "nao pode descer", e **"o runner tem de ter um caminho de saida != 0"**. Apagar o unico
+  // `process.exit(1)` continua apanhado; as outras duas deteccoes (a referencia a contagem de
+  // falhas, e a condicao literalmente falsa) cobrem o ataque de o tornar inalcancavel.
+  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))", zero: true },
   // Contar o `process.exit(1)` NAO basta: o ataque medido nao o apaga, torna-o
   // **inalcancavel** (`if (failures.length) {` -> `if (false) {`), e a contagem nao se move.
   // O que desaparece e a **referencia a contagem de falhas** — e essa desce.
@@ -132,6 +138,17 @@ const CONTAGENS = [
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
 ];
 
+// NOTA sobre este ficheiro se contar a si mesmo: ele esta na superficie congelada (ver
+// `CONFIG_CONTAVEIS`), logo os padroes abaixo sao aplicados ao seu proprio codigo. Ha uma
+// assimetria medida que convem saber antes de acrescentar uma entrada:
+//   - um padrao `/\bfoo\b/` **nao** casa a sua propria definicao: no texto-fonte o `\b` sao
+//     dois caracteres e o `b` e uma letra, logo nao ha fronteira de palavra antes de `foo`;
+//   - um padrao com alternacao — `/\b(?:xit|xdescribe|xtest)\b/` — **casa-se a si mesmo**
+//     (medido: tres ocorrencias), porque o `?:` e o `|` a volta nao sao caracteres de palavra.
+// Consequencia pratica: acrescentar uma entrada do segundo tipo faz este ficheiro sinalizar-se
+// no PR que a acrescenta. Nao e defeito — mudar o detetor merece um olhar humano —, mas e
+// melhor saber porque acontece com umas entradas e nao com outras.
+
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
 // congelada — nunca no codigo de producao, senao um `.skip(offset)` de paginacao ou um
 // `only` de uma query dao falso positivo.
@@ -141,7 +158,24 @@ const MARCAS = [
   // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
   { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
   { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
-  { re: /^\s*if:\s*(?!github\.event_name == 'pull_request')/m, msg: "condicao `if:` acrescentada" },
+  // DUAS falhas empilhadas na versao anterior desta linha, e cada uma sozinha ja matava a
+  // excecao do `pull_request`:
+  //   1. `\s*` e guloso mas recua: o lookahead falhava, o `\s*` voltava a largura ZERO, e
+  //      passava a ser avaliado sobre " github…" (com espaco a frente), que nao casa a
+  //      excecao. O match produzido era so `"        if:"`.
+  //   2. A mortal: o `conta()` aplica `semStrings()` **antes** do regex, logo a linha
+  //      comparada e `if: github.event_name == ""` — o literal `'pull_request'` **nao existe
+  //      la** e a excecao nao poderia casar nem com o `\s*` corrigido.
+  // Medido no `ci.yml` deste repo: acrescentar o step gated por `pull_request` — o caso de
+  // uso para que a excecao foi escrita — levava a contagem de 4 para 5 e dava exit 1.
+  // Agora ancora em `github.event_name`, que sobrevive ao `semStrings`, e o `[ \t]*` **dentro**
+  // do lookahead e o que impede o recuo a largura zero de a contornar.
+  // `cru: true` e o que torna a excecao possivel: ela cita um literal, e no texto
+  // normalizado `'pull_request'` e `'push'` sao indistinguiveis. Assim so o gating em
+  // `pull_request` e excluido — um step gated a `push` **conta**, porque deixa de correr em
+  // PRs, e isso e enfraquecimento. O `[ \t]*` dentro do lookahead impede o recuo a largura
+  // zero de o contornar.
+  { re: /^[ \t]*if:[ \t]*(?![ \t]*github\.event_name == 'pull_request')/m, msg: "condicao `if:`", cru: true },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
@@ -238,16 +272,17 @@ try {
 }
 console.log(`  baseline: ${base}\n`);
 
-// A superficie tem de ter existido **na baseline**. Se os `TEST_GLOBS` nao casavam nada la —
-// o estado de um projeto derivado ate alguem seguir o `BOOTSTRAP.md` §2.4 — este verificador
-// imprimia `superficie de teste intacta` e saia `0`, **para sempre**, sobre uma suite apagada.
-// E o `AP2` aplicado a si mesmo, e a unica mitigacao era prosa.
+// A superficie tem de existir **nalgum lado** — na baseline ou no disco. Se os `TEST_GLOBS`
+// nao casam nada em nenhum dos dois, este verificador imprimia `superficie intacta` e saia
+// `0`, **para sempre**, sobre uma suite apagada: e o `AP2` aplicado a si mesmo, e a unica
+// mitigacao era prosa.
 //
-// Olha para a BASELINE e nao para o disco de proposito: apagar o unico ficheiro de teste
-// deixa o disco sem superficie, mas isso e **enfraquecimento** e tem a sua propria mensagem
-// (`APAGADO`). O que este bloco distingue e "os globs nunca viram nada" — ma configuracao.
-// A primeira versao media o disco e roubava a mensagem ao caso do APAGADO; dois testes
-// existentes apanharam-no.
+// **Os dois lados, e nao so um.** Olhar so para o disco roubava a mensagem ao caso do
+// `APAGADO` (apagar o unico teste deixa o disco vazio, mas isso e enfraquecimento e tem
+// mensagem propria). Olhar so para a baseline reprovava qualquer projeto cuja baseline seja
+// anterior aos testes — medido a seguir a receita do `BOOTSTRAP.md` neste repo, cujo commit
+// inicial e anterior as suites: o gate falhava a dizer que os globs estavam mal. Ambos os
+// erros foram meus, um em cada correcao.
 {
   let naBaseline = [];
   try {
@@ -255,14 +290,22 @@ console.log(`  baseline: ${base}\n`);
   } catch (err) {
     fatal(`o git nao conseguiu listar os ficheiros da baseline: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
   }
-  const superficie = naBaseline.filter((f) => TEST_GLOBS.some((r) => r.test(f)));
-  if (superficie.length === 0) {
+  let noDisco = [];
+  try {
+    noDisco = git(["ls-files"]).split("\n").filter(Boolean);
+  } catch {
+    noDisco = [];
+  }
+  const casa = (f) => TEST_GLOBS.some((r) => r.test(f));
+  const nBase = naBaseline.filter(casa).length;
+  const nDisco = noDisco.filter(casa).length;
+  if (nBase === 0 && nDisco === 0) {
     fatal(
-      `os TEST_GLOBS nao casam nenhum ficheiro de teste em ${base} — nao ha superficie para medir`,
+      `os TEST_GLOBS nao casam nenhum ficheiro de teste, nem em ${base} nem no disco — nao ha superficie para medir`,
       "        adaptar TEST_GLOBS a stack deste projeto (ver BOOTSTRAP.md, 'Adaptar o check-test-surface.mjs')"
     );
   }
-  console.log(`  superficie na baseline: ${superficie.length} ficheiro(s)\n`);
+  console.log(`  superficie: ${nBase} ficheiro(s) na baseline, ${nDisco} no disco\n`);
 }
 
 const eConfigOpaca = (f) => CONFIG_GLOBS.some((r) => r.test(f));
@@ -313,9 +356,15 @@ if (tocados.length === 0) {
     const semComentarios = (t) => t.replace(/^[ \t]*(?:\/\/|\*\/?|\/\*).*$/gm, "");
     const semStrings = (t) =>
       semComentarios(t).replace(/'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*"|`(?:[^`\\\n]|\\.)*`/g, '""');
-    const conta = (texto, re) => {
+    // `cru`: a entrada opta por ver o texto **sem** as strings retiradas. Existe porque uma
+    // excecao que precisa de citar um literal nao pode viver no texto normalizado — o
+    // `semStrings` transforma `'pull_request'` e `'push'` na MESMA string, e ai a excecao ou
+    // exclui os dois ou nenhum. Excluir os dois esconde um enfraquecimento a serio (um step
+    // gated a `push` deixa de correr em PRs). Usar so quando a entrada cita um literal; por
+    // omissao as strings saem, que e o que protege as fixtures.
+    const conta = (texto, re, cru = false) => {
       const g = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
-      return (semStrings(texto).match(g) || []).length;
+      return ((cru ? texto : semStrings(texto)).match(g) || []).length;
     };
     // EXISTIA vs conteudo: um ficheiro de teste **vazio** que e apagado tem conteudo "" na
     // baseline, e depender da truthiness dava-lhe a mensagem vaga em vez de "APAGADO".
@@ -358,16 +407,24 @@ if (tocados.length === 0) {
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;
     }
-    const achadas = MARCAS.filter((m) => conta(agora, m.re) > conta(antes, m.re));
-    const desceram = CONTAGENS.filter((c) => conta(agora, c.re) < conta(antes, c.re));
+    const achadas = MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
+    const desceram = CONTAGENS.filter((c) => {
+      const a = conta(antes, c.re, c.cru);
+      const d = conta(agora, c.re, c.cru);
+      return c.zero ? a > 0 && d === 0 : d < a;
+    });
     const notas = [
       ...achadas.map((a) => `${a.msg} acrescentado(s)`),
-      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
+      // A mensagem tem de contar com as MESMAS flags com que a decisao foi tomada. Sem o
+      // `d.cru`, uma entrada que decide sobre o texto cru reportava numeros do texto
+      // normalizado — podia dizer "2 -> 2" numa linha que acabou de sinalizar. Latente
+      // enquanto nenhuma CONTAGEM usar `cru`, e mentiroso no dia em que usar.
+      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`),
     ];
     // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
     // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
     // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
-    const contavel = CONTAGENS.some((c) => conta(antes, c.re) > 0);
+    const contavel = CONTAGENS.some((c) => conta(antes, c.re, c.cru) > 0);
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
     } else if (config && !contavel) {
