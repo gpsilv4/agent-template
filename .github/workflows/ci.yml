@@ -150,6 +150,8 @@ jobs:
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests
         run: node .agent/scripts/test-commit-msg.mjs
+      - name: Simulador de projeto derivado — negative tests
+        run: node .agent/scripts/test-simulate-derived.mjs
       # A autoridade que o agente nao alcanca (AP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
@@ -188,6 +190,13 @@ jobs:
             echo "  Nenhuma mensagem no intervalo $base..HEAD — nao consegui verificar."
             exit 1
           fi
+      # A verificacao que testa a promessa do template: montar um projeto derivado e correr la
+      # tudo. Custa ~50s (copia o repo e recorre as suites), logo fica so em `pull_request` —
+      # e onde vale a pena e onde alguem le o resultado. Sem isto, a unica forma de saber que
+      # o template funciona num derivado era alguem lembrar-se de o experimentar.
+      - name: Projeto derivado — o template funciona depois do bootstrap
+        if: github.event_name == 'pull_request'
+        run: node .agent/scripts/simulate-derived.mjs
       - name: Test surface — nao enfraquecida desde a base do PR
         if: github.event_name == 'pull_request'
         # `HEAD^1` e nao `base.sha`: o checkout de um PR e o **merge ref**, cujo pai 1 e a

@@ -56,6 +56,10 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 23. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 24. [ ] `SECURITY.md` — politica de disclosure atualizada
 25. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
+25a. [ ] **Ficheiro novo com um `{{PLACEHOLDER}}`?** O bootstrap tem de o varrer: confirmar que
+    o tipo dele esta na Fase 2.1 do `BOOTSTRAP.md`, nos alvos do Guard 13 e no
+    `simulate-derived.mjs`. Um `.githooks/commit-msg` sem extensao escapou as tres e o
+    placeholder sobrevivia ao bootstrap — apanhado pela simulacao de projeto derivado.
 25b. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
     em `PARES` no `mutation-sweep.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
     do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no

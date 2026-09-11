@@ -72,6 +72,12 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir }) {
     ...(listDir(".agent/scripts/guards", ".mjs") || []).map((f) => `.agent/scripts/guards/${f}.mjs`),
     ...(listDir(".claude/commands", ".md") || []).map((f) => `.claude/commands/${f}.md`),
     ...(listDir(".gemini/commands", ".toml") || []).map((f) => `.gemini/commands/${f}.toml`),
+    // Os hooks do git. Nao tem extensao — o git exige o nome exacto do evento — e por isso
+    // escaparam a Fase 2.1 do bootstrap **e** a esta lista quando foram criados: um
+    // `{{PROJECT_NAME}}` ficava la para sempre num projeto derivado. Apanhado pela varredura
+    // do `simulate-derived.mjs`, no dia em que ela passou a olhar para alem das extensoes que
+    // ela propria substitui.
+    ...(listDir(".githooks", "") || []).map((f) => `.githooks/${f}`),
   ];
 
   let ficheirosComSobras = 0;

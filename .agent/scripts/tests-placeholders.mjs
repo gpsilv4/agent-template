@@ -37,7 +37,7 @@ const bootstrapado = (dir) => {
       if (e.isDirectory()) anda(sub);
       // A lista de tipos espelha a Fase 2.1 do BOOTSTRAP. Faltava `.mdc` nas DUAS — o helper
       // e o bootstrap — o que deixava a regra do Cursor com o placeholder para sempre.
-      else if (/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) || e.name === "LICENSE" || e.name === "CODEOWNERS") {
+      else if (/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) || e.name === "LICENSE" || e.name === "CODEOWNERS" || sub.startsWith(".githooks/")) {
         const c = readF(dir, sub);
         const novo = c.replace(/\{\{(?!args\})[A-Z_]+\}\}/g, "VALOR");
         if (novo !== c) writeF(dir, sub, novo);
