@@ -343,6 +343,32 @@ test("`continue-on-error: true` num step e enfraquecimento", (dir) => {
   return ref;
 }, { code: 1, includes: ["continue-on-error"] });
 
+test("uma condicao `if:` qualquer num step e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: false\n");
+  commit(dir, "gate");
+  return ref;
+}, { code: 1, includes: ["condicao `if:`"] });
+
+// O CONTROLO que faltava, e e ele que prova a excecao: sem este caso, ela pode estar escrita
+// e nao excluir nada — foi exactamente o que aconteceu. Duas falhas empilhadas mantiveram-na
+// morta (o `\s*` a recuar a largura zero, e o `semStrings` a apagar o literal citado) e a
+// varredura de mutacao nao as via, porque uma entrada de tabela nao e um sitio de aviso.
+test("`if: github.event_name == 'pull_request'` NAO e enfraquecimento", (dir) => {
+  mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+  writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+  commit(dir, "ci");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, ".github/workflows/ci.yml"),
+    "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: github.event_name == 'pull_request'\n");
+  commit(dir, "gate por evento");
+  return ref;
+}, { code: 0, excludes: ["condicao `if:`"] });
+
 test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
   // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
   // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.

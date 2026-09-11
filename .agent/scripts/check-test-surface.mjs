@@ -141,7 +141,19 @@ const MARCAS = [
   // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
   { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
   { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
-  { re: /^\s*if:\s*(?!github\.event_name == 'pull_request')/m, msg: "condicao `if:` acrescentada" },
+  // DUAS falhas empilhadas na versao anterior desta linha, e cada uma sozinha ja matava a
+  // excecao do `pull_request`:
+  //   1. `\s*` e guloso mas recua: o lookahead falhava, o `\s*` voltava a largura ZERO, e
+  //      passava a ser avaliado sobre " github…" (com espaco a frente), que nao casa a
+  //      excecao. O match produzido era so `"        if:"`.
+  //   2. A mortal: o `conta()` aplica `semStrings()` **antes** do regex, logo a linha
+  //      comparada e `if: github.event_name == ""` — o literal `'pull_request'` **nao existe
+  //      la** e a excecao nao poderia casar nem com o `\s*` corrigido.
+  // Medido no `ci.yml` deste repo: acrescentar o step gated por `pull_request` — o caso de
+  // uso para que a excecao foi escrita — levava a contagem de 4 para 5 e dava exit 1.
+  // Agora ancora em `github.event_name`, que sobrevive ao `semStrings`, e o `[ \t]*` **dentro**
+  // do lookahead e o que impede o recuo a largura zero de a contornar.
+  { re: /^[ \t]*if:[ \t]*(?![ \t]*github\.event_name\b)/m, msg: "condicao `if:`" },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
