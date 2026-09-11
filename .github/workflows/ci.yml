@@ -148,6 +148,8 @@ jobs:
         run: node .agent/scripts/test-test-surface.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
+      - name: commit-msg hook — negative tests
+        run: node .agent/scripts/test-commit-msg.mjs
       # A autoridade que o agente nao alcanca (AP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
@@ -160,6 +162,32 @@ jobs:
         run: node .agent/scripts/check-doc-versions.mjs
       - name: Backlog — contadores, barra de progresso e IDs duplicados
         run: node .agent/scripts/check-backlog.mjs
+      # O `commit-msg` so corre para quem tenha corrido `git config core.hooksPath .githooks`,
+      # e isso e configuracao LOCAL: um clone novo, outra maquina ou outra ferramenta nao a
+      # tem. Esta e a camada que nao depende dela — corre o mesmo hook sobre cada mensagem do
+      # PR. E o mesmo raciocinio do `AP4`: a autoridade que o agente nao alcanca e o CI.
+      - name: Mensagens de commit — sem atribuicao a IA
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse HEAD^1)"
+          # `%B` e o corpo COMPLETO; um `%s` so veria o assunto e os trailers vivem no fim.
+          # `-z` separa por NUL: uma mensagem tem linhas em branco, logo nao ha separador de
+          # linha que sirva. Sem commits no intervalo o loop nao corre e o passo passa — e
+          # correcto: um PR sem commits proprios nao existe.
+          n=0
+          while IFS= read -r -d '' msg; do
+            printf '%s' "$msg" > /tmp/commit-msg-$n
+            node .githooks/commit-msg /tmp/commit-msg-$n
+            n=$((n + 1))
+          done < <(git log --format='%B%x00' "$base..HEAD")
+          echo "  $n mensagem(ns) verificada(s)."
+          # Zero mensagens com um intervalo valido seria o AP2 ("nao ha nada" != "nao consegui
+          # ler"), logo reprova em vez de passar em silencio.
+          if [ "$n" -eq 0 ]; then
+            echo "  Nenhuma mensagem no intervalo $base..HEAD — nao consegui verificar."
+            exit 1
+          fi
       - name: Test surface — nao enfraquecida desde a base do PR
         if: github.event_name == 'pull_request'
         # `HEAD^1` e nao `base.sha`: o checkout de um PR e o **merge ref**, cujo pai 1 e a

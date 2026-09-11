@@ -68,7 +68,7 @@ As regras sao diretivas que o Agente consulta antes de cada acao.
 
 - **[core-rules.md]**: Stack, padroes de codigo criticos, type safety, DRY/reutilizacao, performance, seguranca, CI/CD pipeline, scripts de automacao (doc guards, bundle sizes, backlog, e a varredura de mutacao que prova que as suites afirmam algo).
 - **[process-rules.md]**: Regras de processo: sessao, backlog, arquivamento, sprints, fluxos de trabalho por tipo, testes proativos, Conventional Commits, CI Gate, Git, branches.
-- **[anti-patterns.md]**: Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente).
+- **[anti-patterns.md]** (instrucoes; a **evidencia** — de onde veio cada entrada e o que custou — esta em `src/docs/anti-patterns-why.md`, nao carregado): Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente). As duas metades andam em par: entrada nova na rule, seccao nova no `-why`.
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
 - **sync-docs.md**: Checklist de sincronizacao de docs (26 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.

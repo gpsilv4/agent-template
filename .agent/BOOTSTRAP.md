@@ -417,7 +417,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
-- **`.agent/rules/anti-patterns.md`**: apagar o exemplo comentado (e ilustrativo). A entrada **AP1** que vem preenchida e real e herdada do template — aplica-se a qualquer projeto que escreva testes de verificadores. Manter se o projeto tiver guards/scripts proprios; substituir pela primeira entrada tua se nao tiver.
+- **`.agent/rules/anti-patterns.md`**: apagar **so** o exemplo comentado (esse e ilustrativo). As entradas preenchidas sao reais e herdadas do template, e **os ficheiros do template citam-nas** — as rules, os workflows, os verificadores de `.agent/scripts/` e os hooks de `.claude/`. **Manter enquanto mantiveres esses ficheiros**, e acrescentar os teus com o proximo ID livre. Apagar uma entrada obriga a apagar tambem as citacoes dela, ou o Guard 15 reprova o commit (e diz-te, ficheiro e linha, quais ficaram penduradas). Medido: seguir a versao anterior desta instrucao — deixar o ficheiro sem entradas — dava 68 avisos e exit 1 no dia 1. A evidencia de cada entrada vive em `src/docs/anti-patterns-why.md`, que podes esvaziar sem consequencia nenhuma: nada o cita por numero.
 - **`.agent/rules/ticket-method.md`**: adaptar duas coisas ao projeto — o **nucleo do dominio** (os sitios onde um erro destroi dados ou a confianca, nao apenas da uma resposta errada: reducer, seed, pontuacao, migracoes, precos) e a **lista de angulos** da Fase 3 (os de UI nao servem a uma CLI ou lib). Nao importar — o ponteiro obrigatorio vive em `process-rules.md`.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em `CLAUDE.md`/`GEMINI.md`.
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
@@ -484,7 +484,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
   - Limpo = **sem output**; o pipeline sai com codigo `1` (o `grep` nao encontrou nada). Inverter se algum dia for usado como gate de CI.
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
-- [ ] `anti-patterns.md`: exemplo `AP1` comentado removido, so cabecalho + linha "sem entradas"?
+- [ ] `anti-patterns.md`: exemplo comentado removido, entradas do template **mantidas** (apagar uma exige apagar as citacoes dela — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` no bundle checker atualizados?
 - [ ] `core-rules.md` adaptado a stack?

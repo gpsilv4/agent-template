@@ -39,6 +39,21 @@ razao de estarem aqui: sao as que qualquer projeto repete.
 > aviso que faltava nem existia para ser coberto. Foi um **angulo** da Fase 3 (acoplamento)
 > que o apanhou, nao a varredura. Cobertura de mutacao e um piso, nao um teto.
 
+### Padroes reais de assercao que nao afirma nada
+
+As tres formas que se mediram, e que a Fase 1 existe para apanhar antes de chegarem ao repo:
+
+| Forma | Porque passa sem afirmar |
+|---|---|
+| Assercao de **visibilidade sem limiar** | cumpre-se com **um pixel** visivel; o elemento pode estar praticamente fora do ecra |
+| Assercao de **contagem zero** | cumpre-se no **primeiro instante** em que a contagem e zero — antes de a UI re-renderizar, nao depois |
+| Assercao de **texto contra o output inteiro** | e satisfeita por **outra** verificacao que a mesma mutacao tambem disparou (ver `AP1`) |
+
+A terceira e a que mais reincide em repos de verificadores: numa sessao apanharam-se **tres**
+testes assim, todos escritos na mesma sessao em que o `AP1` estava a ser documentado. Nenhum
+foi encontrado a ler — os tres sairam do **controlo negativo**, que e precisamente a regra que
+a Fase 1 impoe.
+
 ## Fase 3 — porque a paragem e um ponto de decisao e nao um numero
 
 > **"A ultima passagem nao encontrou nada" nao e "esta limpo".** Nesta sessao mediu-se as
@@ -48,6 +63,19 @@ razao de estarem aqui: sao as que qualquer projeto repete.
 > seguinte, de **uso** (secao anterior), achou um defeito de desenho que nenhuma das cinco
 > revisoes viu. Por isso a ausencia de achados encerra a *passagem*, nunca o *ciclo*: quem
 > encerra o ciclo e o utilizador, informado do que ainda nao foi olhado.
+
+### O que apresentar no ponto de decisao, e porque cada item la esta
+
+| Item | Porque, sem ele, a escolha nao e informada |
+|---|---|
+| Achados desta ronda, **com a medicao** | "estava pequeno" nao e um facto; o numero e |
+| Angulos ja usados **e os que faltam** | e o unico item que diz **onde ainda nao se olhou** — sem ele, "mais uma ronda" e uma aposta |
+| O que fica em aberto **de proposito** | um limite nomeado e uma decisao; omitido, e uma surpresa |
+| Custo gasto e custo de mais uma ronda | e o que torna "chega" defensavel em vez de arbitrario |
+
+O agente **propoe** a opcao que recomenda, e nao a assume. As tres escolhas — aceitar assim,
+mais um ciclo com angulo novo declarado, ou corrigir X por inteiro primeiro — estao na tabela
+do `ticket-method.md`.
 
 ---
 

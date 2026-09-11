@@ -6,9 +6,10 @@ Thank you for your interest in contributing to this project.
 
 1. Fork the repository
 2. Clone your fork: `git clone <your-fork-url>`
-3. Install dependencies: `npm install`
-4. Create a branch: `git checkout -b feature/your-feature`
-5. Read the project rules: `.agent/rules/core-rules.md`
+3. Enable the versioned git hooks: `git config core.hooksPath .githooks`
+4. Install dependencies: `npm install`
+5. Create a branch: `git checkout -b feature/your-feature`
+6. Read the project rules: `.agent/rules/core-rules.md`
 
 ## Development Workflow
 
@@ -21,6 +22,12 @@ Follow the workflows in `.agent/workflows/`:
 | Refactor | `/refactor` -> implement -> `/review` |
 
 ## Commit Messages
+
+**No AI attribution.** Commit messages carry the description of the change and nothing else:
+no `Co-Authored-By` naming an AI tool, no "Generated with ...", no robot emoji. A commit
+message is immutable once merged, which is why this is enforced by the versioned `commit-msg`
+hook rather than left to review — run step 3 of Getting Started and it applies to every tool
+and every person, agents included. A human co-author is fine.
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
 

@@ -24,6 +24,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { CONTAGENS, MARCAS } from "./surface-patterns.mjs";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -82,113 +83,21 @@ const CONFIG_CONTAVEIS = [
   /(^|\/)check-[^/]+\.mjs$/,
   /(^|\/)guards\/[^/]+\.mjs$/,
   /(^|\/)test-harness\.mjs$/,
+  // As tabelas de padroes deste verificador. Sem esta linha, extrai-las para um ficheiro
+  // proprio tirava-as da superficie congelada, e apagar metade delas — que e desligar o
+  // detetor — nao mexia em nenhuma contagem vigiada.
+  /(^|\/)surface-patterns\.mjs$/,
   /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
 ];
 
-// O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
-// deixar nenhuma marca de `skip` para trás. Sem isto, cortar uma suite de 328 para 62 linhas
-// passava com exit 0. Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que
-// os nomes contados sejam os que o projeto **usa** para declarar um teste e uma assercao.
-const CONTAGENS = [
-  { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
-  { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
-  { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
-  // O vocabulario DESTE repo. Sem estas linhas a contagem de assercoes era **zero em todas
-  // as suites** (o `expect(`/`assert(` nao aparece em nenhuma, fora de fixtures), e
-  // esvaziar os `includes: [...]` de `test-guards.mjs` passava com `sem marcas de
-  // enfraquecimento` e exit 0 — medido. Um gate que conta um vocabulario que o projeto nao
-  // usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
-  // `\[[^\]]` e nao `\[`: o ataque medido foi trocar `includes: ["x"]` por `includes: []`,
-  // que mantem o `includes: [` e portanto a contagem. So os arrays NAO VAZIOS contam.
-  { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
-  { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
-  { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
-  // `test.each([...])` com a tabela esvaziada para `[]` mantem o `test(` e nao corre nada —
-  // a mesma forma do `includes: []`. So as tabelas NAO VAZIAS contam.
-  { re: /\.each\s*\(\s*\[[^\]]/, msg: "tabelas `each` nao vazias" },
-  // A2: a "configuracao do runner" deste repo conta-se assim.
-  // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
-  // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
-  // forma YAML/JS equivalente (`- run:` inline, `{ alvo: ... }` na mesma linha). Um teste com
-  // a outra forma apanhou-o.
-  { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
-  { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
-  // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
-  // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
-  { re: /^\s*(?:testpaths|addopts|python_files|python_classes|python_functions)\s*=/m, msg: "selecao de testes do pytest" },
-  // A forma mais eficaz de enfraquecer TODAS as suites de uma vez nao move nenhuma das
-  // contagens acima: trocar `if (failures.length) {` por `if (false) {` no harness desliga o
-  // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
-  // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
-  // do runner"), que este verificador nao protegia.
-  // `zero: true` — so conta como enfraquecimento se chegar a **zero**, nao se apenas descer.
-  // Consolidar tres `console.log` + `process.exit(1)` num helper faz a contagem cair de 3 para
-  // 1 e e um refactor legitimo; medido num projeto derivado, dava WARN. O invariante real nao
-  // e "nao pode descer", e **"o runner tem de ter um caminho de saida != 0"**. Apagar o unico
-  // `process.exit(1)` continua apanhado; as outras duas deteccoes (a referencia a contagem de
-  // falhas, e a condicao literalmente falsa) cobrem o ataque de o tornar inalcancavel.
-  { re: /process\.exit\(\s*1\s*\)/, msg: "veredicto do runner (process.exit(1))", zero: true },
-  // Contar o `process.exit(1)` NAO basta: o ataque medido nao o apaga, torna-o
-  // **inalcancavel** (`if (failures.length) {` -> `if (false) {`), e a contagem nao se move.
-  // O que desaparece e a **referencia a contagem de falhas** — e essa desce.
-  { re: /\b(?:failures|falhas|problemas)\.length/, msg: "referencias a contagem de falhas" },
-  // Os proprios verificadores estao na superficie (ver `CONFIG_CONTAVEIS`): despromover um
-  // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
-  // variante do `AP1` que este repo documenta.
-  { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
-];
+/** O ficheiro que DEFINE as marcas. As MARCAS nao se lhe aplicam (ver o uso, abaixo); as
+ *  CONTAGENS aplicam-se, e sao elas que impedem que as tabelas sejam esvaziadas. */
+const definePadroes = (f) => /(^|\/)surface-patterns\.mjs$/.test(f);
 
-// NOTA sobre este ficheiro se contar a si mesmo: ele esta na superficie congelada (ver
-// `CONFIG_CONTAVEIS`), logo os padroes abaixo sao aplicados ao seu proprio codigo. Ha uma
-// assimetria medida que convem saber antes de acrescentar uma entrada:
-//   - um padrao `/\bfoo\b/` **nao** casa a sua propria definicao: no texto-fonte o `\b` sao
-//     dois caracteres e o `b` e uma letra, logo nao ha fronteira de palavra antes de `foo`;
-//   - um padrao com alternacao — `/\b(?:xit|xdescribe|xtest)\b/` — **casa-se a si mesmo**
-//     (medido: tres ocorrencias), porque o `?:` e o `|` a volta nao sao caracteres de palavra.
-// Consequencia pratica: acrescentar uma entrada do segundo tipo faz este ficheiro sinalizar-se
-// no PR que a acrescenta. Nao e defeito — mudar o detetor merece um olhar humano —, mas e
-// melhor saber porque acontece com umas entradas e nao com outras.
-
-// Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
-// congelada — nunca no codigo de producao, senao um `.skip(offset)` de paginacao ou um
-// `only` de uma query dao falso positivo.
-const MARCAS = [
-  // Neutralizar um step de teste **sem o apagar**: a contagem de steps nao se move e nenhuma
-  // marca de `skip` aparece. Medido: `|| true` num step do `ci.yml` passava com exit 0. As
-  // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
-  { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
-  { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
-  // DUAS falhas empilhadas na versao anterior desta linha, e cada uma sozinha ja matava a
-  // excecao do `pull_request`:
-  //   1. `\s*` e guloso mas recua: o lookahead falhava, o `\s*` voltava a largura ZERO, e
-  //      passava a ser avaliado sobre " github…" (com espaco a frente), que nao casa a
-  //      excecao. O match produzido era so `"        if:"`.
-  //   2. A mortal: o `conta()` aplica `semStrings()` **antes** do regex, logo a linha
-  //      comparada e `if: github.event_name == ""` — o literal `'pull_request'` **nao existe
-  //      la** e a excecao nao poderia casar nem com o `\s*` corrigido.
-  // Medido no `ci.yml` deste repo: acrescentar o step gated por `pull_request` — o caso de
-  // uso para que a excecao foi escrita — levava a contagem de 4 para 5 e dava exit 1.
-  // Agora ancora em `github.event_name`, que sobrevive ao `semStrings`, e o `[ \t]*` **dentro**
-  // do lookahead e o que impede o recuo a largura zero de a contornar.
-  // `cru: true` e o que torna a excecao possivel: ela cita um literal, e no texto
-  // normalizado `'pull_request'` e `'push'` sao indistinguiveis. Assim so o gating em
-  // `pull_request` e excluido — um step gated a `push` **conta**, porque deixa de correr em
-  // PRs, e isso e enfraquecimento. O `[ \t]*` dentro do lookahead impede o recuo a largura
-  // zero de o contornar.
-  { re: /^[ \t]*if:[ \t]*(?![ \t]*github\.event_name == 'pull_request')/m, msg: "condicao `if:`", cru: true },
-  // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
-  // forma canonica de desligar um veredicto sem apagar nada.
-  { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
-  { re: /\b(?:it|test|describe|context)\.(?:skip|only|todo)\b/, msg: "seleccao/desativacao de teste" },
-  { re: /\b(?:xit|xdescribe|xtest)\b/, msg: "teste desativado (x-prefixo)" },
-  // `skipIf`/`runIf`/`failing` do vitest: o `\b` do padrao acima falha antes do `If`, logo
-  // `it.skipIf(true)` passava. E `concurrent.skip` tem o modificador pelo meio.
-  { re: /\b(?:it|test|describe|context)\.(?:skipIf|runIf|failing)\b/, msg: "desativacao condicional (skipIf/runIf/failing)" },
-  { re: /\b(?:it|test|describe|context)\.(?:concurrent|sequential|extend)\.(?:skip|only|todo)\b/, msg: "skip/only com modificador pelo meio" },
-  { re: /@pytest\.mark\.(?:skip|xfail)\b/, msg: "marca pytest de skip/xfail" },
-  { re: /\.(?:skip|only)\s*\(\s*\)/, msg: "skip()/only() sem argumento" },
-  { re: /\b(?:pytest\.skip|unittest\.skip)\b/, msg: "skip programatico" },
-];
+// As tabelas de padroes — `CONTAGENS` (o que nao pode descer) e `MARCAS` (o que nao pode
+// aparecer) — vivem em `surface-patterns.mjs`: sao dados, nao decisoes, e eram metade deste
+// ficheiro, que passou o flag das 500 linhas. Esse ficheiro esta em `CONFIG_CONTAVEIS` abaixo,
+// logo continua na superficie congelada: apagar metade das tabelas e desligar o detetor.
 
 function git(args) {
   // `core.quotepath=false`: sem isto o git escapa caminhos nao-ASCII
@@ -212,6 +121,11 @@ const warn = (m) => {
   problemas++;
 };
 const ok = (m) => console.log(`  OK    ${m}`);
+/** Visivel mas sem gate: um facto que quem le tem de confirmar, e nao um enfraquecimento.
+ *  Deliberadamente NAO incrementa `problemas` — se incrementasse era um `warn` com outro
+ *  nome. O unico uso hoje e a contagem que desceu num ficheiro **e** se manteve na superficie:
+ *  uma extracao, que o proprio `core-rules.md` manda fazer acima das 500 linhas. */
+const note = (m) => console.log(`  NOTE  ${m}`);
 /** Nao consegui medir: avisa e sai `!= 0` na hora. Existe como FUNCAO e nao como
  *  `console.log` + `process.exit` soltos porque a varredura de mutacao procura sitios de
  *  aviso por nome: escritos a mao, tres destes ficavam fora da contagem e a varredura
@@ -329,6 +243,8 @@ try {
 }
 
 const tocados = alterados.filter(naSuperficie);
+/** Cada ficheiro tocado com os dois lados ja lidos, para o veredicto poder olhar ao total. */
+const medidos = [];
 if (tocados.length === 0) {
   ok(`superficie de teste intacta (${alterados.length} ficheiro(s) alterado(s), nenhum na superficie)`);
 } else {
@@ -407,19 +323,77 @@ if (tocados.length === 0) {
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;
     }
-    const achadas = MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
+    // RECOLHER agora, DECIDIR depois. A decisao por ficheiro nao pode ser tomada aqui porque
+    // depende de um numero que so existe depois de ler a superficie toda: o TOTAL. Ver o
+    // bloco de veredicto abaixo.
+    medidos.push({ f, antes, agora, config, conta });
+  }
+
+  // --- Totais da superficie: distinguir o que se PERDEU do que se MOVEU -------------
+  // O invariante do `AP4` e "a contagem de testes nao desce" — a contagem, ou seja o TOTAL.
+  // A implementacao comparava so por ficheiro, e por isso punia uma **extracao**: mover testes
+  // de um ficheiro que passou o flag das 500 linhas para um modulo novo lia-se como perda no
+  // ficheiro de origem, com exit 1, embora o total tivesse subido. Medido: as tres extracoes
+  // que o proprio `core-rules.md` exige ("> 500 linhas — candidato obrigatorio a splitting")
+  // fechavam este gate. Um gate que reprova a limpeza que o projeto manda fazer ensina a
+  // ignorar o gate — e e o custo real, nao o exit code.
+  //
+  // Somar so os ficheiros TOCADOS e suficiente e nao e um atalho: um ficheiro que nao mudou
+  // contribui com o mesmo numero para os dois lados e cancela-se. Um ficheiro novo nao existe
+  // na baseline (contribui 0 antes), e um apagado ja avisou por nome proprio acima.
+  const total = (lado, c) => medidos.reduce((n, m) => n + m.conta(m[lado], c.re, c.cru), 0);
+  const totalDesceu = new Map(CONTAGENS.map((c) => [c.msg, total("agora", c) < total("antes", c)]));
+
+  for (const { f, antes, agora, config, conta } of medidos) {
+    // As MARCAS nao se aplicam ao ficheiro que as DEFINE. Nele, cada entrada e uma definicao e
+    // nao uma diretiva: um `xit` ali nao desativa nada, nao ha testes naquele ficheiro. E nao
+    // e uma hipotese — os padroes com alternacao casam-se a si mesmos (ver a nota em
+    // `surface-patterns.mjs`), logo o ficheiro sinalizava-se por existir. A versao anterior
+    // vivia com a verruga por as tabelas partilharem ficheiro com a logica e documentava-a;
+    // separadas, da-se corrigir.
+    //
+    // Nao abre vao nenhum: as CONTAGENS continuam a medir esse ficheiro (os mesmos padroes de
+    // alternacao contam-se la), logo apagar metade das tabelas — que e desligar o detetor —
+    // continua a fazer a contagem descer e a reprovar.
+    const achadas = definePadroes(f)
+      ? []
+      : MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);
       const d = conta(agora, c.re, c.cru);
       return c.zero ? a > 0 && d === 0 : d < a;
     });
+    // O VAO AUTO-REFERENCIAL, e a unica verificacao deste ficheiro que nao pode ser
+    // data-driven. As CONTAGENS sao aplicadas **com as tabelas actuais**: esvaziar as tabelas
+    // desliga a propria contagem que as vigiaria, e tudo passa com exit 0. Medido — a suite
+    // apanhou-o no dia em que as tabelas ganharam ficheiro proprio e o caso passou a ser
+    // exprimivel; antes vivia escondido por elas partilharem ficheiro com a logica.
+    //
+    // A rede tem de estar FORA dos dados: este padrao esta escrito a mao aqui e conta as
+    // ENTRADAS da tabela no texto, sem consultar a tabela. Nao e imune a quem edite este
+    // ficheiro — nada aqui e, e o `AP4` di-lo por escrito — mas fecha o degrau de esvaziar as
+    // tabelas, que nao tocava em nenhum teste e nao deixava marca nenhuma.
+    const entradasDeTabela = /\{\s*re:\s*\//;
+    const tabelasEncolheram =
+      definePadroes(f) && conta(agora, entradasDeTabela) < conta(antes, entradasDeTabela);
+
+    // Desceu NESTE ficheiro e desceu na superficie: perdeu-se. Desceu aqui e o total aguentou:
+    // apareceu noutro ficheiro, logo foi movido. So o primeiro caso e enfraquecimento.
+    const perdidas = desceram.filter((c) => totalDesceu.get(c.msg));
+    const movidas = desceram.filter((c) => !totalDesceu.get(c.msg));
     const notas = [
       ...achadas.map((a) => `${a.msg} acrescentado(s)`),
       // A mensagem tem de contar com as MESMAS flags com que a decisao foi tomada. Sem o
       // `d.cru`, uma entrada que decide sobre o texto cru reportava numeros do texto
       // normalizado — podia dizer "2 -> 2" numa linha que acabou de sinalizar. Latente
       // enquanto nenhuma CONTAGEM usar `cru`, e mentiroso no dia em que usar.
-      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`),
+      ...perdidas.map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`),
+      ...(tabelasEncolheram
+        ? [
+            `entradas das tabelas de padroes: ${conta(antes, entradasDeTabela)} -> ` +
+              `${conta(agora, entradasDeTabela)} — esvaziar as tabelas desliga o detetor`,
+          ]
+        : []),
     ];
     // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
     // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
@@ -427,6 +401,15 @@ if (tocados.length === 0) {
     const contavel = CONTAGENS.some((c) => conta(antes, c.re, c.cru) > 0);
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
+    } else if (movidas.length) {
+      // NOTE e nao WARN, e com os numeros a vista: o total aguentou, logo isto e uma extracao
+      // e nao uma perda. Visivel de proposito — um movimento que ninguem ve e indistinguivel
+      // de uma perda no proximo refactor, e quem le tem de poder confirmar para onde foi.
+      note(
+        `${f}: ${movidas
+          .map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`)
+          .join("; ")} — o total da superficie NAO desceu (movido, nao perdido)`
+      );
     } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
     } else {

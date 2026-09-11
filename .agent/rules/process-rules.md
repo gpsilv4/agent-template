@@ -143,17 +143,16 @@ O detalhe, a escala por tamanho (`S`/`M`/`L`) e a lista de angulos estao em
 
 ### Conventional Commits (Obrigatorio)
 
-Todas as mensagens de commit seguem o formato [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <description>`.
-
-- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci` — tabela completa e exemplos em `CONTRIBUTING.md`.
-- Exemplo: `feat(dashboard): add monthly export`
+Todas as mensagens seguem [Conventional Commits](https://www.conventionalcommits.org/):
+`<type>(<scope>): <description>` — ex. `feat(dashboard): add monthly export`. A lista de types
+e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, aquele nao.
 
 ### Regra de Git (Agente de IA)
 
 - **NUNCA** executar `git commit` ou `git push` de forma autonoma.
 - Sempre que uma tarefa/workflow terminar e estiver pronta para commit, o Agente **deve obrigatoriamente** informar o utilizador do resumo das alteracoes e perguntar: _"Estou pronto para fazer o commit/push, posso avancar?"_.
 - So executar os comandos Git no terminal apos o utilizador analisar o codigo e dar explicitamente "Luz Verde".
-- **NUNCA** adicionar `Co-Authored-By` (de qualquer agente IA) nas mensagens de commit. Commits devem ser limpos, apenas com o conteudo descritivo da alteracao.
+- **NUNCA** atribuir o trabalho a uma IA na mensagem de commit (`Co-Authored-By`, "Generated with", emoji de robo); co-autor humano passa. **Verificado** pelo hook `.githooks/commit-msg` — ligar com `git config core.hooksPath .githooks`.
 - Apos merge de PRs, **perguntar ao utilizador** se deve eliminar o branch ou mante-lo.
 - **CI Gate**: Antes de mergear para main, confirmar que **todos os CI checks passaram** (TypeScript, lint, build, tests, audit). Nunca mergear com checks vermelhos.
 - **PRs**: Usar o template de PR (`.github/pull_request_template.md`) que impoe checklist alinhada com o workflow `/review`.

@@ -17,10 +17,8 @@ Seis fases: **explicar antes de fazer** (0) · desenvolver (1) · um loop com cr
 O criterio diz o que conta como achado; **nao** diz quando o ciclo acaba. Isso e sempre uma
 decisao do utilizador (Fases 2 e 3).
 
-E ha, depois do commit, algo que **nao e do agente e nao se numera: usar** o que mudou — nao
-lhe chamo fase nem passagem de proposito, porque as fases sao seis (0 a 5) e "passagem" ja
-significa uma volta da Fase 3. Nao e um remate opcional: sao **tres instrumentos que apanham
-classes diferentes**, e o terceiro e o unico que apanha uma decisao errada:
+Depois do commit ha algo que **nao e do agente e nao se numera: usar** o que mudou. Sao tres
+instrumentos que apanham classes diferentes, e so o terceiro apanha uma **decisao errada**:
 
 | Instrumento | Apanha |
 |-------------|--------|
@@ -28,8 +26,7 @@ classes diferentes**, e o terceiro e o unico que apanha uma decisao errada:
 | A Fase 4 (leitor independente) | o que **nao consegues ver por teres escrito** |
 | **Usar** (nao e do agente) | o que **decidiste mal** — inclui o que nunca chegou a existir |
 
-Saltar as tres nao e ir mais rapido: e trocar tres tipos de deteccao por um. O detalhe de cada
-um, com as medicoes, esta em **`src/docs/ticket-method-why.md`**.
+Saltar as tres e trocar tres tipos de deteccao por um.
 
 O que escala com o tamanho do ticket sao tres delas — a **Fase 0** (do chat ao ficheiro com
 alternativas), a **Fase 3** (quantas passagens esperar) e a **Fase 4** (se corre). As outras
@@ -89,13 +86,9 @@ leitura; poupa-te a lê-lo quando esta obviamente incompleto.
 Uma regra: **cada teste novo nasce com o seu controlo negativo.** Quebrar de proposito o
 codigo que ele cobre e exigir que fique vermelho **na assercao certa**.
 
-Sem isto, um teste pode nao afirmar nada. Padroes reais desta classe:
-
-- Uma assercao de visibilidade sem limiar passa com **um pixel** visivel.
-- Uma assercao de contagem zero cumpre-se no **primeiro instante** em que a contagem e zero,
-  antes de a UI re-renderizar.
-- Uma assercao de texto contra o output **inteiro** e satisfeita por outra verificacao que a
-  mesma mutacao tambem disparou (ver `AP1` em `anti-patterns.md`).
+Sem isto, um teste pode nao afirmar nada — uma assercao de visibilidade sem limiar passa com um
+pixel, uma de texto contra o output **inteiro** e satisfeita por outra verificacao que a mesma
+mutacao disparou (`AP1`). Mais padroes reais em `src/docs/ticket-method-why.md`.
 
 Para **verificadores** (guards, linters, scripts de CI), o controlo negativo escala para
 **cobertura de mutacao**: desligar cada sitio de erro, um a um, e exigir que a suite fique
@@ -177,14 +170,10 @@ apresentar**.
 Em ambas, o agente apresenta e **espera**. Ficar muito abaixo do tipico nao e eficiencia: e
 sinal de que os angulos declarados eram variacoes do mesmo.
 
-**O que apresentar no ponto de decisao** — para a escolha ser informada, nao um "ok":
-
-- Os achados **desta** ronda e o que foi corrigido, com a medicao de cada um.
-- **Os angulos ja usados** e, sobretudo, **os que faltam**. E o que diz onde ainda nao se
-  olhou — e o que o utilizador precisa para julgar se vale mais uma.
-- O que **fica em aberto de proposito** (defeito conhecido, divida, limite aceite) — nomeado,
-  nao omitido.
-- Custo gasto e custo estimado de mais uma ronda.
+**O que apresentar no ponto de decisao**, para a escolha ser informada: os achados desta ronda
+com a medicao de cada um; os angulos ja usados e **sobretudo os que faltam** (e o que diz onde
+ainda nao se olhou); o que fica em aberto de proposito, nomeado; e o custo gasto e o de mais
+uma ronda.
 
 **A escolha e explicita**, e o agente propoe a que recomenda mas nao a assume:
 
