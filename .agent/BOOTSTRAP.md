@@ -224,7 +224,7 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
-Percorrer todos os `.md`, `.mdc` (regras do Cursor), `.mjs`, `LICENSE` e `.github/CODEOWNERS` e substituir:
+Percorrer todos os `.md`, `.mdc` (regras do Cursor), `.mjs`, `LICENSE`, `.github/CODEOWNERS` e **os ficheiros de `.githooks/`** (nao tem extensao — o git exige o nome exacto do evento) e substituir:
 
 | Placeholder | Fonte |
 |-------------|-------|

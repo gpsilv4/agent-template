@@ -43,6 +43,8 @@
 > canonica do `AP2`.
 
 
+- **Simulador de projeto derivado** (`.agent/scripts/simulate-derived.mjs` + `test-simulate-derived.mjs`): monta um projeto derivado (copia, substitui placeholders, gera as rules do bootstrap, aplica o passo 2.8) e corre la os verificadores. E a unica coisa que testa a promessa do template — todas as outras suites correm sobre o template **nu**. **Nao** se chama `check-*` de proposito: orquestra verificadores que ja tem par, e um alvo sem sitios de aviso proprios reprova na descoberta do sweep com `SINAL ERRADO`. Corre no CI em `pull_request` (~50s). O limite esta no cabecalho: simula o **estado** "bootstrap concluido", nao executa a checklist passo a passo.
+
 ## A regra que os liga
 
 Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua

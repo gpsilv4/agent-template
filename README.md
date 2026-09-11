@@ -107,6 +107,8 @@ When you open a new AI session in any project using this template, the agent **a
     ├── tests-budgets.mjs       <- Series-1 guard tests (mirrors guards/budgets.mjs)
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
+    ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
+    ├── test-simulate-derived.mjs<- Negative tests for it (minimal fixture repo, stubbed checkers)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     └── test-mutation-sweep.mjs <- Negative tests for the sweep itself (fake checker + fake suite)
 
