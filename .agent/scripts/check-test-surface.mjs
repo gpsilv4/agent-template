@@ -138,6 +138,17 @@ const CONTAGENS = [
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
 ];
 
+// NOTA sobre este ficheiro se contar a si mesmo: ele esta na superficie congelada (ver
+// `CONFIG_CONTAVEIS`), logo os padroes abaixo sao aplicados ao seu proprio codigo. Ha uma
+// assimetria medida que convem saber antes de acrescentar uma entrada:
+//   - um padrao `/\bfoo\b/` **nao** casa a sua propria definicao: no texto-fonte o `\b` sao
+//     dois caracteres e o `b` e uma letra, logo nao ha fronteira de palavra antes de `foo`;
+//   - um padrao com alternacao — `/\b(?:xit|xdescribe|xtest)\b/` — **casa-se a si mesmo**
+//     (medido: tres ocorrencias), porque o `?:` e o `|` a volta nao sao caracteres de palavra.
+// Consequencia pratica: acrescentar uma entrada do segundo tipo faz este ficheiro sinalizar-se
+// no PR que a acrescenta. Nao e defeito — mudar o detetor merece um olhar humano —, mas e
+// melhor saber porque acontece com umas entradas e nao com outras.
+
 // Marcas de enfraquecimento. Procuradas **so** nas linhas ACRESCENTADAS da superficie
 // congelada — nunca no codigo de producao, senao um `.skip(offset)` de paginacao ou um
 // `only` de uma query dao falso positivo.
@@ -261,16 +272,17 @@ try {
 }
 console.log(`  baseline: ${base}\n`);
 
-// A superficie tem de ter existido **na baseline**. Se os `TEST_GLOBS` nao casavam nada la —
-// o estado de um projeto derivado ate alguem seguir o `BOOTSTRAP.md` §2.4 — este verificador
-// imprimia `superficie de teste intacta` e saia `0`, **para sempre**, sobre uma suite apagada.
-// E o `AP2` aplicado a si mesmo, e a unica mitigacao era prosa.
+// A superficie tem de existir **nalgum lado** — na baseline ou no disco. Se os `TEST_GLOBS`
+// nao casam nada em nenhum dos dois, este verificador imprimia `superficie intacta` e saia
+// `0`, **para sempre**, sobre uma suite apagada: e o `AP2` aplicado a si mesmo, e a unica
+// mitigacao era prosa.
 //
-// Olha para a BASELINE e nao para o disco de proposito: apagar o unico ficheiro de teste
-// deixa o disco sem superficie, mas isso e **enfraquecimento** e tem a sua propria mensagem
-// (`APAGADO`). O que este bloco distingue e "os globs nunca viram nada" — ma configuracao.
-// A primeira versao media o disco e roubava a mensagem ao caso do APAGADO; dois testes
-// existentes apanharam-no.
+// **Os dois lados, e nao so um.** Olhar so para o disco roubava a mensagem ao caso do
+// `APAGADO` (apagar o unico teste deixa o disco vazio, mas isso e enfraquecimento e tem
+// mensagem propria). Olhar so para a baseline reprovava qualquer projeto cuja baseline seja
+// anterior aos testes — medido a seguir a receita do `BOOTSTRAP.md` neste repo, cujo commit
+// inicial e anterior as suites: o gate falhava a dizer que os globs estavam mal. Ambos os
+// erros foram meus, um em cada correcao.
 {
   let naBaseline = [];
   try {
@@ -278,14 +290,22 @@ console.log(`  baseline: ${base}\n`);
   } catch (err) {
     fatal(`o git nao conseguiu listar os ficheiros da baseline: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
   }
-  const superficie = naBaseline.filter((f) => TEST_GLOBS.some((r) => r.test(f)));
-  if (superficie.length === 0) {
+  let noDisco = [];
+  try {
+    noDisco = git(["ls-files"]).split("\n").filter(Boolean);
+  } catch {
+    noDisco = [];
+  }
+  const casa = (f) => TEST_GLOBS.some((r) => r.test(f));
+  const nBase = naBaseline.filter(casa).length;
+  const nDisco = noDisco.filter(casa).length;
+  if (nBase === 0 && nDisco === 0) {
     fatal(
-      `os TEST_GLOBS nao casam nenhum ficheiro de teste em ${base} — nao ha superficie para medir`,
+      `os TEST_GLOBS nao casam nenhum ficheiro de teste, nem em ${base} nem no disco — nao ha superficie para medir`,
       "        adaptar TEST_GLOBS a stack deste projeto (ver BOOTSTRAP.md, 'Adaptar o check-test-surface.mjs')"
     );
   }
-  console.log(`  superficie na baseline: ${superficie.length} ficheiro(s)\n`);
+  console.log(`  superficie: ${nBase} ficheiro(s) na baseline, ${nDisco} no disco\n`);
 }
 
 const eConfigOpaca = (f) => CONFIG_GLOBS.some((r) => r.test(f));
@@ -395,7 +415,11 @@ if (tocados.length === 0) {
     });
     const notas = [
       ...achadas.map((a) => `${a.msg} acrescentado(s)`),
-      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re)} -> ${conta(agora, d.re)}`),
+      // A mensagem tem de contar com as MESMAS flags com que a decisao foi tomada. Sem o
+      // `d.cru`, uma entrada que decide sobre o texto cru reportava numeros do texto
+      // normalizado — podia dizer "2 -> 2" numa linha que acabou de sinalizar. Latente
+      // enquanto nenhuma CONTAGEM usar `cru`, e mentiroso no dia em que usar.
+      ...desceram.map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`),
     ];
     // O aviso generico de configuracao e o ULTIMO recurso: se o ficheiro tem invariantes
     // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
