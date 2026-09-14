@@ -13,7 +13,7 @@
  *   node .agent/scripts/test-guards.mjs
  */
 
-import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./test-harness.mjs";
 import { registaDescobertos, resumoDescoberta } from "./lib/registo.mjs";
@@ -415,6 +415,101 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
   includes: ["2 de 3 @imports"],
 });
 
+
+// --- Os SKIP que ninguem observava (varredura `--skips`) ----------------------
+// "Todo o skip e visivel" e regra repetida em dezenas de comentarios, e nada media se um
+// skip podia ser apagado em silencio. Um guard que deixa de ANUNCIAR que nao correu e o
+// `AP2`. Cada teste aqui monta a ausencia que faz o guard saltar e exige que ele o diga.
+//
+// `code: 0` na maioria: **um SKIP nao e um WARN**, e o invariante do harness e que o exit
+// code reflete os avisos. O que se afirma nao e reprovacao — e que a linha SKIP aparece.
+// Os dois que esperam `code: 1` sao os que, alem do skip, partem outra coisa (apagar
+// `.agent/workflows` ou o `CLAUDE.md` dispara guards de paridade).
+
+test("G4: ficheiro de termos banidos ausente da SKIP visivel", (dir) => {
+  // O Guard 4 varre ficheiros da lista BANNED; um que nao exista tem de dizer, nao calar.
+  rmSync(file(dir, "src/docs/agent-guide.md"));
+}, { code: 0, includes: ["SKIP", "agent-guide"] });
+
+test("G6: sem .claude/commands da SKIP visivel", (dir) => {
+  rmSync(file(dir, ".claude/commands"), { recursive: true, force: true });
+}, { code: 0, includes: ["SKIP  .claude/commands — pasta ausente"] });
+
+test("G7: sem .agent/workflows da SKIP visivel", (dir) => {
+  rmSync(file(dir, ".agent/workflows"), { recursive: true, force: true });
+}, { code: 1, anyOut: ["SKIP  Guard 7"] });
+
+test("G8: sem CLAUDE.md da SKIP visivel (nao silencio)", (dir) => {
+  rmSync(file(dir, "CLAUDE.md"));
+}, { code: 1, anyOut: ["SKIP  Guard 8"] });
+
+test("G9a: sem AGENTS.md da SKIP visivel", (dir) => {
+  rmSync(file(dir, "AGENTS.md"));
+}, { code: 0, includes: ["SKIP  Guard 9a"] });
+
+test("G9b: sem agent-guide.md da SKIP visivel", (dir) => {
+  rmSync(file(dir, "src/docs/agent-guide.md"));
+}, { code: 0, includes: ["SKIP  Guard 9b"] });
+
+test("G10: sem pastas de wrappers da SKIP visivel", (dir) => {
+  rmSync(file(dir, ".claude/commands"), { recursive: true, force: true });
+  rmSync(file(dir, ".gemini/commands"), { recursive: true, force: true });
+}, { code: 0, includes: ["SKIP  Guard 10"] });
+
+/** Simula o estado de um projeto DERIVADO: marcador de bootstrap presente e placeholders
+ *  substituidos. As duas coisas andam juntas — escrever o marcador sozinho liga o Guard 13
+ *  numa fixture que ainda tem `{{...}}` por todo o lado, e o teste falha por 8 avisos sem
+ *  relacao com o que afirma. Um derivado a serio ja os substituiu. */
+function derivado(dir) {
+  const anda = (rel) => {
+    for (const e of readdirSync(file(dir, rel), { withFileTypes: true })) {
+      const sub = rel ? `${rel}/${e.name}` : e.name;
+      if (e.name === ".git" || e.name === "node_modules") continue;
+      if (e.isDirectory()) { anda(sub); continue; }
+      if (!/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) && e.name !== "LICENSE" && e.name !== "CODEOWNERS") continue;
+      const c = readF(dir, sub);
+      const novo = c.replace(/\{\{(?!args\})[A-Z_]+\}\}/g, "VALOR");
+      if (novo !== c) writeF(dir, sub, novo);
+    }
+  };
+  anda("");
+  writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
+}
+
+test("G3: CHANGELOG sem entrada de versao da NOTE visivel", (dir) => {
+  // O Guard 3 so chega a este ramo com um `package.json` (senao salta antes, com outra
+  // mensagem). O CHANGELOG fica sem nenhum `## [vX.Y.Z]` — que e o estado do template, e o
+  // guard tem de DIZER que nao tinha nada a comparar, em vez de passar calado.
+  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.0.0" }, null, 2) + "\n");
+  writeF(dir, "src/docs/CHANGELOG.md", "# Changelog\n\nSem entradas ainda.\n");
+}, { code: 0, includes: ["ainda sem entrada de versao"] });
+
+test("Guards de deps: lista CHECKS vazia da SKIP visivel (opt-in)", null, {
+  // Opt-in por defeito. Um opt-in silencioso e indistinguivel de um guard partido.
+  code: 0,
+  includes: ["SKIP  Guards de versoes de dependencias — lista CHECKS vazia"],
+});
+
+test("Guards de deps: com CHECKS mas sem package.json da SKIP visivel", (dir) => {
+  // `CHECKS` e opt-in e vem vazio; preencher e a unica forma de chegar ao ramo seguinte.
+  const g = ".agent/scripts/guards/versions.mjs";
+  writeF(dir, g, readF(dir, g).replace(
+    /const CHECKS = \[[\s\S]*?\n\];/,
+    'const CHECKS = [{ name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+)/g, files: [".agent/rules/core-rules.md"] },\n];'));
+}, { code: 0, includes: ["SKIP  Guards de versoes de dependencias — sem package.json"] });
+
+test("G12d: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
+  // O oposto do teste irmao: com o marcador de bootstrap presente, nao ter citacao do numero
+  // de guards e normal — era este ramo que punha o CI de todos os consumidores vermelho.
+  derivado(dir);
+  writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem citacoes de contagens.\n");
+}, { synthetic: true, code: 0, includes: ["SKIP  Guard 12d"] });
+
+test("G12e: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
+  derivado(dir);
+  writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem contagens.\n");
+  writeF(dir, "README.md", "# Projeto\n\nSem contagens.\n");
+}, { synthetic: true, code: 0, includes: ["SKIP  Guard 12e"] });
 
 // AP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
 console.log(resumoDescoberta(await registaDescobertos({
