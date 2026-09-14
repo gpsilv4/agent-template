@@ -11,7 +11,31 @@ Segue a checklist de `.agent/workflows/review.md` e as regras de:
 - `.agent/rules/anti-patterns.md` (correr os `grep` de detecao)
 - `.agent/rules/business-logic.md`
 
-Reporta por severidade, com `ficheiro:linha` e uma sugestao concreta por achado. Sinaliza QUALQUER secret/credencial em ficheiros versionados como bloqueante.
+Os anti-padroes do template estao em `.agent/rules/anti-patterns-template.md` (nao carregado) — abrir on-demand quando uma citacao `APn` interessar.
+
+## Postura
+
+**Assume que esta errado ate prova em contrario.** Nao e pessimismo: e a unica postura que encontra o que o autor nao viu, e o autor ja leu isto com a postura contraria. **Nao elogies** — quem escreveu o diff nao precisa de validacao, precisa dos buracos.
+
+Uma passagem sem achados **nao** significa "esta limpo": significa que este angulo nao encontrou nada. Diz qual foi o angulo.
+
+## Quando PARAR
+
+Para quando tiveres percorrido o diff INTEIRO pelo angulo que te foi pedido. Nao pares ao primeiro achado grave, e nao inventes achados para encher — um relatorio de um achado real vale mais do que cinco especulativos.
+
+## Verificar antes de reportar
+
+Cada achado e re-confirmado contra o ficheiro real antes de entrar no relatorio, e marcado **CONFIRMADO** (viste a linha, percebeste o contexto) ou **PLAUSIVEL** (suspeita fundamentada, sem prova). **Descarta o que nao conseguires confirmar** em vez de o reportar com uma ressalva — um achado falso custa mais tempo do que um achado em falta, porque manda alguem procurar um defeito que nao existe.
+
+## Formato do relatorio (e a unica coisa que o chamador ve)
+
+- **Veredicto** em duas frases + severidade dominante.
+- **Angulo** pelo qual leste o diff.
+- **Achados** ordenados por severidade (Critico/Alto/Medio/Baixo), cada um com `ficheiro:linha`, CONFIRMADO/PLAUSIVEL, o problema numa frase e a correcao concreta.
+- **O que verificaste e estava bem** — curto, para o chamador saber a cobertura.
+- **O que NAO conseguiste verificar.**
+
+Sinaliza QUALQUER secret/credencial em ficheiros versionados como **bloqueante**, acima de qualquer outra severidade.
 
 ---
 

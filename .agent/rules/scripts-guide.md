@@ -23,6 +23,14 @@
     O alvo vem do `cwd` do payload **e de todos os `-C`/`--git-dir`/`cd`/`pushd` do comando**; sem pista valida cai no `cwd` do hook (lista vazia **permitia**). A tabela `BYPASSES` na suite e a lista viva de formas conhecidas — acrescentar uma quando aparecer. **Nao se escreve o tamanho dela em prosa**: a primeira tentativa dizia 28 quando a tabela tinha 47, e envelheceu no mesmo dia. O numero esta a um `grep -c` de distancia.
   - `session-context` (`SessionStart`) — afirma o estado real (branch, o que esta por commitar, PRs abertos) em vez de o deixar inferir. Deliberadamente **curto**: entra no contexto a cada sessao.
   - `stop-verify` (`Stop`) — diz que suite ficou **em divida** para os ficheiros tocados. Nao corre nada: um hook de fim de turno que corresse suites seria desligado.
+  - `precompact-reinject` (`PreCompact`) — devolve o bloco **Fronteiras** do `CLAUDE.md` em
+    `additionalContext` **antes** de a janela ser compactada. Sem ele, a compactacao descarta
+    as rules importadas e o agente continua a trabalhar sem as regras nao-negociaveis, sem
+    nada no ecra a dize-lo — a unica lacuna onde todo o orcamento de contexto (guards 1/1b/1c)
+    podia ser anulado em silencio. Reinjecta **so** as Fronteiras (~600 bytes): reinjectar as
+    rules inteiras (~26 KB) derrotava o proposito da compactacao. **Falha aberta**: sem
+    `CLAUDE.md`, com a seccao renomeada ou vazia, sai `0` calado — bloquear uma compactacao
+    custa mais do que perder a reinjeccao.
   - Ambos usam `git status --untracked-files=all`, porque sem isso o git **colapsa diretorios** nao rastreados e um ficheiro novo em pasta nova aparece como a pasta.
   - **Nao ha `lint-changed-file`** de proposito: os comandos de lint sao especificos da stack, logo o template so poderia trazer um hook inerte — e um hook que nao faz nada por omissao e prosa com mais passos. Se o teu projeto tem lint, vale a pena escreve-lo: `PostToolUse`/`Write|Edit`, a devolver o que nao e auto-corrigivel como contexto para ser corrigido no mesmo turno.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio), logo e opt-in no CI: correr localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.

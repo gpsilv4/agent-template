@@ -71,7 +71,7 @@ As regras sao diretivas que o Agente consulta antes de cada acao.
 - **[anti-patterns.md]** (instrucoes; a **evidencia** — de onde veio cada entrada e o que custou — esta em `src/docs/anti-patterns-why.md`, nao carregado): Registo vivo de anti-padroes derivados de bugs, com `grep` de detecao para o `/review` (sempre carregado; cresce proativamente). As duas metades andam em par: entrada nova na rule, seccao nova no `-why`.
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
-- **sync-docs.md**: Checklist de sincronizacao de docs (26 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
+- **sync-docs.md**: Checklist de sincronizacao de docs (28 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
 - **scripts-guide.md**: O que cada verificador faz, a sua suite, e a regra que os liga (`PARES` + testes negativos) — **nao carregada**, aberta ao mexer em `.agent/scripts/` ou `.claude/hooks/`.
 - **ticket-method.md** (instrucoes; o **porque** e as medicoes estao em `src/docs/ticket-method-why.md`, leitura de humano uma vez): As 6 fases por ticket, 0 a 5 (explicar e esperar -> desenvolver com controlo negativo -> loop da maquina -> loop do julgamento por angulos -> leitor independente -> relatorio) e a escala `S`/`M`/`L` — **nao carregada**, aberta ao iniciar um ticket `M` ou `L`. O ponteiro obrigatorio esta em `process-rules.md`.
 

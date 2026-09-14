@@ -132,8 +132,20 @@ When you open a new AI session in any project using this template, the agent **a
 │   ├── guard-protected-branch.mjs  <- DENY commit/push on protected branches; no force-push
 │   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
-│   └── tests/test-hooks.mjs        <- 26 cases: real git repos, real payloads
+│   ├── precompact-reinject.mjs     <- PreCompact: re-injects the Fronteiras block before
+│   │                                  compaction drops the imported rules from context
+│   └── tests/                      <- Negative tests for the hooks
+│       ├── test-hooks.mjs          <- Real git repos, real payloads
+│       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
+│       └── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
+│                                      the branch guard, plus the legitimate commands
+│                                      it must NOT block (AP6)
 └── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
+
+.githooks/                      <- Versioned git hooks (tool-independent)
+└── commit-msg                 <- Rejects AI attribution in commit messages.
+                                  Enable per clone: git config core.hooksPath .githooks
+                                  (the CI re-runs it on every PR, so it holds either way)
 
 .gemini/                        <- Native Gemini CLI layer
 └── commands/                  <- Same slash commands as .claude/, in TOML (wrap .agent/workflows/)
@@ -239,8 +251,8 @@ git commit -m "chore: bootstrap agent config"
 | Unit Tests | `npm run test:unit` (skipped if there is no `test:unit` script) |
 | Security Audit | `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
-| Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms (opt-in, uncomment in ci.yml) |
-| Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs (opt-in, uncomment in ci.yml) |
+| Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every push/PR** in the `guard-tests` job |
+| Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every push/PR** in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
@@ -292,7 +304,7 @@ Each version (vX.Y.Z) has an annotated git tag. Tags are created after each spri
 
 Branch protection rules (require status checks, block force push) require **GitHub Pro** for private repos. The CI works as an **informational semaphore** — shows green/red on PRs and the developer decides. If Pro becomes available, enable in GitHub Settings > Branches.
 
-> **Note**: CI jobs include `if: hashFiles('package.json') != ''` to skip gracefully on the template repo (which has no code). On repos created from the template, they run normally.
+> **Note**: CI jobs depend on a `detect` job that checks for `package.json` **after checkout**, and skip on the bare template. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
 
 ## Placeholders
 
@@ -354,7 +366,9 @@ Branch protection rules (require status checks, block force push) require **GitH
 > `useEffect`?"* (that's in `.agent/rules/core-rules.md` and nowhere else). If the answer is
 > vague, the tool needs content inlined rather than referenced.
 
-> **Why multiple entry files?** Claude Code parses `@file`, Gemini needs `@[file]` brackets, and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
+> **Why multiple entry files?** Claude Code parses `@file`, Gemini's Memory Import Processor needs a relative prefix (`@./file`), and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
+>
+> An earlier version of this line claimed Gemini needs `@[file]` brackets. That form appears nowhere in the Gemini CLI docs, and `check-doc-versions.mjs` normalised it — so the guard was defending the wrong syntax. **Still unverified in a live Gemini CLI**: run `/memory show` in a clone to confirm what it actually loads.
 
 ### The `.claude/` layer works with other agents too
 
@@ -370,6 +384,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 |------|-------------|--------------------|
 | `.claude/settings.json` | No enforced boundary: nothing blocks reading `.env*`, and nothing forces a prompt before `git commit`/`push` or `npm install`. Guard 11 has nothing to check and skips | Use your tool's own permission/approval settings, and keep the rules in `.agent/rules/` as the stated contract |
 | `.claude/agents/code-reviewer.md` | **Fase 4** of the per-ticket method has no subagent | Run it as a separate session given only the diff — the point is a reader without the author's reasoning, not the mechanism |
+| `.claude/hooks/` | No automatic denial of commit/push on a protected branch, no branch/state assertion at session start, no "which suite is owed" warning. This is the enforcement layer, and it is Claude-only | `.githooks/commit-msg` still runs (it is git-level, not Claude-level), and the CI re-runs it. The equivalent checks are `.agent/scripts/check-*.mjs` — run them before commit |
 | Typed slash commands (except Gemini) | `/plan` is not a keystroke | Say *"follow `.agent/workflows/plan.md`"*. The wrappers were never more than that sentence |
 
 Everything that carries logic — rules, workflows, context, the guards and their tests — is in

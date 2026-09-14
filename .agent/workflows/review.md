@@ -9,7 +9,31 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > conta como passagem**. Para-se na primeira passagem que declare um angulo novo e nao
 > encontre nada. A lista de angulos esta em `.agent/rules/ticket-method.md` (nao carregado).
 
-## 1. Build & CI Check
+## 0. Escala por tamanho do ticket (ler ANTES de comecar)
+
+> O resto do `ticket-method` escala por `S`/`M`/`L` e esta checklist nao escalava: um ticket
+> `S` — definido no backlog como **< 30 min** — pagava as mesmas 56 caixas que um `L`. A
+> aritmetica e o problema: a 10s por caixa sao ~10 min de checklist, mais os 32 pontos do
+> `sync-docs`, para 30 min de trabalho. Um processo que custa tanto como o trabalho e
+> abandonado ao terceiro ticket, e a partir dai nao ha processo nenhum.
+
+| Tamanho | Seccoes obrigatorias | Porque |
+|---------|---------------------|--------|
+| **`S`** | **1, 2, 8, 9, 10, 12, 13** | O que nenhum tamanho dispensa: o CI passa, o CHANGELOG regista, os anti-padroes conhecidos nao voltaram, os testes acompanham, os docs sincronizam, o backlog fecha. Sao ~20 caixas. |
+| **`M`** | Todas menos a **11** | O leitor independente e o unico passo caro que um `M` dispensa por defeito (continua disponivel se o diff mexer no nucleo do dominio). |
+| **`L`** | **Todas**, a 11 incluida | Um `L` toca no nucleo ou atravessa fronteiras: e onde um segundo par de olhos paga. |
+
+> **As seccoes saltadas dizem-se em voz alta.** No relatorio da Fase 5, listar quais e
+> porque — "saltei 3, 5, 6, 7 (ticket `S`)". Uma seccao saltada em silencio e
+> indistinguivel de uma seccao esquecida, e o objetivo da escala e tornar a diferenca
+> visivel, nao esconder trabalho por fazer.
+>
+> **Um `S` que revele algo maior deixa de ser `S`.** Se a seccao 8 apanhar um anti-padrao
+> real ou a 9 revelar um buraco de cobertura, sobe para `M` e corre o resto.
+
+---
+
+## 1. Build & CI Check  — a partir de `S`
 
 > **No template nu ainda nao ha `package.json`**, logo os dois primeiros passos saem em erro
 > ("Missing script") e nao ha nada a concluir dai. Nesse estado, o que substitui esta seccao
@@ -29,7 +53,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
   Abrir o log e ler o relatorio — verde nao significa limpo
 - Mensagens de commit seguem Conventional Commits (`feat:`, `fix:`, `docs:`, etc.) — ver `CONTRIBUTING.md`
 
-## 2. CHANGELOG
+## 2. CHANGELOG  — a partir de `S`
 
 - [ ] Alteracoes significativas registadas em `src/docs/CHANGELOG.md`?
 
@@ -38,7 +62,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > inicial que cada projeto derivado herda. Escrever historia do template neles daria a cada
 > novo projeto um passado que nao e o dele. Num projeto derivado, a regra vale por inteiro.
 
-## 3. Performance
+## 3. Performance  — a partir de `M`
 
 - [ ] `npm run build` — bundle sizes dentro dos targets?
 - [ ] Nenhum `useEffect` com fetch manual — todo o data fetching usa {{STATE_MANAGEMENT}}
@@ -48,7 +72,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] Skeleton loaders para novos loading states
 - [ ] Cache invalidado (`mutate()` / `invalidate()`) apos todas as escritas
 
-## 4. Logica de Negocio
+## 4. Logica de Negocio  — a partir de `M`
 
 <!-- Esta seccao deve ser preenchida com as regras especificas do projeto -->
 <!-- Exemplos: -->
@@ -58,14 +82,14 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 - [ ] Regras de `.agent/rules/business-logic.md` respeitadas?
 
-## 5. Mobile
+## 5. Mobile  — a partir de `M`
 
 - [ ] Sem `grid-cols-*` fixo sem fallback (`flex flex-col sm:flex-row`)
 - [ ] Popovers com `w-[min(300px,calc(100vw-2rem))]`
 - [ ] Modals/Sheets com `w-full` e `overflow-x-hidden`
 - [ ] Sticky headers com `min-w-0 shrink` no texto
 
-## 6. Arquitetura
+## 6. Arquitetura  — a partir de `M`
 
 - [ ] Ficheiros com menos de ~400 linhas (flag se > 500)
 - [ ] **Diff minimo**: nenhuma reformatacao de codigo que o ticket nao toca — `git diff --stat` proporcional a alteracao (`core-rules.md`)
@@ -76,14 +100,14 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] Sem `// eslint-disable` sem comentario justificativo
 - [ ] **Duplicacao nova**: extraida, ou justificada por escrito? (`core-rules.md`, Rule of three — a partir da 2a repeticao, extrair; logica de negocio nunca se duplica)
 
-## 7. Seguranca
+## 7. Seguranca  — a partir de `M`
 
 - [ ] Sem queries diretas a tabelas de auth no cliente
 - [ ] Politicas de seguranca cobrem novas tabelas/colunas
 - [ ] Chaves secretas nunca expostas no frontend
 - [ ] **ZERO dados sensiveis em ficheiros commitados**
 
-## 8. Anti-Padroes
+## 8. Anti-Padroes  — a partir de `S`
 
 > `anti-patterns.md` define, para cada entrada, um **`grep` de detecao "para o /review"**.
 > Este e o passo que os corre — sem ele, esse campo nao tem consumidor.
@@ -95,7 +119,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] O trabalho revelou um padrao evitavel novo? -> propor entrada nova em `anti-patterns.md`
       **e** a seccao correspondente no `anti-patterns-why.md` (as duas andam em par)
 
-## 9. Testes
+## 9. Testes  — a partir de `S`
 
 > **Os testes da camada de agente correm sempre**, com ou sem app, e sao estes — sem eles um
 > agente que siga esta seccao num template nu nao corre nada e marca a checkbox:
@@ -117,15 +141,15 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] **Triagem proativa** (`process-rules.md`): cada item tocado justifica teste novo? **unit** (funcao pura/regra de negocio), **E2E** (fluxo de utilizador), **security** (rota/input/header novo). Propor ao utilizador — nao esperar que peca
 - [ ] Cada teste **novo** nasce com o seu **controlo negativo**: quebrar de proposito o codigo que ele cobre e confirmar que fica vermelho **na assercao certa**. Um teste que passa com o defeito no ecra nao afirma nada
 
-## 10. Sincronizacao de Conhecimento (Docs Sync)
+## 10. Sincronizacao de Conhecimento (Docs Sync)  — a partir de `S`
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (26 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (28 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
 - [ ] **Testes dos guards** (se mexeste em `.agent/scripts/` ou `.claude/hooks/`): `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` — sem eles, um guard partido parece um guard a passar
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 - [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `AP4`)
 
-## 11. Leitor Independente (Fase 4)
+## 11. Leitor Independente (Fase 4)  — a partir de `L`
 
 > Este `/review` e a Fase 3 — o teu julgamento. A Fase 4 e outra coisa: **outra leitura, sem
 > o raciocinio de quem escreveu**. Nao substitui nada acima; le codigo (logica, invariantes,
@@ -144,14 +168,14 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 > Detalhe e a escala por tamanho: `.agent/rules/ticket-method.md`.
 
-## 12. Backlog
+## 12. Backlog  — a partir de `S`
 
 - [ ] O trabalho feito corresponde a um item do `backlog.md`? Se sim, **remover** a linha das tabelas ativas e **mover** para o Historico em `backlog-archive.md`.
 - [ ] Atualizar contadores da tabela "Resumo" e validar com `node .agent/scripts/check-backlog.mjs` (0 divergencias).
 - [ ] Atualizar a barra de progresso e a linha **Proximo:** no `backlog.md`.
 - [ ] O trabalho revelou novos bugs ou melhorias? Propor novos items ao utilizador.
 
-## 13. Sessao (Handoff)
+## 13. Sessao (Handoff)  — a partir de `S`
 
 > Perguntar ao utilizador antes de terminar:
 

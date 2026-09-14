@@ -20,6 +20,14 @@ Follow the workflows in `.agent/workflows/`:
 | New feature | `/plan` -> implement -> `/review` |
 | Bug fix | `/debug` -> implement -> `/review` |
 | Refactor | `/refactor` -> implement -> `/review` |
+| Full sprint | implement all -> `/review` -> `/deploy` |
+
+## Dependencies and the lockfile
+
+`npm install` once and **commit `package-lock.json`**. CI runs `npm ci`, which requires a
+lockfile by definition — without it the install step fails before any check runs. If the
+project uses pnpm/yarn/bun, adjust the install step and the `cache:` key in
+`.github/workflows/ci.yml` to match.
 
 ## Commit Messages
 

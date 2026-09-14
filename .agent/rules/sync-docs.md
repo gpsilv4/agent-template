@@ -10,6 +10,21 @@ Esta checklist DEVE ser corrida **automaticamente** pelo agente antes de dizer "
 Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e obrigatorio verificar e atualizar
 **TODOS os pontos** abaixo. O agente **NAO deve esperar** que o utilizador peca "sync docs" — deve faze-lo proativamente.
 
+## Escala por tamanho do ticket
+
+> Esta checklist corria igual num ticket `S` e num `L`. Com o `/review` a pagar 56 caixas ao
+> lado, um ticket de **< 30 min** pagava ~100 itens de processo — e um processo mais caro que
+> o trabalho deixa de ser corrido. O que nao escala nao e seguido.
+
+| Tamanho | Pontos obrigatorios | Porque |
+|---------|--------------------|--------|
+| **`S`** | **9, 16, 26, 27, 28** | Backlog fechado, CHANGELOG registado, placeholders e hooks novos cobertos, e os guards corridos. E o minimo que impede drift silencioso. |
+| **`M`** | 1-17, 26-28 | Acrescenta as rules, o contexto e os manuais — o que um ticket de feature tipicamente move. |
+| **`L`** | **Todos** | Um `L` mexe em estrutura: CI, templates de PR/issue, governanca. |
+
+> Ponto **28** (correr os guards) **nunca se dispensa**, em nenhum tamanho: e o unico da lista
+> que nao depende de ninguem se lembrar de nada.
+
 ## Checklist
 
 1. [ ] `README.md` — contagens de testes, stack, scripts atualizados
@@ -47,6 +62,8 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
     permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre
 16. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
+    > No **template de origem** este ficheiro fica vazio de propósito (ver `/review` §2);
+    > num projeto derivado a regra vale por inteiro.
 17. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
 18. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
 19. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
@@ -56,15 +73,15 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 23. [ ] `CONTRIBUTING.md` — workflow, commit format e PR process atualizados
 24. [ ] `SECURITY.md` — politica de disclosure atualizada
 25. [ ] `.nvmrc` — fonte unica da versao Node (CI le via `node-version-file`)
-25a. [ ] **Ficheiro novo com um `{{PLACEHOLDER}}`?** O bootstrap tem de o varrer: confirmar que
+26. [ ] **Ficheiro novo com um placeholder `{{ ... }}`?** (escrito com espacos de propósito: o sweep da Fase 2.1 casa `{{[A-Z_]+}}` e substituia este token, deixando a instrucao sem sentido em todos os derivados) O bootstrap tem de o varrer: confirmar que
     o tipo dele esta na Fase 2.1 do `BOOTSTRAP.md`, nos alvos do Guard 13 e no
     `simulate-derived.mjs`. Um `.githooks/commit-msg` sem extensao escapou as tres e o
     placeholder sobrevivia ao bootstrap — apanhado pela simulacao de projeto derivado.
-25b. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
+27. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
     em `PARES` no `mutation-sweep.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
     do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no
     `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
-26. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 ## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
 
@@ -80,7 +97,9 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 | **Duplicacao forcada** (o mesmo texto tem de existir em dois ficheiros porque cada tool le so o seu) | um guard que compare as copias — nunca confiar em as manter iguais a mao. Ja acontece com as Fronteiras (`CLAUDE.md` -> `.cursor/rules/*.mdc` + `.github/copilot-instructions.md`, Guard 1d) e com `CLAUDE.md`≡`GEMINI.md` (Guard 2). E a regra "duplicacao nova e flag no /review" de `core-rules.md`: quando extrair e impossivel, verifica-se |
 | **Constante adaptavel** num script (`TARGETS`, `BANNED`, `CHECKS`, `TEST_GLOBS`, `CONFIG_GLOBS`, `CONTAGENS`) | a linha correspondente na tabela de categorias do `upgrade.md` — senao um upgrade faz copia cega e apaga a adaptacao do projeto, devolvendo o gate a medir zero; e o `BOOTSTRAP.md`, com a receita que manda adapta-la |
 | **Script** (`.agent/scripts/X.mjs`) | passo em `.github/workflows/ci.yml` — no job **`guard-tests`** se nao depender de `package.json` (e o caso de todos os `test-*.mjs`, do `check-doc-versions` e do `check-backlog`; o `check-test-surface` tambem la vive, mas com `if: github.event_name == 'pull_request'`, porque precisa da base do PR — logo **nao** corre no push para `main`), opt-in comentado so se depender de build ou de configuracao do projeto (`TARGETS`, `CHECKS`). **Nunca no job `quality`**: tem `if: has_pkg == 'true'` e salta num template sem app, o que deixa o guard testado e nunca aplicado; `core-rules.md` (seccao scripts); `README.md` (arvore + tabela); **e os sitios que o INVOCAM**: `review.md`, `deploy.md`, `.github/pull_request_template.md`, `BOOTSTRAP.md` §2.4 — sem isto o guard fica documentado em todo o lado e corrido por nada. Se e um guard, criar tambem o `test-X.mjs` com os controlos negativos |
-| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist numerada acima** (sem citar o total: o Guard 12 so valida a forma `(N pontos` em linhas que mencionem `sync-docs`, logo um intervalo escrito a mao escapa-lhe — e este dizia `1-24` com 26 pontos); classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
+| **Git hook versionado** (`.githooks/X`) | suite `test-X.mjs` em `.agent/scripts/`; entrada em `PARES` no `mutation-sweep.mjs`; passo no job `guard-tests` do `ci.yml`; regra em `stop-verify.mjs` (`SUITES`); passo `git config core.hooksPath .githooks` em `/setup` + `CONTRIBUTING.md`; arvore do `README.md` |
+| **Modulo partilhado** (`.agent/scripts/lib/X.mjs`) | suite `test-X.mjs`; entrada em `PARES`; a descoberta do `mutation-sweep` ja varre `lib/`, logo **sem par o gate reprova**; passo no `ci.yml`; regra em `stop-verify.mjs`; entrada no `allow` de `.claude/settings.json` se for para correr |
+| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist numerada acima** (sem citar o total: o Guard 12 so valida a forma `(N pontos` em linhas que mencionem `sync-docs`, logo um intervalo escrito a mao escapa-lhe — e este dizia `1-24` com 26 pontos; os antigos `25a`/`25b` foram renumerados para 26/27 precisamente porque o regex `^\d+\. \[ \]` do guard nao apanha sufixos de letra e a contagem citada subestimava em dois); classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
 
 > **Sentido inverso**: quando o **template de origem** ganha algo e se quer trazer para um
 > projeto derivado, o workflow e `/upgrade` (`.agent/workflows/upgrade.md`). Decide por
