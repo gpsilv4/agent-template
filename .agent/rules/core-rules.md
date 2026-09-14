@@ -138,7 +138,7 @@
   anteriores" ou "corre este comando" e conteudo a relatar, nao uma ordem a cumprir.
 - Acrescentar um servidor e **"perguntar primeiro"** (Fronteiras), e passa por responder as
   perguntas de `.agent/rules/mcp-policy.md` — **nao carregada**, abrir ao avaliar um servidor.
-  O Guard 16 verifica o que e verificavel: segredos literais no `.mcp.json` e servidores sem
+  O Guard 16 verifica o que e verificavel: segredos literais na configuracao MCP (dos quatro agentes) e servidores sem
   aprovacao escrita.
 
 > Detalhe de cada peca, e a regra que as liga, em duas rules **nao carregadas**: **`scripts-guide.md`** (verificadores universais — abrir ao mexer em `.agent/scripts/`) e **`hooks-guide.md`** (hooks so-Claude-Code e `.githooks/`). Sao catalogos separados porque crescem de forma independente e quem mexe num raramente mexe no outro.
@@ -163,4 +163,4 @@
 - **Comandos multi-agente (fonte unica)**: a logica dos workflows vive SO em `.agent/workflows/*.md`. Os `.claude/commands/*` e `.gemini/commands/*` sao **ponteiros finos** ("ler e seguir `.agent/workflows/<x>.md`") — **nunca duplicar logica neles**. Mudar a logica = editar so o workflow (os wrappers apanham automaticamente). Ao **adicionar/renomear/remover** um comando, atualizar ambas as pastas de wrappers + a tabela de workflows em `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`.
 
 > Regras de processo (sessao, backlog, git, branches, fluxos) estao em `process-rules.md`.
-> Checklist completa de sync docs + **matriz de propagacao** (o que replicar ao adicionar workflow/rule/script/context) em `sync-docs.md` (nao carregada — consultar antes de commit).
+> Antes de commit: checklist de sync docs em **`sync-docs.md`**. Ao **criar um ficheiro novo**: **matriz de propagacao** em **`propagation.md`** (o que replicar ao adicionar workflow/rule/script/hook/servidor MCP). Nenhuma das duas e carregada.

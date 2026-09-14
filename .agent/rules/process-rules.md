@@ -128,7 +128,7 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 
 Cada ticket passa por 6 fases (0 a 5): **explicar e esperar aprovacao** -> desenvolver (cada
 teste novo nasce com o seu **controlo negativo**) -> loop da maquina (criterio objetivo, tecto
-de 5, **sumarios nunca filtrados**) -> loop do julgamento (cada passagem **declara o angulo**)
+de 5, **sumarios nunca filtrados**) -> loop do julgamento (cada passagem **declara o angulo e a posicao**: `passagem 2 de 4`)
 -> **leitor independente** (o subagente `code-reviewer`; obrigatorio num `L` ou no nucleo do
 dominio) -> **relatorio de 5 pontos**, e so depois o commit.
 

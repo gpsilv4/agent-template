@@ -7,7 +7,7 @@
  *
  * NAO e um entry point: o `test-test-surface.mjs` importa e chama `registar()`.
  */
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, commit, git } from "./test-surface-harness.mjs";
@@ -269,4 +269,44 @@ export function registar() {
     commit(dir, "despromover um");
     return ref;
   }, { code: 1, includes: ["sitios de aviso: 2 -> 1"] });
+  // --- Os HOOKS estao na superficie congelada --------------------------------
+  // Ficavam de fora: os globs de teste so apanham `.claude/hooks/tests/` (a pasta `tests/`),
+  // logo as suites dos hooks estavam vigiadas e os hooks que elas testam nao. Apagar o
+  // `guard-protected-branch.mjs` — o unico sitio que NEGA um commit em branch protegido —
+  // nao produzia uma palavra.
+  test("hook apagado e reportado (esta na superficie congelada)", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/guardiao.mjs"), 'console.log("ola");\n');
+    commit(dir, "hook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".claude/hooks/guardiao.mjs"));
+    commit(dir, "apagar o hook");
+    return base;
+  }, { code: 1, includes: [".claude/hooks/guardiao.mjs", "APAGADO"] });
+
+  // E o `.githooks/`, que nao tem extensao por onde ser apanhado por um glob de sufixo.
+  test("hook do git apagado e reportado", (dir) => {
+    mkdirSync(join(dir, ".githooks"), { recursive: true });
+    writeFileSync(join(dir, ".githooks/pre-push"), '#!/bin/sh\nexit 0\n');
+    commit(dir, "githook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".githooks/pre-push"));
+    commit(dir, "apagar o githook");
+    return base;
+  }, { code: 1, includes: [".githooks/pre-push", "APAGADO"] });
+
+  // A contagem propria dos hooks: reduzir as decisoes de negacao e enfraquecer a rede sem
+  // tocar em nenhum teste — o equivalente, do lado do enforcement, a apagar um `warn(`.
+  test("decisoes de negacao a descer sao reportadas", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/nega.mjs"),
+      'const a = { permissionDecision: "deny" };\nconst b = { permissionDecision: "deny" };\nconsole.log(a, b);\n');
+    commit(dir, "hook com duas negacoes");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    writeFileSync(join(dir, ".claude/hooks/nega.mjs"),
+      'const a = { permissionDecision: "deny" };\nconsole.log(a);\n');
+    commit(dir, "uma negacao a menos");
+    return base;
+  }, { code: 1, includes: ["decisoes de negacao dos hooks", "2 -> 1"] });
+
 }

@@ -133,7 +133,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > Os `npm run` abaixo sao os da **app** e so existem depois de haver `package.json`.
 
 - [ ] Testes unitarios passam: `npm run test:unit`
-- [ ] Testes E2E funcionais passam: `npm run test`
+- [ ] Testes E2E funcionais passam: `npm run test:e2e`
 - [ ] Testes de seguranca passam: `npm run test:security`
 - [ ] Auditoria de dependencias: `npm run test:audit`
 - [ ] **Nunca filtrar o sumario de uma corrida** (`| tail`, `| grep`): esconde o `1 failed` no meio dos `125 passed`

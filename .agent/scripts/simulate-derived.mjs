@@ -21,7 +21,7 @@
  *
  * O QUE FAZ, a espelhar a Fase 2 do `BOOTSTRAP.md`:
  *   1. copia o repo sem `.git` nem o que nao pertence a um clone novo;
- *   2. substitui os `{{PLACEHOLDER}}`;
+ *   2. substitui os placeholders (`{{ ... }}`);
  *   3. cria as rules que o bootstrap GERA (sao o discriminador de "bootstrap concluido");
  *   4. corre os verificadores e as suites, e reprova se algum sair != 0.
  *
@@ -46,7 +46,7 @@
 import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { dirname, resolve, join } from "path";
+import { dirname, resolve, join, sep } from "path";
 import { tmpdir } from "os";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -171,13 +171,32 @@ console.log("\n=== Simulacao de projeto derivado ===\n");
 // --- 1. copiar -----------------------------------------------------------------
 const dir = mkdtempSync(join(tmpdir(), "derivado-"));
 copiaAtiva = dir;
+/** Aplica-se a QUALQUER profundidade, e nao so a raiz.
+ *
+ *  O filtro corria uma vez por entrada de topo e o `cpSync` recursivo copiava o resto sem
+ *  perguntar. Consequencias medidas: `.claude/state` estava na lista de exclusao e **entrava
+ *  sempre** (a comparacao via `.claude`, nao `.claude/state`); um `.pem`, uma `.key` ou um
+ *  `.env.local` dentro de qualquer subpasta entrava tambem — e a copia ia parar a `/tmp`,
+ *  onde ficava se o script saisse por `fatal()`. Uma lista de exclusao que so olha para o
+ *  primeiro nivel de uma arvore e uma lista que nao exclui.
+ *  @param rel caminho relativo a ROOT, com `/` (ex: `.claude/state`) */
+const excluido = (rel) => {
+  const nome = rel.slice(rel.lastIndexOf("/") + 1);
+  if (NAO_COPIAR.includes(rel) || NAO_COPIAR.includes(nome)) return true;
+  if (NAO_COPIAR_PREFIXO.some((p) => nome.startsWith(p))) return true;
+  if (nome.startsWith(".env")) return true;
+  if (NAO_COPIAR_SUFIXO.some((x) => nome.endsWith(x))) return true;
+  return false;
+};
+
 let copiados = 0;
 for (const e of readdirSync(ROOT, { withFileTypes: true })) {
-  if (NAO_COPIAR.includes(e.name)) continue;
-  if (NAO_COPIAR_PREFIXO.some((p) => e.name.startsWith(p))) continue;
-  if (e.name.startsWith(".env")) continue;
-  if (NAO_COPIAR_SUFIXO.some((x) => e.name.endsWith(x))) continue;
-  cpSync(join(ROOT, e.name), join(dir, e.name), { recursive: true });
+  if (excluido(e.name)) continue;
+  cpSync(join(ROOT, e.name), join(dir, e.name), {
+    recursive: true,
+    // `src` vem absoluto; reduzir a um caminho relativo a ROOT antes de decidir.
+    filter: (src) => !excluido(src.slice(ROOT.length + 1).split(sep).join("/")),
+  });
   copiados++;
 }
 if (copiados === 0) fatal("nao copiei nada do repo — a simulacao nao mediria nada");

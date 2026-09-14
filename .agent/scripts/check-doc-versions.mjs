@@ -38,6 +38,7 @@ import { guardDerivedCounts } from "./guards/derived-counts.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
 import { guardAntiPatternRefs } from "./guards/anti-patterns.mjs";
+import { guardFileSizes } from "./guards/sizes.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
 
 // --- Ancoragem a raiz do repo -------------------------------------------------
@@ -55,6 +56,33 @@ function listDir(path, ext) {
   } catch {
     return null; // pasta inexistente
   }
+}
+
+/** Caminhos (relativos a ROOT) de todos os ficheiros com `ext` dentro de `path`, em
+ *  profundidade. `listDir` devolve nomes de UM nivel e sem extensao — serve os guards de
+ *  paridade; este serve quem precisa de varrer uma arvore (ex: `guards/sizes.mjs`). */
+function listTree(path, ext) {
+  const base = join(ROOT, path);
+  const out = [];
+  const desce = (rel) => {
+    let entradas;
+    try {
+      entradas = readdirSync(join(base, rel), { withFileTypes: true });
+    } catch {
+      // So a RAIZ ausente e "nao ha nada a varrer". Uma SUBPASTA que nao se consegue ler
+      // desaparecia da varredura sem nada no ecra — "nao consegui ler" a passar por "nao ha
+      // nada", que e o `AP2`. Aqui sobe, e quem chama decide.
+      if (rel === "") return null;
+      throw new Error(`nao consegui ler ${path}/${rel}`);
+    }
+    for (const e of entradas.sort((a, b) => a.name.localeCompare(b.name))) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) desce(r);
+      else if (e.name.endsWith(ext)) out.push(`${path}/${r}`);
+    }
+    return out;
+  };
+  return desce("") === null ? null : out;
 }
 
 function read(path) {
@@ -375,6 +403,10 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+
+// --- Guard 17: o flag das 500 linhas mede-se ---
+// `core-rules.md` declarava-o e nada media; quatro ficheiros deste repo estavam acima.
+guardsRun += guardFileSizes({ read, warn, ok, skip, note, listTree });
 
 // --- Guard 16: a configuracao MCP respeita a politica ---
 guardsRun += guardMcp({ read, warn, ok, skip });

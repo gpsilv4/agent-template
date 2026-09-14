@@ -17,44 +17,25 @@ Seis fases: **explicar antes de fazer** (0) · desenvolver (1) · um loop com cr
 O criterio diz o que conta como achado; **nao** diz quando o ciclo acaba. Isso e sempre uma
 decisao do utilizador (Fases 2 e 3).
 
-Depois do commit ha algo que **nao e do agente e nao se numera: usar** o que mudou. Sao tres
-instrumentos que apanham classes diferentes, e so o terceiro apanha uma **decisao errada**:
+**Cada passagem abre dizendo onde esta** — `Fase 3 · passagem 2 de 4 (M) · angulo: clone
+fresco` — e ao mudar de fase diz-se qual fecha e qual abre. Sem isto ninguem distingue "a meio
+do orcamento" de "prestes a parar e perguntar". Medido: numa sessao longa o utilizador teve de
+perguntar "ainda falta muito?" — o que o metodo devia emitir sozinho.
 
-| Instrumento | Apanha |
-|-------------|--------|
-| As Fases 2-3 (o teu julgamento) | o que **acabaste de escrever** |
-| A Fase 4 (leitor independente) | o que **nao consegues ver por teres escrito** |
-| **Usar** (nao e do agente) | o que **decidiste mal** — inclui o que nunca chegou a existir |
-
-Saltar as tres e trocar tres tipos de deteccao por um.
-
+> Depois do commit ha um quarto instrumento que **nao e do agente e nao se numera: usar** o
+> que mudou — e o unico que apanha uma **decisao errada**. Porque os tres nao se substituem:
+> `src/docs/ticket-method-why.md`.
 O que escala com o tamanho do ticket sao tres delas — a **Fase 0** (do chat ao ficheiro com
 alternativas), a **Fase 3** (quantas passagens esperar) e a **Fase 4** (se corre). As outras
 tres sao **binarias**: um controlo negativo, o `tsc 0` e o relatorio de 5 pontos valem igual
 num `S` e num `L`, e nao ha versao reduzida deles.
 
-A escala nao e um detalhe — e o que torna o metodo viavel. Aplicado por inteiro a tudo,
-multiplica o tempo por ticket por 2 a 3. Vale onde um erro custa **confianca na correcao**;
-nao vale numa mudanca de texto.
-
 ---
 
-## Duas coisas diferentes: harness e loop
-
-- **Harness** — o que o *runtime* faz por nos, deterministicamente: permissoes, hooks,
-  subagentes, comandos. **O agente pode esquecer uma regra do `CLAUDE.md`; um hook nao
-  esquece.** Neste template: `.claude/settings.json` (fronteira de permissoes),
-  `.claude/hooks/` (nega antes de acontecer), `.claude/agents/` (leitores independentes).
-- **Loop** — fechar o ciclo para o trabalho continuar: as Fases 2 e 3, e um `/loop` se a
-  ferramenta o tiver.
-
-**A ordem importa: sem harness solido, um loop so amplifica erros.** Um ciclo automatico sobre
-uma regra que vive em prosa repete o esquecimento mais depressa.
-
-> **Nota de portabilidade**: hooks sao **so-Claude Code**. Por isso, neste template, cada
-> verificacao vive num script em `.agent/scripts/` — universal, corre em qualquer agente e no
-> CI — e o hook e um **ponteiro fino** que a chama automaticamente. A verificacao e para todos;
-> o automatismo e so-Claude. Nas outras ferramentas corre-se o script, e o CI e a rede final.
+> **Harness e loop nao sao a mesma coisa, e a ordem importa**: sem harness solido (permissoes,
+> hooks, subagentes) um loop so amplifica erros mais depressa. Hooks sao **so-Claude Code**,
+> por isso aqui cada verificacao vive num script universal de `.agent/scripts/` e o hook e um
+> ponteiro fino. O detalhe: `src/docs/ticket-method-why.md`.
 
 ## Fase 0 — Explicar, e esperar
 
@@ -140,8 +121,9 @@ com a falha **escrita no relatorio**.
 E o `/review` e, se mexeu em UI, o `/design-review`. Nao e automatizavel: _"isto e um defeito
 real?"_ nao tem verificacao de maquina.
 
-**Cada passagem declara o angulo antes de correr.** Um angulo ja usado nesta alteracao nao
-conta como passagem — repetir a checklist da o mesmo resultado.
+**Cada passagem declara o angulo antes de correr**, e com ele a posicao no orcamento
+(`passagem 2 de 4`). Um angulo ja usado nesta alteracao nao conta como passagem — repetir a
+checklist da o mesmo resultado.
 
 Angulos (adaptar ao dominio no bootstrap; os de UI nao servem a uma CLI ou a uma lib):
 

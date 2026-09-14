@@ -57,7 +57,7 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 
 ## Verificado, nao prometido
 
-O **Guard 16** (`.agent/scripts/guards/mcp.mjs`) le o `.mcp.json` do repo, quando existe, e
+O **Guard 16** (`.agent/scripts/guards/mcp.mjs`) le a configuracao MCP do repo de qualquer dos quatro agentes (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`), quando existe, e
 reprova em:
 
 - **segredo literal** num `env`/`args` (token, chave, password, URL com credencial);
@@ -75,7 +75,8 @@ regra so tem trabalho a partir do momento em que o teu projeto acrescenta o prim
 
 ## Servidores aprovados
 
-> Uma linha por servidor **antes** de ele entrar no `.mcp.json`. Sem linha, o Guard 16 reprova.
+> Uma linha por servidor **antes** de ele entrar na configuracao — em qualquer dos quatro
+> ficheiros. Sem linha, o Guard 16 reprova.
 > A coluna *Porque* e a que evita a discussao de zero daqui a seis meses.
 
 | Servidor | Local/Rede | Le | Escreve | Porque | Aprovado em |

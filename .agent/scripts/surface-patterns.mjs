@@ -81,6 +81,11 @@ const CONTAGENS = [
   // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
   // variante do `AP1` que este repo documenta.
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
+  // A mesma ideia do lado dos HOOKS: o que eles tem nao e um `warn(`, e uma decisao de
+  // negacao. Reduzir o numero de negacoes no `guard-protected-branch.mjs` enfraquece a rede
+  // sem que nenhum teste tenha de ser tocado. `cru` porque a chave e um literal e o
+  // `semStrings` apagava-a.
+  { re: /permissionDecision\s*:\s*["']deny["']/, msg: "decisoes de negacao dos hooks", cru: true },
   // O invariante 2 do `AP4` ("estreitar a seleccao do runner") na forma que ESTE repo tem.
   // Os entry points chamavam cada modulo `tests-*.mjs` a mao; comentar uma dessas linhas
   // levava `test-hooks.mjs` de 156 para 39 testes com exit 0 e "todos passaram" — medido

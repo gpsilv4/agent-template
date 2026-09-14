@@ -17,7 +17,7 @@
 - [ ] `npm run build` succeeds
 - [ ] Bundle sizes within targets (if configured — `node .agent/scripts/check-bundle-sizes.mjs`)
 - [ ] Unit tests pass (`npm run test:unit`)
-- [ ] E2E tests pass (`npm run test`)
+- [ ] E2E tests pass (`npm run test:e2e`)
 - [ ] Security tests pass (`npm run test:security`)
 - [ ] Dependency audit reviewed (`npm run test:audit`) — it is informative in CI, so green does not mean clean
 - [ ] Doc guards pass (`node .agent/scripts/check-doc-versions.mjs`) — no WARN

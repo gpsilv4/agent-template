@@ -231,7 +231,15 @@ jobs:
       - name: Mensagens de commit — sem atribuicao a IA
         run: |
           set -euo pipefail
-          base="$(git rev-parse HEAD^1)"
+          # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
+          # inicial, que nao tem pai — `git rev-parse HEAD^1` sai 128 e, com `set -e`, mata o
+          # step. Resultado: o PRIMEIRO CI de cada projeto derivado nascia vermelho, por um
+          # motivo que nao e culpa de quem clona. Isto nao e o AP2: nao e "nao consegui ler",
+          # e "provei que nao ha intervalo".
+          if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
+            echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
+            exit 0
+          fi
           # `%B` e o corpo COMPLETO; um `%s` so veria o assunto e os trailers vivem no fim.
           # `-z` separa por NUL: uma mensagem tem linhas em branco, logo nao ha separador de
           # linha que sirva. `--no-merges`: o checkout de um PR e o merge ref, logo sem ele o
@@ -277,7 +285,15 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          base="$(git rev-parse HEAD^1)"
+          # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
+          # inicial, que nao tem pai — `git rev-parse HEAD^1` sai 128 e, com `set -e`, mata o
+          # step. Resultado: o PRIMEIRO CI de cada projeto derivado nascia vermelho, por um
+          # motivo que nao e culpa de quem clona. Isto nao e o AP2: nao e "nao consegui ler",
+          # e "provei que nao ha intervalo".
+          if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
+            echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
+            exit 0
+          fi
           if git diff --name-only "$base..HEAD" | grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)'; then
             node .agent/scripts/mutation-sweep.mjs
           else

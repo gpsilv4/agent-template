@@ -92,7 +92,7 @@ ci(actions): add Playwright browser caching
 
 ```bash
 npm run test:unit       # Unit tests
-npm run test            # E2E tests ({{TEST_FRAMEWORK}})
+npm run test:e2e        # E2E tests ({{TEST_FRAMEWORK}})
 npm run test:security   # Security tests
 npm run test:audit      # Dependency audit
 npm run test:all        # All tests
