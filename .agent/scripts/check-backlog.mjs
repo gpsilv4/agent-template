@@ -27,17 +27,8 @@ import { dirname, resolve, join } from "path";
 // gate a passar tendo validado nada. Mesma ancoragem que o check-doc-versions.mjs.
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-// Um PAR (ativo, arquivo) pode ser passado por argumento. Existe para o par proprio do
-// template — o `backlog-template.md`, que rastreia o desenvolvimento DESTE repo e que o
-// bootstrap apaga, para nenhum projeto derivado herdar TODOs que nao sao dele (ver a excecao
-// em `/review` §2). Sem isto, esse ficheiro seria um backlog a mao sem rede nenhuma: os
-// contadores e a barra sao dados derivados e derivam sempre, e e exactamente o que este
-// verificador existe para apanhar.
-//
-// Falha FECHADA: passar um alvo que nao existe reprova, em vez de saltar em silencio.
-const [argActive, argArchive] = process.argv.slice(2);
-const ACTIVE = argActive || ".agent/context/backlog.md";
-const ARCHIVE = argArchive || (argActive ? argActive.replace(/\.md$/, "-archive.md") : ".agent/context/backlog-archive.md");
+const ACTIVE = ".agent/context/backlog.md";
+const ARCHIVE = ".agent/context/backlog-archive.md";
 
 function read(path) {
   try {
