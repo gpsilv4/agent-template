@@ -75,7 +75,7 @@ const SEGUROS = new Set([
  *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `AP6`): e uma lista
  *  fechada de chaves que o proprio git documenta como executaveis. */
 const CHAVES_PERIGOSAS =
-  /^(?:core\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor)|sequence\.editor|credential\.helper|diff\.external|filter\..+\.(?:clean|smudge|process)|uploadpack\.packObjectsHook|alias\..+|protocol\..+\.allow|http\.proxy|url\..+\.insteadOf)$/i;
+  /^(?:core\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor|gitProxy)|sequence\.editor|credential\.helper|diff\.external|filter\..+\.(?:clean|smudge|process)|uploadpack\.packObjectsHook|alias\..+|protocol\..+\.allow|http\.proxy|url\..+\.insteadOf|pager\..+|(?:diff|merge)tool\..+\.cmd|gpg(?:\..+)?\.program|include\.path|includeIf\..+\.path|ssh\.variant)$/i;
 
 const FORMAS_INSEGURAS = {
   switch: /^(?:-C|--force|--discard-changes)$/,
@@ -91,9 +91,23 @@ const FORMAS_INSEGURAS = {
     const flagsDestrutivas = /^(?:--unset|--unset-all|--remove-section|--rename-section|--replace-all|-e|--edit)$/;
     if (args.some((a) => flagsDestrutivas.test(a))) return true;
     const posicionais = args.filter((a) => !a.startsWith("-"));
+    if (posicionais.length === 0) return false;
+
+    // O git 2.46 acrescentou sub-comandos (`git config set|unset|get|list|edit ...`). A
+    // versao anterior lia `posicionais[0]` como a CHAVE, logo na forma nova a "chave" era
+    // `set` e nao casava nada: `git config set core.hooksPath /dev/null` passava e desligava
+    // o `.githooks/commit-msg` de facto. Medido com git 2.50 por uma leitura independente —
+    // era o caso que o comentario acima dizia estar fechado.
+    const SUBCOMANDOS = /^(?:set|unset|get|list|edit|replace-all|add|remove-section|rename-section)$/;
+    let campos = posicionais;
+    if (SUBCOMANDOS.test(campos[0])) {
+      // `unset`/`edit` sao destrutivos por si, como as flags equivalentes.
+      if (/^(?:unset|edit|remove-section|rename-section)$/.test(campos[0])) return true;
+      campos = campos.slice(1);
+    }
     // Uma escrita tem chave E valor; `git config core.pager` sozinho apenas le.
-    if (posicionais.length < 2) return false;
-    return CHAVES_PERIGOSAS.test(posicionais[0]);
+    if (campos.length < 2) return false;
+    return CHAVES_PERIGOSAS.test(campos[0]);
   },
   add: /^(?:-i|--interactive|-p|--patch)$/, // interativos: um hook nao tem como responder
   // `fetch` com refspec escreve refs locais (`git fetch . HEAD:master`). Como PREDICADO e nao
@@ -234,6 +248,19 @@ const limpo = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
  *  token, o verbo passa a ser DESCONHECIDO e falha fechado. */
 const OPACO = "\u0000opaco\u0000";
 
+/** O indice `i` cai dentro de um par de aspas ainda aberto? Varre do inicio, porque o estado
+ *  de aspas nao e local. Uma barra invertida escapa o caractere seguinte. */
+function dentroDeAspas(txt, i) {
+  let aspa = null;
+  for (let k = 0; k < i; k++) {
+    const c = txt[k];
+    if (c === "\\") { k++; continue; }
+    if (aspa) { if (c === aspa) aspa = null; }
+    else if (c === "'" || c === '"') aspa = c;
+  }
+  return aspa !== null;
+}
+
 function segmentos(texto) {
   // Uma substituicao de comando e DUAS coisas ao mesmo tempo, e a versao anterior tratou-a
   // como uma so:
@@ -262,7 +289,15 @@ function segmentos(texto) {
       // de uma redireção nunca contem um separador de shell — enumera-los aqui e o que
       // impede o consumo de atravessar a fronteira do comando.
       .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ")
-      .replace(/[;&|(){}\n]+/g, "\n")
+      // Separadores. `;`, `&`, `|` e newline partem SEMPRE, mesmo dentro de aspas: e o que
+      // mantem `eval "a; git commit"` negado, e falhar fechado ali vale mais do que a
+      // precisao. Mas `(`/`)`/`{`/`}` **so partem fora de aspas** — tratá-los como separador
+      // dentro de uma string fazia `echo "(git push --force)"` e
+      // `python3 -c "print('git push --force')"` serem NEGADOS, sem branch nenhum onde
+      // passassem (o force-push e avaliado antes do branch). Medido: bloqueou duas chamadas
+      // legitimas de um revisor. Negar trabalho legitimo custa tanto como deixar passar.
+      .replace(/[;&|\n]+/g, "\n")
+      .replace(/[(){}]/g, (m, i, txt) => (dentroDeAspas(txt, i) ? m : "\n"))
       .split("\n")
       .map((seg) => seg.trim())
       .filter(Boolean);
@@ -475,7 +510,14 @@ try {
     /^([^\n]*?)<<-?\s*(['"]?)(\w+)\2([\s\S]*?)^\s*\3\s*$/gm,
     (_todo, preambulo, _q, _tag, corpo) => {
       // O preambulo e o que esta ANTES do `<<` na mesma linha: e ele que diz quem recebe.
-      if (invocacoes(preambulo).length === 0 && /(?:^|\s)(?:sh|bash|zsh|dash|ksh)(?:\s|$)/.test(limpo(preambulo))) {
+      // Quem recebe o corpo pode estar ANTES do `<<` (`bash -s <<EOF`) ou **depois do
+      // terminador** (`cat <<EOF | bash`). A versao anterior so olhava para o preambulo, e a
+      // segunda forma passava — e a vizinha da que tinha sido corrigida.
+      const ehShell = (t) => /(?:^|[\s|])(?:sh|bash|zsh|dash|ksh)(?:\s|$)/.test(limpo(t));
+      // Em `cat <<EOF | bash`, o `| bash` fica no RESTO DA LINHA do `<<` — que o regex captura
+      // como inicio do corpo, nao depois do terminador. E ai que se procura.
+      const restoDaLinha = corpo.split("\n")[0] ?? "";
+      if (invocacoes(preambulo).length === 0 && (ehShell(preambulo) || ehShell(restoDaLinha))) {
         corposExecutaveis.push(corpo);
       }
       return preambulo;

@@ -88,6 +88,14 @@ function listarDir(rel) {
 // ausencia de um ficheiro, nao a linha em si.
 const PARES = [
   {
+    // Falha aberta por desenho (esta no caminho de CADA prompt), logo nao tem `warn(`.
+    // O sitio que DECIDE e o `console.log` do lembrete.
+    alvo: ".claude/hooks/prompt-fase0.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O hook nao tem `warn(`/`fatal(`: falha aberta por desenho. O sitio que DECIDE e o
     // `console.log` da reinjeccao — desliga-lo faz o hook nao entregar nada, que e
     // exactamente o defeito que os testes tem de apanhar.
@@ -241,6 +249,18 @@ const listarSo = process.argv.includes("--list");
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.slice("--only=".length) : null;
 
+// `--skips`: varrer os sitios `skip()`/`note()` em vez dos `warn()`/`fatal()`.
+//
+// A varredura normal exclui-os de propósito — um SKIP nao e um achado, e exigir um teste por
+// cada um seria estreito de mais para o valor. Mas a regra que este repo repete em dezenas de
+// comentarios e **"todo o skip e visivel"**: um guard que deixa de ANUNCIAR que nao correu
+// e o `AP2` em forma pura, e nada media se isso era possivel. Este modo mede.
+//
+// Fica fora do CI e fora da varredura normal: corre-se a mao, ao mexer nos guards. O que
+// devolve nao e um veredicto de "esta mal" — e a lista dos sitios que ninguem observa.
+const modoSkips = process.argv.includes("--skips");
+const SINAL_SKIPS = /(?<![\w.$])(?:skip|note)\(/;
+
 let falhou = false;
 
 // DESCOBERTA: `PARES` e mantido a mao, logo um verificador novo entrava no repo sem rede
@@ -309,7 +329,8 @@ try {
   // Se o pre-voo do --only ja reprovou, nao ha alvos para varrer.
   if (selecionados.length === 0) throw { __preflight: true };
 
-  for (const { alvo, suite, sinal, neutro, opcional } of selecionados) {
+  for (const { alvo, suite, sinal: sinalDoPar, neutro, opcional } of selecionados) {
+    const sinal = modoSkips ? SINAL_SKIPS : sinalDoPar;
     let src;
     try {
       // Ler SEMPRE do repo real: e o estado que se quer avaliar.
@@ -356,6 +377,10 @@ try {
       // Nao e um "nada a fazer": o verificador existe e reprova de alguma forma. Zero
       // correspondencias significa que o `sinal` deste par esta desatualizado, e varrer
       // zero sitios reportando sucesso seria o mesmo erro que o script combate.
+      if (modoSkips) {
+        console.log(`  SEM SKIPS  ${alvo}: nao tem sitios skip()/note() — nada a medir neste modo`);
+        continue;
+      }
       console.log(`  SINAL ERRADO  ${alvo}: o padrao ${sinal} nao casa nada — atualizar PARES`);
       falhou = true;
       continue;

@@ -124,6 +124,41 @@ export function registar() {
     rmSync(file(dir, "CLAUDE.md"));
   }, { code: 1, anyOut: ["SKIP  Guard 1c"] });
 
+  // --- Os SKIP/NOTE que ninguem observava (varredura `--skips`) -----------------
+  // "Todo o skip e visivel" e uma regra que o repo repete em dezenas de comentarios, e nada
+  // media se um skip podia ser apagado em silencio. Um guard que deixa de ANUNCIAR que nao
+  // correu e o `AP2` em forma pura. Medido com `mutation-sweep --skips`: 17 de 39 cobertos.
+
+  test("G1: rule perto do limite da NOTE (nao WARN)", (dir) => {
+    // 11 500 <= bytes < 12 000: avisa que esta perto, sem reprovar. Sem teste, despromover
+    // este `note` a silencio era invisivel.
+    const alvo = ".agent/rules/core-rules.md";
+    const atual = readF(dir, alvo).length;
+    if (atual < 11500) appendFileSync(file(dir, alvo), "x".repeat(11600 - atual));
+  }, { code: 0, includes: ["NOTE", "perto do limite"] });
+
+  test("G1c: sem @import de .agent/context/ da SKIP visivel", (dir) => {
+    // Os DOIS espelhos: mexer so no CLAUDE.md quebra o Guard 2 e o teste falharia por um
+    // aviso sem relacao nenhuma com o que afirma. A sintaxe difere (`@` vs `@./`).
+    writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md").split("\n")
+      .filter((l) => !l.startsWith("@.agent/context/")).join("\n"));
+    writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md").split("\n")
+      .filter((l) => !l.startsWith("@./.agent/context/")).join("\n"));
+  }, { code: 0, includes: ["SKIP  Guard 1c"] });
+
+  test("G1d: sem bloco de Fronteiras no CLAUDE.md da SKIP visivel", (dir) => {
+    // Remocao CIRURGICA do bloco: reescrever o ficheiro inteiro levava tambem a tabela de
+    // workflows, e o teste falhava com 14 avisos do Guard 7 — sem relacao com o que afirma.
+    const semFronteiras = (t) => t.replace(/^## Fronteiras[\s\S]*?(?=^## )/m, "");
+    for (const f of ["CLAUDE.md", "GEMINI.md"]) writeF(dir, f, semFronteiras(readF(dir, f)));
+  }, { code: 0, includes: ["SKIP  Guard 1d"] });
+
+  test("G1d: sem nenhum ponteiro fino da SKIP visivel", (dir) => {
+    for (const f of [".cursor/rules/project.mdc", ".github/copilot-instructions.md"]) {
+      try { rmSync(file(dir, f)); } catch {}
+    }
+  }, { code: 0, includes: ["SKIP  Guard 1d"] });
+
   test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
     // A lista e DERIVADA do disco: escrever os nomes a mao envelhecia no primeiro ficheiro
     // de referencia novo — e foi o que aconteceu com o `anti-patterns-template.md`, que

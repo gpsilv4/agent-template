@@ -59,7 +59,7 @@ export function descobreModulos(dir) {
  *                               `registar()` rebentasse a meio passaria por registado.
  * @returns {Promise<string[]>}  nomes dos modulos registados
  */
-export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem }) {
+export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, conhecidos }) {
   if (typeof contagem !== "function") fatal("registaDescobertos precisa de `contagem()` para medir o contributo de cada modulo");
   if (!entryPoint) fatal("registaDescobertos precisa de `entryPoint` — sem ele nao sabe que modulos sao seus");
 
@@ -94,6 +94,20 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem }
       );
     }
     if (mod.entryPoint !== entryPoint) {
+      // Um modulo declarado para OUTRO entry point e legitimo — os dois partilham a pasta.
+      // Mas um `entryPoint` que nao corresponde a entry point NENHUM significa que o modulo
+      // nao e corrido por ninguem, e isso nao pode ser silencioso: era o mesmo buraco que
+      // este ficheiro veio fechar, com outro caractere. Medido por uma leitura independente:
+      // trocar `"test-guards.mjs"` por `"test-guard.mjs"` num modulo levava a suite de 188
+      // para 171 testes, com `exit 0` e "Todos os testes dos guards passaram".
+      if (conhecidos && !conhecidos.includes(mod.entryPoint)) {
+        fatal(
+          `${nome} declara \`entryPoint: "${mod.entryPoint}"\`, que nao e nenhum entry point deste repo.\n` +
+            `  Conhecidos: ${conhecidos.join(", ")}.\n` +
+            `  Um modulo com um entry point que nao existe nao e corrido por ninguem — e um\n` +
+            `  erro de escrita desliga a suite inteira em silencio.`
+        );
+      }
       deOutros.push(nome);
       continue;
     }
@@ -122,11 +136,14 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem }
         `  dizer que correu tudo — reprova em vez de passar (AP2).`
     );
   }
-  return registados;
+  return { registados, deOutros };
 }
 
 /** Linha de rodape para o entry point dizer o que correu. Sem isto, a descoberta e
  *  invisivel e ninguem nota que um modulo deixou de ser encontrado. */
-export function resumoDescoberta(registados) {
-  return `  (${registados.length} modulo(s) de teste descoberto(s): ${registados.join(", ")})`;
+export function resumoDescoberta(registados, deOutros = []) {
+  const meus = `  (${registados.length} modulo(s) de teste descoberto(s): ${registados.join(", ")})`;
+  // `deOutros` era construido e nunca lido — a mitigacao chegou a ser escrita e ficou pelo
+  // caminho. Um modulo saltado tem de ser VISIVEL, mesmo quando o salto e legitimo.
+  return deOutros.length ? `${meus}\n  (${deOutros.length} de outro entry point: ${deOutros.join(", ")})` : meus;
 }

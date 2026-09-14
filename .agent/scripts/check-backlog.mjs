@@ -167,7 +167,9 @@ for (const { key, re } of SECTIONS) {
   for (const cells of tableRows(seccao)) {
     const id = cells[0];
     if (iEsforco >= 0 && id) {
-      const e = norm(cells[iEsforco] ?? "").replace(/\*/g, "");
+      // `-`, `—` e `n/a` sao a convencao markdown para "vazio", e a celula vazia ja era
+      // tolerada de propósito. Reprovar a forma escrita e tolerar a vazia era incoerente.
+      const e = norm(cells[iEsforco] ?? "").replace(/\*/g, "").replace(/^(?:-+|–|—|n\/a|\?)$/, "");
       if (e && !ESFORCOS.includes(e)) {
         warn(`${key}: item "${id}" tem Esforco "${cells[iEsforco]}" — esperado S, M ou L (ver a legenda do backlog)`);
       }
@@ -321,7 +323,12 @@ const expectedFilled = countable > 0 ? Math.round((g.concluido / countable) * 20
 if (!progMatch) {
   if (g.total > 0) warn("Nao encontrei a linha de Progresso Geral no formato esperado.");
 } else {
-  const filled = (progMatch[1].match(/[^_\s]/g) || []).length;
+  // `[...str]` e nao `.length`: glifos fora do BMP (🟩/⬜, que um projeto derivado pode usar)
+  // sao pares surrogate e contavam a DOBRAR — uma barra legitima de 20 blocos media 30, e a
+  // mensagem afirmava "tem 30 blocos" sobre um ficheiro que tem 20. E o `AP1` dentro do
+  // verificador escrito para o combater.
+  const blocos = [...progMatch[1]];
+  const filled = blocos.filter((c) => !/[_\s]/.test(c)).length;
   const pct = parseInt(progMatch[2], 10);
   const wConcl = parseInt(progMatch[3], 10);
   const wTotal = parseInt(progMatch[4], 10);
@@ -331,7 +338,7 @@ if (!progMatch) {
   if (filled !== expectedFilled) warn(`Barra: ${filled} blocos preenchidos != esperado ${expectedFilled} (de 20)`);
   // A LARGURA nunca era verificada: `process-rules.md` diz "20 blocos = 100%" e a propria
   // mensagem acima diz "(de 20)", mas uma barra de 40 caracteres passava com exit 0.
-  const largura = progMatch[1].length;
+  const largura = blocos.length;
   if (largura !== 20) warn(`Barra: tem ${largura} blocos, esperados 20 (20 blocos = 100%)`);
 }
 

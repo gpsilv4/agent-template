@@ -463,6 +463,93 @@ test("session: caminho com acento aparece INTEIRO, nao escapado", () => {
   }
 });
 
+// --- UserPromptSubmit: lembrar a Fase 0 ---------------------------------------
+// A Fase 0 era das 13 regras so-prosa. Este hook e a primeira camada mecanica que ela tem.
+// O que se afirma: dispara nas ordens, CALA-SE nas perguntas (um lembrete numa pergunta e
+// ruido, e ruido a cada prompt ensina a ignorar o lembrete), e nunca bloqueia.
+const FASE0 = join(ROOT, ".claude/hooks/prompt-fase0.mjs");
+
+/** Corre o hook com um prompt, sem precisar de repo. */
+function comPrompt(texto) {
+  const out = execFileSync("node", [FASE0], { input: JSON.stringify({ prompt: texto }), encoding: "utf8" });
+  if (!out.trim()) return { vazio: true, ctx: "" };
+  return { vazio: false, ctx: JSON.parse(out).hookSpecificOutput?.additionalContext ?? "" };
+}
+
+// As formas que um leitor independente mediu como FALSOS NEGATIVOS: o hook calava-se
+// precisamente nas ordens mais naturais. Tres causas distintas — o ID sozinho (`B3`) nunca
+// casava apesar de o comentario o prometer, o ramo ingles exigia a palavra "ticket", e
+// `plano`/`fase 0` soltos suprimiam o lembrete.
+for (const ordem of [
+  "faz o ticket B3",
+  "implementa o export mensal",
+  "corrige o bug do login",
+  "acrescenta um filtro a tabela",
+  "implement the ticket F2",
+  "comeca o sprint 2",
+  "faz o B3",
+  "comeca o B3",
+  "avanca para o F12",
+  "trata do ticket B3",
+  "implement the export module",
+  "fix the login timeout",
+  "add a monthly filter",
+  "escreve o hook que falta",
+  "muda o check-backlog para aceitar XL",
+  "implementa o plano de contas",
+]) {
+  test(`fase0: lembra em "${ordem}"`, () => {
+    const r = comPrompt(ordem);
+    if (r.vazio) throw new Error("era uma ordem de implementacao e nao lembrou a Fase 0");
+    contem(r.ctx, "Fase 0");
+  });
+}
+
+// E os FALSOS POSITIVOS: ruido no caminho de cada prompt, e pior — disparava exactamente em
+// quem estava a seguir o processo (mexer no backlog e no CHANGELOG e o que o
+// `process-rules.md` manda fazer). Um lembrete que aparece onde nao deve ensina a ignora-lo.
+for (const naoOrdem of [
+  "como implementar isto?",
+  "porque e que o teste falha?",
+  "o que faz este guard?",
+  "explica-me o ticket B3",
+  "qual e a diferenca entre os dois?",
+  "adiciona uma entrada ao backlog",
+  "acrescenta uma linha ao CHANGELOG",
+  "nao implementar nada ainda, so analisa",
+  "reve o diff e diz se alguma coisa corrige o bug B3",
+  "este script adiciona a linha certa ao resumo?",
+  "resolve-se assim?",
+]) {
+  test(`fase0: CALA-SE em "${naoOrdem}"`, () => {
+    if (!comPrompt(naoOrdem).vazio) throw new Error("era uma pergunta — um lembrete aqui e ruido");
+  });
+}
+
+test("fase0: cala-se quando o pedido JA pede plano (evita lembrar o obvio)", () => {
+  if (!comPrompt("implementa o export, mas explica primeiro o plano").vazio)
+    throw new Error("o pedido ja esta em Fase 0 — lembrar e redundante");
+  if (!comPrompt("corre o /grill sobre o ticket B3 e implementa").vazio)
+    throw new Error("o pedido ja invoca o /grill");
+});
+
+test("fase0: prompt vazio ou ausente nao dispara", () => {
+  if (!comPrompt("").vazio) throw new Error("prompt vazio nao e uma ordem");
+  const out = execFileSync("node", [FASE0], { input: "{}", encoding: "utf8" });
+  if (out.trim()) throw new Error("payload sem prompt nao devia produzir nada");
+});
+
+test("fase0: payload ilegivel sai 0 e calado (falha aberta)", () => {
+  const out = execFileSync("node", [FASE0], { input: "nao e json", encoding: "utf8" });
+  if (out.trim()) throw new Error("um hook no caminho de cada prompt tem de falhar aberto");
+});
+
+test("fase0: NUNCA bloqueia — nao emite decision/deny", () => {
+  const out = execFileSync("node", [FASE0], { input: JSON.stringify({ prompt: "faz o ticket B3" }), encoding: "utf8" });
+  if (/"(?:decision|permissionDecision)"\s*:\s*"(?:block|deny)"/.test(out))
+    throw new Error("recusar o prompt do utilizador custa muito mais do que um lembrete a mais");
+});
+
 // --- PreCompact: reinjectar as Fronteiras -------------------------------------
 // A compactacao descarta as rules importadas pelo CLAUDE.md e nada avisa. Este hook devolve
 // o bloco Fronteiras em `additionalContext` (campo honrado no PreCompact). Falha ABERTA:
@@ -492,6 +579,19 @@ test("precompact: NAO reinjecta as rules inteiras (so as Fronteiras)", () => {
     contem(r.ctx, "so isto");
     if (r.ctx.includes("NAO-DEVIA-APARECER"))
       throw new Error("reinjectou alem das Fronteiras — derrota o proposito da compactacao");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("precompact: `##` dentro de bloco de codigo NAO trunca as Fronteiras", () => {
+  const d = repo("feature/x");
+  try {
+    writeFileSync(join(d, "CLAUDE.md"),
+      "# P\n\n## Fronteiras\n\n- Sempre: X\n\n```md\n## Exemplo\n```\n\n- Nunca: MARCA-FINAL\n\n## Outra\n\nx\n");
+    const r = correNoCwd(PRECOMPACT, d);
+    // Antes: truncava no `## Exemplo` e perdia tudo o resto, em silencio.
+    contem(r.ctx, "MARCA-FINAL");
   } finally {
     rmSync(d, { recursive: true, force: true });
   }
@@ -557,12 +657,14 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
 
 // AP4: os modulos `tests-*.mjs` sao DESCOBERTOS em disco, nao chamados a mao — comentar
 // uma linha aqui levava a suite de 156 para 39 testes com exit 0. Ver `lib/registo.mjs`.
-console.log(resumoDescoberta(await registaDescobertos({
+const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-hooks.mjs",
   ctx: { test, corre, repo, eq, contem },
   contagem: () => passed + falhas.length,
-})));
+  conhecidos: ["test-guards.mjs", "test-test-surface.mjs", "test-hooks.mjs"],
+});
+console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
 test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
   const r = corre({ tool_input: { command: "git commit -m x" } });

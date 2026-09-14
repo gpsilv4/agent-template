@@ -214,6 +214,23 @@ test("Barra: largura diferente de 20 avisa", (dir) => {
     ACTIVE_OK.replace(`\`${BAR}\``, "`" + BAR + "________________________" + "`"));
 }, { code: 1, includes: ["esperados 20"] });
 
+test("Barra: glifos fora do BMP contam como UM bloco, nao dois", (dir) => {
+  // 🟩/⬜ sao pares surrogate: `.length` contava 30 numa barra legitima de 20, e a mensagem
+  // AFIRMAVA "tem 30 blocos" sobre um ficheiro que tem 20 — o AP1 dentro do verificador
+  // escrito para o combater. Regressao para qualquer derivado que troque o glifo.
+  // Glifo preenchido fora do BMP + o `_` que o verificador ja conhece como vazio. O que se
+  // afirma e a CONTAGEM, nao o vocabulario: 8 preenchidos e largura 20, como o baseline.
+  // (Reconhecer `⬜` como vazio seria outra alteracao — e uma feature, nao este defeito.)
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace(`\`${BAR}\``, "`" + "\u{1F7E9}".repeat(8) + "_".repeat(12) + "`"));
+}, { code: 0, includes: ["OK — contadores"] });
+
+test("Esforco: `-` e tratado como vazio, tal como a celula em branco", (dir) => {
+  // A celula vazia ja era tolerada de propósito ("ainda nao preenchido"); reprovar a forma
+  // escrita da mesma coisa era incoerente com a decisao que o proprio codigo tomou.
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(/\| S \|/, "| - |"));
+}, { code: 0, includes: ["OK — contadores"] });
+
 // --- Esforco: o campo que gate-ia todo o ticket-method, sem rede ------------
 test("Esforco invalido avisa (era texto livre)", (dir) => {
   writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(/\| S \|/, "| XXL |"));

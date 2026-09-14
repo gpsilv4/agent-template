@@ -154,6 +154,21 @@ const BYPASSES = [
   //    `$git` e nao casava com `git`.
   ["$'git' (ANSI-C quoting)", "$'git' commit -m x"],
   ['$"git" (locale quoting)', '$"git" commit -m x'],
+
+  // --- Quinta leitura (leitor independente sobre este branch) ----------------
+  // O `git config` ganhou sub-comandos no git 2.46 (`set`/`unset`/`get`/`edit`). O predicado
+  // lia `posicionais[0]` como a CHAVE, logo com a forma nova a chave era "set" e nao casava
+  // nada. Medido a desligar o `.githooks/commit-msg` de facto, com git 2.50.
+  ["config set (sintaxe do git 2.46+)", "git config set core.hooksPath /dev/null"],
+  ["config unset (sintaxe do git 2.46+)", "git config unset core.hooksPath"],
+  // Chaves que executam e nao estavam na lista. `pager.<cmd>` e o mesmo sink que `core.pager`
+  // e dispara num `git log` inocente; `include.path` puxa um ficheiro que redefine tudo.
+  ["config pager.<cmd> executa", 'git config pager.log "git commit -am x"'],
+  ["config gpg.program executa", "git config gpg.program /tmp/evil.sh"],
+  ["config include.path puxa config alheia", "git config include.path ../evil"],
+  ["config mergetool.<x>.cmd executa", 'git config mergetool.x.cmd "git push --force"'],
+  // O destinatario real do heredoc esta DEPOIS do terminador. Forma vizinha da ja corrigida.
+  ["heredoc encanado para uma shell", "cat <<EOF | bash\ngit push --force origin main\nEOF"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -172,6 +187,15 @@ for (const [nome, comando] of BYPASSES) {
 // Oito destes vinham medidos da mesma leitura. O `git merge-base` negou ao revisor a
 // verificacao do range que lhe foi pedida — um falso positivo bloqueia trabalho a serio.
 const LEGITIMOS = [
+  // Negar trabalho legitimo custa tanto como deixar passar. O `partir()` tratava `(` e `{`
+  // como separadores mesmo DENTRO de aspas, logo um comando que apenas MENCIONA git entre
+  // parentesis era negado — e o `eForce` corre ANTES da verificacao de branch, logo nao havia
+  // branch nenhum onde passasse. Aconteceu ao proprio revisor, duas vezes.
+  ["echo com git entre parentesis", 'echo "(git push --force)"'],
+  ["python3 -c que cita git", `python3 -c "print('git push --force')"`],
+  ["node -e que cita git", `node -e "console.log('git commit -m x')"`],
+  ["config a LER uma chave perigosa", "git config --get core.pager"],
+  ["config de identidade (chave inofensiva)", "git config user.email a@b.com"],
   ["merge-base", "git merge-base main HEAD"],
   ["status", "git status --porcelain"],
   ["log", "git log --oneline -5"],

@@ -52,7 +52,17 @@ function raizDoProjeto(payload) {
  *  a suite o poder exercitar sem correr o processo. */
 export function fronteiras(md) {
   if (typeof md !== "string") return null;
-  const m = /^##\s+Fronteiras\b[^\n]*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(md);
+  // Um `## Exemplo` DENTRO de um bloco de codigo cercado nao e um heading — mas o regex via-o
+  // como tal e truncava ali, reinjectando metade das Fronteiras (e uma cerca por fechar) em
+  // silencio, porque o hook falha aberto. Num template cujas Fronteiras falam de comandos, um
+  // exemplo cercado e provavel. As cercas sao neutralizadas antes de procurar o heading, e o
+  // corpo e recortado do texto ORIGINAL pelos indices — para nao devolver o texto mascarado.
+  const mascarado = md.replace(/^```[\s\S]*?^```/gm, (b) => b.replace(/^##/gm, "@@"));
+  const m = /^##\s+Fronteiras\b[^\n]*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/m.exec(mascarado);
+  if (m) {
+    const corpoOriginal = md.slice(m.index + m[0].length - m[1].length, m.index + m[0].length).trim();
+    return corpoOriginal === "" ? null : corpoOriginal;
+  }
   if (!m) return null;
   const corpo = m[1].trim();
   return corpo === "" ? null : corpo;

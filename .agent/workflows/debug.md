@@ -62,11 +62,29 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 - Correr `npx tsc --noEmit` — deve passar com 0 erros
 - Verificar que cache keys afetadas sao invalidadas
 
-## 5. Verificar
+## 5. Verificar — e o criterio de saida
 
-- Testar no browser (desktop + mobile viewport)
-- Confirmar que os dados se atualizam apos operacoes CRUD
-- Confirmar que a navegacao entre paginas mostra dados do cache (sem spinners)
+**Nao esta feito ate existir um teste que ficaria VERMELHO antes da correcao.** E a unica
+verificacao que nao depende de alguem se lembrar de repetir os passos daqui a seis meses.
+
+- [ ] **Teste de regressao** escrito, e **visto a falhar** com a correcao desligada. Um teste
+      que nunca se viu vermelho pode nao estar a afirmar nada (`AP1` — e a mesma regra da
+      Fase 1 do `ticket-method`: cada teste novo nasce com o seu controlo negativo).
+      Se o bug nao justificar teste — tipicamente so-visual — **escrever porque**, em vez de
+      deixar a ausencia por explicar.
+- [ ] O repro do passo 1 deixou de reproduzir.
+- [ ] Testar no browser (desktop + mobile viewport).
+- [ ] Confirmar que os dados se atualizam apos operacoes CRUD.
+- [ ] Confirmar que a navegacao entre paginas mostra dados do cache (sem spinners).
+- [ ] A correcao e **minima**: o que foi tocado alem da causa raiz esta justificado, ou sai.
+
+> **PARA aqui.** Com a causa provada, o repro morto e o teste vermelho-depois-verde, o debug
+> acabou — seguir para o `/review`. Continuar a procurar "mais qualquer coisa" sem sintoma
+> novo nao e rigor, e trabalho sem criterio de fim.
+>
+> **Se a causa nao chegou a ser provada**, tambem se para: dizer o que foi testado, o que foi
+> excluido e que evidencia falta. Um palpite apresentado como conclusao custa mais do que um
+> "nao consegui isolar, falta X".
 
 ## 6. Sincronizacao de Conhecimento (Docs Sync)
 

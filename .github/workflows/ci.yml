@@ -166,11 +166,13 @@ jobs:
   guard-tests:
     name: Guard Tests
     runs-on: ubuntu-latest
-    # 10 e nao 5: a corrida medida esta em ~1m10s, mas o `simulate-derived` sozinho custa
-    # ~50s e o job cresce a cada suite nova. Um timeout apertado falha por tempo e faz
-    # perder meia hora a perceber que nao era um defeito. 25 cobre a varredura de mutacao,
-    # que so corre quando o PR toca nos verificadores.
-    timeout-minutes: 25
+    # 40, e o numero vem de uma MEDICAO e nao de um palpite: a primeira corrida com a
+    # varredura de mutacao ligada levou **20m29s** (PR #36, que tocou nos verificadores).
+    # Um tecto de 25 deixava ~18% de folga, e cada verificador novo empurra isto para cima.
+    # O modo de falha de um timeout apertado e feio — o job morre por tempo e parece um
+    # defeito, em vez de dizer que faltou tempo. Sobe-se antes de doer, nao depois.
+    # Quando o PR NAO toca nos verificadores a varredura salta e o job leva ~1m10s.
+    timeout-minutes: 40
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
