@@ -141,7 +141,7 @@
   O Guard 16 verifica o que e verificavel: segredos literais no `.mcp.json` e servidores sem
   aprovacao escrita.
 
-> Detalhe de cada script, e a regra que os liga, em **`.agent/rules/scripts-guide.md`** — **nao carregado**; abrir ao mexer em `.agent/scripts/` ou `.claude/hooks/`.
+> Detalhe de cada peca, e a regra que as liga, em duas rules **nao carregadas**: **`scripts-guide.md`** (verificadores universais — abrir ao mexer em `.agent/scripts/`) e **`hooks-guide.md`** (hooks so-Claude-Code e `.githooks/`). Sao catalogos separados porque crescem de forma independente e quem mexe num raramente mexe no outro.
 
 ### Code Quality Config
 

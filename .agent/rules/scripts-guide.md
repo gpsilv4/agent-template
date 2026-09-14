@@ -5,10 +5,14 @@
 > carregadas — porque a lista cresce com cada verificador e o orcamento de bytes das rules
 > sempre-carregadas e finito (foi excedido a serio quando esta secao vivia lá).
 >
-> Abrir ao mexer em `.agent/scripts/` ou em `.claude/hooks/`.
+> Abrir ao mexer em `.agent/scripts/`. Para os hooks, ver `hooks-guide.md`.
 
 > **Evidencia em `src/docs/scripts-guide-why.md`** (nao carregado): de onde veio cada decisao
 > e o que custou. Aqui ficam as instrucoes.
+
+> **Os hooks vivem em `.agent/rules/hooks-guide.md`.** Sao dois catalogos independentes,
+> consultados em momentos diferentes — um ao mexer num verificador, outro ao mexer num hook —
+> e juntos cresciam para lá do orcamento a cada peca nova. Ver a nota no fim.
 
 ## Os verificadores e as suas suites
 
@@ -19,35 +23,6 @@
 - **Suites de testes negativos** (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs`, e `.claude/hooks/tests/test-hooks.mjs`): uma por verificador — quebram o que ele promete verificar e afirmam que avisa e sai `!= 0`. Correm no job `guard-tests` do CI, sem gate. Sem dependencias nem `package.json`. Correr apos qualquer alteracao a um `check-*.mjs`: um guard que passa quando devia falhar produz confianca infundada.
 - **Backlog Checker** (`.agent/scripts/check-backlog.mjs`): Trata os contadores do Resumo e a barra de progresso do backlog como dados derivados — recalcula-os a partir das tabelas (items abertos em `backlog.md` + fechados em `backlog-archive.md`) e avisa se divergirem; deteta tambem IDs duplicados. Caminhos ancorados a raiz do repo (nao ao cwd) e **ficheiro ausente reprova** — um gate que nao consegue validar nao pode sair `0`. Correr antes de commit; **corre no CI** no job `guard-tests`.
 - **Test Surface Checker** (`.agent/scripts/check-test-surface.mjs`): responde a "a superficie de teste foi enfraquecida desde a baseline?" — testes apagados, `skip`/`only` acrescentados, ou a **configuracao do runner** estreitada (que remove falhas sem tocar num teste). Compara **contagens** entre as duas versoes, nao linhas do diff. Sai `!= 0` tambem quando **nao consegue medir**. Ver `AP4`.
-- **Hooks** (`.claude/hooks/`, **so-Claude Code**): o agente pode esquecer uma regra do `CLAUDE.md`; um hook nao esquece. Saem `0` em tudo excepto na negacao explicita — um hook avariado nunca bloqueia trabalho legitimo. Testes em `.claude/hooks/tests/test-hooks.mjs`.
-  - `guard-protected-branch` (`PreToolUse`/`Bash`) — num branch protegido **permite so os verbos seguros** do `git` e **nega o resto**, incluindo o que nao consegue identificar; force-push cru (`--force`, `-f`, `+refspec`) e `--mirror` sao negados em **qualquer** branch; `--delete` e `:refspec` sao negados quando o **alvo** e um branch protegido — apagar um `fix/...` mergeado e rotina e tem de passar. E um **allowlist** de proposito: a versao com blocklist tinha 32 defeitos medidos — ver `AP6`. Tres detalhes que so aparecem quando se mede:
-    O alvo vem do `cwd` do payload **e de todos os `-C`/`--git-dir`/`cd`/`pushd` do comando**; sem pista valida cai no `cwd` do hook (lista vazia **permitia**). A tabela `BYPASSES` na suite e a lista viva de formas conhecidas — acrescentar uma quando aparecer. **Nao se escreve o tamanho dela em prosa**: a primeira tentativa dizia 28 quando a tabela tinha 47, e envelheceu no mesmo dia. O numero esta a um `grep -c` de distancia.
-  - `session-context` (`SessionStart`) — afirma o estado real (branch, o que esta por commitar, PRs abertos) em vez de o deixar inferir. Deliberadamente **curto**: entra no contexto a cada sessao.
-  - `stop-verify` (`Stop`) — diz que suite ficou **em divida** para os ficheiros tocados. Nao corre nada: um hook de fim de turno que corresse suites seria desligado.
-  - `precompact-reinject` (`PreCompact`) — devolve o bloco **Fronteiras** do `CLAUDE.md` antes de a janela compactar. Sem ele, a compactacao descarta as rules importadas e o agente segue sem as regras nao-negociaveis, sem nada no ecra a dize-lo. So as Fronteiras (~600 bytes): reinjectar as rules inteiras derrotava o proposito da compactacao. Falha aberta.
-  - `prompt-fase0` (`UserPromptSubmit`) — quando o pedido parece uma ordem de implementacao, devolve o que a **Fase 0** exige, antes de o agente responder. **Nao bloqueia** e **cala-se em perguntas** — ruido a cada prompt ensina a ignorar o lembrete. Falha aberta.
-  - Ambos usam `git status --untracked-files=all`, porque sem isso o git **colapsa diretorios** nao rastreados e um ficheiro novo em pasta nova aparece como a pasta.
-  - **Nao ha `lint-changed-file`** de proposito: os comandos de lint sao especificos da stack, logo o template so poderia trazer um hook inerte — e um hook que nao faz nada por omissao e prosa com mais passos. Se o teu projeto tem lint, vale a pena escreve-lo: `PostToolUse`/`Write|Edit`, a devolver o que nao e auto-corrigivel como contexto para ser corrigido no mesmo turno.
-- **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio), logo e opt-in no CI: correr localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
-
-- **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do hook.
-
-> **O limite da varredura, e o `AP7`.** Ela mede se cada sitio de aviso **existente** e
-> observado; **nao** mede se um ramo nunca dispara, nem ve um falso positivo. Um `note()` nao e
-> sitio de aviso, e um `warn()` inalcancavel por construcao passa igualmente — ela nao tem como
-> distinguir "coberto" de "impossivel". Medido: `26/26` no Guard 15 antes **e** depois de fechar
-> um ramo que era codigo morto. O que apanha isto e o **controlo negativo por ramo** — desligar
-> cada metade da correcao, uma por vez, e exigir vermelho em cada uma. Historia completa e as
-> licoes transferiveis em `src/docs/anti-patterns-why.md` (`AP7`).
-
-> **`test-harness.mjs`, `tests-*.mjs` e `.claude/hooks/tests/` nao sao entry points.** Correm
-> por importacao a partir do `test-guards.mjs` (ou do runner dos hooks) e reprovam se alguem os
-> invocar diretamente — um ficheiro chamado `tests-x.mjs` que "passa" sem correr nada e a forma
-> canonica do `AP2`.
-
-
-- **Simulador de projeto derivado** (`.agent/scripts/simulate-derived.mjs` + `test-simulate-derived.mjs`): monta um projeto derivado (copia, substitui placeholders, gera as rules do bootstrap, aplica o passo 2.8) e corre la os verificadores. E a unica coisa que testa a promessa do template — todas as outras suites correm sobre o template **nu**. **Nao** se chama `check-*` de proposito: orquestra verificadores que ja tem par, e um alvo sem sitios de aviso proprios reprova na descoberta do sweep com `SINAL ERRADO`. Corre no CI em `pull_request` (~50s). O limite esta no cabecalho: simula o **estado** "bootstrap concluido", nao executa a checklist passo a passo.
-
 ## A regra que os liga
 
 Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua
@@ -68,3 +43,11 @@ O que carrega **logica** vive em `.agent/scripts/` — so precisa de `node`, log
 corre e o CI corre para todos. Os **hooks** em `.claude/hooks/` sao so-Claude Code e nao contem
 logica: chamam as mesmas verificacoes **antes** de a ferramenta correr. Fora do Claude Code
 perde-se o automatismo, nao a verificacao.
+
+## Porque este ficheiro nao tem os hooks
+
+Um catalogo cresce com o numero de pecas, e este cresceu tres vezes numa so sessao ate ao
+limiar do Guard 1b — cortar prosa adiava, nao resolvia. A divisao segue a fronteira que este
+ficheiro ja desenhava na seccao acima: **os verificadores sao universais** (so precisam de
+`node`, correm em qualquer agente e no CI) e **os hooks sao so-Claude-Code**. Quem mexe num
+raramente mexe no outro.

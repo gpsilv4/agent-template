@@ -144,7 +144,7 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 - **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
 - **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 13 workflows + ritual de backlog/sprint + guards.
 
-> Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `sync-docs.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
+> Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `propagation.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
 
 ### Obrigatorias
 
@@ -416,7 +416,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 > **Idiomas de toolchain nao sao placeholders.** Os workflows assumem `npm`/`npx tsc`/`npm run lint|build` e Playwright como default. O sweep de placeholders da Fase 3 **nao** apanha estes — se o projeto usa pnpm/yarn/bun, nao e TypeScript, ou usa outro runner de testes, **adaptar manualmente** os comandos em todos os workflows (e no `ci.yml`). O `ci.yml` ja e resiliente (salta typecheck/lint/build/test se o tsconfig/script nao existir), mas a prosa dos workflows precisa de revisao humana.
 
-> **Modo minimo (ver decisao de arranque na Fase 1).** Se escolheste Modo minimo, **remover agora** os workflows nao-essenciais: para cada um, apagar o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>.md` e `.gemini/commands/<x>.toml` + a linha na tabela de `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`. O Guard 6/7 (`check-doc-versions.mjs`) continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
+> **Modo minimo (ver decisao de arranque na Fase 1).** Se escolheste Modo minimo, **remover agora** os workflows nao-essenciais: para cada um, apagar o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>.md` e `.gemini/commands/<x>.toml` + a linha na tabela de `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`. O Guard 6/7 (`check-doc-versions.mjs`) continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `propagation.md`).
 >
 > **E actualizar as citacoes do NUMERO de workflows.** O Guard 12e compara qualquer `"N
 > workflows"`/`"N comandos"` escrito em prosa com os que existem em disco. Podar parte dos workflows
