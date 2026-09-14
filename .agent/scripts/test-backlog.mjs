@@ -177,9 +177,47 @@ console.log("\n=== Testes do Backlog Checker ===\n");
 // --- Baseline: a fixture tem de estar limpa, senao tudo o resto e ruido ------
 test("baseline: fixture valida passa sem avisos", null, {
   code: 0,
-  includes: ["OK — contadores, barra e IDs consistentes"],
+  includes: ["OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes"],
   excludes: ["  WARN  "],
 });
+
+// --- A linha `**Total**` (era FILTRADA e nunca comparada) --------------------
+// Achado de auditoria: um Resumo com Total a 999/888/777/666/555 saia `OK — contadores
+// consistentes` com exit 0. O gate afirmava o que nao media (AP1).
+test("Resumo: linha Total divergente avisa", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace("| **Total** | **6** | **2** | **1** | **2** | **1** |",
+                      "| **Total** | **999** | **888** | **777** | **666** | **555** |"));
+}, { code: 1, includes: ['Resumo "Total": escrito [999,888,777,666,555]'] });
+
+test("Resumo: linha Total em falta avisa", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace("| **Total** | **6** | **2** | **1** | **2** | **1** |\n", ""));
+}, { code: 1, includes: ['nao tem linha "**Total**"'] });
+
+test("Resumo: celula ilegivel e reportada como tal, nao lida como zero", (dir) => {
+  // `parseInt(x) || 0` transformava `?`/`n/a`/`—` num zero silencioso — o AP2 ao nivel da
+  // celula — e a mensagem acusava o ficheiro de dizer [0,0,0,0,0].
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace("| Melhorias UX | 1 | 1 | 0 | 0 | 0 |", "| Melhorias UX | 1 | 1 | ? | n/a | — |"));
+}, { code: 1, includes: ["nao e um numero"] });
+
+test("Resumo: linha Total com celulas ilegiveis avisa (nao lidas como zero)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace("| **Total** | **6** | **2** | **1** | **2** | **1** |",
+                      "| **Total** | **6** | **2** | ? | n/a | — |"));
+}, { code: 1, includes: ['linha "Total" do Resumo tem celulas nao numericas'] });
+
+// --- Largura da barra (a mensagem dizia "(de 20)" e nunca a media) -----------
+test("Barra: largura diferente de 20 avisa", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace(`\`${BAR}\``, "`" + BAR + "________________________" + "`"));
+}, { code: 1, includes: ["esperados 20"] });
+
+// --- Esforco: o campo que gate-ia todo o ticket-method, sem rede ------------
+test("Esforco invalido avisa (era texto livre)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(/\| S \|/, "| XXL |"));
+}, { code: 1, includes: ["esperado S, M ou L"] });
 
 // --- Contadores do Resumo (1 sitio, exercitado por seccao) -------------------
 test("Resumo: contador de Bugs errado avisa", (dir) => {
@@ -272,7 +310,7 @@ test("ancoragem: corrido de subpasta le os mesmos ficheiros", (dir) => {
 test("ancoragem: fixture valida vista de subpasta continua limpa", (dir) => {
   mkdirSync(f(dir, "src/deep"), { recursive: true });
   return f(dir, "src/deep");
-}, { code: 0, includes: ["OK — contadores, barra e IDs consistentes"], excludes: ["  WARN  "] });
+}, { code: 0, includes: ["OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes"], excludes: ["  WARN  "] });
 
 // --- Estrutura: a tabela Resumo tambem precisa de rede ------------------------
 // Achado do leitor independente (Fase 4): os cabecalhos `## 1.`..`## 4.` ganharam duas
@@ -283,7 +321,7 @@ test("Resumo: cabecalho `## Resumo` renomeado avisa", (dir) => {
     readF(dir, ".agent/context/backlog.md").replace("## Resumo", "## Sumario"));
 }, { code: 1,
      includes: ['a tabela "Resumo" tem 0 linha(s) de seccao, esperadas 4'],
-     excludes: ["OK — contadores, barra e IDs consistentes"] });
+     excludes: ["OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes"] });
 
 test("Resumo: linha de seccao apagada avisa", (dir) => {
   writeF(dir, ".agent/context/backlog.md",
@@ -304,7 +342,7 @@ test("Resumo: casa por NOME, nao por posicao", (dir) => {
   c = c.replace("| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |\n| Melhorias UX | 1 | 1 | 0 | 0 | 0 |",
                 "| Melhorias UX | 1 | 1 | 0 | 0 | 0 |\n| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |");
   writeF(dir, ".agent/context/backlog.md", c);
-}, { code: 0, includes: ["OK — contadores, barra e IDs consistentes"], excludes: ["  WARN  "] });
+}, { code: 0, includes: ["OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes"], excludes: ["  WARN  "] });
 
 // --- Estrutura: seccao renomeada nao pode virar "backlog vazio" --------------
 // O defeito que isto cobre: um backlog com items reais e o cabecalho `## 1. Bugs`
@@ -344,6 +382,11 @@ test("backlog vazio (estado do template) passa sem avisos", (dir) => {
     ACTIVE_OK.replace(/^\| (B1|B2|UX1) \|.*$/gm, "| | | | | | | |")
              .replace(/\| (Bugs \/ Violacoes de Regras|Melhorias UX|Divida Tecnica|Features Futuras) \| \d.*$/gm,
                       (m) => m.replace(/\| \d+ /g, "| 0 ").replace(/\| \d+ \|$/, "| 0 |"))
+             // A linha `**Total**` tambem tem de ser zerada: passou a ser VALIDADA contra o
+             // agregado (antes era filtrada e ignorada), logo uma fixture que a deixasse a
+             // 6/2/1/2/1 com zero items estaria a afirmar um backlog inconsistente.
+             .replace("| **Total** | **6** | **2** | **1** | **2** | **1** |",
+                      "| **Total** | **0** | **0** | **0** | **0** | **0** |")
              .replace(`\`${BAR}\` **40%** (2/5 concluidos)`, "`____________________` **0%** (0/0 concluidos)"));
   writeF(dir, ".agent/context/backlog-archive.md",
     ARCHIVE_OK.replace(/^\| (B3|T1|F1) \|.*$/gm, "| | | | | | | |"));

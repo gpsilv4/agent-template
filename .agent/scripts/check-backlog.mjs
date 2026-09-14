@@ -49,6 +49,20 @@ function norm(s) {
 
 // Extrai as linhas de dados das tabelas markdown numa seccao de texto.
 // Ignora cabecalho, separador (|---|) e linhas totalmente vazias (placeholder).
+/** As celulas do CABECALHO de uma tabela. O `tableRows` descarta-o de propósito; a
+ *  validacao de `Esforco` precisa dele para achar a coluna **pelo nome** e nao pela posicao
+ *  — as quatro seccoes tem esquemas diferentes, e uma posicao fixa mentia a primeira vez
+ *  que alguem acrescentasse uma coluna. */
+function tableHeader(text) {
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t.startsWith("|")) continue;
+    if (/^\|[\s|:-]+\|?$/.test(t)) continue;
+    return t.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => norm(c));
+  }
+  return null;
+}
+
 function tableRows(text) {
   const rows = [];
   for (const line of text.split("\n")) {
@@ -142,9 +156,22 @@ const trackId = (id, origem) => {
 };
 
 // 1) Items ABERTOS a partir das tabelas por tipo em backlog.md
+const ESFORCOS = ["s", "m", "l"];
 for (const { key, re } of SECTIONS) {
-  for (const cells of tableRows(section(active, re))) {
+  const seccao = section(active, re);
+  // `Esforco` gate-ia todo o `ticket-method` (Fase 0, Fase 3, Fase 4) e era texto livre sem
+  // validacao nenhuma — medido: um item com `Esforco = XXL` passava com exit 0. Um campo que
+  // decide o rigor do processo nao pode ser o unico sem rede.
+  const cabecalho = tableHeader(seccao);
+  const iEsforco = cabecalho ? cabecalho.indexOf("esforco") : -1;
+  for (const cells of tableRows(seccao)) {
     const id = cells[0];
+    if (iEsforco >= 0 && id) {
+      const e = norm(cells[iEsforco] ?? "").replace(/\*/g, "");
+      if (e && !ESFORCOS.includes(e)) {
+        warn(`${key}: item "${id}" tem Esforco "${cells[iEsforco]}" — esperado S, M ou L (ver a legenda do backlog)`);
+      }
+    }
     const estado = norm(cells[1]);
     trackId(id, `${key} (ativo)`);
     if (OPEN_STATES.includes(estado)) {
@@ -223,7 +250,12 @@ for (const { key } of SECTIONS) for (const k of Object.keys(g)) g[k] += counts[k
 // devolve [], o forEach nao corre e o checker anunciava "contadores consistentes" com exit 0
 // — a desligar em silencio a sua propria razao de existir. Mesma forma do AP2 que este
 // ficheiro deu origem, e que ficou de fora quando os cabecalhos `## 1.`..`## 4.` a ganharam.
-const resumoRows = tableRows(section(active, /^##\s*Resumo/i)).filter((r) => !norm(r[0]).includes("total"));
+const todasResumoRows = tableRows(section(active, /^##\s*Resumo/i));
+// A linha `**Total**` era FILTRADA e nunca comparada — e e o numero mais lido do backlog.
+// Medido: um Resumo com Total a `999/888/777/666/555` saia `OK — contadores consistentes`
+// com exit 0. O gate nao so passava: **afirmava** consistencia que nao verificara (AP1).
+const linhaTotal = todasResumoRows.find((r) => norm(r[0]).includes("total"));
+const resumoRows = todasResumoRows.filter((r) => !norm(r[0]).includes("total"));
 if (resumoRows.length !== SECTIONS.length) {
   warn(
     `${ACTIVE}: a tabela "Resumo" tem ${resumoRows.length} linha(s) de seccao, esperadas ${SECTIONS.length} ` +
@@ -242,12 +274,42 @@ resumoRows.forEach((cells) => {
     return;
   }
   const c = counts[key];
-  const nums = cells.slice(1, 6).map((x) => parseInt(x, 10) || 0);
+  // `parseInt(x) || 0` tornava qualquer celula ilegivel (`?`, `n/a`, `—`, ou um numero em
+  // **negrito**) num zero silencioso — o AP2 a nivel de celula, e uma mensagem que acusava o
+  // ficheiro de dizer [0,0,0,0,0] quando dizia outra coisa. `\d+` tolera o negrito e o resto
+  // e reportado como ilegivel, nao como zero.
+  const nums = cells.slice(1, 6).map((x, i) => {
+    const m = /-?\d+/.exec(x);
+    if (!m) {
+      warn(`Resumo "${cells[0]}": celula ${i + 1} nao e um numero (${JSON.stringify(x)}) — nao validei esta linha`);
+      return null;
+    }
+    return Number(m[0]);
+  });
+  if (nums.includes(null)) return;
   const expected = [c.total, c.pendente, c["a fazer"], c.concluido, c.cancelado];
   if (nums.join(",") !== expected.join(",")) {
     warn(`Resumo "${key}": escrito [${nums.join(",")}] != calculado [${expected.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
   }
 });
+
+// --- Validar a linha `**Total**` do Resumo contra o agregado ---
+if (linhaTotal) {
+  const nums = linhaTotal.slice(1, 6).map((x) => {
+    const m = /-?\d+/.exec(x);
+    return m ? Number(m[0]) : null;
+  });
+  if (nums.includes(null)) {
+    warn(`${ACTIVE}: a linha "Total" do Resumo tem celulas nao numericas — nao validada`);
+  } else {
+    const esperado = [g.total, g.pendente, g["a fazer"], g.concluido, g.cancelado];
+    if (nums.join(",") !== esperado.join(",")) {
+      warn(`Resumo "Total": escrito [${nums.join(",")}] != calculado [${esperado.join(",")}] (Total,Pend,AFazer,Concl,Canc)`);
+    }
+  }
+} else if (resumoRows.length > 0) {
+  warn(`${ACTIVE}: a tabela "Resumo" nao tem linha "**Total**" — o numero mais lido do backlog ficaria sem rede`);
+}
 
 // --- Validar barra de progresso ---
 // Linha esperada: `<bar>` **NN%** (X/Y concluidos)
@@ -267,6 +329,10 @@ if (!progMatch) {
   if (wTotal !== countable) warn(`Progresso: total escrito (${wTotal}) != calculado (${countable}, exclui cancelados)`);
   if (pct !== expectedPct) warn(`Progresso: percentagem escrita (${pct}%) != calculado (${expectedPct}%)`);
   if (filled !== expectedFilled) warn(`Barra: ${filled} blocos preenchidos != esperado ${expectedFilled} (de 20)`);
+  // A LARGURA nunca era verificada: `process-rules.md` diz "20 blocos = 100%" e a propria
+  // mensagem acima diz "(de 20)", mas uma barra de 40 caracteres passava com exit 0.
+  const largura = progMatch[1].length;
+  if (largura !== 20) warn(`Barra: tem ${largura} blocos, esperados 20 (20 blocos = 100%)`);
 }
 
 // --- Resumo final ---
@@ -283,7 +349,7 @@ if (g.total === 0 && warnings === 0) {
 } else if (g.total === 0) {
   console.log(`WARNING: ${warnings} problema(s) e ZERO items contados — o backlog pode nao estar vazio, mas ilegivel. Corrigir antes de commit.\n`);
 } else if (warnings === 0) {
-  console.log("  OK — contadores, barra e IDs consistentes.\n");
+  console.log("  OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes.\n");
 } else {
   console.log(`WARNING: ${warnings} divergencia(s). Corrigir antes de commit.\n`);
 }
