@@ -260,7 +260,12 @@ function syntheticSandbox() {
     // guard varre os `.agent/scripts/` — incluindo-se a si mesmo. A lista e **derivada** do
     // ficheiro real, para nao envelhecer quando se acrescentar um anti-padrao novo.
     if (r === "anti-patterns") {
-      const real = readFileSync(join(ROOT, ".agent/rules/anti-patterns.md"), "utf8");
+      // Os DOIS ficheiros de definicoes: as entradas do template mudaram-se para o
+      // `anti-patterns-template.md` (nao carregado), e derivar so do primeiro dava todas as
+      // citacoes dos scripts como mortas na fixture "limpa por construcao".
+      const real = [".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"]
+        .map((f) => (existsSync(join(ROOT, f)) ? readFileSync(join(ROOT, f), "utf8") : ""))
+        .join("\n");
       const entradas = [...real.matchAll(/^#{2,3}\s+(AP\d+\b.*)$/gm)].map((m) => `## ${m[1]}`);
       w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n\n${entradas.join("\n\n")}\n`);
       continue;
@@ -298,7 +303,7 @@ function syntheticSandbox() {
     "| Planear | `.agent/workflows/plan.md` |",
   ].join("\n") + "\n";
   w("CLAUDE.md", entry);
-  w("GEMINI.md", entry.replace(/^@(.*)$/gm, "@[$1]"));
+  w("GEMINI.md", entry.replace(/^@(.*)$/gm, "@./$1"));
   w("AGENTS.md", "# Agents\n\nWorkflows: `plan`\n");
   w("src/docs/agent-guide.md", "# Guia\n\n| **`/plan`** | Planear |\n");
   w(".nvmrc", "24\n");
@@ -378,6 +383,11 @@ export function registarResultado(name, problems, out) {
     console.log(`  PASS  ${name}`);
   }
 }
+
+/** Total de testes ja corridos (passados + falhados). E como o registo por descoberta
+ *  mede o contributo de cada modulo: um `tests-*.mjs` que nao mova este numero nao
+ *  registou nada e reprova, em vez de passar por registado. */
+export const contagem = () => passed + failures.length;
 
 export { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings,
          listWorkflowRows, dropLinesContaining, GUARD, GUARD_MODULES, ROOT };

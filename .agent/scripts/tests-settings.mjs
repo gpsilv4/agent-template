@@ -23,6 +23,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-guards.mjs";
+
 export function registar() {
 // --- Guard 11: sanidade do settings.json -------------------------------------
 test("G11: deny de .env retirado por completo avisa", (dir) => {

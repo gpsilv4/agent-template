@@ -88,6 +88,23 @@ function listarDir(rel) {
 // ausencia de um ficheiro, nao a linha em si.
 const PARES = [
   {
+    // O hook nao tem `warn(`/`fatal(`: falha aberta por desenho. O sitio que DECIDE e o
+    // `console.log` da reinjeccao — desliga-lo faz o hook nao entregar nada, que e
+    // exactamente o defeito que os testes tem de apanhar.
+    alvo: ".claude/hooks/precompact-reinject.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // A seleccao do runner (AP4, invariante 2). Vive em `lib/` e nao em `guards/` porque
+    // nao e um guard de documentacao — mas tem sitios de recusa, logo tem de ter rede.
+    alvo: ".agent/scripts/lib/registo.mjs",
+    suite: ".agent/scripts/test-registo.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-doc-versions.mjs",
     suite: ".agent/scripts/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
@@ -238,6 +255,9 @@ if (!only) {
     // fazia a sua propria fixture de teste (que substitui `PARES`) reprovar.
     ...listarDir(".agent/scripts").filter((f) => /^check-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
     ...listarDir(".agent/scripts/guards").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/guards/${f}`),
+    // `lib/`: modulos partilhados com sitios de recusa proprios (hoje, o registo de suites
+    // por descoberta). Sem esta linha um modulo novo ali entrava sem par e sem suite.
+    ...listarDir(".agent/scripts/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/lib/${f}`),
     // Os hooks tambem: sao codigo de enforcement com sitios de decisao, e estavam fora da
     // regra que o template impoe a todos os verificadores ("cada um com a sua suite"). Um
     // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard
