@@ -19,7 +19,9 @@ permissions:
 concurrency:
   # Manual/on-demand runs (workflow_dispatch): NAO cancelar — dois dispatches com base_url
   # diferente na mesma ref nao se devem matar mutuamente.
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.run_id }}
+  # SEM `github.run_id`: ele e unico por corrida, logo o grupo nunca tinha dois membros e o
+  # bloco nao fazia nada — parecia proteger e nao protegia.
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -55,10 +57,20 @@ jobs:
       # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
       # Vitest browser mode, …), replace this install step and the run commands below.
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ -d node_modules/@playwright/test ] || [ -d node_modules/playwright ]; then
+            npx playwright install --with-deps chromium
+          else
+            echo "Playwright nao instalado — a saltar (outro runner de E2E?)"
+          fi
 
+      # Guardado como no `ci.yml`: um projeto sem este script levava `npm ERR! Missing
+      # script` em vez de saltar. NOTA: o nome e `test:e2e`, nao `test` — a convencao
+      # esmagadoramente comum e `test` = unitarios, e usar `test` aqui fazia o job "E2E"
+      # correr os unitarios sem ninguem saber.
       - name: Run E2E Tests
-        run: npm run test
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:e2e']?0:1)"; then npm run test:e2e; else echo "No 'test:e2e' script — skipping"; fi
         env:
           PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || '' }}
           # Add test credentials as GitHub Secrets:
@@ -92,9 +104,15 @@ jobs:
       # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
       # Vitest browser mode, …), replace this install step and the run commands below.
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: |
+          if [ -d node_modules/@playwright/test ] || [ -d node_modules/playwright ]; then
+            npx playwright install --with-deps chromium
+          else
+            echo "Playwright nao instalado — a saltar (outro runner de E2E?)"
+          fi
 
       - name: Run Security Tests
-        run: npm run test:security
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.['test:security']?0:1)"; then npm run test:security; else echo "No 'test:security' script — skipping"; fi
         env:
           PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || '' }}

@@ -13,7 +13,9 @@ on:
 # the default (it runs untrusted PR code with a privileged token).
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.head.ref || github.ref }}
+  # `pull_request.number` e nao `head.ref`: dois PRs de FORKS diferentes com o mesmo nome de
+  # branch (`patch-1`, `main`) partilhavam grupo e cancelavam-se um ao outro — DoS trivial.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # Least privilege: no job here writes to the repo.
@@ -47,9 +49,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile. Descomentar depois
+          # de commitar o `package-lock.json`, ou trocar por `cache: pnpm`/`yarn`.
+          # cache: npm
 
-      - run: npm ci
+      # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
+      # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
+      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
+      # que nao aponta para a causa. A mensagem de erro aqui aponta.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
+            exit 1
+          fi
 
       # Each step is guarded so a project WITHOUT that tool/script does not red-fail.
       # `detect` only proves package.json exists; these guards prove the specific
@@ -87,9 +102,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile. Descomentar depois
+          # de commitar o `package-lock.json`, ou trocar por `cache: pnpm`/`yarn`.
+          # cache: npm
 
-      - run: npm ci
+      # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
+      # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
+      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
+      # que nao aponta para a causa. A mensagem de erro aqui aponta.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
+            exit 1
+          fi
 
       - name: Unit Tests
         run: |
@@ -107,9 +135,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile. Descomentar depois
+          # de commitar o `package-lock.json`, ou trocar por `cache: pnpm`/`yarn`.
+          # cache: npm
 
-      - run: npm ci
+      # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
+      # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
+      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
+      # que nao aponta para a causa. A mensagem de erro aqui aponta.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
+            exit 1
+          fi
 
       # Informative, NOT a hard gate: transitive high-sev advisories are common and
       # often unfixable without a breaking bump — blocking every merge on them is a
@@ -125,7 +166,11 @@ jobs:
   guard-tests:
     name: Guard Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # 10 e nao 5: a corrida medida esta em ~1m10s, mas o `simulate-derived` sozinho custa
+    # ~50s e o job cresce a cada suite nova. Um timeout apertado falha por tempo e faz
+    # perder meia hora a perceber que nao era um defeito. 25 cobre a varredura de mutacao,
+    # que so corre quando o PR toca nos verificadores.
+    timeout-minutes: 25
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
@@ -146,6 +191,8 @@ jobs:
         run: node .agent/scripts/test-mutation-sweep.mjs
       - name: Test-surface checker — negative tests
         run: node .agent/scripts/test-test-surface.mjs
+      - name: Registo de suites por descoberta — negative tests
+        run: node .agent/scripts/test-registo.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests
@@ -168,6 +215,19 @@ jobs:
       # e isso e configuracao LOCAL: um clone novo, outra maquina ou outra ferramenta nao a
       # tem. Esta e a camada que nao depende dela — corre o mesmo hook sobre cada mensagem do
       # PR. E o mesmo raciocinio do `AP4`: a autoridade que o agente nao alcanca e o CI.
+      # No `push` para main verifica-se a mensagem do commit integrado: o CONTRIBUTING manda
+      # "Squash and merge", e o titulo do squash e o titulo do PR — editavel no momento do
+      # merge e nunca passado pelo hook. Sem este passo, a superficie que o template promete
+      # cobrir ("a autoridade que o agente nao alcanca e o CI") tinha um buraco no fim.
+      - name: Mensagem do commit integrado — sem atribuicao a IA
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          msgfile="$RUNNER_TEMP/head-msg"
+          git log -1 --format='%B' HEAD > "$msgfile"
+          node .githooks/commit-msg "$msgfile" </dev/null
+          echo "  mensagem de HEAD verificada."
+
       - name: Mensagens de commit — sem atribuicao a IA
         if: github.event_name == 'pull_request'
         run: |
@@ -175,14 +235,20 @@ jobs:
           base="$(git rev-parse HEAD^1)"
           # `%B` e o corpo COMPLETO; um `%s` so veria o assunto e os trailers vivem no fim.
           # `-z` separa por NUL: uma mensagem tem linhas em branco, logo nao ha separador de
-          # linha que sirva. Sem commits no intervalo o loop nao corre e o passo passa — e
-          # correcto: um PR sem commits proprios nao existe.
+          # linha que sirva. `--no-merges`: o checkout de um PR e o merge ref, logo sem ele o
+          # commit de merge gerado pelo GitHub entrava SEMPRE e a contagem dizia mais uma do
+          # que o PR tem — e o ramo `n -eq 0` ficava inalcancavel (AP7).
           n=0
           while IFS= read -r -d '' msg; do
-            printf '%s' "$msg" > /tmp/commit-msg-$n
-            node .githooks/commit-msg /tmp/commit-msg-$n
+            # `RUNNER_TEMP` e nao `/tmp`: num runner self-hosted (que qualquer derivado pode
+            # adoptar) `/tmp/commit-msg-N` e um caminho previsivel, partilhado entre jobs.
+            # `</dev/null`: o `node` herdava o stdin do `while read` — hoje o hook nao le
+            # stdin, mas e a classe de bug que so aparece quando alguem lho acrescenta.
+            msgfile="$RUNNER_TEMP/commit-msg-$n"
+            printf '%s' "$msg" > "$msgfile"
+            node .githooks/commit-msg "$msgfile" </dev/null
             n=$((n + 1))
-          done < <(git log --format='%B%x00' "$base..HEAD")
+          done < <(git log --no-merges --format='%B%x00' "$base..HEAD")
           echo "  $n mensagem(ns) verificada(s)."
           # Zero mensagens com um intervalo valido seria o AP2 ("nao ha nada" != "nao consegui
           # ler"), logo reprova em vez de passar em silencio.
@@ -203,11 +269,21 @@ jobs:
         # base exata desse merge. Com `base.sha` (que pode estar atras da ponta do base) um
         # PR que nao tocou em testes ficava vermelho por causa de um merge feito noutro PR.
         run: node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD^1)"
-      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (dezenas de sitios),
-      # logo custa minutos, nao segundos. Fica opt-in: correr localmente apos mexer num
-      # verificador. Se a quiseres no CI, descomenta e sobe o timeout-minutes deste job.
-      # - name: Mutation sweep — cada aviso tem de ficar vermelho
-      #   run: node .agent/scripts/mutation-sweep.mjs
+      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (~117 sitios),
+      # logo custa minutos, nao segundos. Estava COMENTADA — o instrumento que prova que as
+      # suites afirmam algo era o unico verificador que nao corria automaticamente em lado
+      # nenhum, e a regra "cada verificador tem a sua suite" ficava em "corre se te lembrares".
+      # Agora corre onde e relevante: quando o PR toca nos verificadores ou nos hooks.
+      - name: Mutation sweep — cada aviso tem de ficar vermelho
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse HEAD^1)"
+          if git diff --name-only "$base..HEAD" | grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)'; then
+            node .agent/scripts/mutation-sweep.mjs
+          else
+            echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
+          fi
 
   # Runs on every push/PR, including the bare template (no package.json guard):
   # scans the full history for committed secrets/keys.

@@ -1,4 +1,9 @@
 version: 2
+# NOTA: o bloco `npm` abaixo so funciona num repo COM `package.json`. No template nu o
+# Dependabot regista um erro semanal ("couldn't find any package manifests") em
+# Insights > Dependency graph > Dependabot — ruido recorrente e invisivel no separador
+# Actions. Comentar este bloco enquanto nao houver manifesto; `github-actions` e sempre
+# valido e fica ligado.
 updates:
   - package-ecosystem: npm
     directory: "/"
