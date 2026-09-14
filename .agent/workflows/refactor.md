@@ -66,7 +66,7 @@ Seguir o checklist estrito:
 - Testar navegacao (cache deve manter dados entre paginas)
 - Testar em mobile viewport (sem overflow horizontal)
 - Correr testes unitarios: `npm run test:unit`
-- Correr testes E2E funcionais: `npm run test`
+- Correr testes E2E funcionais: `npm run test:e2e`
 - Correr testes de seguranca: `npm run test:security`
 - Se dependencias mudaram: `npm run test:audit`
 

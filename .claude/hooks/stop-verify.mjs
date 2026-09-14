@@ -38,7 +38,11 @@ const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-doc" },
   { re: /^\.agent\/scripts\/check-backlog\.mjs$/, cmd: "node .agent/scripts/test-backlog.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-backlog" },
-  { re: /^\.agent\/scripts\/check-test-surface\.mjs$/, cmd: "node .agent/scripts/test-test-surface.mjs" },
+  // O `surface-patterns.mjs` e os dois harnesses nao casavam nenhuma regra: mexer neles nao
+  // gerava divida nenhuma no fim do turno, ao contrario de mexer no `check-test-surface.mjs`.
+  // E sao eles que DECIDEM — as tabelas de padroes e o veredicto de ~280 testes.
+  { re: /^\.agent\/scripts\/(?:check-test-surface|surface-patterns|test-surface-harness)\.mjs$/, cmd: "node .agent/scripts/test-test-surface.mjs" },
+  { re: /^\.agent\/scripts\/test-harness\.mjs$/, cmd: "node .agent/scripts/test-guards.mjs" },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, cmd: "node .agent/scripts/test-bundle-sizes.mjs" },
   { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, cmd: "node .agent/scripts/test-mutation-sweep.mjs" },
   { re: /^\.agent\/scripts\/lib\//, cmd: "node .agent/scripts/test-registo.mjs" },

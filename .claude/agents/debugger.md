@@ -1,6 +1,6 @@
 ---
 name: debugger
-description: Investiga bugs de forma metodica (isola a causa raiz antes de propor correcao). Usar quando um comportamento esta errado e a causa nao e obvia.
+description: Investiga bugs de forma metodica (isola a causa raiz antes de propor correcao). Usar quando um comportamento esta errado e a causa nao e obvia. TEM `Bash` — corre comandos; nao e um leitor passivo.
 tools: Read, Grep, Glob, Bash
 ---
 

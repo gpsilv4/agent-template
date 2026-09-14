@@ -169,6 +169,57 @@ const BYPASSES = [
   ["config mergetool.<x>.cmd executa", 'git config mergetool.x.cmd "git push --force"'],
   // O destinatario real do heredoc esta DEPOIS do terminador. Forma vizinha da ja corrigida.
   ["heredoc encanado para uma shell", "cat <<EOF | bash\ngit push --force origin main\nEOF"],
+
+  // --- Sexta leitura (segunda auditoria multi-lente) --------------------------
+  // `symbolic-ref` LE com um argumento e ESCREVE com dois; e `PROTEGIDOS` comparava por
+  // igualdade exacta. Em APFS/NTFS (case-insensitive por defeito) `refs/heads/MAIN` E
+  // `refs/heads/main`: dois comandos, ambos de verbos "seguros", faziam `main` avancar com
+  // o guarda a dizer allow. Medido de ponta a ponta.
+  ["symbolic-ref escreve o HEAD", "git symbolic-ref HEAD refs/heads/evil"],
+  ["symbolic-ref para o MESMO branch noutra caixa", "git symbolic-ref HEAD refs/heads/MAIN"],
+  ["symbolic-ref -d apaga o HEAD", "git symbolic-ref -d HEAD"],
+
+  // `--file`/`-f`/`--blob` consomem o argumento seguinte; sem os saltar, o CAMINHO virava a
+  // "chave" e a lista de chaves perigosas testava `.git/config`.
+  ["config --file desarma a lista de chaves", "git config --file .git/config core.hooksPath /dev/null"],
+  ["config -f idem", "git config -f .git/config core.pager 'sh -c evil'"],
+  ["config set --file idem", "git config set --file .git/config core.hooksPath /dev/null"],
+
+  // Familias de chaves que executam e nao estavam na lista (era literal onde devia ser familia).
+  ["credential.<url>.helper", "git config credential.https://github.com.helper '!sh -c evil'"],
+  ["merge.<driver>.driver", "git config merge.evil.driver 'sh -c evil'"],
+  ["diff.<driver>.command", "git config diff.evil.command 'sh -c evil'"],
+  ["init.templateDir", "git config init.templateDir /tmp/evil"],
+  ["trailer.<x>.command", "git config trailer.sign.command 'sh -c evil'"],
+
+  // `--follow-tags` publica o refspec normal MAIS as tags: publica o branch atual.
+  ["push --follow-tags publica o branch", "git push --follow-tags origin"],
+
+  // O valor de uma atribuicao com espacos partia a varredura antes de chegar ao `git`.
+  ["atribuicao com espacos", 'GIT_AUTHOR_DATE="2020-01-01 00:00" git commit -m x'],
+  ["atribuicao com espacos (push)", 'GIT_SSH_COMMAND="ssh -i k" git push origin main'],
+
+  // --- A fronteira nao se reescreve a si propria -------------------------------
+  // O `deny` do settings so cobre `Edit`/`Write`. Por `Bash` havia seis caminhos abertos, e o
+  // `BOOTSTRAP.md` vendia essa linha como "sem ela, o agente alarga as proprias permissoes" —
+  // vendia mais do que entregava. Um agente que reescreva a fronteira deixa a sessao SEGUINTE
+  // sem nenhuma, e essa nao tem como saber.
+  ["sed -i sobre a fronteira", "sed -i '' 's/deny/xeny/' .claude/settings.json"],
+  ["redireccao sobre a fronteira", "printf '{}' > .claude/settings.json"],
+  // A unica das seis que sobrevivia a primeira versao desta verificacao: `node` estava na
+  // allowlist de leitura. Correr um FICHEIRO e leitura; correr codigo INLINE escreve tao bem
+  // como um `>`.
+  ["node -e a escrever a fronteira", `node -e "require('fs').writeFileSync('.claude/settings.json','{}')"`],
+  ["mv por cima de um hook", "mv /tmp/x .claude/hooks/guard-protected-branch.mjs"],
+  ["rm sobre o .githooks", "rm .githooks/commit-msg"],
+  ["chmod 000 sobre um hook", "chmod 000 .claude/hooks/stop-verify.mjs"],
+  // `git` esta na allowlist (um `git diff` sobre a fronteira e leitura), e por isso os seus
+  // sub-verbos de ESCRITA passavam. Apanhado ao usar `git rm` num hook obsoleto, minutos
+  // depois de escrever a verificacao: uma allowlist por binario e grossa de mais quando o
+  // binario tem sub-verbos que apagam.
+  ["git rm sobre um hook", "git rm .claude/hooks/stop-verify.mjs"],
+  ["git checkout -- a reverter um hook", "git checkout -- .claude/hooks/stop-verify.mjs"],
+  ["git restore sobre o settings", "git restore .claude/settings.json"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -187,6 +238,31 @@ for (const [nome, comando] of BYPASSES) {
 // Oito destes vinham medidos da mesma leitura. O `git merge-base` negou ao revisor a
 // verificacao do range que lhe foi pedida — um falso positivo bloqueia trabalho a serio.
 const LEGITIMOS = [
+  // --- Falsos positivos medidos na segunda auditoria --------------------------
+  // Tres destes bloquearam trabalho de LEITURA durante a propria sessao de correcao. Um
+  // guarda que nega `git --version` ou um `grep` nao protege nada — treina a contorna-lo.
+  ["command -v git", "command -v git"],
+  ["env git --version", "env git --version"],
+  ["timeout 5 git --version", "timeout 5 git --version"],
+  ["echo com separador dentro de aspas", 'echo "a; git push --force"'],
+  ["grep cuja STRING cita um comando", 'rg "build && git push --force" docs/'],
+  ["branch -c COPIA, nao destroi", "git branch -c antigo novo"],
+  ["fetch para refs remote-tracking", "git fetch origin +refs/heads/main:refs/remotes/origin/main"],
+  ["symbolic-ref a LER (um argumento)", "git symbolic-ref HEAD"],
+  // LER a fronteira tem de continuar trivial. Um guard que nega `cat` ou `git diff` sobre ela
+  // treina a gente a contorna-lo — e o `git diff` foi mesmo um falso positivo da primeira
+  // versao desta verificacao, apanhado ao medi-la.
+  ["cat da fronteira", "cat .claude/settings.json"],
+  ["grep na fronteira", "grep -n deny .claude/settings.json"],
+  ["jq na fronteira", "jq .permissions .claude/settings.json"],
+  ["git diff sobre a fronteira", "git diff .claude/settings.json"],
+  ["correr a suite dos hooks", "node .claude/hooks/tests/test-hooks.mjs"],
+  // Por SEGMENTO, e nao pelo primeiro verbo da linha: a primeira versao olhava so para o
+  // inicio do texto e negava um `for` que corresse a suite. Medido na sessao em que nasceu —
+  // bloqueou-me a correr os proprios testes. Um guard que nega trabalho normal e contornado.
+  ["for a correr a suite dos hooks", "for s in a b; do node .claude/hooks/tests/test-hooks.mjs; done"],
+  ["suite com redireccao para /tmp", "node .claude/hooks/tests/test-hooks.mjs > /tmp/o 2>&1"],
+  ["sed -i NOUTRO ficheiro, na mesma linha", "sed -i '' 's/a/b/' README.md && cat .claude/settings.json"],
   // Negar trabalho legitimo custa tanto como deixar passar. O `partir()` tratava `(` e `{`
   // como separadores mesmo DENTRO de aspas, logo um comando que apenas MENCIONA git entre
   // parentesis era negado — e o `eForce` corre ANTES da verificacao de branch, logo nao havia
@@ -220,7 +296,10 @@ const LEGITIMOS = [
   // process-rules.md) corre em `main`. Negar isso punha o guard contra a documentacao.
   ["pull --ff-only (procedimento de release)", "git pull --ff-only origin main"],
   ["push so de tags (procedimento de release)", "git push origin --tags"],
-  ["push --follow-tags", "git push --follow-tags"],
+  // `git push --follow-tags` SAIU daqui: medido com `--dry-run --porcelain` contra um remoto
+  // real, publica o refspec normal **mais** as tags — ou seja, publica o branch atual. Estava
+  // listado como procedimento de release por analogia com `--tags`, que publica so tags.
+  // O procedimento de release usa `--tags`, e esse continua aqui em baixo.
   // B3: nao fazem nada; negar e ruido.
   ["git sozinho", "git"],
   ["git --version", "git --version"],

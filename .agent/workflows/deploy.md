@@ -97,7 +97,7 @@ gh pr checks --watch
 npm run test:unit
 
 # Testes E2E funcionais
-npm run test
+npm run test:e2e
 
 # Testes de seguranca
 npm run test:security
@@ -112,7 +112,7 @@ npm run test:all
 ### Fase 2 — Preview (antes do merge para main)
 
 ```bash
-PLAYWRIGHT_BASE_URL=<preview-url> npm run test
+PLAYWRIGHT_BASE_URL=<preview-url> npm run test:e2e
 PLAYWRIGHT_BASE_URL=<preview-url> npm run test:security
 npm run test:audit
 ```

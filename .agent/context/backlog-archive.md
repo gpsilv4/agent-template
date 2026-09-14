@@ -1,7 +1,8 @@
 # Backlog — Arquivo ({{PROJECT_NAME}})
 
 > **Arquivo historico do backlog.** Contem items **fechados** (Concluido/Cancelado) e sprints fechados.
-> Este ficheiro NAO e importado em `CLAUDE.md`/`GEMINI.md` — nao entra no contexto do agente
+> Este ficheiro NAO e importado em `CLAUDE.md`, `GEMINI.md` nem `AGENTS.md` (o ponto de
+> entrada do Cursor, Copilot, Codex e restantes) — nao entra no contexto do agente
 > a cada sessao, para manter o contexto enxuto. O agente le-o **on-demand** (via `Read`/grep),
 > tipicamente para:
 >   - confirmar unicidade de IDs antes de criar um item novo (IDs nunca sao reutilizados);

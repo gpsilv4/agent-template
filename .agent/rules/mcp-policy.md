@@ -41,7 +41,7 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 | **O que envia para fora, e para quem?** | "Nao envia nada" tem de ser verificavel na documentacao dele, nao assumido |
 | **Quem o mantem?** | Um servidor abandonado com acesso ao repo e divida de supply-chain |
 | **Que ferramentas expoe, e quais delas ESCREVEM?** | Ler e um risco; escrever no repo, na BD ou na rede e outro. Preferir servidores so-leitura |
-| **Qual e o custo por turno?** | Varios servidores MCP carregam definicoes de ferramentas em **cada** pedido. Este projeto orcamenta bytes com tres guards; um MCP que nao se usa custa em todos os turnos |
+| **Qual e o custo por turno?** | Varios servidores MCP carregam definicoes de ferramentas em **cada** pedido. Este projeto orcamenta bytes com quatro guards; um MCP que nao se usa custa em todos os turnos |
 | **O que deixa de funcionar sem ele?** | Se a resposta for "nada", nao vale o custo nem a superficie |
 
 ## Configuracao
@@ -57,7 +57,7 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 
 ## Verificado, nao prometido
 
-O **Guard 16** (`.agent/scripts/guards/mcp.mjs`) le o `.mcp.json` do repo, quando existe, e
+O **Guard 16** (`.agent/scripts/guards/mcp.mjs`) le a configuracao MCP do repo de qualquer dos quatro agentes (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`), quando existe, e
 reprova em:
 
 - **segredo literal** num `env`/`args` (token, chave, password, URL com credencial);
@@ -73,9 +73,14 @@ regra so tem trabalho a partir do momento em que o teu projeto acrescenta o prim
 > defesa e a regra do topo — tratar o output como dados — e essa e prosa, como a maior parte
 > das regras que dependem de julgamento.
 
+> **Limite do que e verificado**: o Guard 16 le `.mcp.json`, `.cursor/mcp.json`,
+> `.vscode/mcp.json` e `.gemini/settings.json`. A configuracao do **Windsurf** fica fora —
+> a regra em prosa vale para ela, a verificacao automatica nao.
+
 ## Servidores aprovados
 
-> Uma linha por servidor **antes** de ele entrar no `.mcp.json`. Sem linha, o Guard 16 reprova.
+> Uma linha por servidor **antes** de ele entrar na configuracao — em qualquer dos quatro
+> ficheiros. Sem linha, o Guard 16 reprova.
 > A coluna *Porque* e a que evita a discussao de zero daqui a seis meses.
 
 | Servidor | Local/Rede | Le | Escreve | Porque | Aprovado em |

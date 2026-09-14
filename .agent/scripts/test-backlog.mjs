@@ -236,6 +236,58 @@ test("Esforco invalido avisa (era texto livre)", (dir) => {
   writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(/\| S \|/, "| XXL |"));
 }, { code: 1, includes: ["esperado S, M ou L"] });
 
+// O cabecalho em NEGRITO desligava a validacao inteira, calada. `| **Esforco** |` e a forma
+// corrente em markdown, e o proprio template escreve `| **Total** |` na linha do Resumo — ou
+// seja, o repo ja usa a forma que o checker nao reconhecia. Este teste exige que um Esforco
+// invalido continue a avisar **com o cabecalho em negrito**: se o `norm` voltar a deixar o
+// `*` passar, `indexOf("esforco")` volta a -1, o aviso desaparece e o teste fica vermelho.
+test("Esforco: cabecalho em **negrito** nao desliga a validacao (falha-aberta)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace(/\| Esforco \|/g, "| **Esforco** |").replace(/\| S \|/, "| XXL |"));
+}, { code: 1, includes: ["esperado S, M ou L"] });
+
+// O negrito ficou coberto por acaso (o strip de `*` e global e indiferente a ordem); o
+// ITALICO nao. Com o strip de `_` a correr ANTES do `.trim()`, uma celula `" _Esforco_ "`
+// — a forma normal, com espacos — dava `"_esforco_"` e `indexOf("esforco") === -1`: a
+// validacao voltava a desligar-se em silencio pela mesma porta que se acabara de fechar.
+test("Esforco: cabecalho em _italico_ tambem nao desliga a validacao", (dir) => {
+  writeF(dir, ".agent/context/backlog.md",
+    ACTIVE_OK.replace(/\| Esforco \|/g, "| _Esforco_ |").replace(/\| S \|/, "| XXL |"));
+}, { code: 1, includes: ["esperado S, M ou L"] });
+
+test("Barra: `⬛`/`⬜` sao um par — cheio e vazio", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(BAR, "⬛".repeat(8) + "⬜".repeat(12)));
+}, { code: 0, includes: ["OK — contadores"] });
+
+// O ID tem de ganhar a MESMA tolerancia que o Estado e o Esforco, senao `| **B3** |` no
+// ativo e `| B3 |` no arquivo sao duas chaves distintas e o aviso de ID duplicado nao sai —
+// uma porta aberta por a tolerancia ser dada a dois campos e nao ao terceiro.
+test("ID em **negrito** e o mesmo ID (duplicado continua a avisar)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace("| B1 | Pendente |", "| **B3** | Pendente |"));
+}, { code: 1, includes: ['ID duplicado "B3"'] });
+
+test("Estado em **negrito** conta como o mesmo estado", (dir) => {
+  // Se o `*` sobreviver ao `norm`, "**Pendente**" cai fora de OPEN_STATES e o item some dos
+  // contadores — que passam a discordar do Resumo. Aqui nada muda de facto: tem de passar.
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace("| B1 | Pendente |", "| B1 | **Pendente** |"));
+}, { code: 0, includes: ["OK — contadores"] });
+
+// --- A barra: allowlist dos dois lados (AP6) ---------------------------------
+// `⬜` e o quadrado BRANCO — um bloco VAZIO. O teste antigo era `!/[_\s]/`, logo contava-o
+// como preenchido: uma barra de 20 `⬜` (zero feito) media 20/20 e passava por 100%.
+test("Barra: `⬜` conta como VAZIO, nao como preenchido", (dir) => {
+  // 8 cheios + 12 vazios escritos em emoji — a mesma barra valida, outro vocabulario.
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(BAR, "🟩".repeat(8) + "⬜".repeat(12)));
+}, { code: 0, includes: ["OK — contadores"] });
+
+test("Barra: `⬜` a mais e reportado como blocos a menos", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(BAR, "🟩".repeat(6) + "⬜".repeat(14)));
+}, { code: 1, includes: ["Barra: 6 blocos preenchidos != esperado 8 (de 20)"] });
+
+test("Barra: glifo desconhecido e reportado em vez de assumido", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace(BAR, "@".repeat(8) + "_".repeat(12)));
+}, { code: 1, includes: ["nao sei classificar"] });
+
 // --- Contadores do Resumo (1 sitio, exercitado por seccao) -------------------
 test("Resumo: contador de Bugs errado avisa", (dir) => {
   writeF(dir, ".agent/context/backlog.md",

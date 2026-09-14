@@ -7,7 +7,7 @@
  *
  * NAO e um entry point: o `test-test-surface.mjs` importa e chama `registar()`.
  */
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, commit, git } from "./test-surface-harness.mjs";
@@ -192,6 +192,35 @@ export function registar() {
     return ref;
   }, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
 
+  test("assercao VACUA (`includes: [\"\"]`) conta como enfraquecimento", (dir) => {
+    // A chave-mestra. `[^\\]]` exigia array nao-vazio e `[""]` e nao-vazio: trocar cada
+    // assercao por `[""]` deixava 196/196 e 227/227 verdes com **tudo** vacuo
+    // (`.includes("")` e sempre verdadeiro) e as contagens intactas. Com ela aberta, qualquer
+    // outro enfraquecimento ficava barato de esconder.
+    writeFileSync(join(dir, "tests/a.test.js"),
+      'test("a", null, { includes: ["mensagem real"] });\ntest("b", null, { includes: ["outra"] });\n');
+    commit(dir, "assercoes reais");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, "tests/a.test.js"),
+      'test("a", null, { includes: [""] });\ntest("b", null, { includes: [""] });\n');
+    commit(dir, "esvaziar por dentro");
+    return ref;
+  }, { code: 1, includes: ["assercoes (includes/excludes): 2 -> 0"] });
+
+  test("apagar um step que APLICA um guard no CI e enfraquecimento", (dir) => {
+    // `\\S*test` so via os steps que TESTAM; apagar o `check-doc-versions` do `ci.yml`
+    // — que e o que APLICA os guards — passava sem a superficie reagir.
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, ".github/workflows/ci.yml"),
+      "jobs:\n  g:\n    steps:\n      - run: node a-test.mjs\n      - run: node check-doc-versions.mjs\n");
+    commit(dir, "ci com teste e guard aplicado");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, ".github/workflows/ci.yml"),
+      "jobs:\n  g:\n    steps:\n      - run: node a-test.mjs\n");
+    commit(dir, "apagar o guard aplicado");
+    return ref;
+  }, { code: 1, includes: ["steps de verificacao no CI: 2 -> 1"] });
+
   test("apagar o registo de suites por descoberta e enfraquecimento", (dir) => {
     // AP4, invariante 2. A descoberta em disco (`lib/registo.mjs`) substituiu as chamadas
     // manuais a cada `tests-*.mjs`, mas a propria chamada a descoberta continua a ser uma
@@ -240,4 +269,44 @@ export function registar() {
     commit(dir, "despromover um");
     return ref;
   }, { code: 1, includes: ["sitios de aviso: 2 -> 1"] });
+  // --- Os HOOKS estao na superficie congelada --------------------------------
+  // Ficavam de fora: os globs de teste so apanham `.claude/hooks/tests/` (a pasta `tests/`),
+  // logo as suites dos hooks estavam vigiadas e os hooks que elas testam nao. Apagar o
+  // `guard-protected-branch.mjs` — o unico sitio que NEGA um commit em branch protegido —
+  // nao produzia uma palavra.
+  test("hook apagado e reportado (esta na superficie congelada)", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/guardiao.mjs"), 'console.log("ola");\n');
+    commit(dir, "hook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".claude/hooks/guardiao.mjs"));
+    commit(dir, "apagar o hook");
+    return base;
+  }, { code: 1, includes: [".claude/hooks/guardiao.mjs", "APAGADO"] });
+
+  // E o `.githooks/`, que nao tem extensao por onde ser apanhado por um glob de sufixo.
+  test("hook do git apagado e reportado", (dir) => {
+    mkdirSync(join(dir, ".githooks"), { recursive: true });
+    writeFileSync(join(dir, ".githooks/pre-push"), '#!/bin/sh\nexit 0\n');
+    commit(dir, "githook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".githooks/pre-push"));
+    commit(dir, "apagar o githook");
+    return base;
+  }, { code: 1, includes: [".githooks/pre-push", "APAGADO"] });
+
+  // A contagem propria dos hooks: reduzir as decisoes de negacao e enfraquecer a rede sem
+  // tocar em nenhum teste — o equivalente, do lado do enforcement, a apagar um `warn(`.
+  test("decisoes de negacao a descer sao reportadas", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/nega.mjs"),
+      'const a = { permissionDecision: "deny" };\nconst b = { permissionDecision: "deny" };\nconsole.log(a, b);\n');
+    commit(dir, "hook com duas negacoes");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    writeFileSync(join(dir, ".claude/hooks/nega.mjs"),
+      'const a = { permissionDecision: "deny" };\nconsole.log(a);\n');
+    commit(dir, "uma negacao a menos");
+    return base;
+  }, { code: 1, includes: ["decisoes de negacao dos hooks", "2 -> 1"] });
+
 }

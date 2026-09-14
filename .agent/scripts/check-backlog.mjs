@@ -40,12 +40,30 @@ function read(path) {
 
 // Remove acentos e normaliza para comparar de forma resiliente.
 function norm(s) {
+  // A enfase markdown sai ANTES do resto. Sem isto, um cabecalho escrito `| **Esforco** |`
+  // — forma corrente, e a que o proprio template usa na linha do Total — dava
+  // `indexOf("esforco") === -1`, e a validacao de Esforco **desligava-se em silencio** com
+  // exit 0. Falha-aberta no campo que decide o rigor de todo o `ticket-method`.
+  // Vale para as celulas tambem: um `| **Concluido** |` caia fora de OPEN_STATES da mesma forma.
   return (s ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
-    .trim()
+    .replace(/[*`]/g, "")
+    // Espacos e `_` juntos, e numa so passagem: o `tableHeader` normaliza celulas NAO
+    // aparadas (`" _Esforco_ "`), e com o strip de `_` antes do `.trim()` sobrava
+    // `"_esforco_"` -> `indexOf("esforco") === -1` -> a validacao voltava a desligar-se em
+    // silencio. O negrito so ficou coberto por acaso: o strip de `*` e global.
+    .replace(/^[\s_]+|[\s_]+$/g, "")
     .toLowerCase();
 }
+
+/** O ID com a mesma tolerancia a enfase que o Estado e o Esforco ganharam. Sem isto,
+ *  `| **B7** |` no ativo e `| B7 |` no arquivo eram duas chaves diferentes em `allIds` —
+ *  logo o aviso de ID duplicado **nao saia** — e nenhuma delas casava o `ID_LIKE`, pelo que
+ *  a linha tambem escapava ao aviso de "tabela que nenhuma seccao reconhece". Dar a
+ *  tolerancia a dois campos e a um terceiro nao e pior do que nao a dar a nenhum: e uma
+ *  incoerencia que abre uma porta que ninguem procura. */
+const idDe = (celula) => norm(celula).toUpperCase();
 
 // Extrai as linhas de dados das tabelas markdown numa seccao de texto.
 // Ignora cabecalho, separador (|---|) e linhas totalmente vazias (placeholder).
@@ -165,11 +183,11 @@ for (const { key, re } of SECTIONS) {
   const cabecalho = tableHeader(seccao);
   const iEsforco = cabecalho ? cabecalho.indexOf("esforco") : -1;
   for (const cells of tableRows(seccao)) {
-    const id = cells[0];
+    const id = idDe(cells[0]);
     if (iEsforco >= 0 && id) {
       // `-`, `—` e `n/a` sao a convencao markdown para "vazio", e a celula vazia ja era
       // tolerada de propósito. Reprovar a forma escrita e tolerar a vazia era incoerente.
-      const e = norm(cells[iEsforco] ?? "").replace(/\*/g, "").replace(/^(?:-+|–|—|n\/a|\?)$/, "");
+      const e = norm(cells[iEsforco] ?? "").replace(/^(?:-+|–|—|n\/a|\?)$/, ""); // `norm` ja tira a enfase
       if (e && !ESFORCOS.includes(e)) {
         warn(`${key}: item "${id}" tem Esforco "${cells[iEsforco]}" — esperado S, M ou L (ver a legenda do backlog)`);
       }
@@ -209,7 +227,7 @@ for (const { key, re } of SECTIONS) {
 const ID_LIKE = /^[A-Z]{1,4}\d+$/;
 const contados = new Set(allIds.keys());
 for (const cells of tableRows(active)) {
-  const id = cells[0];
+  const id = idDe(cells[0]);
   if (ID_LIKE.test(id) && !contados.has(id)) {
     warn(`${ACTIVE}: item "${id}" esta numa tabela que nenhuma seccao reconhecida cobre — verificar os cabecalhos \`## 1.\`..\`## 4.\``);
   }
@@ -221,7 +239,7 @@ const tipoToKey = {};
 for (const { key, tipos } of SECTIONS) for (const t of tipos) tipoToKey[t] = key;
 
 for (const cells of tableRows(section(archive, /^##\s*Historico/i))) {
-  const id = cells[0];
+  const id = idDe(cells[0]);
   const tipo = norm(cells[1]);
   const estado = norm(cells[3]);
   trackId(id, "arquivo");
@@ -314,6 +332,12 @@ if (linhaTotal) {
 }
 
 // --- Validar barra de progresso ---
+// Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
+const BLOCO_VAZIO = new Set(["_", " ", "\t", "-", "\u00b7", "\u2591", "\u2b1c", "\u25cb", "\u25fb", "\u25ab"]);
+// `\u2b1b` (⬛) e o PAR de `\u2b1c` (⬜), que ja estava nos vazios. Sem ele, quem usasse o
+// par mais natural de todos levava dois avisos de uma vez ("nao sei classificar" + "0 blocos").
+const BLOCO_CHEIO = new Set(["\u2588", "\u2593", "\u2592", "#", "\u25a0", "\u25cf", "\u2b1b", "\ud83d\udfe9", "\ud83d\udfe6", "\ud83d\udfe8", "\u25fc", "\u25aa"]);
+
 // Linha esperada: `<bar>` **NN%** (X/Y concluidos)
 const progMatch = active.match(/`([^`]*)`\s*\*\*(\d+)%\*\*\s*\((\d+)\/(\d+)/);
 const countable = g.total - g.cancelado; // cancelados nao contam
@@ -328,7 +352,16 @@ if (!progMatch) {
   // mensagem afirmava "tem 30 blocos" sobre um ficheiro que tem 20. E o `AP1` dentro do
   // verificador escrito para o combater.
   const blocos = [...progMatch[1]];
-  const filled = blocos.filter((c) => !/[_\s]/.test(c)).length;
+  // Allowlist dos dois lados, e nao `!/[_\s]/` (AP6). O teste anterior perguntava "nao e
+  // vazio?", logo **qualquer** glifo desconhecido contava como preenchido — e o comentario
+  // acima ja admitia que um projeto derivado usa `⬜`, o quadrado BRANCO, que e precisamente
+  // um bloco VAZIO: uma barra de 20 `⬜` (0% feito) media 20/20 e passava por 100%.
+  // O que nao souber classificar, di-lo em vez de assumir.
+  const desconhecidos = [...new Set(blocos.filter((c) => !BLOCO_VAZIO.has(c) && !BLOCO_CHEIO.has(c)))];
+  if (desconhecidos.length) {
+    warn(`Barra: nao sei classificar ${desconhecidos.map((c) => `"${c}"`).join(", ")} — usar \`_\`/\`⬜\` (vazio) e \`█\`/\`🟩\` (cheio), ou acrescentar o glifo a check-backlog.mjs`);
+  }
+  const filled = blocos.filter((c) => BLOCO_CHEIO.has(c)).length;
   const pct = parseInt(progMatch[2], 10);
   const wConcl = parseInt(progMatch[3], 10);
   const wTotal = parseInt(progMatch[4], 10);

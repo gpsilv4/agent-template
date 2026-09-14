@@ -128,3 +128,53 @@ ambiguidade de requisitos ficava por extrair ate aparecer no code review, ou dep
 Num `S` nao corre, e a razao e a mesma da escala do `/review` e do `sync-docs`: mudar um numero
 nao tem ramos de decisao, e perguntar na mesma ensina a saltar o processo. Um processo mais
 caro que o trabalho e abandonado ao terceiro ticket.
+
+## Porque as Fases 2-3, a Fase 4 e o *usar* nao se substituem
+
+Depois do commit ha algo que **nao e do agente e nao se numera: usar** o que mudou. Sao tres
+instrumentos que apanham classes diferentes, e so o terceiro apanha uma **decisao errada**:
+
+| Instrumento | Apanha |
+|-------------|--------|
+| As Fases 2-3 (o teu julgamento) | o que **acabaste de escrever** |
+| A Fase 4 (leitor independente) | o que **nao consegues ver por teres escrito** |
+| **Usar** (nao e do agente) | o que **decidiste mal** — inclui o que nunca chegou a existir |
+
+Saltar as tres e trocar tres tipos de deteccao por um.
+
+## Porque o metodo escala com o tamanho do ticket
+
+A escala nao e um detalhe — e o que torna o metodo viavel. Aplicado por inteiro a tudo,
+multiplica o tempo por ticket por 2 a 3. Vale onde um erro custa **confianca na correcao**;
+nao vale numa mudanca de texto.
+
+## Harness e loop: duas coisas diferentes, e a ordem importa
+
+- **Harness** — o que o *runtime* faz por nos, deterministicamente: permissoes, hooks,
+  subagentes, comandos. **O agente pode esquecer uma regra do `CLAUDE.md`; um hook nao
+  esquece.** Neste template: `.claude/settings.json` (fronteira de permissoes),
+  `.claude/hooks/` (nega antes de acontecer), `.claude/agents/` (leitores independentes).
+- **Loop** — fechar o ciclo para o trabalho continuar: as Fases 2 e 3, e um `/loop` se a
+  ferramenta o tiver.
+
+**A ordem importa: sem harness solido, um loop so amplifica erros.** Um ciclo automatico sobre
+uma regra que vive em prosa repete o esquecimento mais depressa.
+
+> **Nota de portabilidade**: hooks sao **so-Claude Code**. Por isso, neste template, cada
+> verificacao vive num script em `.agent/scripts/` — universal, corre em qualquer agente e no
+> CI — e o hook e um **ponteiro fino** que a chama automaticamente. A verificacao e para todos;
+> o automatismo e so-Claude. Nas outras ferramentas corre-se o script, e o CI e a rede final.
+
+## Porque a checklist do `/review` escala por tamanho
+
+O resto do `ticket-method` escala por `S`/`M`/`L` e a checklist do `/review` nao escalava: um
+ticket `S` — definido no backlog como **< 30 min** — pagava as mesmas ~56 caixas que um `L`.
+
+A aritmetica e o problema. A 10s por caixa sao ~10 min de checklist, mais os 28 pontos do
+`sync-docs`, para 30 min de trabalho. Um processo que custa tanto como o trabalho e abandonado
+ao terceiro ticket, e a partir dai **nao ha processo nenhum** — que e pior do que uma
+checklist curta.
+
+Por isso o `S` paga so as seccoes que nenhum tamanho dispensa (1, 2, 8, 9, 10, 12, 13, ~26
+caixas), e as saltadas **dizem-se em voz alta** no relatorio: uma seccao saltada em silencio e
+indistinguivel de uma esquecida.

@@ -25,6 +25,7 @@ import { execFileSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
+import { TETOS } from "./guards/sizes.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -56,6 +57,11 @@ const FIXTURE_PATHS = [
   ".agent/context",
   ".agent/scripts",
   ".claude/commands",
+  // Os hooks nao estavam aqui, pelo mesmo motivo que o `BOOTSTRAP.md` nao estava: ninguem
+  // os lia. O Guard 17 (tamanho de ficheiro) le-os, e dois dos quatro tetos congelados sao
+  // ficheiros desta pasta — sem ela, o guard reportava-os como "nao existe" em TODOS os
+  // testes e a fixture media o oposto do repo.
+  ".claude/hooks",
   ".claude/settings.json",
   ".cursor/rules",
   ".github/copilot-instructions.md",
@@ -106,6 +112,88 @@ function runGuard(dir, cwd) {
 }
 
 /**
+ * O VEREDICTO de um teste, isolado do que o produz. Recebe o que o guard fez (`code`, `out`),
+ * o que o teste esperava (`expect`, `extra`) e o baseline, e devolve a lista de problemas.
+ *
+ * PORQUE VIVE SEPARADO: a varredura de mutacao mediu 0/9 neste ficheiro. Desligar uma
+ * assercao do harness so torna os testes MAIS permissivos — as suites ficam verdes e o ecra
+ * continua a dizer "todos passaram". O ficheiro que decide o veredicto de ~280 testes era o
+ * unico sem rede, e estar em `PARES` nao chegava: nao havia nada que uma mutacao partisse.
+ *
+ * Isolada e pura, esta funcao pode ser chamada com entradas fabricadas — e e o que o
+ * `tests-harness-self.mjs` faz: cada `problems.push` aqui tem um caso que o exige. Desligue-se
+ * um, e essa suite fica vermelha.
+ */
+export function avaliar({ code, out, expect, extra = {}, base }) {
+  const problems = [];
+  if (!out.includes("=== Doc Guards ===")) {
+    problems.push(`o guard nao produziu output (rebentou?): ${out.slice(0, 160)}`);
+  }
+  // Afirmacao por DIFERENCA face ao baseline, nao pelo exit code absoluto. Uma versao
+  // anterior saltava os testes `code: 0` quando o repo tinha avisos — desligava 17 dos
+  // 64 em silencio, com exit 0 e a dizer "todos passaram". Agora todos correm sempre.
+  // INVARIANTE, verificada em cada corrida: o exit code tem de refletir os avisos.
+  // Sem isto, trocar a ultima linha do guard por `process.exit(1)` dava 84/84 verde —
+  // as assercoes diferenciais falam de mensagens e nao do veredicto.
+  const temWarn = out.includes("  WARN  ");
+  if (temWarn && code === 0) problems.push("imprimiu WARN mas saiu 0");
+  if (!temWarn && code !== 0) problems.push(`nao imprimiu WARN mas saiu ${code}`);
+  const novos = [...warnsOf(out)].filter((w) => !base.has(w));
+  if (expect.code === 0) {
+    if (novos.length) problems.push(`nao devia acrescentar avisos; acrescentou ${novos.length}: ${novos[0]}`);
+  } else {
+    if (novos.length === 0) {
+      // Dizer PORQUE nao ha aviso novo. A causa mais comum nao e o guard: e o repo ja
+      // estar a avisar disto **antes** da mutacao, e ai o teste diferencial nao tem como
+      // ver nada de novo. Medido num projeto derivado meio-atualizado: dois testes do
+      // Guard 12d falhavam com esta mensagem sem que ela dissesse que a culpa era do
+      // BOOTSTRAP.md do projeto estar desalinhado. Sem esta explicacao, quem le vai
+      // procurar o defeito no guard.
+      const esperados = [...(expect.includes ?? []), ...(extra.includes ?? [])];
+      const jaNoBaseline = esperados.filter((t) => [...base].some((w) => w.includes(chaveWarn(t))));
+      problems.push(
+        jaNoBaseline.length
+          ? `devia acrescentar um aviso novo e nao acrescentou: o baseline JA avisava disto ` +
+              `(${jaNoBaseline[0]}). Corrigir o repo antes de correr a suite — o teste e ` +
+              `diferencial e nao tem como ver como novo um aviso que ja la estava`
+          : "devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum"
+      );
+    }
+    if (code === 0) problems.push("devia sair != 0");
+  }
+  // CAUSA-RAIZ de quatro rondas de defeitos: `out.includes(...)` nao olha ao NIVEL da
+  // linha. Um teste `code: 1` era satisfeito por uma linha `NOTE` com o mesmo texto, ou
+  // pelo WARN de OUTRO guard que a mutacao tambem disparava — e sabotar o guard sob teste
+  // ficava invisivel. Um teste que espera aviso afirma-se contra as linhas WARN e mais
+  // nada; um que espera sucesso pode afirmar OK/SKIP/NOTE, logo usa o output inteiro.
+  const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
+  const ondeAlvo = expect.code === 0 ? "output" : "linhas WARN";
+  for (const s of [...(expect.includes ?? []), ...(extra.includes ?? [])]) {
+    if (!alvo.includes(s)) problems.push(`${ondeAlvo} devia conter "${s}"`);
+  }
+  // `anyOut`: para afirmar linhas que NAO sao WARN (OK/SKIP/NOTE) num teste que
+  // ainda assim espera exit != 0.
+  for (const s of expect.anyOut ?? []) {
+    if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
+  }
+  // `excludes` tambem tem de ser DIFERENCIAL, pela mesma razao que o `includes`: era
+  // testado contra o output absoluto, logo um WARN de baseline sem relacao nenhuma —
+  // por exemplo o orcamento de bytes num projeto que acrescentou regras de dominio as
+  // rules, que e o uso normal — fazia falhar testes de CRLF e de placeholders, apontando
+  // o diagnostico para o sitio errado. Uma linha que ja estava no baseline nao e culpa
+  // desta mutacao.
+  for (const s of [...(expect.excludes ?? []), ...(extra.excludes ?? [])]) {
+    if (!out.includes(s)) continue;
+    const novaOcorrencia = out
+      .split("\n")
+      .filter((l) => l.includes(s))
+      .some((l) => !base.has(chaveWarn(l)));
+    if (novaOcorrencia) problems.push(`output NAO devia conter "${s}" (ocorrencia nova, nao de baseline)`);
+  }
+  return problems;
+}
+
+/**
  * @param name    descricao do cenario
  * @param mutate  (dir) => void — a quebra a aplicar; omitir para o baseline
  * @param expect  {
@@ -139,71 +227,7 @@ function test(name, mutate, expect) {
       }
     }
     const { code, out } = runGuard(dir, expect.cwd);
-    const problems = [];
-    if (!out.includes("=== Doc Guards ===")) {
-      problems.push(`o guard nao produziu output (rebentou?): ${out.slice(0, 160)}`);
-    }
-    // Afirmacao por DIFERENCA face ao baseline, nao pelo exit code absoluto. Uma versao
-    // anterior saltava os testes `code: 0` quando o repo tinha avisos — desligava 17 dos
-    // 64 em silencio, com exit 0 e a dizer "todos passaram". Agora todos correm sempre.
-    // INVARIANTE, verificada em cada corrida: o exit code tem de refletir os avisos.
-    // Sem isto, trocar a ultima linha do guard por `process.exit(1)` dava 84/84 verde —
-    // as assercoes diferenciais falam de mensagens e nao do veredicto.
-    const temWarn = out.includes("  WARN  ");
-    if (temWarn && code === 0) problems.push("imprimiu WARN mas saiu 0");
-    if (!temWarn && code !== 0) problems.push(`nao imprimiu WARN mas saiu ${code}`);
-    const novos = [...warnsOf(out)].filter((w) => !base.has(w));
-    if (expect.code === 0) {
-      if (novos.length) problems.push(`nao devia acrescentar avisos; acrescentou ${novos.length}: ${novos[0]}`);
-    } else {
-      if (novos.length === 0) {
-        // Dizer PORQUE nao ha aviso novo. A causa mais comum nao e o guard: e o repo ja
-        // estar a avisar disto **antes** da mutacao, e ai o teste diferencial nao tem como
-        // ver nada de novo. Medido num projeto derivado meio-atualizado: dois testes do
-        // Guard 12d falhavam com esta mensagem sem que ela dissesse que a culpa era do
-        // BOOTSTRAP.md do projeto estar desalinhado. Sem esta explicacao, quem le vai
-        // procurar o defeito no guard.
-        const esperados = [...(expect.includes ?? []), ...(extra.includes ?? [])];
-        const jaNoBaseline = esperados.filter((t) => [...base].some((w) => w.includes(chaveWarn(t))));
-        problems.push(
-          jaNoBaseline.length
-            ? `devia acrescentar um aviso novo e nao acrescentou: o baseline JA avisava disto ` +
-                `(${jaNoBaseline[0]}). Corrigir o repo antes de correr a suite — o teste e ` +
-                `diferencial e nao tem como ver como novo um aviso que ja la estava`
-            : "devia acrescentar pelo menos um aviso novo — nao acrescentou nenhum"
-        );
-      }
-      if (code === 0) problems.push("devia sair != 0");
-    }
-    // CAUSA-RAIZ de quatro rondas de defeitos: `out.includes(...)` nao olha ao NIVEL da
-    // linha. Um teste `code: 1` era satisfeito por uma linha `NOTE` com o mesmo texto, ou
-    // pelo WARN de OUTRO guard que a mutacao tambem disparava — e sabotar o guard sob teste
-    // ficava invisivel. Um teste que espera aviso afirma-se contra as linhas WARN e mais
-    // nada; um que espera sucesso pode afirmar OK/SKIP/NOTE, logo usa o output inteiro.
-    const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
-    const ondeAlvo = expect.code === 0 ? "output" : "linhas WARN";
-    for (const s of [...(expect.includes ?? []), ...(extra.includes ?? [])]) {
-      if (!alvo.includes(s)) problems.push(`${ondeAlvo} devia conter "${s}"`);
-    }
-    // `anyOut`: para afirmar linhas que NAO sao WARN (OK/SKIP/NOTE) num teste que
-    // ainda assim espera exit != 0.
-    for (const s of expect.anyOut ?? []) {
-      if (!out.includes(s)) problems.push(`output devia conter "${s}"`);
-    }
-    // `excludes` tambem tem de ser DIFERENCIAL, pela mesma razao que o `includes`: era
-    // testado contra o output absoluto, logo um WARN de baseline sem relacao nenhuma —
-    // por exemplo o orcamento de bytes num projeto que acrescentou regras de dominio as
-    // rules, que e o uso normal — fazia falhar testes de CRLF e de placeholders, apontando
-    // o diagnostico para o sitio errado. Uma linha que ja estava no baseline nao e culpa
-    // desta mutacao.
-    for (const s of [...(expect.excludes ?? []), ...(extra.excludes ?? [])]) {
-      if (!out.includes(s)) continue;
-      const novaOcorrencia = out
-        .split("\n")
-        .filter((l) => l.includes(s))
-        .some((l) => !base.has(chaveWarn(l)));
-      if (novaOcorrencia) problems.push(`output NAO devia conter "${s}" (ocorrencia nova, nao de baseline)`);
-    }
+    const problems = avaliar({ code, out, expect, extra, base });
     if (problems.length) {
       failures.push({ name, problems, out });
       console.log(`  FAIL  ${name}`);
@@ -220,7 +244,14 @@ function test(name, mutate, expect) {
 // Helpers de mutacao
 const file = (dir, p) => join(dir, p);
 const readF = (dir, p) => readFileSync(file(dir, p), "utf8");
-const writeF = (dir, p, s) => writeFileSync(file(dir, p), s);
+// Cria a pasta-pai. Sem isto, escrever num caminho que o template nao traz (ex:
+// `.vscode/mcp.json`) rebentava com ENOENT no setup — e o teste que falhava era o do
+// ficheiro que ainda nao existe, que e exatamente o caso que se quer cobrir.
+const writeF = (dir, p, s) => {
+  const alvo = file(dir, p);
+  mkdirSync(dirname(alvo), { recursive: true });
+  writeFileSync(alvo, s);
+};
 const patchSettings = (dir, fn) => {
   const cfg = JSON.parse(readF(dir, ".claude/settings.json"));
   fn(cfg);
@@ -251,6 +282,18 @@ function syntheticSandbox() {
   cpSync(join(ROOT, GUARD), join(dir, GUARD));
   if (existsSync(join(ROOT, GUARD_MODULES))) {
     cpSync(join(ROOT, GUARD_MODULES), join(dir, GUARD_MODULES), { recursive: true });
+  }
+
+  // Os ficheiros que o Guard 17 congelou em `TETOS`. A fixture copia o verificador e os seus
+  // modulos, mas nao as suites — e entao os tetos que apontam para `.agent/scripts/*` viam
+  // ficheiros "desaparecidos" numa pasta que existe. O stub tem EXATAMENTE as linhas do teto:
+  // derivado da lista real, nao fixado aqui, para nao envelhecer quando um teto mudar.
+  // (Os tetos de `.claude/hooks/` ficam de fora de propósito: a fixture nao tem essa camada,
+  // e o guard reporta-a como fora do alcance — que e o caso de um derivado sem Claude Code.)
+  for (const [alvo, teto] of Object.entries(TETOS)) {
+    if (!alvo.startsWith(".agent/scripts/")) continue;
+    if (existsSync(join(dir, alvo))) continue;
+    w(alvo, "// stub da fixture\n".repeat(teto));
   }
 
   for (const r of ["core-rules", "process-rules", "anti-patterns"]) {

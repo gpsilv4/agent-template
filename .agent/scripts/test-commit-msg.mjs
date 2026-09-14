@@ -81,6 +81,29 @@ test("mensagem normal passa", "fix(scripts): corrigir o guard\n", { code: 0 });
 
 test("co-autor HUMANO passa", "feat: x\n\nCo-Authored-By: Maria Silva <maria@exemplo.pt>\n", { code: 0 });
 
+// O ficheiro promete, por escrito, que "um co-autor humano passa". Nao prometia o suficiente:
+// `aider` casava DENTRO de "Haider" e recusava o commit de uma pessoa real. Um hook que
+// recusa um humano ensina a contorna-lo com `--no-verify`, e ai deixa de haver hook.
+test("co-autor humano cujo APELIDO contem um nome de IA passa",
+  "feat: x\n\nCo-Authored-By: Ali Haider <ali@exemplo.pt>\n", { code: 0 });
+test("co-autor humano chamado Grokowski passa",
+  "feat: x\n\nCo-Authored-By: Jan Grokowski <jan@exemplo.pl>\n", { code: 0 });
+test("co-autor humano chamado Cordeiro passa",
+  "feat: x\n\nCo-Authored-By: Luis Cordeiro <luis@exemplo.pt>\n", { code: 0 });
+
+// AMBIGUIDADE ASSUMIDA, e nao um defeito por fechar: `Devin` e `Cody` sao ao mesmo tempo
+// agentes e nomes proprios correntes. Nenhuma ancora os distingue. Fica a recusar, porque a
+// mensagem do hook nomeia a linha e manda ajustar a lista (nao `--no-verify`) — e um humano
+// assim chamado resolve-o uma vez, no repo dele. Este teste existe para que a escolha seja
+// EXPLICITA: quem a inverter parte um teste e tem de dizer porque.
+test("co-autor chamado Devin recusa (ambiguidade assumida)",
+  "feat: x\n\nCo-Authored-By: Devin Jones <d@exemplo.pt>\n", { code: 1 });
+
+// Os agentes que a lista nao conhecia ate hoje.
+for (const nome of ["Codex", "Cline", "Jules", "Junie", "Qwen Coder", "Roo Code"]) {
+  test(`atribuicao a ${nome} recusa`, `feat: x\n\nCo-Authored-By: ${nome} <x@exemplo.com>\n`, { code: 1 });
+}
+
 test("prosa que fala de geracao passa", "docs: explicar como o relatorio e gerado pelo script\n", { code: 0 });
 
 // O texto de ajuda que o git acrescenta ao ficheiro vem comentado com `#` e NAO entra na

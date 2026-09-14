@@ -65,18 +65,42 @@ const falhas = [];
 /** Total de testes ja corridos. Usado pelo registo por descoberta para medir o
  *  contributo de cada modulo `tests-*.mjs`. */
 export const contagem = () => passed + falhas.length;
+/**
+ * O VEREDICTO, isolado do que o produz — o mesmo desenho do `test-harness.mjs`, e pela mesma
+ * razao: a varredura de mutacao mediu **0 de 3** sitios aqui. Desligar uma destas assercoes
+ * so torna os 66 testes da superficie mais permissivos, e nada fica vermelho.
+ *
+ * Pura, pode ser chamada com entradas fabricadas — e e o que o `tests-surface-self.mjs` faz.
+ */
+export function avaliar({ code, out, expect }) {
+  const problemas = [];
+  if (code !== expect.code) problemas.push(`exit ${code}, esperado ${expect.code}`);
+  // Afirmar contra as linhas WARN quando se espera reprovacao: um `includes` sobre o output
+  // inteiro seria satisfeito por uma linha OK com o mesmo nome de ficheiro.
+  const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
+  for (const s of expect.includes ?? []) if (!alvo.includes(s)) problemas.push(`${expect.code === 0 ? "output" : "linhas WARN"} devia conter "${s}"`);
+  for (const s of expect.excludes ?? []) if (out.includes(s)) problemas.push(`output NAO devia conter "${s}"`);
+  return problemas;
+}
+
+/** Regista um resultado ja avaliado (usado pelos testes do proprio harness). */
+export function registarResultado(nome, problemas, out) {
+  if (problemas.length) {
+    falhas.push({ nome, problemas, out });
+    console.log(`  FAIL  ${nome}`);
+    for (const p of problemas) console.log(`          ${p}`);
+  } else {
+    passed++;
+    console.log(`  PASS  ${nome}`);
+  }
+}
+
 function test(nome, mutate, expect) {
   const { dir, base } = sandbox();
   try {
     const ref = mutate ? mutate(dir, base) ?? base : base;
     const { code, out } = corre(dir, ref);
-    const problemas = [];
-    if (code !== expect.code) problemas.push(`exit ${code}, esperado ${expect.code}`);
-    // Afirmar contra as linhas WARN quando se espera reprovacao: um `includes` sobre o output
-    // inteiro seria satisfeito por uma linha OK com o mesmo nome de ficheiro.
-    const alvo = expect.code === 0 ? out : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
-    for (const s of expect.includes ?? []) if (!alvo.includes(s)) problemas.push(`${expect.code === 0 ? "output" : "linhas WARN"} devia conter "${s}"`);
-    for (const s of expect.excludes ?? []) if (out.includes(s)) problemas.push(`output NAO devia conter "${s}"`);
+    const problemas = avaliar({ code, out, expect });
     if (problemas.length) {
       falhas.push({ nome, problemas, out });
       console.log(`  FAIL  ${nome}`);
