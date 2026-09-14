@@ -17,7 +17,9 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-import { registar as registarBypasses } from "./tests-bypasses.mjs";
+// Fonte unica da descoberta de suites (AP4). O caminho atravessa arvores de proposito:
+// duplicar a logica aqui era exactamente o que o `sync-docs` proibe.
+import { registaDescobertos, resumoDescoberta } from "../../../.agent/scripts/lib/registo.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".claude/hooks/guard-protected-branch.mjs");
@@ -412,6 +414,121 @@ test("stop: a divida sub-reportada era silenciosa — reporta os DOIS ficheiros"
   }
 });
 
+// --- Caminhos que o porcelain CITA (AP5, segunda cara) -------------------------
+// Sem `-z`, o git devolve `?? ".agent/scripts/guards/caf\303\251.mjs"` — com aspas e escapes
+// octais. O `slice(3)` entregava essa string ao matcher, nenhuma regra casava, e a divida
+// desaparecia em silencio. Medido: o hook via 1 de 3 ficheiros. Num template escrito em
+// portugues, um nome com acento e o caso normal e nao a excepcao.
+test("stop: ficheiro com ACENTO no nome nao escapa a divida", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/scripts/guards/acentuado-caf\u00e9.mjs", "// x\n");
+    contem(correNoCwd(STOP, d).ctx, "test-guards.mjs");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("stop: ficheiro com ESPACO no nome nao escapa a divida", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/scripts/guards/com espaco.mjs", "// x\n");
+    contem(correNoCwd(STOP, d).ctx, "test-guards.mjs");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("stop: acento + espaco + ASCII — os TRES contam, nao so o ASCII", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/scripts/guards/caf\u00e9.mjs", "// x\n");
+    commitarEModificar(d, ".agent/scripts/guards/a b.mjs", "// x\n");
+    commitarEModificar(d, ".agent/scripts/guards/plain.mjs", "// x\n");
+    // Antes da correcao: "1 ficheiro". A contagem e o que distingue "viu todos" de
+    // "viu o que era facil".
+    contem(correNoCwd(STOP, d).ctx, "3 ficheiros");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("session: caminho com acento aparece INTEIRO, nao escapado", () => {
+  const d = repo("feature/x");
+  try {
+    commitarEModificar(d, ".agent/rules/caf\u00e9.md", "# x\n");
+    contem(correNoCwd(SESSION, d).ctx, ".agent/rules/caf\u00e9.md");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+// --- PreCompact: reinjectar as Fronteiras -------------------------------------
+// A compactacao descarta as rules importadas pelo CLAUDE.md e nada avisa. Este hook devolve
+// o bloco Fronteiras em `additionalContext` (campo honrado no PreCompact). Falha ABERTA:
+// qualquer problema sai 0 em silencio, porque bloquear uma compactacao custa mais do que
+// perder a reinjeccao.
+const PRECOMPACT = join(ROOT, ".claude/hooks/precompact-reinject.mjs");
+
+test("precompact: devolve o bloco Fronteiras do CLAUDE.md do projeto medido", () => {
+  const d = repo("feature/x");
+  try {
+    writeFileSync(join(d, "CLAUDE.md"),
+      "# P\n\n## Fronteiras (prioridade maxima)\n\n- **Nunca**: MARCA-DE-TESTE-XYZ\n\n## Outra\n\nx\n");
+    const r = correNoCwd(PRECOMPACT, d);
+    contem(r.ctx, "MARCA-DE-TESTE-XYZ");
+    contem(r.ctx, "Fronteiras");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("precompact: NAO reinjecta as rules inteiras (so as Fronteiras)", () => {
+  const d = repo("feature/x");
+  try {
+    writeFileSync(join(d, "CLAUDE.md"),
+      "# P\n\n## Fronteiras\n\n- so isto\n\n## Regras\n\n@.agent/rules/core-rules.md\nNAO-DEVIA-APARECER\n");
+    const r = correNoCwd(PRECOMPACT, d);
+    contem(r.ctx, "so isto");
+    if (r.ctx.includes("NAO-DEVIA-APARECER"))
+      throw new Error("reinjectou alem das Fronteiras — derrota o proposito da compactacao");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("precompact: sem CLAUDE.md sai 0 e calado (falha aberta)", () => {
+  const d = repo("feature/x");
+  try {
+    const r = correNoCwd(PRECOMPACT, d);
+    if (!r.vazio) throw new Error("sem CLAUDE.md nao ha nada a dizer — devia sair calado");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("precompact: seccao Fronteiras renomeada sai 0 e calado", () => {
+  const d = repo("feature/x");
+  try {
+    writeFileSync(join(d, "CLAUDE.md"), "# P\n\n## Limites\n\n- x\n");
+    const r = correNoCwd(PRECOMPACT, d);
+    if (!r.vazio) throw new Error("seccao ausente nao e erro — devia sair calado");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
+test("precompact: seccao Fronteiras VAZIA nao reinjecta um bloco vazio", () => {
+  const d = repo("feature/x");
+  try {
+    writeFileSync(join(d, "CLAUDE.md"), "# P\n\n## Fronteiras\n\n## Outra\n\nx\n");
+    const r = correNoCwd(PRECOMPACT, d);
+    if (!r.vazio) throw new Error("bloco vazio nao vale a pena reinjectar");
+  } finally {
+    rmSync(d, { recursive: true, force: true });
+  }
+});
+
 // --- A marca de "ja disse isto" pertence ao repo medido ------------------------
 test("stop: a marca fica no repo medido, nao no repo do hook", () => {
   const d = repo("feature/x");
@@ -438,7 +555,14 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
   }
 });
 
-registarBypasses({ test, corre, repo, eq, contem });
+// AP4: os modulos `tests-*.mjs` sao DESCOBERTOS em disco, nao chamados a mao — comentar
+// uma linha aqui levava a suite de 156 para 39 testes com exit 0. Ver `lib/registo.mjs`.
+console.log(resumoDescoberta(await registaDescobertos({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  entryPoint: "test-hooks.mjs",
+  ctx: { test, corre, repo, eq, contem },
+  contagem: () => passed + falhas.length,
+})));
 
 test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
   const r = corre({ tool_input: { command: "git commit -m x" } });

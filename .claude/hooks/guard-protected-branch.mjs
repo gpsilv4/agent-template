@@ -71,11 +71,30 @@ const SEGUROS = new Set([
  *  develop` e `git fetch . HEAD:master` passavam todos — e o primeiro faz o que o
  *  `reset --hard` faz, que a versao anterior negava. Cada entrada aqui e uma forma que torna
  *  inseguro um verbo que esta em `SEGUROS`. */
+/** Chaves de `git config` cuja ESCRITA e execucao de codigo ou desliga uma rede de
+ *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `AP6`): e uma lista
+ *  fechada de chaves que o proprio git documenta como executaveis. */
+const CHAVES_PERIGOSAS =
+  /^(?:core\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor)|sequence\.editor|credential\.helper|diff\.external|filter\..+\.(?:clean|smudge|process)|uploadpack\.packObjectsHook|alias\..+|protocol\..+\.allow|http\.proxy|url\..+\.insteadOf)$/i;
+
 const FORMAS_INSEGURAS = {
   switch: /^(?:-C|--force|--discard-changes)$/,
   branch: /^(?:-f|--force|-[dD]|--delete|-[mMcC]|--move|--copy)$/,
   tag: /^(?:-d|--delete|-f|--force)$/,
-  config: /^(?:--unset|--unset-all|--remove-section|--rename-section|--replace-all|-e|--edit)$/,
+  // `config` e um verbo de LEITURA seguro, mas escrever certas chaves e execucao de codigo
+  // ou desligar a propria rede: `core.hooksPath /dev/null` mata o `.githooks/commit-msg`
+  // (a rede anti-atribuicao-a-IA deste repo), e `core.pager`/`credential.helper`/
+  // `core.editor` sao sinks que um `git log` inocente dispara. Medidos a passar.
+  // Como PREDICADO e nao regex: e preciso distinguir a leitura (`git config --get x`, que
+  // continua a passar) da escrita, e isso depende de haver um VALOR a seguir a chave.
+  config: (args) => {
+    const flagsDestrutivas = /^(?:--unset|--unset-all|--remove-section|--rename-section|--replace-all|-e|--edit)$/;
+    if (args.some((a) => flagsDestrutivas.test(a))) return true;
+    const posicionais = args.filter((a) => !a.startsWith("-"));
+    // Uma escrita tem chave E valor; `git config core.pager` sozinho apenas le.
+    if (posicionais.length < 2) return false;
+    return CHAVES_PERIGOSAS.test(posicionais[0]);
+  },
   add: /^(?:-i|--interactive|-p|--patch)$/, // interativos: um hook nao tem como responder
   // `fetch` com refspec escreve refs locais (`git fetch . HEAD:master`). Como PREDICADO e nao
   // regex, para excluir primeiro os `:` que sao de URL — senao `git fetch https://x/y main` e
@@ -99,7 +118,10 @@ const SUBVERBOS_INSEGUROS = {
   reflog: /^(?:expire|delete)$/,
   remote: /^(?:remove|rm|set-url|rename)$/,
   worktree: /^(?:remove|move)$/,
-  submodule: /^(?:deinit|set-url)$/,
+  // `foreach` corre um comando arbitrario em cada submodulo (`git submodule foreach 'git
+  // push origin main'`) — a mesma classe que o `difftool -x` e o `bisect run`, que ja
+  // estavam fora de `SEGUROS`. Medido a passar.
+  submodule: /^(?:deinit|set-url|foreach)$/,
   notes: /^(?:remove|prune)$/,
 };
 
@@ -181,6 +203,14 @@ const PALAVRAS_SHELL = new Set([
  *  `timeout 5 git push` parava o consumo e a invocacao passava por nao-git. */
 const VALOR_DE_WRAPPER = /^\d+[smhd]?$/;
 
+/** Flags de SUB-COMANDO que consomem o argumento seguinte. Sem esta lista, o valor de uma
+ *  flag era lido como sub-verbo e o sub-verbo verdadeiro escapava (`git notes --ref x
+ *  remove`). So precisa de cobrir os sub-comandos que tem entrada em `SUBVERBOS_INSEGUROS`. */
+const SUBVERBO_FLAGS_COM_VALOR = new Set([
+  "--ref", "-m", "--message", "-F", "--file", "-C", "--reuse-message", "-c", "--reedit-message",
+  "-n", "--expire", "--expire-unreachable", "--format", "--pretty",
+]);
+
 /** Flags globais do `git` que consomem o argumento seguinte. */
 const GIT_FLAGS_COM_VALOR = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"]);
 
@@ -194,7 +224,7 @@ function ler() {
 
 /** Um token sem aspas nem escapes: `'git'`, `"git"` e `g\i\t` sao todos `git`. E o que
  *  desmonta a ofuscacao por aspas (`git comm""it`) sem precisar de a prever. */
-const limpo = (t) => t.replace(/["'\\]/g, "");
+const limpo = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
 
 /** Parte o comando em comandos simples. Todo o separador de shell conta — incluindo
  *  `$(`, backticks, `{`/`}` e `!`, que eram bypasses na versao anterior. */
@@ -225,7 +255,13 @@ function segmentos(texto) {
     x
       // Redireções: `>out.txt git commit` e forma valida de shell, e partir no `>` fazia o
       // segmento comecar em `out.txt` — nao havia invocacao nenhuma. O destino e consumido.
-      .replace(/\d?[<>]{1,2}&?\s*\S*/g, " ")
+      //
+      // O alvo NAO pode ser `\S*`: `\S` nao para nos separadores, logo `2>&1; git commit`
+      // era consumido INTEIRO (incluindo o `;`) e os dois comandos fundiam-se num so, cujo
+      // verbo era `make`/`npm`. Cinco bypasses medidos, entre eles um `push --force`. O alvo
+      // de uma redireção nunca contem um separador de shell — enumera-los aqui e o que
+      // impede o consumo de atravessar a fronteira do comando.
+      .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ")
       .replace(/[;&|(){}\n]+/g, "\n")
       .split("\n")
       .map((seg) => seg.trim())
@@ -351,9 +387,29 @@ function seguro(inv) {
   if (!SEGUROS.has(inv.verbo)) return false;
   const exigida = FORMA_EXIGIDA[inv.verbo];
   if (exigida) return exigida(inv.args);
-  // Sub-verbo: so o PRIMEIRO argumento (os sub-verbos do git sao posicionais).
+  // Sub-verbo: o primeiro argumento POSICIONAL (nao-flag). Comparar so com `args[0]` fazia
+  // QUALQUER flag anular a tabela inteira — `git stash -q drop`, `git reflog --verbose
+  // expire`, `git remote -v remove origin` passavam todos. Cinco bypasses medidos.
+  // Continua a nao apanhar falsos positivos: em `git stash push -m "apply later"` o primeiro
+  // posicional e `push`, nao a palavra `apply` da mensagem.
   const subverbo = SUBVERBOS_INSEGUROS[inv.verbo];
-  if (subverbo && inv.args.length && subverbo.test(inv.args[0])) return false;
+  if (subverbo) {
+    // O PRIMEIRO posicional, saltando o valor das flags que consomem um argumento. Sem
+    // isso, `git notes --ref x remove` dava `x` como primeiro posicional e o `remove`
+    // escapava — medido. E so o primeiro: percorrer todos faria de `git stash push -m
+    // "drop this"` um falso positivo, porque `drop` e um token da mensagem.
+    let posicional;
+    for (let i = 0; i < inv.args.length; i++) {
+      const a = inv.args[i];
+      if (a.startsWith("-")) {
+        if (SUBVERBO_FLAGS_COM_VALOR.has(a)) i++; // `--ref x`: o `x` e valor, nao sub-verbo
+        continue;
+      }
+      posicional = a;
+      break;
+    }
+    if (posicional !== undefined && subverbo.test(posicional)) return false;
+  }
   // Flags: com as agrupadas e aderentes expandidas, para comparar por igualdade.
   const insegura = FORMAS_INSEGURAS[inv.verbo];
   if (!insegura) return true;
@@ -409,9 +465,24 @@ try {
   // Corpos de heredoc saem: uma mensagem de commit que cite `push --force` nao e um push.
   // As aspas NAO saem — retira-las em bloco foi o que fez `eval "git commit"` escapar. Aqui
   // sao retiradas token a token, o que desmonta a ofuscacao em vez de a esconder.
-  const texto = cmd.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^\s*\2\s*$/gm, "");
+  //
+  // MAS o corpo so e "texto" se quem o recebe for o `git`. Quando o destinatario e uma
+  // SHELL (`bash -s <<EOF ... EOF`), o corpo sao COMANDOS que correm — e remove-lo apagava
+  // a analise inteira. Dois bypasses medidos. O corpo desses e guardado e varrido como
+  // segmento proprio, em vez de descartado.
+  const corposExecutaveis = [];
+  const texto = cmd.replace(
+    /^([^\n]*?)<<-?\s*(['"]?)(\w+)\2([\s\S]*?)^\s*\3\s*$/gm,
+    (_todo, preambulo, _q, _tag, corpo) => {
+      // O preambulo e o que esta ANTES do `<<` na mesma linha: e ele que diz quem recebe.
+      if (invocacoes(preambulo).length === 0 && /(?:^|\s)(?:sh|bash|zsh|dash|ksh)(?:\s|$)/.test(limpo(preambulo))) {
+        corposExecutaveis.push(corpo);
+      }
+      return preambulo;
+    }
+  );
 
-  const invs = invocacoes(texto);
+  const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando
 
   for (const inv of invs) {

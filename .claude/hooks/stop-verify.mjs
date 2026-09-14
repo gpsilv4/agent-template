@@ -41,6 +41,9 @@ const SUITES = [
   { re: /^\.agent\/scripts\/check-test-surface\.mjs$/, cmd: "node .agent/scripts/test-test-surface.mjs" },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, cmd: "node .agent/scripts/test-bundle-sizes.mjs" },
   { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, cmd: "node .agent/scripts/test-mutation-sweep.mjs" },
+  { re: /^\.agent\/scripts\/lib\//, cmd: "node .agent/scripts/test-registo.mjs" },
+  { re: /^\.githooks\//, cmd: "node .agent/scripts/test-commit-msg.mjs" },
+  { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, cmd: "node .agent/scripts/test-simulate-derived.mjs" },
   { re: /^\.claude\/hooks\//, cmd: "node .claude/hooks/tests/test-hooks.mjs" },
   { re: /^\.agent\/(rules|workflows)\//, cmd: "node .agent/scripts/check-doc-versions.mjs" },
   { re: /^(CLAUDE|GEMINI|AGENTS|README)\.md$/, cmd: "node .agent/scripts/check-doc-versions.mjs" },
@@ -48,21 +51,45 @@ const SUITES = [
   { re: /^\.claude\/settings\.json$/, cmd: "node .agent/scripts/test-guards.mjs" },
 ];
 
+/** Caminhos de um `git status --porcelain -z`.
+ *
+ *  `-z` e obrigatorio, nao cosmetico: SEM ele o git **cita** os caminhos que tenham espacos
+ *  ou bytes nao-ASCII (`?? ".agent/guards/caf\303\251.mjs"`), e o `slice(3)` entrega a aspa
+ *  e os escapes octais ao matcher — nenhuma regra casa e a divida e sub-reportada em
+ *  SILENCIO, que e o defeito que este hook existe para evitar. Medido: 1 de 3 ficheiros
+ *  vistos. E a segunda cara do `AP5` (o `.trim()` foi a primeira).
+ *
+ *  Com `-z` as entradas vem separadas por NUL e os caminhos crus. Renomeacoes e copias
+ *  ocupam DUAS entradas (`R  novo\0antigo\0`): a segunda e um caminho nu, sem coluna de
+ *  estado, logo um `slice(3)` cego comia-lhe 3 caracteres. Por isso sao consumidas ao par.
+ *
+ *  (Existe uma copia desta funcao em `session-context.mjs` — sao dois hooks independentes
+ *  e o template evita acoplar um ao outro; se mudar aqui, mudar la.) */
+function caminhosPorcelain(saida) {
+  const entradas = saida.split("\0").filter(Boolean);
+  const caminhos = [];
+  for (let i = 0; i < entradas.length; i++) {
+    const estado = entradas[i].slice(0, 2);
+    caminhos.push(entradas[i].slice(3));
+    // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado.
+    if (estado[0] === "R" || estado[0] === "C") i++;
+  }
+  return caminhos;
+}
+
 try {
   // `--untracked-files=all` e obrigatorio: sem ele o git **colapsa diretorios** nao
   // rastreados — um ficheiro novo em pasta nova aparece como `?? .agent/` e nenhuma regra de
   // caminho casa, logo o hook nao reportava divida nenhuma. Um teste apanhou-o.
-  const porcelain = execFileSync("git", ["status", "--porcelain", "--untracked-files=all"], {
+  const porcelain = execFileSync("git", ["status", "--porcelain", "--untracked-files=all", "-z"], {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
-    // `.replace(/\n+$/)` e NAO `.trim()`: ver a nota em `session-context.mjs` — `.trim()`
-    // comia o espaco da coluna de estado da primeira linha e o `slice(3)` levava um caractere
-    // do caminho. Consequencia real: o primeiro ficheiro modificado escapava as regras abaixo
-    // e a divida era **sub-reportada em silencio** — o defeito que este hook existe para evitar.
-  }).replace(/\n+$/, "");
-  if (!porcelain) process.exit(0); // nada tocado: nada em divida
+    // Nada de `.trim()` nem de `.replace(/\n+$/)`: com `-z` o separador e NUL e o caminho e
+    // cru. Aparar bloco a bloco foi o `AP5` original (comia o espaco da coluna de estado).
+  });
+  if (!porcelain.replace(/\0+$/, "")) process.exit(0); // nada tocado: nada em divida
 
-  const tocados = porcelain.split("\n").filter(Boolean).map((l) => l.slice(3).trim());
+  const tocados = caminhosPorcelain(porcelain);
   const devidos = new Map(); // cmd -> ficheiros que o motivam
   for (const f of tocados) {
     const regra = SUITES.find((s) => s.re.test(f));

@@ -13,6 +13,8 @@
       "Read(./**/credentials*)",
       "Read(./**/secrets/**)",
       "Edit(./.claude/settings.json)",
+      "Edit(./.claude/settings.local.json)",
+      "Write(./.claude/settings.local.json)",
       "Write(./.claude/settings.json)",
       "Edit(./.env*)",
       "Write(./.env*)",
@@ -27,7 +29,9 @@
       "Bash(git merge:*)",
       "Bash(gh pr merge:*)",
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Edit(./.claude/hooks/**)",
+      "Write(./.claude/hooks/**)"
     ],
     "allow": [
       "Read(./.agent/**)",
@@ -38,6 +42,10 @@
       "Bash(node .agent/scripts/test-bundle-sizes.mjs)",
       "Bash(node .agent/scripts/test-backlog.mjs)",
       "Bash(node .agent/scripts/test-mutation-sweep.mjs)",
+      "Bash(node .agent/scripts/simulate-derived.mjs)",
+      "Bash(node .agent/scripts/test-simulate-derived.mjs)",
+      "Bash(node .agent/scripts/test-commit-msg.mjs)",
+      "Bash(node .agent/scripts/test-registo.mjs)",
       "Bash(node .agent/scripts/mutation-sweep.mjs)",
       "Bash(node .agent/scripts/mutation-sweep.mjs --list)",
       "Bash(npx tsc --noEmit)",
@@ -81,6 +89,16 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-verify.mjs\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/precompact-reinject.mjs\""
           }
         ]
       }
