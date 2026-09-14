@@ -215,21 +215,18 @@ jobs:
       # e isso e configuracao LOCAL: um clone novo, outra maquina ou outra ferramenta nao a
       # tem. Esta e a camada que nao depende dela — corre o mesmo hook sobre cada mensagem do
       # PR. E o mesmo raciocinio do `AP4`: a autoridade que o agente nao alcanca e o CI.
-      # No `push` para main verifica-se a mensagem do commit integrado: o CONTRIBUTING manda
-      # "Squash and merge", e o titulo do squash e o titulo do PR — editavel no momento do
-      # merge e nunca passado pelo hook. Sem este passo, a superficie que o template promete
-      # cobrir ("a autoridade que o agente nao alcanca e o CI") tinha um buraco no fim.
-      - name: Mensagem do commit integrado — sem atribuicao a IA
-        if: github.event_name == 'push'
-        run: |
-          set -euo pipefail
-          msgfile="$RUNNER_TEMP/head-msg"
-          git log -1 --format='%B' HEAD > "$msgfile"
-          node .githooks/commit-msg "$msgfile" </dev/null
-          echo "  mensagem de HEAD verificada."
-
+      # SEM `if:`, e de propósito. `HEAD^1..HEAD` resolve nos dois eventos e o intervalo
+      # certo em cada um:
+      #   - `pull_request`: o checkout e o merge ref, cujo pai 1 e a base — logo o intervalo
+      #     sao os commits do PR;
+      #   - `push` para main: o pai 1 e a ponta anterior de main — logo o intervalo e o que
+      #     acabou de ser integrado, seja um squash (um commit, cuja mensagem e o TITULO DO
+      #     PR, editavel no momento do merge e de outra forma nunca verificado) ou um merge
+      #     commit (os commits do PR).
+      # Uma versao anterior tinha DOIS passos, um por evento, e o gated a `push` contava como
+      # enfraquecimento no `check-test-surface` — com razao: um passo que so corre em `push`
+      # deixa de correr em PRs. Um passo sem condicao nenhuma cobre mais e conta menos.
       - name: Mensagens de commit — sem atribuicao a IA
-        if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           base="$(git rev-parse HEAD^1)"
