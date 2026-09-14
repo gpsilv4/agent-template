@@ -1,0 +1,34 @@
+# Porque cada verificador e assim — evidencia
+
+> **NAO carregado.** Par de `.agent/rules/scripts-guide.md`: la ficam as instrucoes, aqui a
+> historia. A separacao existe por orcamento de contexto — o guia e reaberto a cada ticket que
+> toque em `.agent/scripts/` ou `.claude/hooks/`, e passou o limiar de 12 500 bytes ao ganhar
+> a documentacao do quarto e quinto hooks.
+
+## `guard-protected-branch` — os detalhes que so aparecem quando se mede
+
+    - **A forma conta, nao so o verbo** (`FORMAS_INSEGURAS`): `switch -C main` faz o que `reset --hard` faz, e `branch -f`/`branch -D`/`fetch . HEAD:master` reescrevem ou apagam um branch protegido. O verbo esta em `SEGUROS` e a flag e que destroi.
+    - **Alguns verbos exigem uma forma** (`FORMA_EXIGIDA`): `pull --ff-only` e `push --tags` passam porque o procedimento de release deste repo (`deploy.md`, `CONTRIBUTING.md`) corre em `main`; nega-los punha o guard contra a documentacao, e um falso positivo que bloqueia trabalho documentado custa tanto como um bypass.
+    - **So o verbo falha fechado.** Chegar ao verbo depende da lista `WRAPPERS`, que **e** uma blocklist: `flock`, `su -c`, `ssh host git commit` e `GIT_PAGER='git commit' git log` passam. Esta escrito no cabecalho do hook e nao se finge o contrario.
+
+## `simulate-derived` — porque a lista de comandos e derivada
+
+Era escrita a mao, com um comentario a dizer "os mesmos do `guard-tests` do `ci.yml`" e nada a
+verifica-lo. Acrescentar uma suite ao CI e esquecer aqui fazia a simulacao medir **menos**, em
+silencio — a mesma classe que o `PARES` ja tinha resolvido com descoberta em disco.
+
+Ao derivar do CI apareceu logo a armadilha: a lista inclui o proprio simulador e a sua suite,
+logo ele corria-se **dentro da copia**, que fazia outra copia. Recursao infinita, medida — o
+processo nao terminava e deixou 63 copias do repo em `/tmp`. Dai as exclusoes explicitas.
+
+Foi tambem o que revelou que o `fatal()` nao limpava a copia: cada caminho de recusa depois do
+passo 1 saia com `process.exit(1)` e deixava o repo inteiro para tras. Num projeto derivado isso
+inclui `.env` e chaves — dai o `try/finally`, o handler de `SIGINT`, e as exclusoes de segredos
+na copia.
+
+## `--skips`: porque a varredura normal NAO varre os `skip()`
+
+Um SKIP nao e um achado, e exigir um teste por cada um seria estreito de mais para o valor.
+Mas a regra que este repo repete em dezenas de comentarios e **"todo o skip e visivel"**: um
+guard que deixa de ANUNCIAR que nao correu e o `AP2` em forma pura, e nada media se isso era
+possivel. O modo `--skips` mede — fora do CI, corrido a mao ao mexer nos guards.

@@ -19,9 +19,9 @@
 
 ## Progresso Geral
 
-`____________________` **0%** (0/10 concluidos)
+`███████████_________` **55%** (6/11 concluidos)
 
-**Proximo:** T1 — `/e2e-tests` sem criterio de sucesso nem condicao de paragem
+**Proximo:** T4 — 17 sitios `skip()`/`note()` sem teste (varredura `--skips` a medir)
 
 ## Resumo
 
@@ -29,9 +29,9 @@
 |--------|-------|----------|---------|-----------|-----------|
 | Bugs / Violacoes de Regras | 1 | 1 | 0 | 0 | 0 |
 | Melhorias UX | 0 | 0 | 0 | 0 | 0 |
-| Divida Tecnica | 8 | 8 | 0 | 0 | 0 |
-| Features Futuras | 1 | 1 | 0 | 0 | 0 |
-| **Total** | **10** | **10** | **0** | **0** | **0** |
+| Divida Tecnica | 9 | 4 | 0 | 5 | 0 |
+| Features Futuras | 1 | 0 | 0 | 1 | 0 |
+| **Total** | **11** | **5** | **0** | **6** | **0** |
 
 ---
 
@@ -45,12 +45,6 @@
 
 | Ordem | ID | Descricao | Esforco | Depende de |
 |-------|-----|-----------|---------|------------|
-| 1 | T1 | `/e2e-tests`: criterio de sucesso, paragem e output | M | — |
-| 2 | T2 | `/security-tests`: catalogo OWASP -> passos com veredicto | M | — |
-| 3 | T7 | `/debug`: criterio de saida no workflow | S | — |
-| 4 | T6 | `/setup`: separar o que e workflow do que e documentacao | S | — |
-| 5 | T3 | `README`: o primeiro comando antes do inventario | S | — |
-| 6 | F1 | Hook `UserPromptSubmit`: Fase 0 deixa de ser so prosa | M | — |
 | 7 | T4 | 17 sitios `skip()`/`note()` sem teste | M | — |
 | 8 | T5 | 14 entradas de `surface-patterns` sem caso | M | — |
 
@@ -81,17 +75,12 @@
 
 | ID | Estado | Issue | Detalhe | Esforco | Ficheiro(s) |
 |----|--------|-------|---------|---------|-------------|
-| T1 | Pendente | `/e2e-tests` nao passa os tres testes que se aplicam aos outros workflows | Sem criterio de sucesso, sem condicao de paragem, sem output verificavel. A §4 ("O que testamos?") esta **inteiramente dentro de um comentario HTML** | M | `.agent/workflows/e2e-tests.md` |
-| T2 | Pendente | `/security-tests` e um catalogo OWASP disfarcado de workflow | Diz o que existe, nunca como se sabe que passou. Um unico comando executavel, que nem existe no template nu | M | `.agent/workflows/security-tests.md` |
-| T3 | Pendente | `README`: 110 linhas de arvore antes do primeiro comando | Falha o teste dos 5 minutos — quem chega atravessa o inventario completo antes de saber como comecar | S | `README.md` |
 | T4 | Pendente | 17 sitios `skip()`/`note()` podem ser apagados com as suites verdes | A varredura exclui `skip(` por desenho e nao ve `note()`. Um guard que deixa de anunciar que nao correu e o `AP2` | M | `check-doc-versions.mjs`, `guards/*.mjs` |
 | T5 | Pendente | 14 entradas das tabelas de `surface-patterns` sao desligaveis sem a suite reagir | Quatro sao nucleo deste repo, nao globs de stacks alheias | M | `.agent/scripts/surface-patterns.mjs` |
-| T6 | Pendente | `/setup` e documentacao para humanos empacotada como workflow | Um agente nao corre `nvm use` nem abre um browser. Duplica a tabela de workflows que ja existe em quatro sitios | S | `.agent/workflows/setup.md` |
-| T7 | Pendente | `/debug` nao tem criterio de saida explicito no workflow | O subagente `debugger` ja o tem; o workflow que ele diz seguir nao | S | `.agent/workflows/debug.md` |
 | T8 | Pendente | Duas das cinco rules sempre-carregadas nunca foram auditadas | `business-logic.md` e `pages-architecture.md` so existem depois do bootstrap | M | `.agent/rules/` |
+| T9 | Pendente | As regras de backlog ocupam 5132 bytes numa rule CARREGADA | Quase metade do `process-rules.md`, e so servem quando se toca no backlog. Move-las para referencia (padrao do `ticket-method.md`) poupa ~4KB **em todas as sessoes de todos os projetos derivados**. E decisao arquitetural: muda onde o agente procura as regras | M | `.agent/rules/process-rules.md` |
 
 ## 4. Features Futuras (valor para o utilizador)
 
 | ID | Estado | Feature | Impacto | Esforco | Pagina afetada |
 |----|--------|---------|---------|---------|----------------|
-| F1 | Pendente | Hook `UserPromptSubmit` que injeta o lembrete da Fase 0 | Das ~30 regras do projeto, 13 sao so prosa — incluindo o metodo de 6 fases inteiro. Este hook fecha a primeira delas: detetar "faz o ticket X" sem plano previo | M | `.claude/hooks/`, `.claude/settings.json` |

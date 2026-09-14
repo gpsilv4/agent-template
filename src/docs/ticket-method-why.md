@@ -113,3 +113,18 @@ pena onde a tabela da Fase 4 diz que corre; nao vale num `S`.
 
 O resto e quase gratis em tempo de maquina: os controlos negativos correm com a suite, e a
 varredura de mutacao custa minutos **uma vez** por alteracao a um verificador, nao por commit.
+
+
+## Porque a Fase 0 comeca por PERGUNTAR (`/grill`)
+
+Todo o resto do metodo tem o agente a **falar**: a Fase 0 explica e espera aprovacao, o
+`plan-auditor` julga um plano ja escrito, o `/plan` estrutura o que o agente ja decidiu. Em
+nenhum dos 13 pontos de aprovacao de um ticket alguem **pergunta** ao utilizador o que ele nao
+disse.
+
+Um "sim" a um plano nao significa acordo — significa que a explicacao era plausivel. A
+ambiguidade de requisitos ficava por extrair ate aparecer no code review, ou depois do deploy.
+
+Num `S` nao corre, e a razao e a mesma da escala do `/review` e do `sync-docs`: mudar um numero
+nao tem ramos de decisao, e perguntar na mesma ensina a saltar o processo. Um processo mais
+caro que o trabalho e abandonado ao terceiro ticket.
