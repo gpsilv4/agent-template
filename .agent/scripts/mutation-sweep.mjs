@@ -88,6 +88,22 @@ function listarDir(rel) {
 // ausencia de um ficheiro, nao a linha em si.
 const PARES = [
   {
+    // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
+    // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel
+    // da linha WARN, apagar as invariantes WARN<->exit, ou apagar o `if (code !== expect.code)`
+    // deixavam tudo verde.
+    alvo: ".agent/scripts/test-harness.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])problems\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    alvo: ".agent/scripts/test-surface-harness.mjs",
+    suite: ".agent/scripts/test-test-surface.mjs",
+    sinal: /(?<![\w.$])problemas\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/mcp.mjs",
     suite: ".agent/scripts/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
@@ -105,7 +121,7 @@ const PARES = [
     // O hook nao tem `warn(`/`fatal(`: falha aberta por desenho. O sitio que DECIDE e o
     // `console.log` da reinjeccao — desliga-lo faz o hook nao entregar nada, que e
     // exactamente o defeito que os testes tem de apanhar.
-    alvo: ".claude/hooks/precompact-reinject.mjs",
+    alvo: ".claude/hooks/reinject-fronteiras.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /(?<![\w.$])console\.log\(/,
     neutro: "(() => {})(",
@@ -284,6 +300,8 @@ if (!only) {
     // `lib/`: modulos partilhados com sitios de recusa proprios (hoje, o registo de suites
     // por descoberta). Sem esta linha um modulo novo ali entrava sem par e sem suite.
     ...listarDir(".agent/scripts/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/lib/${f}`),
+    // Os harnesses: decidem o veredicto de todas as suites e estavam fora da descoberta.
+    ...listarDir(".agent/scripts").filter((f) => /^test-.*harness\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
     // Os hooks tambem: sao codigo de enforcement com sitios de decisao, e estavam fora da
     // regra que o template impoe a todos os verificadores ("cada um com a sua suite"). Um
     // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard

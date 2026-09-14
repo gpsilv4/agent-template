@@ -46,7 +46,15 @@ import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
 
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
-const PROTEGIDOS = new Set(["main", "master", "develop"]);
+const PROTEGIDOS_LISTA = ["main", "master", "develop"];
+/** Comparacao NORMALIZADA, nao igualdade exacta de `Set`. Num filesystem case-insensitive
+ *  (APFS/macOS e NTFS, ambos por defeito) `refs/heads/MAIN` e o mesmo ficheiro que
+ *  `refs/heads/main` — logo um `symbolic-ref` para `MAIN` punha o git a reportar um branch
+ *  que a lista nao reconhecia, e tudo passava a ser permitido. Medido: `main` avancou.
+ *  Tambem se corta `refs/heads/` a frente, que e como o branch aparece em algumas formas. */
+const PROTEGIDOS = new Set(PROTEGIDOS_LISTA.map((b) => b.toLowerCase()));
+const ehProtegido = (br) =>
+  typeof br === "string" && PROTEGIDOS.has(br.replace(/^refs\/heads\//, "").toLowerCase());
 
 /** Verbos permitidos num branch protegido: leitura, inspecao, e escrita local que nao cria
  *  commits, nao reescreve historia e nao publica. **Tudo o que nao esta aqui e negado.**
@@ -74,13 +82,49 @@ const SEGUROS = new Set([
 /** Chaves de `git config` cuja ESCRITA e execucao de codigo ou desliga uma rede de
  *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `AP6`): e uma lista
  *  fechada de chaves que o proprio git documenta como executaveis. */
-const CHAVES_PERIGOSAS =
-  /^(?:core\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor|gitProxy)|sequence\.editor|credential\.helper|diff\.external|filter\..+\.(?:clean|smudge|process)|uploadpack\.packObjectsHook|alias\..+|protocol\..+\.allow|http\.proxy|url\..+\.insteadOf|pager\..+|(?:diff|merge)tool\..+\.cmd|gpg(?:\..+)?\.program|include\.path|includeIf\..+\.path|ssh\.variant)$/i;
+const CHAVES_PERIGOSAS = new RegExp(
+  "^(?:" +
+    [
+      // Chaves nomeadas que executam um comando.
+      "core\\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor|gitProxy|alternateRefsCommand)",
+      "sequence\\.editor", "http\\.proxy", "ssh\\.variant", "init\\.templateDir",
+      "uploadpack\\.packObjectsHook", "instaweb\\.httpd",
+      // Familias inteiras. A versao anterior tinha `credential.helper` LITERAL e deixava
+      // passar `credential.<url>.helper`, que e a forma documentada e a mais usada. O mesmo
+      // para `diff.external` vs `diff.<driver>.command`. Generalizar por SUFIXO fecha a
+      // familia em vez de perseguir nomes um a um.
+      "credential(?:\\..+)?\\.helper",
+      "(?:diff|merge)\\..+\\.(?:command|driver|textconv)",
+      "diff\\.external",
+      "filter\\..+\\.(?:clean|smudge|process)",
+      "gpg(?:\\..+)?\\.program",
+      "(?:pager|man|browser|trailer|guitool)\\..+",
+      "alias\\..+", "protocol\\..+\\.allow", "url\\..+\\.insteadOf",
+      "include\\.path", "includeIf\\..+\\.path",
+      // Rede final: qualquer chave que TERMINE num sufixo de execucao. E o que apanha o
+      // proximo nome que o git inventar, em vez de esperar por outra auditoria.
+      ".*\\.(?:cmd|command|program|driver|helper|hook|hooksPath)",
+    ].join("|") +
+    ")$",
+  "i"
+);
 
 const FORMAS_INSEGURAS = {
   switch: /^(?:-C|--force|--discard-changes)$/,
-  branch: /^(?:-f|--force|-[dD]|--delete|-[mMcC]|--move|--copy)$/,
+  // `-c`/`-C` COPIAM um branch (`git branch -c antigo novo`) — nao destroem nada e sao a
+  // forma normal de duplicar. Ficam de fora; `-m`/`-M` (mover/renomear) continuam, porque
+  // renomear um branch protegido fa-lo desaparecer.
+  branch: /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/,
   tag: /^(?:-d|--delete|-f|--force)$/,
+  // `symbolic-ref` LE o HEAD com um argumento e ESCREVE-O com dois. E a forma que permitia
+  // `git symbolic-ref HEAD refs/heads/MAIN` seguido de `git commit` — medido a fazer `main`
+  // avancar com o guarda a dizer `allow` nos dois passos, porque `PROTEGIDOS` comparava por
+  // igualdade exacta e num filesystem case-insensitive `MAIN` **e** `main`.
+  // Como predicado: `git symbolic-ref HEAD` (leitura) passa; com valor, ou com `-d`, nao.
+  "symbolic-ref": (args) => {
+    if (args.some((a) => /^(?:-d|--delete)$/.test(a))) return true;
+    return args.filter((a) => !a.startsWith("-")).length >= 2;
+  },
   // `config` e um verbo de LEITURA seguro, mas escrever certas chaves e execucao de codigo
   // ou desligar a propria rede: `core.hooksPath /dev/null` mata o `.githooks/commit-msg`
   // (a rede anti-atribuicao-a-IA deste repo), e `core.pager`/`credential.helper`/
@@ -90,7 +134,18 @@ const FORMAS_INSEGURAS = {
   config: (args) => {
     const flagsDestrutivas = /^(?:--unset|--unset-all|--remove-section|--rename-section|--replace-all|-e|--edit)$/;
     if (args.some((a) => flagsDestrutivas.test(a))) return true;
-    const posicionais = args.filter((a) => !a.startsWith("-"));
+    // As flags que CONSOMEM o argumento seguinte: sem as saltar, o valor de `--file` virava
+    // `posicionais[0]` e `CHAVES_PERIGOSAS` testava `.git/config` em vez da chave. Medido a
+    // escrever `core.hooksPath` de facto — a mesma chave que a tabela ja dava por fechada.
+    const FLAGS_COM_VALOR = /^(?:--file|-f|--blob|--default|--type|-t)$/;
+    const posicionais = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i].startsWith("-")) {
+        if (FLAGS_COM_VALOR.test(args[i])) i++;
+        continue;
+      }
+      posicionais.push(args[i]);
+    }
     if (posicionais.length === 0) return false;
 
     // O git 2.46 acrescentou sub-comandos (`git config set|unset|get|list|edit ...`). A
@@ -113,9 +168,13 @@ const FORMAS_INSEGURAS = {
   // `fetch` com refspec escreve refs locais (`git fetch . HEAD:master`). Como PREDICADO e nao
   // regex, para excluir primeiro os `:` que sao de URL — senao `git fetch https://x/y main` e
   // `git fetch git@host:o/r.git` eram negados, tres falsos positivos medidos.
+  // `+refs/heads/main:refs/remotes/origin/main` escreve um ref REMOTE-TRACKING, que e o que
+  // um fetch normal faz — nao toca em `refs/heads/`. Negar isto bloqueava um fetch explicito,
+  // que e trabalho legitimo e frequente.
   fetch: (args) =>
     args.some(
       (a) =>
+        !/:refs\/remotes\//.test(a) &&
         !/^[a-z][a-z0-9+.-]*:\/\//i.test(a) && !/^[^/\s]+@[^:\s]+:/.test(a) && (a.includes(":") || a.startsWith("+"))
     ),
 };
@@ -171,8 +230,13 @@ const FORMA_EXIGIDA = {
   pull: (args) => args.includes("--ff-only"),
   push: (args) => {
     // (a) So tags: e o procedimento de release, que corre em `main`.
+    //
+    // `--follow-tags` SAIU daqui: nao e `--tags`. Publica o refspec normal **mais** as tags
+    // anotadas, logo publica o branch atual — medido com `--dry-run --porcelain` contra um
+    // remoto real, a enviar um commit de `main` que ninguem reviu. Tratar os dois como
+    // equivalentes permitia exactamente o que este guarda existe para impedir.
     const soTags =
-      (args.includes("--tags") || args.includes("--follow-tags")) &&
+      args.includes("--tags") &&
       args.filter((a) => !a.startsWith("-")).length <= 1 && // no maximo o nome do remoto
       !args.some((a) => a.includes(":"));
     if (soTags) return true;
@@ -194,7 +258,7 @@ const FORMA_EXIGIDA = {
     const temDelete = args.some((a) => a === "--delete" || /^-[a-zA-Z]*d[a-zA-Z]*$/.test(a));
     const todosApagam = refs.length > 0 && refs.every((r) => temDelete || r.startsWith(":"));
     if (!todosApagam) return false;
-    return !refsApagados(args).some((r) => PROTEGIDOS.has(r));
+    return !refsApagados(args).some((r) => ehProtegido(r));
   },
 };
 
@@ -250,6 +314,13 @@ const OPACO = "\u0000opaco\u0000";
 
 /** O indice `i` cai dentro de um par de aspas ainda aberto? Varre do inicio, porque o estado
  *  de aspas nao e local. Uma barra invertida escapa o caractere seguinte. */
+/** A primeira palavra do texto e um wrapper que volta a interpretar o que recebe? Se sim, o
+ *  que esta dentro de aspas E codigo e tem de partir; se nao, e um argumento literal. */
+function comandoOpaco(txt) {
+  const primeira = (txt.trim().split(/\s+/)[0] ?? "").replace(/["'\\]/g, "").replace(/^.*\//, "");
+  return WRAPPERS_OPACOS.has(primeira);
+}
+
 function dentroDeAspas(txt, i) {
   let aspa = null;
   for (let k = 0; k < i; k++) {
@@ -296,7 +367,13 @@ function segmentos(texto) {
       // `python3 -c "print('git push --force')"` serem NEGADOS, sem branch nenhum onde
       // passassem (o force-push e avaliado antes do branch). Medido: bloqueou duas chamadas
       // legitimas de um revisor. Negar trabalho legitimo custa tanto como deixar passar.
-      .replace(/[;&|\n]+/g, "\n")
+      // `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o comando que
+      // as abre nao e um wrapper opaco. `eval "a; git commit"` tem de partir (o shell volta a
+      // interpretar a string); `echo "a; git push --force"` e
+      // `rg "build && git push --force" docs/` nao — ali o texto e um ARGUMENTO, nunca corre,
+      // e nega-los bloqueia trabalho de leitura. Medido tres vezes numa so sessao, incluindo
+      // um `grep` cuja string de pesquisa citava um comando.
+      .replace(/[;&|\n]+/g, (m, i, txt) => (dentroDeAspas(txt, i) && !comandoOpaco(txt) ? m : "\n"))
       .replace(/[(){}]/g, (m, i, txt) => (dentroDeAspas(txt, i) ? m : "\n"))
       .split("\n")
       .map((seg) => seg.trim())
@@ -313,6 +390,7 @@ function invocacoes(texto) {
     let toks = seg.split(/\s+/).map(limpo).filter(Boolean);
     // Consumir wrappers, palavras-chave de shell, flags e atribuicoes ate ao comando real.
     let viuWrapper = false;
+    let viuWrapperOpaco = false;
     let anteriorEraFlag = false;
     for (;;) {
       const t = toks[0];
@@ -324,8 +402,27 @@ function invocacoes(texto) {
       // tabela de bypasses apanhou no momento em que eu as introduzi.
       if (base === "git") break;
       if (/^\w+=/.test(t) || t.startsWith("-")) { toks = toks.slice(1); anteriorEraFlag = true; continue; }
+      // O VALOR de uma atribuicao com espacos: `GIT_AUTHOR_DATE="2020-01-01 00:00" git commit`
+      // parte-se em tokens e o `00:00` nao e atribuicao, nem flag, nem wrapper — o ciclo
+      // quebrava ali e a invocacao do git nunca era vista. Medido a passar, e nao e ofuscacao:
+      // e a forma normal de escrever. Depois de uma atribuicao, o token seguinte so continua o
+      // valor se **nao** houver `=` nele e ainda nao tivermos chegado ao `git`.
+      if (anteriorEraFlag && !t.includes("=") && !WRAPPERS.has(base) && !PALAVRAS_SHELL.has(t)) {
+        toks = toks.slice(1);
+        // Repor: consome-se **um** token de valor, nao uma cadeia. Sem isto, `sudo -u me echo
+        // git commit` engolia tambem o `echo` e passava a ser lido como uma invocacao do git —
+        // um falso positivo que a tabela `LEGITIMOS` apanhou no momento em que o introduzi.
+        anteriorEraFlag = false;
+        continue;
+      }
       if (PALAVRAS_SHELL.has(t)) { toks = toks.slice(1); anteriorEraFlag = false; continue; }
-      if (WRAPPERS.has(base)) { toks = toks.slice(1); viuWrapper = true; anteriorEraFlag = false; continue; }
+      if (WRAPPERS.has(base)) {
+        toks = toks.slice(1);
+        viuWrapper = true;
+        if (WRAPPERS_OPACOS.has(base)) viuWrapperOpaco = true;
+        anteriorEraFlag = false;
+        continue;
+      }
       // O valor de uma opcao de wrapper nem sempre e um numero: `sudo -u me git commit`,
       // `env -u VAR git commit`, `timeout -s KILL 5 git push`, `xargs -d '\n' git commit`.
       // A versao anterior so aceitava `\d+[smhd]?`, logo o token parava o varrimento e a
@@ -346,7 +443,7 @@ function invocacoes(texto) {
       const f = toks[i].split("=")[0];
       i += GIT_FLAGS_COM_VALOR.has(f) && !toks[i].includes("=") ? 2 : 1;
     }
-    out.push({ verbo: i < toks.length ? toks[i] : null, args: toks.slice(i + 1), seg, viaWrapper: viuWrapper });
+    out.push({ verbo: i < toks.length ? toks[i] : null, args: toks.slice(i + 1), seg, viaWrapper: viuWrapper, viaWrapperOpaco: viuWrapperOpaco });
   }
   return out;
 }
@@ -374,7 +471,7 @@ function eForce(inv) {
   ) {
     return true;
   }
-  return refsApagados(args).some((r) => PROTEGIDOS.has(r));
+  return refsApagados(args).some((r) => ehProtegido(r));
 }
 
 /** Refs que um `git push` apagaria: `--delete` (**global**: apaga TODOS os refs listados,
@@ -403,10 +500,18 @@ function refsApagados(args) {
 
 /** Sem verbo identificavel: `git`, `git --version`, `git --help` nao fazem nada e negar isso
  *  e ruido; qualquer outra coisa (`git $VERBO`) **nao** e segura — e a parte que falha fechada. */
+/** Wrappers cujo comando NAO esta visivel no texto: vem do stdin (`xargs`) ou de uma string
+ *  que o shell volta a interpretar (`eval`, `sh -c`). Para estes, o que se ve nao e o que
+ *  corre, logo falha fechado. Os outros (`env`, `timeout`, `sudo`, `command`, `nice`) passam
+ *  o comando como ARGUMENTOS — o texto e fiavel e `env git --version` nao esconde nada. */
+const WRAPPERS_OPACOS = new Set(["xargs", "eval", "sh", "bash", "zsh", "dash", "ksh", "ssh", "su", "doas"]);
+
 function semVerboEInofensivo(inv) {
-  // `echo commit | xargs git` chega aqui sem verbo — mas o verbo vem do stdin, logo nao ha
-  // nada de inofensivo nisso. So um `git` escrito diretamente pode ser inofensivo.
-  if (inv.viaWrapper) return false;
+  // `echo commit | xargs git` chega aqui sem verbo — o verbo vem do stdin, logo nao ha nada
+  // de inofensivo nisso. Mas `env git --version` e `timeout 5 git --version` eram negados
+  // pela mesma regra, e negar `git --version` nao protege nada: so treina quem o le a
+  // contornar o guarda. A distincao e se o wrapper esconde o comando ou nao.
+  if (inv.viaWrapperOpaco) return false;
   const resto = inv.seg.replace(/^[\s\S]*?(?:^|\/|\s)git(?![\w.-])/, "").trim();
   return resto === "" || /^(?:--version|--help|-h)$/.test(resto);
 }
@@ -419,6 +524,11 @@ function seguro(inv) {
     const flags = normalizaFlags(inv.args);
     return flags.includes("-b") && !flags.includes("-B");
   }
+  // Verbos de INSPECAO pura: nao escrevem nada, em nenhuma forma. `command -v git`,
+  // `env git --version`, `timeout 5 git --version` eram NEGADOS porque `viaWrapper` fecha a
+  // porta a tudo — e negar `git --version` nao protege nada. Estes passam mesmo via wrapper.
+  const INSPECAO_PURA = /^(?:--version|version|--help|help)$/;
+  if (INSPECAO_PURA.test(inv.verbo) && !inv.viaWrapperOpaco) return true;
   if (!SEGUROS.has(inv.verbo)) return false;
   const exigida = FORMA_EXIGIDA[inv.verbo];
   if (exigida) return exigida(inv.args);
@@ -541,7 +651,7 @@ try {
 
   for (const dir of diretorios(texto, payload?.cwd)) {
     const br = branchDe(dir);
-    if (br && PROTEGIDOS.has(br)) {
+    if (ehProtegido(br)) {
       const v = perigosas.map((p) => p.verbo ?? "(nao identificado)").join(", ");
       negar(
         `\`${br}\` e um branch protegido (${dir}) e \`git ${v}\` nao esta na lista de verbos ` +

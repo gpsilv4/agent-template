@@ -213,7 +213,7 @@ test("config: apagar um step de teste do CI faz a contagem descer", (dir) => {
     "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
   commit(dir, "apagar um step");
   return ref;
-}, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+}, { code: 1, includes: ["steps de verificacao no CI: 2 -> 1"] });
 
 test("config: apagar um par da varredura faz a contagem descer", (dir) => {
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
@@ -317,7 +317,7 @@ test("workflow COM steps de teste continua a ser medido por contagem", (dir) => 
   writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
   commit(dir, "apagar um");
   return ref;
-}, { code: 1, includes: ["steps de teste no CI: 2 -> 1"] });
+}, { code: 1, includes: ["steps de verificacao no CI: 2 -> 1"] });
 
 // --- As formas que nao movem nenhuma contagem obvia ---------------------------
 // Movidas para `tests-surface-marks.mjs`: sao as mais numerosas e passavam este ficheiro do

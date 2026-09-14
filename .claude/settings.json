@@ -81,6 +81,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-context.mjs\""
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/reinject-fronteiras.mjs\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -89,16 +98,6 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-verify.mjs\""
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/precompact-reinject.mjs\""
           }
         ]
       }

@@ -192,6 +192,35 @@ export function registar() {
     return ref;
   }, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
 
+  test("assercao VACUA (`includes: [\"\"]`) conta como enfraquecimento", (dir) => {
+    // A chave-mestra. `[^\\]]` exigia array nao-vazio e `[""]` e nao-vazio: trocar cada
+    // assercao por `[""]` deixava 196/196 e 227/227 verdes com **tudo** vacuo
+    // (`.includes("")` e sempre verdadeiro) e as contagens intactas. Com ela aberta, qualquer
+    // outro enfraquecimento ficava barato de esconder.
+    writeFileSync(join(dir, "tests/a.test.js"),
+      'test("a", null, { includes: ["mensagem real"] });\ntest("b", null, { includes: ["outra"] });\n');
+    commit(dir, "assercoes reais");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, "tests/a.test.js"),
+      'test("a", null, { includes: [""] });\ntest("b", null, { includes: [""] });\n');
+    commit(dir, "esvaziar por dentro");
+    return ref;
+  }, { code: 1, includes: ["assercoes (includes/excludes): 2 -> 0"] });
+
+  test("apagar um step que APLICA um guard no CI e enfraquecimento", (dir) => {
+    // `\\S*test` so via os steps que TESTAM; apagar o `check-doc-versions` do `ci.yml`
+    // — que e o que APLICA os guards — passava sem a superficie reagir.
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, ".github/workflows/ci.yml"),
+      "jobs:\n  g:\n    steps:\n      - run: node a-test.mjs\n      - run: node check-doc-versions.mjs\n");
+    commit(dir, "ci com teste e guard aplicado");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, ".github/workflows/ci.yml"),
+      "jobs:\n  g:\n    steps:\n      - run: node a-test.mjs\n");
+    commit(dir, "apagar o guard aplicado");
+    return ref;
+  }, { code: 1, includes: ["steps de verificacao no CI: 2 -> 1"] });
+
   test("apagar o registo de suites por descoberta e enfraquecimento", (dir) => {
     // AP4, invariante 2. A descoberta em disco (`lib/registo.mjs`) substituiu as chamadas
     // manuais a cada `tests-*.mjs`, mas a propria chamada a descoberta continua a ser uma

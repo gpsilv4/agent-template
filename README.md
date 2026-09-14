@@ -206,8 +206,8 @@ git commit -m "chore: bootstrap agent config"
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
 │   ├── prompt-fase0.mjs            <- UserPromptSubmit: reminds of Fase 0 when the
 │   │                                  prompt looks like an order to implement
-│   ├── precompact-reinject.mjs     <- PreCompact: re-injects the Fronteiras block before
-│   │                                  compaction drops the imported rules from context
+│   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
+│   │                                  block AFTER compaction dropped the imported rules
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)

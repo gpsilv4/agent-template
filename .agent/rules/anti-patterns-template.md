@@ -16,15 +16,6 @@
 > dizendo quais. Nao as substituas pelas tuas: acrescenta as tuas em
 > `.agent/rules/anti-patterns.md`, com o proximo ID livre.
 
-## AP1 — `useEffect` para data fetching
-
-- **Origem**: B3 (dados desatualizados apos navegacao)
-- **Anti-padrao**: `useEffect(() => { fetch(...).then(setState) }, [])` para dados do backend.
-- **Correto**: usar o data-fetching layer do projeto (<state-management>) com cache + invalidacao.
-- **Detecao em review**: `grep -rn "useEffect" src/ | grep -i "fetch\|setState"`
-
--->
-
 ## AP1 — Teste cuja assercao e satisfeita por outra verificacao
 
 - **Origem**: cinco rondas de review a este template, sempre a mesma classe.
