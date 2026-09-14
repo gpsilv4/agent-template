@@ -13,14 +13,12 @@
  *   node .agent/scripts/test-guards.mjs
  */
 
-import { mkdirSync, rmSync, writeFileSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado } from "./test-harness.mjs";
-import { registar as registarSettings } from "./tests-settings.mjs";
-import { registar as registarDerivedCounts } from "./tests-derived-counts.mjs";
-import { registar as registarPlaceholders } from "./tests-placeholders.mjs";
-import { registar as registarAntiPatterns } from "./tests-anti-patterns.mjs";
-import { registar as registarBudgets } from "./tests-budgets.mjs";
+import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./test-harness.mjs";
+import { registaDescobertos, resumoDescoberta } from "./lib/registo.mjs";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 // --- Baseline -----------------------------------------------------------------
 // Estes dois nao usam `test()`: correm contra a fixture sintetica, nao contra o repo.
@@ -244,7 +242,7 @@ test("G7: workflow sem colisao de nome continua a ser apanhado", (dir) => {
   const base = ["# Entry", "", "@.agent/rules/core-rules.md", "", "| W | F |", "|---|---|",
     ...listWorkflowRows(dir)].join("\n") + "\n";
   writeF(dir, "CLAUDE.md", base);
-  writeF(dir, "GEMINI.md", base.replace(/^@(.*)$/gm, "@[$1]"));
+  writeF(dir, "GEMINI.md", base.replace(/^@(.*)$/gm, "@./$1"));
   for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, ".agent/workflows/debug.md");
 }, { code: 1, includes: ['Workflow "debug" nao listado'] });
 
@@ -306,11 +304,19 @@ test("crlf: o guard passa num clone com line endings do Windows", (dir) => {
                    ".agent/rules/core-rules.md", ".agent/rules/process-rules.md",
                    ".agent/rules/anti-patterns.md", ".agent/rules/sync-docs.md",
                    ".agent/rules/ticket-method.md", "src/docs/agent-guide.md"]) {
-    try { paraCrlf(p); } catch { /* nao existe nesta fixture */ }
+    // Engolir SO o ficheiro ausente. A versao anterior tinha um `catch {}` mudo e o
+    // `readFileSync` nao estava importado: as 10 iteracoes lancavam `ReferenceError`, o
+    // catch comia-os, e o teste passava por a fixture ficar IDENTICA ao baseline. A receita
+    // de deteccao que o AP2 prescreve ("correr cada verificador num clone com CRLF") esteve
+    // por verificar desde que foi escrita.
+    try {
+      paraCrlf(p);
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+    }
   }
 }, { code: 0, excludes: ["  WARN  "] });
 
-registarSettings();
 
 // --- Ficheiros em branco: "existe mas vazio" != "ausente" ---------------------
 test("blank: AGENTS.md vazio nao passa a verde", (dir) => {
@@ -402,7 +408,7 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
     ...listWorkflowRows(dir),
   ].join("\n") + "\n";
   writeF(dir, "CLAUDE.md", md);
-  writeF(dir, "GEMINI.md", md.replace(/^@(.*)$/gm, "@[$1]"));
+  writeF(dir, "GEMINI.md", md.replace(/^@(.*)$/gm, "@./$1"));
 }, {
   code: 0,
   synthetic: true, // a contagem depende de `business-logic.md` nao existir
@@ -410,9 +416,11 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
 });
 
 
-registarDerivedCounts();
-registarPlaceholders();
-registarAntiPatterns();
-registarBudgets();
+// AP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
+console.log(resumoDescoberta(await registaDescobertos({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  entryPoint: "test-guards.mjs",
+  contagem,
+})));
 
 resumo();

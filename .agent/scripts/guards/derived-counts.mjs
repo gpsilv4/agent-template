@@ -36,7 +36,7 @@ function ficheirosComProsa(listDir) {
 
 /** Guards 12 e 12c: numeros citados em prosa recalculados a partir da fonte.
  *  @returns {number} guards executados */
-export function guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir }) {
+export function guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir, ehDerivado }) {
   let guardsRun = 0;
 
 // --- Guard 12: o tamanho da checklist de sync-docs e dado DERIVADO ---
@@ -206,7 +206,17 @@ if (metodo) {
       // Os guards 12b e 12c tem este ramo; o 12d nao tinha, logo apagar a citacao fazia o
       // guard passar em silencio — sem OK e sem WARN — enquanto `guardsRun` continuava a
       // contar. Um guard que nao verifica nada tem de o dizer.
-      warn("nenhum ficheiro cita o numero de guards numerados — a referencia desapareceu?");
+      //
+      // MAS: num projeto DERIVADO nao ha citacao nenhuma para desaparecer. As unicas do
+      // template vivem no `BOOTSTRAP.md` (que o bootstrap manda apagar) e no `README.md`
+      // (que manda substituir) — logo este ramo reprovava TODOS os consumidores no primeiro
+      // PR, por terem seguido a documentacao. Medido. A distincao certa e entre "a citacao
+      // foi removida do template" (defeito) e "este projeto nunca teve uma" (normal).
+      if (ehDerivado()) {
+        skip("Guard 12d (N guards numerados) — projeto derivado sem citacao propria");
+      } else {
+        warn("nenhum ficheiro cita o numero de guards numerados — a referencia desapareceu?");
+      }
     } else if (mal === 0) {
       ok(`${cit} citacao(oes) de "N guards numerados" coerentes com ${numerados.size}`);
     }
@@ -236,8 +246,12 @@ if (metodo) {
         }
       }
     }
-    if (cit === 0) warn("nenhum ficheiro cita o numero de workflows — a referencia desapareceu?");
-    else if (mal === 0) ok(`${cit} citacao(oes) de "N workflows/comandos" coerentes com ${nWorkflows}`);
+    if (cit === 0) {
+      // Mesma razao do 12d: num derivado a citacao nunca existiu, e reprovar por isso
+      // partia o CI de quem seguiu o bootstrap a letra.
+      if (ehDerivado()) skip("Guard 12e (N workflows) — projeto derivado sem citacao propria");
+      else warn("nenhum ficheiro cita o numero de workflows — a referencia desapareceu?");
+    } else if (mal === 0) ok(`${cit} citacao(oes) de "N workflows/comandos" coerentes com ${nWorkflows}`);
   }
   guardsRun++;
 

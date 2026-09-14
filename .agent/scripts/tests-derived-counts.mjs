@@ -24,6 +24,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-guards.mjs";
+
 export function registar() {
 // --- Guard 12: a contagem da checklist como dado derivado ---------------------
 // Quatro sitios de aviso, um teste por sitio. O guard nasceu porque a checklist cresceu
@@ -156,12 +161,20 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // --- 12d: contagem de guards numerados ------------------------------------
   // Terceira instancia do padrao: o BOOTSTRAP.md dizia "11 guards numerados" com 14 a
   // existir. Sem rede, um numero a mao envelhece na primeira alteracao.
+  // AP3: a fixture ESCREVE o ficheiro de que a assercao depende, em vez de o ler do repo.
+  // A versao anterior fazia `readF(dir, ".agent/BOOTSTRAP.md")` — que so existe enquanto o
+  // bootstrap nao correu. Num projeto derivado (onde o BOOTSTRAP.md foi apagado e o
+  // README.md substituido, como a propria documentacao manda) estes quatro testes davam
+  // `setup rebentou: ENOENT` e o CI nascia vermelho. Medido.
   test("G12d: citacao desatualizada de 'N guards numerados' avisa", (dir) => {
-    writeF(dir, ".agent/BOOTSTRAP.md",
-      readF(dir, ".agent/BOOTSTRAP.md").replace(/\d+ guards numerados/, "3 guards numerados"));
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nO checker corre 3 guards numerados.\n");
   }, { code: 1, includes: ['diz "3 guards numerados" mas existem'] });
 
   test("G12d: guard novo sem atualizar a prosa avisa", (dir) => {
+    // A fixture monta a CITACAO de que a assercao depende, alem do guard novo. Sem isto o
+    // teste so passava enquanto o `BOOTSTRAP.md` do repo citasse o numero — falso em
+    // qualquer projeto derivado, onde a citacao foi apagada com o ficheiro (AP3).
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nO checker corre 1 guards numerados.\n");
     writeF(dir, ".agent/scripts/guards/settings.mjs",
       readF(dir, ".agent/scripts/guards/settings.mjs") + "\n// --- Guard 99: inventado ---\n");
   }, { code: 1, includes: ["guards numerados\" mas existem"] });
@@ -188,22 +201,23 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // Os guards 12b/12c avisam quando `citacoes === 0`; o 12d nao tinha esse ramo, logo
   // apagar a citacao fazia-o passar em silencio — sem OK e sem WARN — enquanto `guardsRun`
   // continuava a conta-lo. Achado da Fase 4.
-  test("G12d: citacao do numero de guards apagada avisa", (dir) => {
-    writeF(dir, ".agent/BOOTSTRAP.md",
-      readF(dir, ".agent/BOOTSTRAP.md").replace(/\d+ guards numerados/, "muitos guards"));
+  test("G12d: citacao do numero de guards apagada avisa (no TEMPLATE)", (dir) => {
+    // O BOOTSTRAP.md fica SEM a frase — e continua a existir, logo isto e o template e nao
+    // um derivado. A distincao importa: num derivado a ausencia de citacao e normal e o
+    // guard tem de saltar, nao avisar. O teste irmao abaixo fixa esse outro lado.
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem citacoes de contagens.\n");
   }, { code: 1, includes: ["nenhum ficheiro cita o numero de guards numerados"] });
 
   // --- 12e: contagem de workflows/comandos ----------------------------------
   // Quarta instancia do padrao: "11 workflows" e "11 commands" ficaram atras quando o
   // /upgrade fez 12. O numero ja estava calculado nos guards 6/7/9, so nao era comparado.
   test("G12e: citacao desatualizada do numero de workflows avisa", (dir) => {
-    writeF(dir, "README.md", readF(dir, "README.md") + "\n\nO template traz 99 workflows.\n");
+    writeF(dir, "README.md", "# Projeto\n\nO template traz 99 workflows.\n");
   }, { code: 1, includes: ['diz "99 workflows" mas existem'] });
 
-  test("G12e: citacao apagada avisa", (dir) => {
-    for (const f of ["README.md", ".agent/BOOTSTRAP.md"]) {
-      writeF(dir, f, readF(dir, f).replace(/(\d+)\s+(workflows|comandos|commands)\b/gi, "os workflows"));
-    }
+  test("G12e: citacao apagada avisa (no TEMPLATE)", (dir) => {
+    writeF(dir, "README.md", "# Projeto\n\nSem contagens.\n");
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem contagens.\n");
   }, { code: 1, includes: ["nenhum ficheiro cita o numero de workflows"] });
 
   test("G12e: pasta de workflows vazia avisa", (dir) => {

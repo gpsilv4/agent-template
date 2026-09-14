@@ -20,7 +20,20 @@
  * Nao citar numeros de anti-padrao concretos aqui, ou o guard reprova-se a si mesmo.
  */
 
-export const AP_FILE = ".agent/rules/anti-patterns.md";
+/** Os DOIS ficheiros onde vivem definicoes de anti-padroes.
+ *
+ *  O `anti-patterns.md` e sempre-carregado e e onde o PROJETO escreve os seus; o
+ *  `anti-patterns-template.md` guarda os que vieram do template (nao carregado, lido
+ *  on-demand). A separacao existe por orcamento de contexto: as entradas do template sao
+ *  sobre a maquinaria dele e custavam 24% do contexto de cada sessao a todos os derivados.
+ *
+ *  Contar os dois e obrigatorio: dezenas de ficheiros citam `AP1`..`AP7`, e olhar so para o
+ *  primeiro ficheiro dava essas citacoes como MORTAS — o guard passaria a reprovar o repo
+ *  inteiro pela sua propria arrumacao. */
+export const AP_FILES = [".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"];
+
+/** O ficheiro sempre-carregado, onde o projeto acrescenta os seus. */
+export const AP_FILE = AP_FILES[0];
 
 /** Comentarios HTML fora. Os `\n` sao PRESERVADOS (o corpo do comentario vira espacos, nao
  *  desaparece): os avisos deste guard citam o numero de linha, e um `replace(…, "")`
@@ -74,15 +87,16 @@ function alvosDe(listDir) {
  * @returns {number} guards executados
  */
 export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
-  const ap = read(AP_FILE);
-  if (ap === null) {
-    skip(`Guard 15 (referencias a anti-padroes) — sem ${AP_FILE}`);
+  const conteudos = AP_FILES.map((f) => [f, read(f)]).filter(([, c]) => c !== null);
+  if (conteudos.length === 0) {
+    skip(`Guard 15 (referencias a anti-padroes) — sem ${AP_FILES.join(" nem ")}`);
     return 0;
   }
 
   // O exemplo ilustrativo do template esta dentro de `<!-- -->` e nao e uma definicao.
+  // A UNIAO dos dois ficheiros: uma citacao resolve se a entrada existir em qualquer um.
   const existentes = new Set(
-    [...semHtml(ap).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1])
+    conteudos.flatMap(([, c]) => [...semHtml(c).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]))
   );
 
   let citacoes = 0;
@@ -114,12 +128,12 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
       // Sem esta linha o ramo do "ninguem cita" era inalcancavel em QUALQUER projeto, e nao
       // so neste: cada definicao contribuia com a sua propria linha para a contagem, logo
       // `citacoes >= existentes.size` sempre.
-      if (alvo === AP_FILE && CABECALHO_AP.test(linha)) return;
+      if (AP_FILES.includes(alvo) && CABECALHO_AP.test(linha)) return;
       for (const m of linha.matchAll(/\bAP(\d+)\b/g)) {
         citacoes++;
         if (!ehCodigo(alvo)) citacoesDoc++;
         if (!existentes.has(m[1])) {
-          warn(`${alvo}:${i + 1}: cita AP${m[1]}, que nao existe em anti-patterns.md`);
+          warn(`${alvo}:${i + 1}: cita AP${m[1]}, que nao existe em nenhum dos ficheiros de anti-padroes`);
           mortas++;
         }
       }

@@ -20,22 +20,22 @@ Stack: {{STACK}}.
 
 ## Regras (carregar sempre)
 
-@[.agent/rules/core-rules.md]
-@[.agent/rules/process-rules.md]
-@[.agent/rules/anti-patterns.md]
-@[.agent/rules/business-logic.md]
-@[.agent/rules/pages-architecture.md]
+@./.agent/rules/core-rules.md
+@./.agent/rules/process-rules.md
+@./.agent/rules/anti-patterns.md
+@./.agent/rules/business-logic.md
+@./.agent/rules/pages-architecture.md
 
 ---
 
 ## Estado atual e decisoes
 
-@[.agent/context/session.md]
-@[.agent/context/decisions.md]
-@[.agent/context/task.md]
-@[.agent/context/walkthrough.md]
-@[.agent/context/implementation_plan.md]
-@[.agent/context/backlog.md]
+@./.agent/context/session.md
+@./.agent/context/decisions.md
+@./.agent/context/task.md
+@./.agent/context/walkthrough.md
+@./.agent/context/implementation_plan.md
+@./.agent/context/backlog.md
 
 > Nota: `.agent/context/backlog-archive.md` (items fechados + sprints fechados) e **deliberadamente NAO importado** aqui, para manter o contexto enxuto. Ler on-demand quando necessario (ex: confirmar unicidade de IDs).
 

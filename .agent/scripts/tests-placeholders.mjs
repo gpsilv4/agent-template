@@ -25,10 +25,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // derivado e estas asserções passariam a esperar "VALOR". Achado a simular o bootstrap.
 const ph = (nome) => "{" + "{" + nome + "}" + "}";
 
-/** Simula um bootstrap CONCLUIDO: cria o `business-logic.md` (o sinal que o guard procura)
- *  e substitui TODOS os `{{...}}` em toda a fixture. Substituir so num punhado de ficheiros
- *  deixava 40+ a avisar, e o teste falhava por a fixture estar a meio bootstrap em vez de
- *  pelo que queria afirmar. */
+/** Simula um bootstrap CONCLUIDO: escreve o `.agent/.template-version` (o marcador que o
+ *  `ehDerivado()` procura) e substitui TODOS os `{{...}}` em toda a fixture. Substituir so
+ *  num punhado de ficheiros deixava 40+ a avisar, e o teste falhava por a fixture estar a
+ *  meio bootstrap em vez de pelo que queria afirmar.
+ *
+ *  O marcador mudou de `business-logic.md` para `.template-version`: aquela rule e um
+ *  artefacto de DOMINIO que uma CLI ou uma lib nao geram, logo um meio-bootstrap desligava
+ *  o Guard 13 para sempre. Ver o cabecalho de `guards/placeholders.mjs`. */
 const bootstrapado = (dir) => {
   const anda = (rel) => {
     for (const e of readdirSync(join(dir, rel), { withFileTypes: true })) {
@@ -45,23 +49,37 @@ const bootstrapado = (dir) => {
     }
   };
   anda("");
-  writeF(dir, ".agent/rules/business-logic.md", "# Regras de negocio\n\nGerado no bootstrap.\n");
+  writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
 };
+
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-guards.mjs";
 
 export function registar() {
   // --- Guard 13: placeholders esquecidos -------------------------------------
-  // O teste controla a sua PROPRIA pre-condicao: apaga o `business-logic.md` da fixture.
-  // A versao anterior passava `null` como mutacao e assumia que o ficheiro nao existia —
-  // verdade no template nu, **falsa em qualquer projeto derivado**, onde o bootstrap o gera.
-  // Resultado: a suite passava aqui e falhava no primeiro dia de cada consumidor. Um teste
-  // que depende do ambiente em vez de o montar nao esta a afirmar o que diz.
+  // O teste controla a sua PROPRIA pre-condicao: garante que o marcador de bootstrap NAO
+  // existe. A versao anterior passava `null` como mutacao e assumia o estado do repo —
+  // verdade no template nu, **falsa em qualquer projeto derivado**. Resultado: a suite
+  // passava aqui e falhava no primeiro dia de cada consumidor. Um teste que depende do
+  // ambiente em vez de o montar nao esta a afirmar o que diz.
   test("G13: sem bootstrap da SKIP visivel (placeholders sao esperados)", (dir) => {
+    // `ehDerivado()` tem DOIS sinais: o marcador presente, ou o `BOOTSTRAP.md` ausente. Para
+    // montar o estado "ainda nao houve bootstrap" e preciso negar os dois — apagar so o
+    // marcador deixava a fixture a depender de o repo ainda ter o `BOOTSTRAP.md`, que e
+    // falso em todo projeto derivado. Montar metade da pre-condicao e o AP3.
     try {
-      rmSync(file(dir, ".agent/rules/business-logic.md"));
+      rmSync(file(dir, ".agent/.template-version"));
     } catch {
-      /* no template nu ja nao existe — e o estado que este teste quer */
+      /* no template nu ainda nao existe — e o estado que este teste quer */
     }
   }, {
+    // `synthetic: true`: a fixture sintetica monta um `BOOTSTRAP.md` proprio, com as
+    // contagens DERIVADAS do que acabou de escrever. E o que fecha o segundo sinal do
+    // `ehDerivado()` sem escrever numeros a mao — escreve-los aqui fazia disparar os
+    // guards 12d/12e, que existem precisamente para apanhar numeros escritos a mao.
+    synthetic: true,
     code: 0,
     includes: ["SKIP  Guard 13 (placeholders) — bootstrap ainda nao correu"],
   });

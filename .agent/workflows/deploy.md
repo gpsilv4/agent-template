@@ -20,7 +20,13 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 1. Sincronizacao de Conhecimento (Docs Sync)
 
-- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (26 pontos)
+- [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (28 pontos)
+> **Excecao, no template de origem**: `src/docs/CHANGELOG.md` e os ficheiros de
+> `.agent/context/` ficam **deliberadamente vazios** — sao o estado inicial que cada projeto
+> derivado herda, e escrever historia do template neles daria a cada projeto novo um passado
+> que nao e o dele. **Num projeto derivado a regra vale por inteiro.** (A mesma nota vive em
+> `/review` §2; estava so la, e este ficheiro mandava o contrario.)
+
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` — sem WARN
 - [ ] **`.agent/context/session.md`** limpo — tarefas concluidas e proximos passos atualizados?
 - [ ] **Testes dos guards** passam (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs`)?

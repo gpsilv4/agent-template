@@ -20,6 +20,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-test-surface.mjs";
+
 export function registar() {
   // --- As formas que nao movem nenhuma contagem obvia ---------------------------
   // Achados de uma terceira leitura independente. Todos passavam com exit 0.
@@ -186,6 +191,22 @@ export function registar() {
     commit(dir, "desligar o veredicto");
     return ref;
   }, { code: 1, includes: ["condicao literalmente falsa", "contagem de falhas: 1 -> 0"] });
+
+  test("apagar o registo de suites por descoberta e enfraquecimento", (dir) => {
+    // AP4, invariante 2. A descoberta em disco (`lib/registo.mjs`) substituiu as chamadas
+    // manuais a cada `tests-*.mjs`, mas a propria chamada a descoberta continua a ser uma
+    // linha comentavel — e comenta-la faz o entry point correr so os testes inline, com
+    // exit 0. `zero: true`: o que se afirma e que a descoberta existe em ALGUM sitio, nao
+    // que o numero de entry points nunca desce.
+    writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"),
+      "await registaDescobertos({ dir, entryPoint: 'x', contagem });\nprocess.exit(1);\n");
+    commit(dir, "entry point com descoberta");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"),
+      "// await registaDescobertos({ dir, entryPoint: 'x', contagem });\nprocess.exit(1);\n");
+    commit(dir, "desligar a descoberta");
+    return ref;
+  }, { code: 1, includes: ["registo de suites por descoberta"] });
 
   test("consolidar varios `process.exit(1)` num helper NAO e enfraquecimento", (dir) => {
     // Medido num projeto derivado: contar ocorrencias penalizava um refactor legitimo (tres

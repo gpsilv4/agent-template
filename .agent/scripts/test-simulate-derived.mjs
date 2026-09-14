@@ -27,27 +27,28 @@ import { dirname, resolve, join } from "path";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SIMULADOR = join(ROOT, ".agent/scripts/simulate-derived.mjs");
 
-/** Os caminhos que o simulador tenta correr. Derivados do PROPRIO simulador, e nao escritos a
- *  mao: uma lista fixa aqui envelhecia no primeiro comando que o simulador acrescentasse, e os
- *  testes passavam a medir stubs que ele ja nao chama. */
-const COMANDOS = [...
-  execFileSync("node", ["-e", `
-    const s = require("fs").readFileSync(${JSON.stringify(SIMULADOR)}, "utf8");
-    const bloco = s.split("const COMANDOS = [")[1].split("];")[0];
-    process.stdout.write([...bloco.matchAll(/"([^"]+)"/g)].map((m) => m[1]).join("\\n"));
-  `], { encoding: "utf8" }).split("\n").filter(Boolean)];
+/** Os caminhos que o simulador tem de correr. **A fixture e que manda**: ela escreve um
+ *  `ci.yml` com estes comandos no job `guard-tests`, e o simulador tem de os DERIVAR de la.
+ *  Antes esta lista era extraida do codigo-fonte do simulador (um array literal); agora que a
+ *  lista dele vem do CI, isso seria medir a fixture contra si propria. Assim mede-se a
+ *  derivacao: se ela partir, estes testes ficam vermelhos. */
+const COMANDOS = [
+  ".agent/scripts/test-alfa.mjs",
+  ".agent/scripts/test-beta.mjs",
+  ".claude/hooks/tests/test-gama.mjs",
+];
 
-if (COMANDOS.length === 0) {
-  console.error("nao consegui derivar a lista de comandos do simulador — o formato mudou?");
-  process.exit(1);
-}
+/** Um `ci.yml` minimo com o job que o simulador le. */
+const ciYml = (comandos) =>
+  "name: CI\non:\n  push:\n\njobs:\n  guard-tests:\n    runs-on: ubuntu-latest\n    steps:\n" +
+  comandos.map((c) => `      - name: ${c}\n        run: node ${c}\n`).join("");
 
 let passed = 0;
 const falhas = [];
 
 /** Repo minimo, limpo por construcao: um placeholder para substituir, uma seccao 2.2 no
  *  BOOTSTRAP para derivar, e um stub por cada comando que o simulador chama. */
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -76,10 +77,17 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   w(".agent/rules/anti-patterns.md",
     "# Anti-Padroes\n\n<!-- Exemplo a remover no bootstrap.\n\n## AP1 — exemplo\n\n-->\n\n## AP1 — real\n");
 
-  for (const [i, c] of semStubs ? [] : COMANDOS.entries()) {
+  const listaStubs = comandoExtra ? [...COMANDOS, ".agent/scripts/test-delta.mjs"] : COMANDOS;
+  for (const [i, c] of semStubs ? [] : listaStubs.entries()) {
     const falha = stubFalha !== null && c.includes(stubFalha);
     w(c, `#!/usr/bin/env node\nconsole.log("  ${i} passaram, ${falha ? 1 : 0} falharam.");\n` +
          `process.exit(${falha ? 1 : 0});\n`);
+  }
+
+  // O `ci.yml` e a FONTE da lista de comandos do simulador.
+  if (!ciAusente) {
+    const yml = ciYml(ciSemComandos ? [] : (comandoExtra ? [...COMANDOS, ".agent/scripts/test-delta.mjs"] : COMANDOS));
+    w(".github/workflows/ci.yml", jobRenomeado ? yml.replace("guard-tests:", "verificacoes:") : yml);
   }
 
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
@@ -191,6 +199,31 @@ test("`--only` valido corre so o seleccionado", {}, {
   code: 0,
   args: [`--only=${COMANDOS[0].split("/").pop().replace(".mjs", "")}`],
   includes: ["1 verificacao(oes) verdes"],
+});
+
+// --- A lista de comandos e DERIVADA do ci.yml (era mantida a mao) ----------------
+// Estava escrita no simulador com um comentario a dizer "os mesmos do ci.yml" e nada a
+// verifica-lo: acrescentar uma suite ao CI e esquecer aqui fazia a simulacao medir menos,
+// em silencio. Estes tres casos fixam a derivacao nos dois sentidos.
+
+test("sem ci.yml reprova a dizer que NAO DERIVOU — nao 'nada a correr' (AP2)", { ciAusente: true }, {
+  code: 1,
+  includes: ["nao derivei nenhum comando"],
+});
+
+test("job `guard-tests` renomeado reprova, em vez de correr zero", { jobRenomeado: true }, {
+  code: 1,
+  includes: ["nao derivei nenhum comando"],
+});
+
+test("job sem nenhum `node ...mjs` reprova", { ciSemComandos: true }, {
+  code: 1,
+  includes: ["nao derivei nenhum comando"],
+});
+
+test("um comando ACRESCENTADO ao ci.yml passa a ser corrido pela simulacao", { comandoExtra: true }, {
+  code: 0,
+  includes: [".agent/scripts/test-delta.mjs"],
 });
 
 console.log("");

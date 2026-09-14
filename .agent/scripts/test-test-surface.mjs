@@ -11,8 +11,10 @@
  *   node .agent/scripts/test-test-surface.mjs
  */
 
-import { test, commit, git, resumo } from "./test-surface-harness.mjs";
-import { registar as registarMarcas } from "./tests-surface-marks.mjs";
+import { test, commit, git, resumo, contagem } from "./test-surface-harness.mjs";
+import { registaDescobertos, resumoDescoberta } from "./lib/registo.mjs";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { join } from "path";
 
@@ -412,6 +414,11 @@ test("apostrofo num comentario nao dessincroniza a contagem", (dir) => {
   return ref;
 }, { code: 0 });
 
-registarMarcas();
+// AP4: descoberta em disco, nao chamada a mao. Ver `lib/registo.mjs`.
+console.log(resumoDescoberta(await registaDescobertos({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  entryPoint: "test-test-surface.mjs",
+  contagem,
+})));
 
 resumo();

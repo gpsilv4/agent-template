@@ -69,6 +69,14 @@ const CONTAGENS = [
   // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
   // variante do `AP1` que este repo documenta.
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
+  // O invariante 2 do `AP4` ("estreitar a seleccao do runner") na forma que ESTE repo tem.
+  // Os entry points chamavam cada modulo `tests-*.mjs` a mao; comentar uma dessas linhas
+  // levava `test-hooks.mjs` de 156 para 39 testes com exit 0 e "todos passaram" — medido
+  // numa auditoria. A seleccao passou a ser DESCOBERTA em disco (`lib/registo.mjs`), o que
+  // tira as cinco linhas comentaveis mas deixa uma: a propria chamada a descoberta.
+  // `zero: true` fecha-a — o invariante nao e "o numero nao desce" (tres entry points
+  // podiam legitimamente virar dois), e **"tem de existir descoberta em algum sitio"**.
+  { re: /\bregistaDescobertos\s*\(/, msg: "registo de suites por descoberta", zero: true },
 ];
 
 // NOTA sobre este ficheiro se contar a si mesmo: ele esta na superficie congelada (ver

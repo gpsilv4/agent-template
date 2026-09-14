@@ -61,6 +61,10 @@ function corre(dir, base) {
 
 let passed = 0;
 const falhas = [];
+
+/** Total de testes ja corridos. Usado pelo registo por descoberta para medir o
+ *  contributo de cada modulo `tests-*.mjs`. */
+export const contagem = () => passed + falhas.length;
 function test(nome, mutate, expect) {
   const { dir, base } = sandbox();
   try {

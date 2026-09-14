@@ -25,6 +25,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-hooks.mjs";
+
 export function registar({ test, corre, repo, eq, contem }) {
 // --- BYPASSES: as formas conhecidas de contornar o guard ---------------------
 // Sem numero de propósito: escrever o tamanho da tabela em prosa foi errado duas vezes no
@@ -108,6 +113,47 @@ const BYPASSES = [
   ["sudo com -u", "sudo -u me git commit -m x"],
   ["env com -u", "env -u VAR git commit"],
   ["timeout com -s", "timeout -s KILL 5 git push"],
+
+  // --- Quarta leitura independente (auditoria multi-lente) -------------------
+  // Dez formas medidas a conduzir o hook com payloads reais. A primeira classe e a mais
+  // grave: nao precisa de ofuscacao nenhuma, e o que um agente distraido escreve.
+  //
+  // 1) Redireção que COME o separador. A regex consumia `\S*` a seguir ao `>`, e `\S*` nao
+  //    para no `;` nem no `|` — logo `2>&1; git commit` virava um unico segmento cujo verbo
+  //    era `make`/`npm`, e o comando seguinte desaparecia da analise.
+  ["redireção come o `;` seguinte", "make build > build.log 2>&1; git commit -am wip"],
+  ["redireção come o `;` e esconde um force-push", "npm run build >/dev/null 2>&1;git push --force origin main"],
+  ["redireção come o `|` seguinte", "git status >/dev/null|git commit -m x"],
+  ["redireção come o `||` seguinte", "ls >f||git push origin main"],
+  ["redireção simples come o `;`", "echo hi > out.txt; git commit -m x"],
+
+  // 2) Heredoc cujo destinatario e uma SHELL. Remover o corpo e correcto para
+  //    `git commit -F - <<EOF` (o corpo e a mensagem) e errado quando quem o recebe executa.
+  ["heredoc para bash -s", "bash -s <<EOF\ngit commit -m x\nEOF"],
+  ["heredoc para zsh", "zsh <<EOF\ngit push origin main\nEOF"],
+
+  // 3) Flag ANTES do sub-verbo: a comparacao era so com `args[0]`, logo qualquer flag
+  //    anulava a tabela inteira de sub-verbos destrutivos.
+  ["flag antes do sub-verbo (stash drop)", "git stash -q drop"],
+  ["flag antes do sub-verbo (reflog expire)", "git reflog --verbose expire --all"],
+  ["flag antes do sub-verbo (remote remove)", "git remote -v remove origin"],
+  ["flag antes do sub-verbo (worktree remove)", "git worktree --help remove ../wt"],
+  ["flag antes do sub-verbo (notes remove)", "git notes --ref x remove"],
+
+  // 4) `git config` a escrever chaves que EXECUTAM ou que desligam a propria rede.
+  //    `core.hooksPath` desliga o `.githooks/commit-msg` — a rede anti-atribuicao-a-IA.
+  ["config desliga o commit-msg", "git config core.hooksPath /dev/null"],
+  ["config poe um comando no pager", "git config core.pager 'sh -c whoami'"],
+  ["config poe um comando no credential.helper", "git config credential.helper '!echo x'"],
+
+  // 5) `submodule foreach` corre um comando arbitrario — a mesma classe que o `difftool -x`
+  //    e o `bisect run`, que o autor ja tinha excluido de propósito.
+  ["submodule foreach corre comandos", "git submodule foreach 'git push origin main'"],
+
+  // 6) `$` colado a aspa: `limpo()` tirava as aspas e deixava o `$`, logo o token ficava
+  //    `$git` e nao casava com `git`.
+  ["$'git' (ANSI-C quoting)", "$'git' commit -m x"],
+  ['$"git" (locale quoting)', '$"git" commit -m x'],
 ];
 
 for (const [nome, comando] of BYPASSES) {

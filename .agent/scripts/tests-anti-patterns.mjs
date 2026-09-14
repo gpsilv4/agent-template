@@ -20,6 +20,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-guards.mjs";
+
 export function registar() {
   // --- Guard 15: as referencias a anti-padroes resolvem -------------------------
   // Uma citacao errada e pior do que nenhuma: manda o leitor a uma entrada REAL com outro
@@ -35,17 +40,20 @@ export function registar() {
   test("G15: citacao de um anti-padrao que nao existe avisa", (dir) => {
     const f = ".agent/rules/core-rules.md";
     writeF(dir, f, readF(dir, f) + `\n> Ver ${AP_INEXISTENTE} para o detalhe.\n`);
-  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em anti-patterns.md"] });
+  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
 
   test("G15: entrada escrita com `###` tambem conta como definida", (dir) => {
     // Tolerancia aos dois niveis: as entradas deste repo usam `##`, um derivado pode usar
     // `###`, e o guard nao pode passar a dizer que o anti-padrao desapareceu por isso.
     const f = ".agent/rules/anti-patterns.md";
     writeF(dir, f, readF(dir, f).replace(/^## AP/gm, "### AP"));
-  }, { code: 0, excludes: ["nao existe em anti-patterns.md"] });
+  }, { code: 0, excludes: ["nao existe em nenhum dos ficheiros de anti-padroes"] });
 
   test("G15: sem anti-patterns.md da SKIP visivel, nao silencio", (dir) => {
+    // Os DOIS ficheiros de definicoes: o guard so salta quando nenhum existe. Apagar so um
+    // deixava o outro a definir tudo, e o SKIP nunca disparava.
     rmSync(file(dir, ".agent/rules/anti-patterns.md"));
+    rmSync(file(dir, ".agent/rules/anti-patterns-template.md"));
   }, { code: 1, anyOut: ["SKIP  Guard 15"] });
 
   /** Mesma nocao de "codigo" que o guard usa (`guards/anti-patterns.mjs`): se as duas
@@ -233,7 +241,7 @@ export function registar() {
           "",
         ].join("\n")
     );
-  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em anti-patterns.md"] });
+  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
 
   // O CONTROLO do ambito: os cabecalhos de definicao saem da contagem **so** no
   // `anti-patterns.md`. Um `## APn` em qualquer outro ficheiro e uma citacao como as outras —
@@ -242,4 +250,4 @@ export function registar() {
   test("G15: cabecalho `## APn` NOUTRO ficheiro continua a contar como citacao", (dir) => {
     const f = ".agent/rules/core-rules.md";
     writeF(dir, f, readF(dir, f) + `\n## ${AP_INEXISTENTE} — cabecalho copiado de outro projeto\n`);
-  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em anti-patterns.md"] });}
+  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });}
