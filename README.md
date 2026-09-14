@@ -135,6 +135,7 @@ gh pr create --fill     # then merge once CI is green
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
+│   ├── backlog-method.md       <- Step-by-step backlog procedure (NOT loaded; on-demand)
 │   ├── mcp-policy.md           <- When an MCP server is worth it, and what it may not hold (NOT loaded)
 │   ├── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
 │   └── hooks-guide.md          <- What each hook does, and why it can't be prose (NOT loaded)

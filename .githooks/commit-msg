@@ -63,7 +63,12 @@ const linhas = msg
 
 /** Nomes que identificam uma ferramenta de IA. Acrescentar aqui quando aparecer outro. */
 const IA =
-  /claude|anthropic|chatgpt|openai|gpt-[0-9]|copilot|gemini|\bbard\b|cursor|codeium|windsurf|devin|aider|sourcegraph|cody|llama|mistral|deepseek|\bgrok\b/i;
+  // `\b` em TODOS os nomes curtos que sao tambem nomes de pessoa ou pedacos de palavra.
+  // Medido: `aider` casava dentro de **Haider** e recusava o commit de `Ali Haider`; `devin`
+  // e `cody` sao nomes proprios correntes. Um hook que recusa uma pessoa real ensina a
+  // contorna-lo com `--no-verify`, e ai deixa de haver hook. Os nomes longos e inequivocos
+  // (`anthropic`, `sourcegraph`) nao precisam de ancora.
+  /claude|anthropic|chatgpt|openai|gpt-[0-9]|copilot|gemini|\bbard\b|cursor|\bcodeium\b|windsurf|\bdevin\b|\baider\b|sourcegraph|\bcody\b|\bllama\b|\bmistral\b|deepseek|\bgrok\b|\bcodex\b|\bcline\b|\broo\s?code\b|\bjules\b|\bjunie\b|ampcode|\bqwen\b|\bkimi\b|tabnine|\breplit\b|lovable|bolt\.new|\btrae\b|augmentcode/i;
 
 /** Formas conhecidas de atribuir autoria numa mensagem de commit. */
 const FORMAS = [

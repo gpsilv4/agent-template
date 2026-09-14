@@ -20,6 +20,15 @@
   - `prompt-fase0` (`UserPromptSubmit`) — quando o pedido parece uma ordem de implementacao, devolve o que a **Fase 0** exige, antes de o agente responder. **Nao bloqueia** e **cala-se em perguntas** — ruido a cada prompt ensina a ignorar o lembrete. Falha aberta.
   - O `session-context` e o `stop-verify` usam `git status --untracked-files=all -z`: sem o `--untracked-files=all` o git **colapsa diretorios** nao rastreados (um ficheiro novo em pasta nova aparece como a pasta), e sem o `-z` cita os caminhos com acentos ou espacos e o matcher deixa de os reconhecer. (Este "ambos" dizia-se de dois hooks quando havia tres; com cinco, nomeiam-se.)
   - **Nao ha `lint-changed-file`** de proposito: os comandos de lint sao especificos da stack, logo o template so poderia trazer um hook inerte — e um hook que nao faz nada por omissao e prosa com mais passos. Se o teu projeto tem lint, vale a pena escreve-lo: `PostToolUse`/`Write|Edit`, a devolver o que nao e auto-corrigivel como contexto para ser corrigido no mesmo turno.
+  - **A fronteira nao se reescreve a si propria.** O `deny` do `.claude/settings.json` cobre
+    `Edit`/`Write` e **nao cobre `Bash`**: `sed -i`, `>`, `node -e`, `mv`, `rm` ou `chmod`
+    sobre `.claude/settings.json`, `.claude/hooks/` ou `.githooks/` reescreviam a fronteira
+    sem passar por nenhuma das duas — e o `BOOTSTRAP.md` vendia essa linha como "sem ela, o
+    agente alarga as proprias permissoes". O hook fecha-o com uma **allowlist dos verbos de
+    leitura**, nao uma blocklist dos de escrita (`AP6`): as formas de escrever em shell nao
+    sao enumeraveis, as de ler sao poucas. Julga **por segmento** (`;`, `&&`, `|`, `do`) e nao
+    pelo primeiro verbo da linha — a primeira versao negava um `for` que corresse a suite dos
+    hooks, medido na sessao em que nasceu. O caminho aberto e o `Edit`, que pede aprovacao.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio), logo e opt-in no CI: correr localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
 
 - **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do hook.

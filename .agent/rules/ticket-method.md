@@ -12,7 +12,7 @@
 
 Seis fases: **explicar antes de fazer** (0) · desenvolver (1) · um loop com criterio de
 **maquina** (2) · um loop com criterio de **julgamento** (3) · um **leitor independente** (4)
-· relatorio (5). **Nenhuma se salta** — e a 4 e a que mais foge, por ser a mais cara.
+· relatorio (5). **Nenhuma se salta em silencio** (o que escala esta na tabela de cada fase) — e a 4 e a que mais foge, por ser a mais cara.
 
 O criterio diz o que conta como achado; **nao** diz quando o ciclo acaba. Isso e sempre uma
 decisao do utilizador (Fases 2 e 3).
@@ -22,10 +22,11 @@ fresco` — e ao mudar de fase diz-se qual fecha e qual abre. Sem isto ninguem d
 do orcamento" de "prestes a parar e perguntar". Medido: numa sessao longa o utilizador teve de
 perguntar "ainda falta muito?" — o que o metodo devia emitir sozinho.
 
-> Depois do commit ha um quarto instrumento que **nao e do agente e nao se numera: usar** o
-> que mudou — e o unico que apanha uma **decisao errada**. Porque os tres nao se substituem:
-> `src/docs/ticket-method-why.md`.
-O que escala com o tamanho do ticket sao tres delas — a **Fase 0** (do chat ao ficheiro com
+> Depois do commit ha um quarto instrumento, que **nao e do agente e nao se numera: usar** o
+> que mudou — o unico que apanha uma **decisao errada**. Porque as Fases 2-3, a Fase 4 e o
+> *usar* nao se substituem: `src/docs/ticket-method-why.md`.
+
+Das seis fases, **tres escalam** com o tamanho do ticket — a **Fase 0** (do chat ao ficheiro com
 alternativas), a **Fase 3** (quantas passagens esperar) e a **Fase 4** (se corre). As outras
 tres sao **binarias**: um controlo negativo, o `tsc 0` e o relatorio de 5 pontos valem igual
 num `S` e num `L`, e nao ha versao reduzida deles.

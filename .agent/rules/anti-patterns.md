@@ -11,7 +11,7 @@
 > citacoes continuam a resolver.
 >
 > **Comeca no proximo ID livre** — os sete do template estao tomados e sao citados em dezenas
-> de sitios. Confirma com: `git grep -hoE '^#{2,3} AP[0-9]+' .agent/rules/ | sort -u | tail -1`
+> de sitios. Confirma com: `git grep -hoE '^#{2,3}[[:space:]]+AP[0-9]+' .agent/rules/ | sort -uV | tail -1`
 
 ## Formato de cada entrada
 

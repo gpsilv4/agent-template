@@ -198,6 +198,21 @@ const BYPASSES = [
   // O valor de uma atribuicao com espacos partia a varredura antes de chegar ao `git`.
   ["atribuicao com espacos", 'GIT_AUTHOR_DATE="2020-01-01 00:00" git commit -m x'],
   ["atribuicao com espacos (push)", 'GIT_SSH_COMMAND="ssh -i k" git push origin main'],
+
+  // --- A fronteira nao se reescreve a si propria -------------------------------
+  // O `deny` do settings so cobre `Edit`/`Write`. Por `Bash` havia seis caminhos abertos, e o
+  // `BOOTSTRAP.md` vendia essa linha como "sem ela, o agente alarga as proprias permissoes" —
+  // vendia mais do que entregava. Um agente que reescreva a fronteira deixa a sessao SEGUINTE
+  // sem nenhuma, e essa nao tem como saber.
+  ["sed -i sobre a fronteira", "sed -i '' 's/deny/xeny/' .claude/settings.json"],
+  ["redireccao sobre a fronteira", "printf '{}' > .claude/settings.json"],
+  // A unica das seis que sobrevivia a primeira versao desta verificacao: `node` estava na
+  // allowlist de leitura. Correr um FICHEIRO e leitura; correr codigo INLINE escreve tao bem
+  // como um `>`.
+  ["node -e a escrever a fronteira", `node -e "require('fs').writeFileSync('.claude/settings.json','{}')"`],
+  ["mv por cima de um hook", "mv /tmp/x .claude/hooks/guard-protected-branch.mjs"],
+  ["rm sobre o .githooks", "rm .githooks/commit-msg"],
+  ["chmod 000 sobre um hook", "chmod 000 .claude/hooks/stop-verify.mjs"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -227,6 +242,20 @@ const LEGITIMOS = [
   ["branch -c COPIA, nao destroi", "git branch -c antigo novo"],
   ["fetch para refs remote-tracking", "git fetch origin +refs/heads/main:refs/remotes/origin/main"],
   ["symbolic-ref a LER (um argumento)", "git symbolic-ref HEAD"],
+  // LER a fronteira tem de continuar trivial. Um guard que nega `cat` ou `git diff` sobre ela
+  // treina a gente a contorna-lo — e o `git diff` foi mesmo um falso positivo da primeira
+  // versao desta verificacao, apanhado ao medi-la.
+  ["cat da fronteira", "cat .claude/settings.json"],
+  ["grep na fronteira", "grep -n deny .claude/settings.json"],
+  ["jq na fronteira", "jq .permissions .claude/settings.json"],
+  ["git diff sobre a fronteira", "git diff .claude/settings.json"],
+  ["correr a suite dos hooks", "node .claude/hooks/tests/test-hooks.mjs"],
+  // Por SEGMENTO, e nao pelo primeiro verbo da linha: a primeira versao olhava so para o
+  // inicio do texto e negava um `for` que corresse a suite. Medido na sessao em que nasceu —
+  // bloqueou-me a correr os proprios testes. Um guard que nega trabalho normal e contornado.
+  ["for a correr a suite dos hooks", "for s in a b; do node .claude/hooks/tests/test-hooks.mjs; done"],
+  ["suite com redireccao para /tmp", "node .claude/hooks/tests/test-hooks.mjs > /tmp/o 2>&1"],
+  ["sed -i NOUTRO ficheiro, na mesma linha", "sed -i '' 's/a/b/' README.md && cat .claude/settings.json"],
   // Negar trabalho legitimo custa tanto como deixar passar. O `partir()` tratava `(` e `{`
   // como separadores mesmo DENTRO de aspas, logo um comando que apenas MENCIONA git entre
   // parentesis era negado — e o `eForce` corre ANTES da verificacao de branch, logo nao havia

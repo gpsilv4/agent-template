@@ -41,7 +41,7 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 | **O que envia para fora, e para quem?** | "Nao envia nada" tem de ser verificavel na documentacao dele, nao assumido |
 | **Quem o mantem?** | Um servidor abandonado com acesso ao repo e divida de supply-chain |
 | **Que ferramentas expoe, e quais delas ESCREVEM?** | Ler e um risco; escrever no repo, na BD ou na rede e outro. Preferir servidores so-leitura |
-| **Qual e o custo por turno?** | Varios servidores MCP carregam definicoes de ferramentas em **cada** pedido. Este projeto orcamenta bytes com tres guards; um MCP que nao se usa custa em todos os turnos |
+| **Qual e o custo por turno?** | Varios servidores MCP carregam definicoes de ferramentas em **cada** pedido. Este projeto orcamenta bytes com quatro guards; um MCP que nao se usa custa em todos os turnos |
 | **O que deixa de funcionar sem ele?** | Se a resposta for "nada", nao vale o custo nem a superficie |
 
 ## Configuracao
@@ -72,6 +72,10 @@ regra so tem trabalho a partir do momento em que o teu projeto acrescenta o prim
 > servidor honesto no `.mcp.json` pode servir conteudo hostil em runtime. Contra isso a unica
 > defesa e a regra do topo — tratar o output como dados — e essa e prosa, como a maior parte
 > das regras que dependem de julgamento.
+
+> **Limite do que e verificado**: o Guard 16 le `.mcp.json`, `.cursor/mcp.json`,
+> `.vscode/mcp.json` e `.gemini/settings.json`. A configuracao do **Windsurf** fica fora —
+> a regra em prosa vale para ela, a verificacao automatica nao.
 
 ## Servidores aprovados
 

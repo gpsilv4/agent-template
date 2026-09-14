@@ -44,6 +44,9 @@
 
 import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
+// As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
+// do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
+import { SEGUROS, FORMAS_INSEGURAS } from "./lib/verbos-git.mjs";
 
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
 const PROTEGIDOS_LISTA = ["main", "master", "develop"];
@@ -56,128 +59,6 @@ const PROTEGIDOS = new Set(PROTEGIDOS_LISTA.map((b) => b.toLowerCase()));
 const ehProtegido = (br) =>
   typeof br === "string" && PROTEGIDOS.has(br.replace(/^refs\/heads\//, "").toLowerCase());
 
-/** Verbos permitidos num branch protegido: leitura, inspecao, e escrita local que nao cria
- *  commits, nao reescreve historia e nao publica. **Tudo o que nao esta aqui e negado.**
- *  `switch` esta ca dentro de proposito: e como se SAI de um branch protegido, e (ao
- *  contrario de `checkout`) nunca recebe caminhos — quem descarta ficheiros e o `restore`. */
-const SEGUROS = new Set([
-  "status", "log", "diff", "show", "branch", "tag", "remote", "fetch", "switch", "stash",
-  "rev-parse", "rev-list", "symbolic-ref", "merge-base", "describe", "blame", "shortlog",
-  "ls-files", "ls-tree", "ls-remote", "cat-file", "grep", "reflog", "add", "config", "help",
-  "version", "init", "clone", "worktree", "name-rev", "count-objects", "cherry", "whatchanged",
-  "diff-tree", "diff-index", "diff-files", "check-ignore", "check-attr", "var", "show-ref",
-  "show-branch", "for-each-ref", "verify-commit", "verify-tag", "fsck", "archive", "bundle",
-  "format-patch", "range-diff", "annotate", "notes", "submodule",
-  // Estes dois so passam na forma exigida (ver `FORMA_EXIGIDA`).
-  "pull", "push",
-  // FORA de proposito: `difftool` (`-x <cmd>`) e `bisect` (`bisect run <cmd>`) correm comandos
-  // arbitrarios; `gui`/`citool`/`instaweb`/`web--browse` abrem processos interativos.
-]);
-
-/** Um verbo seguro pode ser destrutivo pela FLAG. Medido numa revisao independente:
- *  `git switch -C main`, `git checkout -B main`, `git branch -f master`, `git branch -D
- *  develop` e `git fetch . HEAD:master` passavam todos — e o primeiro faz o que o
- *  `reset --hard` faz, que a versao anterior negava. Cada entrada aqui e uma forma que torna
- *  inseguro um verbo que esta em `SEGUROS`. */
-/** Chaves de `git config` cuja ESCRITA e execucao de codigo ou desliga uma rede de
- *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `AP6`): e uma lista
- *  fechada de chaves que o proprio git documenta como executaveis. */
-const CHAVES_PERIGOSAS = new RegExp(
-  "^(?:" +
-    [
-      // Chaves nomeadas que executam um comando.
-      "core\\.(?:hooksPath|pager|editor|askpass|sshCommand|fsmonitor|gitProxy|alternateRefsCommand)",
-      "sequence\\.editor", "http\\.proxy", "ssh\\.variant", "init\\.templateDir",
-      "uploadpack\\.packObjectsHook", "instaweb\\.httpd",
-      // Familias inteiras. A versao anterior tinha `credential.helper` LITERAL e deixava
-      // passar `credential.<url>.helper`, que e a forma documentada e a mais usada. O mesmo
-      // para `diff.external` vs `diff.<driver>.command`. Generalizar por SUFIXO fecha a
-      // familia em vez de perseguir nomes um a um.
-      "credential(?:\\..+)?\\.helper",
-      "(?:diff|merge)\\..+\\.(?:command|driver|textconv)",
-      "diff\\.external",
-      "filter\\..+\\.(?:clean|smudge|process)",
-      "gpg(?:\\..+)?\\.program",
-      "(?:pager|man|browser|trailer|guitool)\\..+",
-      "alias\\..+", "protocol\\..+\\.allow", "url\\..+\\.insteadOf",
-      "include\\.path", "includeIf\\..+\\.path",
-      // Rede final: qualquer chave que TERMINE num sufixo de execucao. E o que apanha o
-      // proximo nome que o git inventar, em vez de esperar por outra auditoria.
-      ".*\\.(?:cmd|command|program|driver|helper|hook|hooksPath)",
-    ].join("|") +
-    ")$",
-  "i"
-);
-
-const FORMAS_INSEGURAS = {
-  switch: /^(?:-C|--force|--discard-changes)$/,
-  // `-c`/`-C` COPIAM um branch (`git branch -c antigo novo`) — nao destroem nada e sao a
-  // forma normal de duplicar. Ficam de fora; `-m`/`-M` (mover/renomear) continuam, porque
-  // renomear um branch protegido fa-lo desaparecer.
-  branch: /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/,
-  tag: /^(?:-d|--delete|-f|--force)$/,
-  // `symbolic-ref` LE o HEAD com um argumento e ESCREVE-O com dois. E a forma que permitia
-  // `git symbolic-ref HEAD refs/heads/MAIN` seguido de `git commit` — medido a fazer `main`
-  // avancar com o guarda a dizer `allow` nos dois passos, porque `PROTEGIDOS` comparava por
-  // igualdade exacta e num filesystem case-insensitive `MAIN` **e** `main`.
-  // Como predicado: `git symbolic-ref HEAD` (leitura) passa; com valor, ou com `-d`, nao.
-  "symbolic-ref": (args) => {
-    if (args.some((a) => /^(?:-d|--delete)$/.test(a))) return true;
-    return args.filter((a) => !a.startsWith("-")).length >= 2;
-  },
-  // `config` e um verbo de LEITURA seguro, mas escrever certas chaves e execucao de codigo
-  // ou desligar a propria rede: `core.hooksPath /dev/null` mata o `.githooks/commit-msg`
-  // (a rede anti-atribuicao-a-IA deste repo), e `core.pager`/`credential.helper`/
-  // `core.editor` sao sinks que um `git log` inocente dispara. Medidos a passar.
-  // Como PREDICADO e nao regex: e preciso distinguir a leitura (`git config --get x`, que
-  // continua a passar) da escrita, e isso depende de haver um VALOR a seguir a chave.
-  config: (args) => {
-    const flagsDestrutivas = /^(?:--unset|--unset-all|--remove-section|--rename-section|--replace-all|-e|--edit)$/;
-    if (args.some((a) => flagsDestrutivas.test(a))) return true;
-    // As flags que CONSOMEM o argumento seguinte: sem as saltar, o valor de `--file` virava
-    // `posicionais[0]` e `CHAVES_PERIGOSAS` testava `.git/config` em vez da chave. Medido a
-    // escrever `core.hooksPath` de facto — a mesma chave que a tabela ja dava por fechada.
-    const FLAGS_COM_VALOR = /^(?:--file|-f|--blob|--default|--type|-t)$/;
-    const posicionais = [];
-    for (let i = 0; i < args.length; i++) {
-      if (args[i].startsWith("-")) {
-        if (FLAGS_COM_VALOR.test(args[i])) i++;
-        continue;
-      }
-      posicionais.push(args[i]);
-    }
-    if (posicionais.length === 0) return false;
-
-    // O git 2.46 acrescentou sub-comandos (`git config set|unset|get|list|edit ...`). A
-    // versao anterior lia `posicionais[0]` como a CHAVE, logo na forma nova a "chave" era
-    // `set` e nao casava nada: `git config set core.hooksPath /dev/null` passava e desligava
-    // o `.githooks/commit-msg` de facto. Medido com git 2.50 por uma leitura independente —
-    // era o caso que o comentario acima dizia estar fechado.
-    const SUBCOMANDOS = /^(?:set|unset|get|list|edit|replace-all|add|remove-section|rename-section)$/;
-    let campos = posicionais;
-    if (SUBCOMANDOS.test(campos[0])) {
-      // `unset`/`edit` sao destrutivos por si, como as flags equivalentes.
-      if (/^(?:unset|edit|remove-section|rename-section)$/.test(campos[0])) return true;
-      campos = campos.slice(1);
-    }
-    // Uma escrita tem chave E valor; `git config core.pager` sozinho apenas le.
-    if (campos.length < 2) return false;
-    return CHAVES_PERIGOSAS.test(campos[0]);
-  },
-  add: /^(?:-i|--interactive|-p|--patch)$/, // interativos: um hook nao tem como responder
-  // `fetch` com refspec escreve refs locais (`git fetch . HEAD:master`). Como PREDICADO e nao
-  // regex, para excluir primeiro os `:` que sao de URL — senao `git fetch https://x/y main` e
-  // `git fetch git@host:o/r.git` eram negados, tres falsos positivos medidos.
-  // `+refs/heads/main:refs/remotes/origin/main` escreve um ref REMOTE-TRACKING, que e o que
-  // um fetch normal faz — nao toca em `refs/heads/`. Negar isto bloqueava um fetch explicito,
-  // que e trabalho legitimo e frequente.
-  fetch: (args) =>
-    args.some(
-      (a) =>
-        !/:refs\/remotes\//.test(a) &&
-        !/^[a-z][a-z0-9+.-]*:\/\//i.test(a) && !/^[^/\s]+@[^:\s]+:/.test(a) && (a.includes(":") || a.startsWith("+"))
-    ),
-};
 
 /** Sub-verbos destrutivos. Comparados **so contra o primeiro argumento**, porque os
  *  sub-verbos do git sao posicionais: comparar contra qualquer argumento negava
@@ -633,6 +514,44 @@ try {
       return preambulo;
     }
   );
+
+  // --- A fronteira nao se reescreve a si propria ---------------------------------
+  // O `deny` do settings cobre `Edit`/`Write` e NAO cobre `Bash`. ALLOWLIST dos verbos de
+  // leitura, e nao blocklist dos de escrita (`AP6`). Porque assim: `hooks-guide.md`.
+  const FRONTEIRA = /(?:^|[\s"'`=(])(?:\.\/)?(?:\.claude\/(?:settings(?:\.local)?\.json|hooks\/)|\.githooks\/)/;
+  const LEITURA = new Set([
+    "cat", "bat", "less", "more", "head", "tail", "wc", "grep", "rg", "egrep", "fgrep", "awk",
+    "sed", "jq", "diff", "cmp", "md5", "md5sum", "shasum", "sha256sum", "file", "stat", "ls",
+    "find", "realpath", "dirname", "basename", "node", "test", "wl-copy", "pbcopy", "echo", "printf",
+    // `git` le e encena; o que ele tem de destrutivo ja e tratado pela lista SEGUROS acima.
+    // Sem ele, um `git diff .claude/settings.json` era negado — falso positivo num comando
+    // que e precisamente o que se quer poder correr sobre a fronteira.
+    "git",
+  ]);
+  // `sed`/`awk` so contam como leitura SEM edicao no sitio; `node`/`printf`/`echo` so sem
+  // redireccao. A redireccao e o `tee` sao verificados a parte, no texto inteiro.
+  // Por SEGMENTO, nao pelo primeiro verbo da linha: a primeira versao negava um `for` que
+  // corresse a suite dos hooks. Um guard que nega trabalho normal e contornado.
+  const segmentos = texto.split(/(?:&&|\|\||[;|\n])+|\bdo\b|\bthen\b/);
+  const tocaFronteira = segmentos.filter((seg) => FRONTEIRA.test(seg));
+  if (tocaFronteira.length) {
+    // So os segmentos que TOCAM a fronteira sao julgados.
+    const alvo = tocaFronteira.join("\n");
+    const primeiro = tocaFronteira[0].trim().split(/\s+/)[0].replace(/^.*\//, "");
+    const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
+    // Um interpretador a correr um FICHEIRO e leitura; codigo INLINE (`node -e`) escreve.
+    const codigoInline = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/.test(alvo);
+    const redireciona = /(?:^|[^>\d])>{1,2}\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
+    if (!LEITURA.has(primeiro) || editaNoSitio || codigoInline || redireciona) {
+      negar(
+        "A configuracao de fronteira (`.claude/settings.json`, `.claude/hooks/`, `.githooks/`) " +
+          "nao se altera por `Bash`. O `deny` do settings so cobre `Edit`/`Write`, logo esta " +
+          "verificacao existe para fechar o resto — um agente que reescreva a propria fronteira " +
+          "deixa a sessao seguinte sem nenhuma. Editar com a ferramenta `Edit` (que pede " +
+          "aprovacao para os hooks e recusa o settings), ou a mao, fora do agente."
+      );
+    }
+  }
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando

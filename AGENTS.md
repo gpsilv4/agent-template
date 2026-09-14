@@ -27,6 +27,9 @@ Stack: {{STACK}}.
 `setup` · `grill` · `plan` · `review` · `design-review` · `refactor` · `deploy` · `debug` · `e2e-tests` · `security-tests` · `audit` · `market-scan` · `upgrade`
 → ficheiros em `.agent/workflows/<nome>.md`. No Claude Code sao tambem slash commands (`.claude/commands/`).
 
+> **Projeto por configurar?** Se `.agent/.template-version` **nao existir**, ler e seguir
+> **`.agent/BOOTSTRAP.md`** antes de qualquer outra coisa.
+
 ## Fronteiras (prioridade maxima)
 
 - **Sempre**: TypeScript estrito (`any` proibido, ficheiros ~400 linhas); UI em {{UI_LANGUAGE}}, codigo em ingles, commits em Conventional Commits (`type(scope):` em ingles); antes de commit, correr `.agent/rules/sync-docs.md` + os guards (`.agent/scripts/`).

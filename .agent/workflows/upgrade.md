@@ -84,6 +84,40 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template deve espelhar o `/review` deste projeto | Governance: metade e do projeto |
 | **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
 
+## 2b. Mudancas que REPROVAM um projeto que estava verde
+
+Nem toda a melhoria e aditiva. Quando o template **aperta** um criterio, um projeto que passava
+deixa de passar — e a leitura natural ("o upgrade partiu o meu CI") leva a desfaze-lo, que e o
+contrario do que se quer. Estas nao se trazem em silencio: **dizem-se na Fase 0, com o numero
+que cada uma custa neste projeto, medido ANTES de aplicar.**
+
+| Classe | Como reconhecer | O que perguntar ao utilizador |
+|--------|-----------------|-------------------------------|
+| **Limiar apertado** | um numero desceu num guard (orcamento de bytes, tamanho de ficheiro, cobertura) | correr o guard NOVO contra o projeto ANTES de aplicar; apresentar a lista do que passa a reprovar e quanto falta a cada um |
+| **Alcance alargado** | o guard passa a ler ficheiros que antes ignorava | dizer quais, e o que aparece neles hoje |
+| **Verbo negado** | um hook passa a recusar algo que o projeto usa | listar os comandos do projeto que passariam a ser negados |
+| **Verificacao nova sem dados** | um guard novo exige um ficheiro/seccao que o projeto nao tem | acrescentar o que falta, ou nao trazer o guard — nunca trazer e deixar vermelho |
+
+**Trazidos nesta ronda, e cada um reprova projetos que estavam verdes:**
+
+- **Tecto unico de 12 000 bytes** para *tudo o que o agente le* — rules carregadas, rules de
+  referencia, **workflows** e catalogos. Antes as referencias tinham 12 500/14 000 e os
+  workflows **nao tinham limite nenhum**. Medir primeiro:
+  `for f in .agent/rules/*.md .agent/workflows/*.md; do wc -c "$f"; done | sort -rn | head`
+- **Guard 17 (tamanho de ficheiro)**: `> 500` linhas reprova. Os ficheiros que o projeto ja
+  tenha acima disso entram em `TETOS` (em `guards/sizes.mjs`) com a contagem **do dia da
+  migracao** — e uma catraca, nao uma isencao: podem encolher, crescer reprova.
+  Medir: `find .agent/scripts .claude/hooks -name '*.mjs' -exec wc -l {} + | sort -rn | head`
+- **A fronteira nao se reescreve por `Bash`** (`guard-protected-branch.mjs`): passam a ser
+  negados `sed -i`, redireccao, `node -e`, `mv`, `rm` e `chmod` sobre `.claude/settings.json`,
+  `.claude/hooks/` e `.githooks/`. Um projeto com um script de manutencao que toque nesses
+  caminhos deixa de o poder correr pelo agente.
+- **Guard 16 (MCP) alargado** de `.mcp.json` aos quatro agentes: um servidor que ja estivesse
+  configurado no Cursor, no VS Code ou no Gemini passa a exigir linha em *Servidores aprovados*.
+
+> Um upgrade que deixa o projeto vermelho sem que ninguem tenha decidido isso e pior do que
+> nao ter feito upgrade nenhum.
+
 ## 3. Verificar — e e aqui que o upgrade se prova
 
 Depois de aplicar, correr **nesta ordem**:

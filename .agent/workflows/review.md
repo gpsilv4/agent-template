@@ -6,20 +6,19 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 > Este workflow **e a Fase 3** do Metodo de Trabalho por Ticket (`process-rules.md`): cada
 > passagem **declara o angulo antes de correr**, e um angulo ja usado nesta alteracao **nao
-> conta como passagem**. Para-se na primeira passagem que declare um angulo novo e nao
-> encontre nada. A lista de angulos esta em `.agent/rules/ticket-method.md` (nao carregado).
+> conta como passagem**. Numa passagem com angulo novo e sem achados, **apresenta-se e
+> espera-se** — fechar o ciclo e decisao do utilizador, nunca do agente. A lista de angulos
+> esta em `.agent/rules/ticket-method.md` (nao carregado).
 
 ## 0. Escala por tamanho do ticket (ler ANTES de comecar)
 
-> O resto do `ticket-method` escala por `S`/`M`/`L` e esta checklist nao escalava: um ticket
-> `S` — definido no backlog como **< 30 min** — pagava as mesmas 56 caixas que um `L`. A
-> aritmetica e o problema: a 10s por caixa sao ~10 min de checklist, mais os 32 pontos do
-> `sync-docs`, para 30 min de trabalho. Um processo que custa tanto como o trabalho e
-> abandonado ao terceiro ticket, e a partir dai nao ha processo nenhum.
+> Esta checklist nao escalava: um `S` (**< 30 min** no backlog) pagava as mesmas caixas que
+> um `L`. Um processo que custa tanto como o trabalho e abandonado ao terceiro ticket — e a
+> aritmetica que o mostra esta em `src/docs/ticket-method-why.md`.
 
 | Tamanho | Seccoes obrigatorias | Porque |
 |---------|---------------------|--------|
-| **`S`** | **1, 2, 8, 9, 10, 12, 13** | O que nenhum tamanho dispensa: o CI passa, o CHANGELOG regista, os anti-padroes conhecidos nao voltaram, os testes acompanham, os docs sincronizam, o backlog fecha. Sao ~20 caixas. |
+| **`S`** | **1, 2, 8, 9, 10, 12, 13** | O que nenhum tamanho dispensa: o CI passa, o CHANGELOG regista, os anti-padroes conhecidos nao voltaram, os testes acompanham, os docs sincronizam, o backlog fecha. Sao ~26 caixas. |
 | **`M`** | Todas menos a **11** | O leitor independente e o unico passo caro que um `M` dispensa por defeito (continua disponivel se o diff mexer no nucleo do dominio). |
 | **`L`** | **Todas**, a 11 incluida | Um `L` toca no nucleo ou atravessa fronteiras: e onde um segundo par de olhos paga. |
 
@@ -46,7 +45,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
   **ja existe PR** (o `/review` corre tipicamente antes do commit; sem PR o comando sai em
   erro "no pull requests found"). **Contar os checks antes de os esperar** — com zero checks
   o `gh pr checks --watch` sai `0` e o gate passa sem nada ter sido verificado:
-  `n=$(gh pr checks --json state --jq 'length'); [ "$n" -gt 0 ] && gh pr checks --watch`
+  `n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0); [ "${n:-0}" -gt 0 ] && gh pr checks --watch || echo "sem PR/checks ainda"`
   Antes de haver PR, os equivalentes locais sao o `tsc`/`lint`/testes desta checklist
 - Se CI falhou, corrigir antes de pedir review/merge
 - **Security Audit**: corre com `continue-on-error` por defeito, logo fica **sempre verde**.
@@ -112,7 +111,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > `anti-patterns.md` define, para cada entrada, um **`grep` de detecao "para o /review"**.
 > Este e o passo que os corre — sem ele, esse campo nao tem consumidor.
 
-- [ ] Correr os `grep` de detecao de **cada entrada** de `.agent/rules/anti-patterns.md` sobre o diff
+- [ ] Correr os `grep` de detecao de **cada entrada** dos **dois** ficheiros: `.agent/rules/anti-patterns.md` (vazio no template nu) e `.agent/rules/anti-patterns-template.md` (`AP1`-`AP7`). Varrer so o primeiro e correr zero greps e marcar a caixa sobre o diff
 - [ ] Algum achado -> corrigir, ou justificar por escrito porque nao se aplica
 - [ ] Duvida sobre o que uma deteccao apanha, ou porque a entrada existe? -> `src/docs/anti-patterns-why.md`
       (evidencia e receitas por inteiro; **nao** carregado, abrir so quando faz falta)
@@ -144,7 +143,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 10. Sincronizacao de Conhecimento (Docs Sync)  — a partir de `S`
 
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (28 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
-- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/` ou `.claude/hooks/`): `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` — sem eles, um guard partido parece um guard a passar
+- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`, `.claude/hooks/` ou `.githooks/`): as **nove** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte) — sem eles, um guard partido parece um guard a passar
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 - [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `AP4`)

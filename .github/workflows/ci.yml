@@ -35,7 +35,31 @@ jobs:
       - uses: actions/checkout@v7
       - id: check
         run: |
-          if [ -f package.json ]; then echo "has_pkg=true" >> "$GITHUB_OUTPUT"; else echo "has_pkg=false" >> "$GITHUB_OUTPUT"; fi
+          # `-f package.json` so olhava para a RAIZ. Num monorepo (apps/web, packages/*,
+          # frontend/) — o caso por omissao em Turborepo, pnpm workspaces e Nx — a resposta era
+          # "nao ha app" e o typecheck, o lint, o build, os testes unitarios e o audit
+          # deixavam de correr **para sempre, em verde**. Pior: um job `skipped` satisfaz um
+          # required status check, logo o gate que o consumidor marcou como obrigatorio ficava
+          # permanentemente satisfeito por nao correr.
+          if [ -f package.json ]; then
+            echo "has_pkg=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Nao ha na raiz. Ha noutro sitio? Se ha, e um erro de configuracao e nao "nao ha app".
+          outro="$(git ls-files '*package.json' | grep -v node_modules | head -3 || true)"
+          if [ -n "$outro" ]; then
+            echo "::error::Ha package.json fora da raiz e o CI so olha para a raiz:"
+            echo "$outro" | sed 's/^/::error::  /'
+            echo "::error::Apontar os jobs para essa pasta (working-directory) ou mover o package.json."
+            exit 1
+          fi
+          # Nem na raiz nem em lado nenhum. Depois do bootstrap isso e "nao consegui medir",
+          # nao "esta tudo bem" (AP2) — mas o template puro e exatamente este caso, e ai e
+          # legitimo. O discriminador e a marca de bootstrap.
+          if [ -f .agent/.template-version ]; then
+            echo "::warning::Projeto bootstrapado sem package.json em lado nenhum — typecheck, lint, build, testes e audit NAO correm."
+          fi
+          echo "has_pkg=false" >> "$GITHUB_OUTPUT"
 
   quality:
     name: Code Quality

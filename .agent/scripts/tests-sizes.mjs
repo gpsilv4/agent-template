@@ -11,6 +11,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./test-harness.mjs";
+import { TETOS } from "./guards/sizes.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -56,12 +57,21 @@ export function registar() {
 
   // --- A catraca: os congelados so podem ENCOLHER ----------------------------
   test("G17: ficheiro congelado que CRESCE avisa", (dir) => {
-    writeF(dir, CONGELADO, readF(dir, CONGELADO) + "// mais uma linha\n");
+    // Quantas linhas acrescentar deriva do TETO e do tamanho ATUAL — uma so nao chega quando
+    // o ficheiro encolheu e ficou com folga, e fixar o numero aqui obrigava a mexer neste
+    // teste a cada extraccao. Foi o que aconteceu ao extrair `lib/verbos-git.mjs`.
+    const atual = readF(dir, CONGELADO).replace(/\n$/, "").split("\n").length;
+    const faltam = TETOS[CONGELADO] - atual + 1;
+    writeF(dir, CONGELADO, readF(dir, CONGELADO) + "// mais uma linha\n".repeat(Math.max(1, faltam)));
   }, { code: 1, includes: ["o teto congelado e", "so pode ENCOLHER"] });
 
   test("G17: ficheiro congelado que ENCOLHE (sem chegar ao limite) nao avisa", (dir) => {
-    const linhas = readF(dir, CONGELADO).split("\n");
-    writeF(dir, CONGELADO, linhas.slice(0, 600).join("\n") + "\n");
+    // Encolher para um valor entre o LIMITE (500) e o teto: nao pode avisar. O numero e
+    // derivado do teto real, nao fixado — fixa-lo aqui obrigava a mexer neste teste sempre
+    // que o ficheiro encolhesse, e foi o que aconteceu ao re-congelar o teto em 590.
+    const teto = TETOS[CONGELADO];
+    const alvo = Math.floor((500 + teto) / 2);
+    writeF(dir, CONGELADO, readF(dir, CONGELADO).split("\n").slice(0, alvo).join("\n") + "\n");
   }, { code: 0, includes: ["tamanho de ficheiro:"] });
 
   // --- A excecao nao sobrevive ao problema -----------------------------------

@@ -164,3 +164,17 @@ uma regra que vive em prosa repete o esquecimento mais depressa.
 > verificacao vive num script em `.agent/scripts/` — universal, corre em qualquer agente e no
 > CI — e o hook e um **ponteiro fino** que a chama automaticamente. A verificacao e para todos;
 > o automatismo e so-Claude. Nas outras ferramentas corre-se o script, e o CI e a rede final.
+
+## Porque a checklist do `/review` escala por tamanho
+
+O resto do `ticket-method` escala por `S`/`M`/`L` e a checklist do `/review` nao escalava: um
+ticket `S` — definido no backlog como **< 30 min** — pagava as mesmas ~56 caixas que um `L`.
+
+A aritmetica e o problema. A 10s por caixa sao ~10 min de checklist, mais os 28 pontos do
+`sync-docs`, para 30 min de trabalho. Um processo que custa tanto como o trabalho e abandonado
+ao terceiro ticket, e a partir dai **nao ha processo nenhum** — que e pior do que uma
+checklist curta.
+
+Por isso o `S` paga so as seccoes que nenhum tamanho dispensa (1, 2, 8, 9, 10, 12, 13, ~26
+caixas), e as saltadas **dizem-se em voz alta** no relatorio: uma seccao saltada em silencio e
+indistinguivel de uma esquecida.

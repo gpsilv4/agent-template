@@ -32,3 +32,23 @@ TEMPLATE-FIXES*.md
 # OS / logs
 .DS_Store
 *.log
+
+# --- Segredos ---------------------------------------------------------------
+# O `.gitignore` so protegia `.env*`, enquanto o `.claude/settings.json` nega a LEITURA de
+# `*.pem`, `*.key`, `id_rsa*`, `.npmrc`, `credentials*` e `secrets/**`, e o
+# `simulate-derived.mjs` exclui `.pem`/`.key`/`.p12`/`.pfx` da copia "porque segredos nunca
+# entram". Duas camadas declaravam o modelo de ameaca e a que evita o `git add -A` distraido
+# nao o conhecia — e um segredo commitado e um problema de HISTORIA, nao de ficheiro.
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*
+id_ed25519*
+.npmrc
+.netrc
+.pgpass
+.git-credentials
+credentials*
+secrets/

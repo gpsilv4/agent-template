@@ -20,6 +20,10 @@ Stack: {{STACK}}.
 
 ## Regras (carregar sempre)
 
+> **Projeto por configurar?** Se `.agent/.template-version` **nao existir**, este repo
+> ainda e o template por estrear: ler e seguir **`.agent/BOOTSTRAP.md`** antes de
+> qualquer outra coisa. E o unico passo que tem de acontecer primeiro.
+
 @./.agent/rules/core-rules.md
 @./.agent/rules/process-rules.md
 @./.agent/rules/anti-patterns.md

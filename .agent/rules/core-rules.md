@@ -23,10 +23,10 @@
   o que as ferramentas leem e o que o `.githooks/commit-msg` e o CI verificam. O **corpo**
   segue a lingua do projeto.
 
-> Porque nao "commits em ingles" e ponto final, que era o que esta regra dizia: os 57 commits
-> deste repo estao em portugues. **Uma regra violada a 100% nao e uma regra — e uma licao de
-> que as regras se ignoram**, que e o oposto do que este template ensina. A parte que importa
-> para tooling (o prefixo) fica obrigatoria e verificada; o resto e escolha do projeto.
+> **Uma regra violada a 100% nao e uma regra — e uma licao de que as regras se ignoram.** Por
+> isso so e obrigatorio o que as ferramentas leem e o `.githooks/commit-msg` verifica: o
+> prefixo. A lingua do corpo e escolha do projeto. (A medicao que levou a isto:
+> `src/docs/ticket-method-why.md`.)
 
 ## Dominio
 
