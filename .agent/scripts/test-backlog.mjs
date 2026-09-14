@@ -115,9 +115,9 @@ const f = (dir, p) => join(dir, p);
 const readF = (dir, p) => readFileSync(f(dir, p), "utf8");
 const writeF = (dir, p, c) => writeFileSync(f(dir, p), c);
 
-function run(dir, cwd) {
+function run(dir, cwd, args = []) {
   try {
-    const out = execFileSync("node", [f(dir, ".agent/scripts/check-backlog.mjs")], {
+    const out = execFileSync("node", [f(dir, ".agent/scripts/check-backlog.mjs"), ...args], {
       cwd: cwd ?? dir,
       encoding: "utf8",
       stdio: "pipe",
@@ -135,7 +135,7 @@ function test(name, mutate, expect) {
   const dir = sandbox();
   try {
     const cwd = mutate ? mutate(dir) : undefined;
-    const { code, out } = run(dir, cwd);
+    const { code, out } = run(dir, cwd, expect.args ?? []);
     const problems = [];
 
     // Invariante do gate: exit != 0 exatamente quando imprimiu WARN. Sem isto, um
@@ -180,6 +180,19 @@ test("baseline: fixture valida passa sem avisos", null, {
   includes: ["OK — contadores (por seccao e Total), barra, esforcos e IDs consistentes"],
   excludes: ["  WARN  "],
 });
+
+// --- Par alternativo por argumento (o backlog proprio do template) ------------
+// O verificador passou a aceitar `check-backlog.mjs <ativo> [<arquivo>]`, para o
+// `backlog-template.md` — que rastreia o trabalho sobre o template e que o bootstrap apaga —
+// ter a mesma rede que o par principal. Falha FECHADA: um alvo que nao existe reprova.
+test("argumento: alvo inexistente reprova, nao salta em silencio", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK);
+}, { code: 1, args: [".agent/context/nao-existe.md"], includes: ["nao encontrado ou vazio"] });
+
+test("argumento: o arquivo e derivado do ativo quando nao e passado", (dir) => {
+  writeF(dir, ".agent/context/outro.md", ACTIVE_OK);
+  writeF(dir, ".agent/context/outro-archive.md", ARCHIVE_OK);
+}, { code: 0, args: [".agent/context/outro.md"], includes: ["OK — contadores"] });
 
 // --- A linha `**Total**` (era FILTRADA e nunca comparada) --------------------
 // Achado de auditoria: um Resumo com Total a 999/888/777/666/555 saia `OK — contadores
