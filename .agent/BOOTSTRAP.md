@@ -597,6 +597,17 @@ git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 > nao e commitar em `main` por baixo do hook, e decidir por escrito que este repo nao tem
 > branch protegido e tirar `main` de `PROTEGIDOS` em `.claude/hooks/guard-protected-branch.mjs`.
 
+> **O primeiro PR demora, e e normal.** O CI corre a varredura de mutacao quando o diff toca
+> `.agent/scripts/` — e o bootstrap toca, ao substituir os placeholders la dentro. Ela desliga
+> **cada sitio de recusa, um a um**, e exige que a suite fique vermelha em cada um: sao
+> **dezenas de minutos**. Nao esta pendurado. E a unica corrida que prova que os verificadores
+> continuam a reprovar o que devem **neste** repo, e nao apenas no template. Os PRs seguintes,
+> que mexem no teu codigo, nao pagam isto — a condicao so dispara para
+> `.agent/scripts/`, `.claude/hooks/` e `.githooks/`.
+>
+> (Sem numero de minutos de proposito: ele muda a cada verificador ou teste que se acrescente,
+> e um numero escrito a mao que ninguem recalcula envelhece sozinho — `AP1`.)
+
 ---
 
 ## Notas para a AI
