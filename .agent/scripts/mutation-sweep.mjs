@@ -88,6 +88,14 @@ function listarDir(rel) {
 // ausencia de um ficheiro, nao a linha em si.
 const PARES = [
   {
+    // Falha aberta por desenho (esta no caminho de CADA prompt), logo nao tem `warn(`.
+    // O sitio que DECIDE e o `console.log` do lembrete.
+    alvo: ".claude/hooks/prompt-fase0.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O hook nao tem `warn(`/`fatal(`: falha aberta por desenho. O sitio que DECIDE e o
     // `console.log` da reinjeccao — desliga-lo faz o hook nao entregar nada, que e
     // exactamente o defeito que os testes tem de apanhar.

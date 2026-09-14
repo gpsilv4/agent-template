@@ -463,6 +463,70 @@ test("session: caminho com acento aparece INTEIRO, nao escapado", () => {
   }
 });
 
+// --- UserPromptSubmit: lembrar a Fase 0 ---------------------------------------
+// A Fase 0 era das 13 regras so-prosa. Este hook e a primeira camada mecanica que ela tem.
+// O que se afirma: dispara nas ordens, CALA-SE nas perguntas (um lembrete numa pergunta e
+// ruido, e ruido a cada prompt ensina a ignorar o lembrete), e nunca bloqueia.
+const FASE0 = join(ROOT, ".claude/hooks/prompt-fase0.mjs");
+
+/** Corre o hook com um prompt, sem precisar de repo. */
+function comPrompt(texto) {
+  const out = execFileSync("node", [FASE0], { input: JSON.stringify({ prompt: texto }), encoding: "utf8" });
+  if (!out.trim()) return { vazio: true, ctx: "" };
+  return { vazio: false, ctx: JSON.parse(out).hookSpecificOutput?.additionalContext ?? "" };
+}
+
+for (const ordem of [
+  "faz o ticket B3",
+  "implementa o export mensal",
+  "corrige o bug do login",
+  "acrescenta um filtro a tabela",
+  "implement the ticket F2",
+  "comeca o sprint 2",
+]) {
+  test(`fase0: lembra em "${ordem}"`, () => {
+    const r = comPrompt(ordem);
+    if (r.vazio) throw new Error("era uma ordem de implementacao e nao lembrou a Fase 0");
+    contem(r.ctx, "Fase 0");
+  });
+}
+
+for (const naoOrdem of [
+  "como implementar isto?",
+  "porque e que o teste falha?",
+  "o que faz este guard?",
+  "explica-me o ticket B3",
+  "qual e a diferenca entre os dois?",
+]) {
+  test(`fase0: CALA-SE em "${naoOrdem}"`, () => {
+    if (!comPrompt(naoOrdem).vazio) throw new Error("era uma pergunta — um lembrete aqui e ruido");
+  });
+}
+
+test("fase0: cala-se quando o pedido JA pede plano (evita lembrar o obvio)", () => {
+  if (!comPrompt("implementa o export, mas explica primeiro o plano").vazio)
+    throw new Error("o pedido ja esta em Fase 0 — lembrar e redundante");
+  if (!comPrompt("corre o /grill sobre o ticket B3 e implementa").vazio)
+    throw new Error("o pedido ja invoca o /grill");
+});
+
+test("fase0: prompt vazio ou ausente nao dispara", () => {
+  if (!comPrompt("").vazio) throw new Error("prompt vazio nao e uma ordem");
+  const out = execFileSync("node", [FASE0], { input: "{}", encoding: "utf8" });
+  if (out.trim()) throw new Error("payload sem prompt nao devia produzir nada");
+});
+
+test("fase0: payload ilegivel sai 0 e calado (falha aberta)", () => {
+  const out = execFileSync("node", [FASE0], { input: "nao e json", encoding: "utf8" });
+  if (out.trim()) throw new Error("um hook no caminho de cada prompt tem de falhar aberto");
+});
+
+test("fase0: NUNCA bloqueia — nao emite decision/deny", () => {
+  const out = execFileSync("node", [FASE0], { input: JSON.stringify({ prompt: "faz o ticket B3" }), encoding: "utf8" });
+  if (/"(?:decision|permissionDecision)"\s*:\s*"(?:block|deny)"/.test(out))
+    throw new Error("recusar o prompt do utilizador custa muito mais do que um lembrete a mais");
+});
+
 // --- PreCompact: reinjectar as Fronteiras -------------------------------------
 // A compactacao descarta as rules importadas pelo CLAUDE.md e nada avisa. Este hook devolve
 // o bloco Fronteiras em `additionalContext` (campo honrado no PreCompact). Falha ABERTA:

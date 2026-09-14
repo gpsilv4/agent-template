@@ -14,7 +14,7 @@ Stack: {{STACK}}.
 - **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
 - **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
 
-> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.
+> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida, lembram a Fase 0 quando o pedido e uma ordem de implementacao, e reinjectam as Fronteiras antes de a janela compactar) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.
 
 ---
 

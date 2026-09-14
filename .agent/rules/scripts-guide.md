@@ -31,6 +31,12 @@
     rules inteiras (~26 KB) derrotava o proposito da compactacao. **Falha aberta**: sem
     `CLAUDE.md`, com a seccao renomeada ou vazia, sai `0` calado — bloquear uma compactacao
     custa mais do que perder a reinjeccao.
+  - `prompt-fase0` (`UserPromptSubmit`) — quando o pedido parece uma ordem de implementacao
+    ("faz o ticket B3", "implementa X"), devolve o que a **Fase 0** exige, **antes** de o
+    agente comecar a responder. Fecha a primeira das 13 regras que eram so prosa. **Nao
+    bloqueia** (um `exit 2` recusaria o prompt do utilizador, e o custo de um falso positivo
+    e muito maior do que o de um lembrete a mais) e **cala-se em perguntas** — ruido a cada
+    prompt ensina a ignorar o lembrete. Falha aberta.
   - Ambos usam `git status --untracked-files=all`, porque sem isso o git **colapsa diretorios** nao rastreados e um ficheiro novo em pasta nova aparece como a pasta.
   - **Nao ha `lint-changed-file`** de proposito: os comandos de lint sao especificos da stack, logo o template so poderia trazer um hook inerte — e um hook que nao faz nada por omissao e prosa com mais passos. Se o teu projeto tem lint, vale a pena escreve-lo: `PostToolUse`/`Write|Edit`, a devolver o que nao e auto-corrigivel como contexto para ser corrigido no mesmo turno.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio), logo e opt-in no CI: correr localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
