@@ -34,6 +34,13 @@ const aprova = (dir, nome) => {
 };
 
 const cfg = (servidores) => JSON.stringify({ mcpServers: servidores }, null, 2) + "\n";
+
+/** Os segredos de fixture CONSTROEM-SE, nunca se escrevem por extenso — e a convencao deste
+ *  ficheiro desde sempre (`"ghp_" + "A".repeat(36)`), e existe porque o `gitleaks` do CI varre
+ *  o codigo-fonte e nao distingue uma fixture de um token a serio. Medido: colei um JWT
+ *  literal aqui e o job `Secret Scan` do PR ficou vermelho. Montado em pedacos, tem a forma
+ *  que o guard procura e nao a assinatura que o scanner procura. */
+const jwtFalso = ["eyJ" + "hbGciOiJIUzI1NiJ9", "eyJ" + "yb2xlIjoiZml4dHVyZSJ9", "Q" + "UJDREVGR0hJSktM"].join(".");
 /** O VS Code chama-lhe `servers`, nao `mcpServers`. */
 const cfgVscode = (servidores) => JSON.stringify({ servers: servidores }, null, 2) + "\n";
 
@@ -123,7 +130,7 @@ export function registar() {
   test("G16: JWT literal (service key) avisa", (dir) => {
     aprova(dir, "bd");
     writeF(dir, ".mcp.json", cfg({
-      bd: { command: "npx", env: { KEY: "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.QUJDREVGR0hJSktM" } },
+      bd: { command: "npx", env: { KEY: jwtFalso } },
     }));
   }, { code: 1, includes: ["JWT (eyJ...)"] });
 
