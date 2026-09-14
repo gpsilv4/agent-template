@@ -89,6 +89,11 @@ const CONFIG_CONTAVEIS = [
   // as suites estavam na superficie e o que elas testam nao. Apagar o
   // `guard-protected-branch.mjs` nao produzia uma palavra.
   /(^|\/)\.claude\/hooks\/[^/]+\.mjs$/,
+  // `.claude/hooks/lib/` pela MESMA razao que `.agent/scripts/lib/` acima — e a lacuna foi
+  // fechada de um lado e deixada aberta do outro. Medido no CI: extrair a verificacao de
+  // fronteira para `lib/fronteira.mjs` leu-se como perda de 6 casos no ficheiro de origem,
+  // porque o destino nao estava na superficie. O `[^/]+` do padrao acima nao alcanca `lib/`.
+  /(^|\/)\.claude\/hooks\/lib\/[^/]+\.mjs$/,
   // O `.githooks/` nao tem extensao (o git exige o nome exato do evento), logo nao ha sufixo
   // por onde o apanhar.
   /(^|\/)\.githooks\/[^/]+$/,
