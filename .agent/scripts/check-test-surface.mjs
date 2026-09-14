@@ -83,10 +83,28 @@ const CONFIG_CONTAVEIS = [
   /(^|\/)check-[^/]+\.mjs$/,
   /(^|\/)guards\/[^/]+\.mjs$/,
   /(^|\/)test-harness\.mjs$/,
+  // Os HOOKS, pela mesmissima razao que os `check-*` e os `guards/*` acima: sao codigo de
+  // enforcement, e desligar uma decisao deles enfraquece a rede sem tocar num teste. Ficavam
+  // de fora porque os globs de teste so apanham `.claude/hooks/tests/` (a pasta `tests/`) —
+  // as suites estavam na superficie e o que elas testam nao. Apagar o
+  // `guard-protected-branch.mjs` nao produzia uma palavra.
+  /(^|\/)\.claude\/hooks\/[^/]+\.mjs$/,
+  // O `.githooks/` nao tem extensao (o git exige o nome exato do evento), logo nao ha sufixo
+  // por onde o apanhar.
+  /(^|\/)\.githooks\/[^/]+$/,
   // As tabelas de padroes deste verificador. Sem esta linha, extrai-las para um ficheiro
   // proprio tirava-as da superficie congelada, e apagar metade delas — que e desligar o
   // detetor — nao mexia em nenhuma contagem vigiada.
   /(^|\/)surface-patterns\.mjs$/,
+  // `lib/`: os modulos partilhados. A mesma lacuna, encontrada ao extrair a tabela `PARES`
+  // para `lib/pares.mjs` — a extracao lia-se como perda de 19 pares porque o destino nao
+  // estava na superficie. E ja valia antes disso para o `lib/registo.mjs`, que **e** o
+  // invariante 2 do `AP4` (a seleccao do runner) e estava fora da superficie congelada.
+  // Ancorado a `.agent/scripts/`: sem isso casava `src/lib/utils.mjs` e `packages/x/lib/y.mjs`
+  // de qualquer projeto derivado, e apagar um ficheiro normal da app dava
+  // "ficheiro da superficie de teste APAGADO" com exit 1 — a mesma classe de falso positivo
+  // que o comentario acima ja documenta ter fechado uma vez.
+  /(^|\/)\.agent\/scripts\/lib\/[^/]+\.mjs$/,
   /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
 ];
 

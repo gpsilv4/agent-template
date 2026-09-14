@@ -86,8 +86,16 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
   // ~12 KB (o `ticket-method.md` vive nos 11958): com o NOTE em 12000 a proxima frase que se
   // acrescentasse a esse ficheiro produzia ruido. Acima de 20000 a mensagem e mais dura; o
   // gate e o mesmo.
-  const REF_NOTE_BYTES = 12500;
-  const REF_MAX_BYTES = 14000;
+  //
+  // **Descidos de 12500/14000 para 11500/12000.** Razao, e nao e teorica: o `ticket-method.md`
+  // passou os 12000 **tres vezes**, e as tres quem deu por isso foi o UTILIZADOR — o guard
+  // dizia `OK` porque o seu limiar de referencia era outro. Num repo cuja tese e "prosa nao e
+  // garantia", ter a pessoa como detetor de um limite numerico e o defeito. A linha que toda
+  // a gente tem na cabeca e os 12k das rules carregadas; uma referencia que precise de mais do
+  // que isso nao esta grande — esta a misturar instrucao com evidencia, e a evidencia tem
+  // casa propria em `src/docs/*-why.md`. O NOTE 500 bytes antes do gate da aviso a tempo.
+  const REF_NOTE_BYTES = 11500;
+  const REF_MAX_BYTES = 12000;
   const REF_ABANDONO_BYTES = 20000;
   const CARREGADAS = new Set([...REQUIRED_RULES, ...BOOTSTRAP_RULES]);
   // Catalogos de DEFINICOES: nao sao manuais reabertos a cada ticket (que e o que este guard
@@ -116,6 +124,52 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
       } else {
         ok(`${file} = ${bytes} bytes (referencia)`);
       }
+    }
+    corridos++;
+  }
+
+  // --- Guard 1e: os catalogos de DEFINICOES, e os WORKFLOWS ---
+  // Dois buracos que o utilizador encontrou a olho, o que ja diz o suficiente:
+  //   - `anti-patterns-template.md` esta fora do Guard 1b **de proposito** (e uma tabela que
+  //     o Guard 15 le, nao um manual reaberto por ticket), mas "nao e um manual" nao e
+  //     licenca de tamanho: a 30 KB deixa de ser legivel na mesma;
+  //   - os **workflows** nao tinham orcamento NENHUM, e sao exatamente o caso do Guard 1b —
+  //     lidos por inteiro quando o comando e invocado. O `review.md` vive nos 11.8 KB.
+  // O tecto e o mesmo 12 000 de tudo o resto: e a linha que este projeto tem, e ter tres
+  // numeros diferentes foi precisamente o que fez o utilizador e o guard discordarem.
+  const outros = [
+    ...[...DEFINICOES].map((f) => ({ file: `.agent/rules/${f}`, tipo: "catalogo de definicoes" })),
+    ...(listDir(".agent/workflows", ".md") || []).map((n) => ({ file: `.agent/workflows/${n}.md`, tipo: "workflow" })),
+  ];
+  if (outros.length === 0) {
+    skip("Guard 1e — sem catalogos nem workflows para orcamentar");
+  } else {
+    let maior = { file: null, bytes: 0 };
+    let avisados = 0;
+    let lidos = 0;
+    for (const { file, tipo } of outros) {
+      const c = read(file);
+      if (c === null) continue;
+      lidos++;
+      const bytes = Buffer.byteLength(c.replace(/\r\n/g, "\n"), "utf8");
+      if (bytes > maior.bytes) maior = { file, bytes };
+      if (bytes > REF_MAX_BYTES) {
+        warn(`${file} = ${bytes} bytes > ${REF_MAX_BYTES} (${tipo}) — condensar; a evidencia e o racional vao para src/docs/`);
+        avisados++;
+      } else if (bytes > REF_NOTE_BYTES) {
+        note(`${file} = ${bytes} bytes (${tipo}, perto do limite ${REF_MAX_BYTES})`);
+      }
+    }
+    // Um por um seriam 14 linhas de `OK` a cada corrida. O que interessa e o MAIOR: se ele
+    // cabe, cabem todos — e o numero fica a vista, que e o que falta quando so se diz "ok".
+    // Zero ficheiros LIDOS nao e o mesmo que zero candidatos: a lista de catalogos e fixa,
+    // logo um catalogo que nao exista deixava `outros.length > 0` e o guard nao emitia nem
+    // `OK` nem `SKIP` — silencio, que e o `AP2` dentro do proprio guard. Apanhado pela sua
+    // suite, no cenario em que se apagam os workflows todos.
+    if (lidos === 0) {
+      skip(`Guard 1e — nenhum dos ${outros.length} candidatos (workflows, catalogos) existe no disco`);
+    } else if (avisados === 0) {
+      ok(`catalogos e workflows: ${lidos} ficheiros, maior ${maior.file} (${maior.bytes} bytes), tecto ${REF_MAX_BYTES}`);
     }
     corridos++;
   }
@@ -202,7 +256,11 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
     };
     const raiz = read("CLAUDE.md");
     const base = raiz === null ? null : fronteirasDe(raiz);
-    const PONTEIROS = [".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
+    // O `AGENTS.md` estava FORA desta lista — e foi exatamente onde a copia envelheceu: o
+    // paragrafo "Prosa nao e garantia" descrevia 3 dos 5 deveres dos hooks enquanto o
+    // `CLAUDE.md` ja descrevia 5. Um ficheiro que carrega as mesmas Fronteiras e nao e
+    // comparado e o sitio onde a deriva vai acontecer, porque e o unico sem rede.
+    const PONTEIROS = ["AGENTS.md", ".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
     if (base === null) {
       skip("Guard 1d — sem CLAUDE.md ou sem bloco de Fronteiras para comparar");
     } else {

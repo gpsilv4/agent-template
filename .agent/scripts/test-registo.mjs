@@ -30,6 +30,11 @@ function corre({ modulos = {}, entryPoint = "entry.mjs", conhecidos = ["entry.mj
     for (const [nome, conteudo] of Object.entries(modulos)) {
       writeFileSync(join(dir, nome), conteudo);
     }
+    // Os entry points conhecidos existem como FICHEIRO nesta pasta: a descoberta e por pasta,
+    // e um modulo que declare um entry point que nao esta aqui nao e corrido por ninguem.
+    for (const ep of conhecidos) {
+      if (ep !== "entry.mjs") writeFileSync(join(dir, ep), "// entry point vizinho\n");
+    }
     // O entry point conta os testes com um contador proprio: o que se mede aqui e o
     // contrato do registo, nao o harness dos guards.
     writeFileSync(
@@ -189,32 +194,38 @@ test(
 
 testCru(
   "sem `contagem()` reprova (nao ha como medir o contributo de cada modulo)",
-  '{ dir: ".", entryPoint: "x.mjs" }',
+  '{ dir: ".", entryPoint: "x.mjs", conhecidos: ["x.mjs"] }',
   { code: 1, includes: ["precisa de `contagem()`"] }
 );
 
 testCru(
   "sem `entryPoint` reprova (nao saberia que modulos sao seus)",
-  '{ dir: ".", contagem: () => 0 }',
+  '{ dir: ".", contagem: () => 0, conhecidos: ["x.mjs"] }',
   { code: 1, includes: ["precisa de `entryPoint`"] }
 );
 
 testCru(
   "pasta ilegivel reprova a dizer que NAO LEU — nao 'nao ha nada' (AP2)",
-  '{ dir: "/nao/existe/em/lado/nenhum", entryPoint: "x.mjs", contagem: () => 0 }',
+  '{ dir: "/nao/existe/em/lado/nenhum", entryPoint: "x.mjs", contagem: () => 0, conhecidos: ["x.mjs"] }',
   { code: 1, includes: ["nao consegui ler"] }
 );
 
 test(
   "entryPoint que nao existe em NENHUM entry point reprova (era saltado em silencio)",
-  { modulos: { "tests-a.mjs": OK(), "tests-erro.mjs": OK("test-guard.mjs") }, conhecidos: ["entry.mjs", "outro.mjs"] },
-  { code: 1, includes: ["nao e nenhum entry point deste repo"] }
+  { modulos: { "tests-a.mjs": OK(), "tests-erro.mjs": OK("naoexiste.mjs") }, conhecidos: ["entry.mjs", "outro.mjs"] },
+  { code: 1, includes: ["nao e um entry point DESTA pasta"] }
 );
 
 test(
   "um modulo de OUTRO entry point conhecido e saltado, mas dito em voz alta",
   { modulos: { "tests-a.mjs": OK(), "tests-alheio.mjs": OK("outro.mjs") } },
   { code: 0, includes: ["REGISTADOS:tests-a.mjs|OUTROS:tests-alheio.mjs"] }
+);
+
+testCru(
+  "sem `conhecidos` reprova — uma rede opcional nao e uma rede",
+  '{ dir: ".", entryPoint: "x.mjs", contagem: () => 0 }',
+  { code: 1, includes: ["precisa de `conhecidos`"] }
 );
 
 console.log("");

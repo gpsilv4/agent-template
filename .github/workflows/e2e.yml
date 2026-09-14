@@ -50,9 +50,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile, e o `setup-node`
+          # rebenta com "Dependencies lock file is not found" antes de qualquer mensagem util.
+          # O `ci.yml` ja tinha isto comentado; aqui estava ativo. Descomentar depois de
+          # commitar o `package-lock.json`.
+          # cache: npm
 
-      - run: npm ci
+      # Guardado como no `ci.yml`: um `npm ci` nu falha com uma mensagem que nao aponta para a
+      # causa, e num workflow de `workflow_dispatch` ninguem percebe porque. A mensagem aponta.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
+            exit 1
+          fi
 
       # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
       # Vitest browser mode, …), replace this install step and the run commands below.
@@ -97,9 +110,22 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-          cache: npm
+          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile, e o `setup-node`
+          # rebenta com "Dependencies lock file is not found" antes de qualquer mensagem util.
+          # O `ci.yml` ja tinha isto comentado; aqui estava ativo. Descomentar depois de
+          # commitar o `package-lock.json`.
+          # cache: npm
 
-      - run: npm ci
+      # Guardado como no `ci.yml`: um `npm ci` nu falha com uma mensagem que nao aponta para a
+      # causa, e num workflow de `workflow_dispatch` ninguem percebe porque. A mensagem aponta.
+      - name: Install
+        run: |
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            npm ci
+          else
+            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
+            exit 1
+          fi
 
       # NOTE: assumes Playwright. If your E2E runner differs (Cypress, WebdriverIO,
       # Vitest browser mode, …), replace this install step and the run commands below.

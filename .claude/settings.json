@@ -12,16 +12,43 @@
       "Read(./**/.npmrc)",
       "Read(./**/credentials*)",
       "Read(./**/secrets/**)",
+      "Read(./*.pem)",
+      "Read(./*.key)",
+      "Read(./id_rsa*)",
+      "Read(./.npmrc)",
+      "Read(./credentials*)",
+      "Read(./secrets/**)",
+      "Read(./**/id_*)",
+      "Read(./**/.envrc)",
+      "Read(./**/.netrc)",
+      "Read(./**/.pgpass)",
+      "Read(./**/.git-credentials)",
+      "Read(./**/*.p12)",
+      "Read(./**/*.pfx)",
+      "Read(./**/*.jks)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.npmrc)",
+      "Read(~/.config/gh/**)",
       "Edit(./.claude/settings.json)",
       "Edit(./.claude/settings.local.json)",
       "Write(./.claude/settings.local.json)",
       "Write(./.claude/settings.json)",
       "Edit(./.env*)",
+      "Edit(./**/.env*)",
       "Write(./.env*)",
+      "Write(./**/.env*)",
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git reset --hard:*)",
-      "Bash(rm -rf:*)"
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)",
+      "Bash(rm -Rf:*)",
+      "Bash(rm -fR:*)",
+      "Bash(rm -r -f:*)",
+      "Bash(rm -f -r:*)",
+      "Bash(rm --recursive --force:*)",
+      "Bash(git push --force-with-lease:*)"
     ],
     "ask": [
       "Bash(git commit:*)",
@@ -31,7 +58,21 @@
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
       "Edit(./.claude/hooks/**)",
-      "Write(./.claude/hooks/**)"
+      "Write(./.claude/hooks/**)",
+      "Bash(git checkout -b:*)",
+      "Bash(git switch -c:*)",
+      "Bash(git branch:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(yarn add:*)",
+      "Bash(yarn remove:*)",
+      "Bash(bun add:*)",
+      "Bash(bun remove:*)",
+      "Bash(pip install:*)",
+      "Edit(./.githooks/**)",
+      "Write(./.githooks/**)",
+      "Edit(./.claude/agents/**)",
+      "Write(./.claude/agents/**)"
     ],
     "allow": [
       "Read(./.agent/**)",
@@ -50,15 +91,23 @@
       "Bash(node .agent/scripts/mutation-sweep.mjs --list)",
       "Bash(npx tsc --noEmit)",
       "Bash(npm run lint)",
-      "Bash(npm run lint:*)",
       "Bash(npm run build)",
       "Bash(npm run test)",
-      "Bash(npm run test:*)",
       "Bash(node .agent/scripts/check-test-surface.mjs:*)",
       "Bash(node .agent/scripts/test-test-surface.mjs)",
       "Bash(node .claude/hooks/tests/test-hooks.mjs)",
       "Bash(node .claude/hooks/session-context.mjs)",
-      "Bash(node .claude/hooks/stop-verify.mjs)"
+      "Bash(node .claude/hooks/stop-verify.mjs)",
+      "Bash(npm run test:unit)",
+      "Bash(npm run test:e2e)",
+      "Bash(npm run test:security)",
+      "Bash(npm run test:audit)",
+      "Bash(npm run test:all)",
+      "Bash(npm run lint:fix)",
+      "Bash(node .agent/scripts/mutation-sweep.mjs --only=guards)",
+      "Bash(node .agent/scripts/mutation-sweep.mjs --only=check-doc)",
+      "Bash(node .agent/scripts/mutation-sweep.mjs --only=check-backlog)",
+      "Bash(node .agent/scripts/mutation-sweep.mjs --skips)"
     ]
   },
   "hooks": {
@@ -81,6 +130,15 @@
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-context.mjs\""
           }
         ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/reinject-fronteiras.mjs\""
+          }
+        ]
       }
     ],
     "Stop": [
@@ -89,16 +147,6 @@
           {
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop-verify.mjs\""
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/precompact-reinject.mjs\""
           }
         ]
       }

@@ -8,6 +8,9 @@
  */
 import { appendFileSync, readdirSync, rmSync } from "fs";
 import { pathToFileURL } from "url";
+// A lista real, para os testes nao a duplicarem a mao.
+const PONTEIROS_1D = ["AGENTS.md", ".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
+import { join } from "path";
 import { test, file, readF, writeF } from "./test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -60,8 +63,48 @@ export function registar() {
   test("G1b: referencia maior que uma rule carregada da NOTE, nao WARN", (dir) => {
     // NOTE nao e WARN: o exit fica 0 e o aviso e informativo. So a NOTE prova que o limiar
     // intermedio existe — sem este teste, colapsar os dois limiares passava despercebido.
-    writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(13000));
+    // 11 500 <= bytes < 12 000 e a banda da NOTE depois de os limiares descerem de
+    // 12500/14000 (o `ticket-method.md` passou os 12k tres vezes e quem deu por isso foi
+    // sempre o utilizador, nunca o guard).
+    writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(11700));
   }, { code: 0, includes: ["scripts-guide.md", "maior que uma rule carregada"] });
+
+  // A outra metade: acima dos 12 000 **reprova**. Sem este teste, subir o gate de volta —
+  // que e o remendo tentador quando um ficheiro incha — nao partia nada.
+  test("G1b: referencia acima dos 12 000 REPROVA (o limiar que se media a olho)", (dir) => {
+    writeF(dir, ".agent/rules/scripts-guide.md", "# guia\n\n" + "y".repeat(12600));
+  }, { code: 1, includes: ["scripts-guide.md", "separar instrucoes de evidencia"] });
+
+  // --- Guard 1e: workflows e catalogos de definicoes ---------------------------
+  // Dois buracos que ninguem media e que o UTILIZADOR viu a olho: os workflows nao tinham
+  // orcamento nenhum (o `review.md` vive nos 11.8 KB) e o `anti-patterns-template.md` estava
+  // fora do Guard 1b de proposito — mas "nao e um manual" nao e licenca de tamanho.
+  test("G1e: workflow acima do tecto reprova", (dir) => {
+    writeF(dir, ".agent/workflows/review.md", "# review\n\n" + "z".repeat(12600));
+  }, { code: 1, includes: [".agent/workflows/review.md", "(workflow)"] });
+
+  test("G1e: catalogo de definicoes acima do tecto reprova", (dir) => {
+    // Este ficheiro NAO passa pelo Guard 1b (e uma tabela que o Guard 15 le). Sem o 1e,
+    // podia crescer sem limite e nada dizia uma palavra.
+    writeF(dir, ".agent/rules/anti-patterns-template.md",
+      readF(dir, ".agent/rules/anti-patterns-template.md") + "\n\n" + "w".repeat(12600));
+  }, { code: 1, includes: ["anti-patterns-template.md", "catalogo de definicoes"] });
+
+  test("G1e: workflow perto do tecto da NOTE, nao WARN", (dir) => {
+    writeF(dir, ".agent/workflows/debug.md", "# debug\n\n" + "z".repeat(11700));
+  }, { code: 0, includes: ["NOTE", "perto do limite"] });
+
+  // O veredicto de sucesso nomeia o MAIOR e o numero. Um "ok" sem numero e indistinguivel de
+  // um guard que nao mediu nada (`AP2`), e com 14 ficheiros ninguem os conta a mao.
+  test("G1e: o OK diz qual e o maior e quantos bytes tem", null, {
+    code: 0,
+    anyOut: ["catalogos e workflows:", "maior ", "tecto 12000"],
+  });
+
+  test("G1e: sem workflows nem catalogos da SKIP visivel", (dir) => {
+    for (const f of readdirSync(join(dir, ".agent/workflows"))) rmSync(join(dir, ".agent/workflows", f));
+    rmSync(file(dir, ".agent/rules/anti-patterns-template.md"), { force: true });
+  }, { code: 1, anyOut: ["SKIP  Guard 1e"] });
 
   // --- Guard 1d: as Fronteiras copiadas nos ponteiros finos ---------------------
   // A copia existe porque nao esta verificado que o Cursor e o Copilot SIGAM um ponteiro em
@@ -154,10 +197,20 @@ export function registar() {
   }, { code: 0, includes: ["SKIP  Guard 1d"] });
 
   test("G1d: sem nenhum ponteiro fino da SKIP visivel", (dir) => {
-    for (const f of [".cursor/rules/project.mdc", ".github/copilot-instructions.md"]) {
+    // Derivado do PONTEIROS real, e nao fixado aqui: o `AGENTS.md` foi acrescentado a lista
+    // (era o unico ficheiro com as Fronteiras fora do alcance do guard, e foi la que a copia
+    // envelheceu) e este teste apagava dois de tres.
+    for (const f of PONTEIROS_1D) {
       try { rmSync(file(dir, f)); } catch {}
     }
   }, { code: 0, includes: ["SKIP  Guard 1d"] });
+
+  // A outra metade: o `AGENTS.md` esta DENTRO do alcance. Sem este teste, tira-lo da lista
+  // nao partia nada — e foi assim que a deriva passou despercebida.
+  test("G1d: Fronteiras divergentes no AGENTS.md avisam", (dir) => {
+    const f = "AGENTS.md";
+    writeF(dir, f, readF(dir, f).replace("- **Nunca**:", "- **Nunca (versao antiga)**:"));
+  }, { code: 1, includes: ["AGENTS.md", "Fronteiras"] });
 
   test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
     // A lista e DERIVADA do disco: escrever os nomes a mao envelhecia no primeiro ficheiro

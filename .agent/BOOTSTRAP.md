@@ -141,7 +141,7 @@ Guarda as respostas — vais precisar delas para preencher todos os placeholders
 
 Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo**:
 
-- **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
+- **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`, `upgrade` — este e o que traz melhorias do template, e um projeto pequeno precisa dele tanto como um grande) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`, `grill` — o `/grill` acompanha o `/plan`, e num projeto sem tickets `L` nao tem trabalho) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
 - **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 13 workflows + ritual de backlog/sprint + guards.
 
 > Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `propagation.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
@@ -246,7 +246,7 @@ printf 'template: %s\ncommit: %s\nversao: %s\ndata: %s\n' \
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
-Percorrer todos os `.md`, `.mdc` (regras do Cursor), `.mjs`, `LICENSE`, `.github/CODEOWNERS` e **os ficheiros de `.githooks/`** (nao tem extensao — o git exige o nome exacto do evento) e substituir:
+Percorrer todos os `.md`, `.mdc` (regras do Cursor), **`.toml` (`.gemini/commands/`)**, `.mjs`, `LICENSE`, `.github/CODEOWNERS` e **os ficheiros de `.githooks/`** (nao tem extensao — o git exige o nome exacto do evento) e substituir:
 
 | Placeholder | Fonte |
 |-------------|-------|
@@ -334,7 +334,7 @@ const TARGETS = {
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 21 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, e sanidade do `.claude/settings.json`.
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 23 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, o flag das 500 linhas nos ficheiros da maquinaria, e o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le).
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -403,7 +403,6 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **Se NAO e React**: adaptar padroes de componentes e hooks
 - **Se NAO usa SWR**: adaptar seccao "Data Fetching" ao state management escolhido
 - **Se NAO usa Tailwind**: remover padroes mobile especificos de Tailwind
-- **Se NAO tem PWA**: remover seccoes de PWA/Service Worker
 
 ### 2.6 Adaptar workflows a stack
 
@@ -448,7 +447,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.agent/rules/anti-patterns.md`**: apagar **so** o exemplo comentado (esse e ilustrativo). As entradas preenchidas sao reais e herdadas do template, e **os ficheiros do template citam-nas** — as rules, os workflows, os verificadores de `.agent/scripts/` e os hooks de `.claude/`. **Manter enquanto mantiveres esses ficheiros**, e acrescentar os teus com o proximo ID livre. Apagar uma entrada obriga a apagar tambem as citacoes dela, ou o Guard 15 reprova o commit (e diz-te, ficheiro e linha, quais ficaram penduradas). Medido: seguir a versao anterior desta instrucao — deixar o ficheiro sem entradas — dava 68 avisos e exit 1 no dia 1. A evidencia de cada entrada vive em `src/docs/anti-patterns-why.md`, que podes esvaziar sem consequencia nenhuma: nada o cita por numero.
 - **`.agent/rules/ticket-method.md`**: adaptar duas coisas ao projeto — o **nucleo do dominio** (os sitios onde um erro destroi dados ou a confianca, nao apenas da uma resposta errada: reducer, seed, pontuacao, migracoes, precos) e a **lista de angulos** da Fase 3 (os de UI nao servem a uma CLI ou lib). Nao importar — o ponteiro obrigatorio vive em `process-rules.md`.
 - **`.agent/rules/anti-patterns-template.md`**: **manter**. Sao as licoes do template, citadas por dezenas de ficheiros que vais herdar; o Guard 15 reprova se as apagares e diz quais citacoes ficaram penduradas. Os teus anti-padroes vao para `anti-patterns.md`.
-- **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em `CLAUDE.md`/`GEMINI.md`.
+- **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em **nenhum** dos tres pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`).
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
 
 ### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)
@@ -468,6 +467,23 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
 - **`.claude/agents/*.md`** (`code-reviewer`, `debugger`, `plan-auditor`): subagentes read-only/investigacao. Ajustar se o processo mudar.
+- **`.claude/hooks/*.mjs`** (**so-Claude Code**): a camada que corre **antes** da ferramenta, e
+  a unica que nao depende de o agente se lembrar. Cinco: nega `commit`/`push` em branch
+  protegido, afirma o estado real no arranque, diz que suite ficou em divida ao parar, lembra a
+  Fase 0 quando o prompt parece uma ordem de implementacao, e reinjecta as Fronteiras quando a
+  janela compacta. **Nao ha nada a customizar no bootstrap** — funcionam tal como vem; a lista
+  de branches protegidos le-se do `main`/`master` do repo. Detalhe em
+  **`.agent/rules/hooks-guide.md`**; a suite negativa e `node .claude/hooks/tests/test-hooks.mjs`.
+  > Fora do Claude Code (Gemini, Cursor, Copilot, Codex) **perde-se o automatismo, nao a
+  > verificacao**: os mesmos criterios estao nos guards de `.agent/scripts/`, que so precisam de
+  > `node`, e o CI corre-os para todos.
+- **`.githooks/commit-msg`** (independente da tool): recusa atribuicao a IA na mensagem de
+  commit. E versionado mas **nao esta ativo num clone novo** — cada programador liga-o uma vez
+  com `git config core.hooksPath .githooks`. Por esta linha no `/setup` (ja la esta) e no
+  README do projeto; o CI re-corre a mesma verificacao em cada PR, logo vale de qualquer forma.
+- **Servidores MCP**: o template **nao traz nenhum**, e isso e deliberado — um `.mcp.json`
+  versionado e um convite a guardar tokens no repo. Antes de adicionar um, ler
+  **`.agent/rules/mcp-policy.md`** (quando compensa, e o que nunca pode la estar); os **Guard 16** verificam-no. Adicionar um servidor MCP e "perguntar primeiro", como uma dependencia.
 - **`.claude/settings.json`**: **a fronteira de seguranca real** do projeto — e o unico ficheiro
   machine-enforceable, e JSON nao aceita comentarios, por isso o racional vive aqui:
   - `deny` e avaliado **antes** de `ask` e `allow` (primeira match ganha). Cobre leitura de secrets
@@ -533,7 +549,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
   `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
 
-> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, `test`, `test:security`, `test:audit`, `test:all`, `test:ui`, `test:headed`). **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, **`test:e2e`**, `test:security`, `test:audit`, `test:all`, `test:e2e:ui`, `test:e2e:headed`) — **os nomes sao estes**: o `e2e.yml` procura `test:e2e` e **salta em silencio** se nao o encontrar, logo um `test` simples da um job verde que nunca correu nada. **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 
@@ -564,10 +580,22 @@ nao existir, voltar ao 2.0 e cria-lo agora:
 git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
   | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
 
-# Primeiro commit
+# Primeiro commit — NUM BRANCH, e nao em `main`
+#
+# O hook `guard-protected-branch.mjs` NEGA `git commit` em `main` (e a "Regra de Branch" do
+# `process-rules.md` diz o mesmo a todos os agentes). Um bootstrap que acabasse com um
+# commit em `main` era o primeiro passo do projeto a ser bloqueado pela sua propria rede —
+# e, pior, o primeiro convite a desliga-la. O bootstrap e uma alteracao como as outras:
+# branch, PR, CI verde, merge. E assim o dia 1 ja demonstra o fluxo que o projeto vai usar.
+git switch -c chore/bootstrap
 git add .
 git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 ```
+
+> Depois: abrir o PR (`gh pr create --fill`), esperar o CI, e so entao mergear. Se este
+> projeto nao vai usar PRs, dizer ao utilizador **antes** de mergear a mao — a alternativa
+> nao e commitar em `main` por baixo do hook, e decidir por escrito que este repo nao tem
+> branch protegido e tirar `main` de `PROTEGIDOS` em `.claude/hooks/guard-protected-branch.mjs`.
 
 ---
 

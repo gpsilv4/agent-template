@@ -19,7 +19,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -48,7 +48,7 @@ const falhas = [];
 
 /** Repo minimo, limpo por construcao: um placeholder para substituir, uma seccao 2.2 no
  *  BOOTSTRAP para derivar, e um stub por cada comando que o simulador chama. */
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -91,6 +91,14 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   }
 
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
+  if (segredosAninhados) {
+    // Segredos e estado local ABAIXO do primeiro nivel. A lista de exclusao comparava contra
+    // o nome de topo (`.claude`), logo `.claude/state` — que estava la escrito — entrava
+    // sempre, e um `.pem` dentro de qualquer subpasta entrava com ele.
+    w(".claude/state/sessao.json", '{"segredo":"nao devia sair daqui"}\n');
+    w("infra/certs/servidor.pem", "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n");
+    w("apps/web/.env.local", "SUPABASE_SERVICE_KEY=nao-copiar\n");
+  }
   copyFileSync(SIMULADOR, join(dir, ".agent/scripts/simulate-derived.mjs"));
   return dir;
 }
@@ -122,6 +130,19 @@ function test(nome, opcoes, expect) {
     }
     for (const s of expect.excludes ?? []) {
       if (out.includes(s)) problemas.push(`output NAO devia conter "${s}"`);
+    }
+    // Afirmacoes sobre a COPIA em si (nao sobre o que o simulador imprimiu). So faz sentido
+    // com `--keep`, que e o que a deixa no disco para ser inspeccionada.
+    if (expect.copia) {
+      const m = out.match(/copia mantida em (.+)/);
+      if (!m) problemas.push("esperava a linha `copia mantida em ...` (falta --keep?)");
+      else {
+        try {
+          problemas.push(...(expect.copia(m[1].trim()) ?? []));
+        } finally {
+          rmSync(m[1].trim(), { recursive: true, force: true });
+        }
+      }
     }
     if (problemas.length) {
       falhas.push({ nome, problemas, out });
@@ -224,6 +245,26 @@ test("job sem nenhum `node ...mjs` reprova", { ciSemComandos: true }, {
 test("um comando ACRESCENTADO ao ci.yml passa a ser corrido pela simulacao", { comandoExtra: true }, {
   code: 0,
   includes: [".agent/scripts/test-delta.mjs"],
+});
+
+// --- A lista de exclusao tem de valer em profundidade ------------------------
+// Medido: `.claude/state` estava na lista e entrava sempre na copia, porque a comparacao
+// era feita contra o nome de TOPO (`.claude`). O mesmo para um `.pem` ou um `.env.local`
+// dentro de qualquer subpasta — e a copia vai para `/tmp`, onde fica se o script sair por
+// `fatal()`. Uma lista de exclusao que so olha para o primeiro nivel nao exclui nada.
+test("segredos e estado local em subpastas NAO entram na copia", { segredosAninhados: true }, {
+  code: 0,
+  args: ["--keep"],
+  copia: (dir) => {
+    const problemas = [];
+    for (const rel of [".claude/state/sessao.json", "infra/certs/servidor.pem", "apps/web/.env.local"]) {
+      if (existsSync(join(dir, rel))) problemas.push(`${rel} entrou na copia e nao devia`);
+    }
+    // O contra-teste: se a copia estivesse vazia, o de cima passava por nao haver nada.
+    if (!existsSync(join(dir, ".agent/BOOTSTRAP.md"))) problemas.push("a copia nao tem o que devia ter — o teste acima nao prova nada");
+    if (!existsSync(join(dir, "infra/certs"))) problemas.push("a subpasta `infra/certs` devia existir (so o .pem e que sai)");
+    return problemas;
+  },
 });
 
 console.log("");

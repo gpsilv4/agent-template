@@ -33,8 +33,17 @@ const CONTAGENS = [
   // usa mede zero, e zero nao desce. Adaptar ao harness do projeto derivado.
   // `\[[^\]]` e nao `\[`: o ataque medido foi trocar `includes: ["x"]` por `includes: []`,
   // que mantem o `includes: [` e portanto a contagem. So os arrays NAO VAZIOS contam.
-  { re: /\b(?:includes|excludes)\s*:\s*\[[^\]]/, msg: "assercoes (includes/excludes)" },
-  { re: /\b(?:eq|contem)\s*\(/, msg: "assercoes (eq/contem)" },
+  // `[^\]]` exigia array NAO VAZIO — e `includes: [""]` e nao vazio. Medido: trocar cada
+  // assercao por `[""]` em quatro modulos deixou **196/196 e 227/227 verdes**, com todas as
+  // assercoes vacuas (`.includes("")` e sempre verdadeiro) e a contagem intacta. Era a
+  // chave-mestra: com ela, qualquer outro enfraquecimento fica barato de esconder.
+  // Agora exige-se **conteudo** dentro das aspas, nao so um elemento.
+  // `cru: true` e obrigatorio aqui: o `conta()` aplica `semStrings()` antes do padrao, logo
+  // `["x"]` chega como `[""]` e a distincao entre assercao real e vacua seria impossivel.
+  // E o mesmo mecanismo que a entrada do `if:` ja usava, pela mesma razao.
+  { re: /\b(?:includes|excludes)\s*:\s*\[\s*["'`][^"'`\]]/, msg: "assercoes (includes/excludes)", cru: true },
+  // Mesma classe: `contem(x, "")` passa sempre. Exige-se um segundo argumento com conteudo.
+  { re: /\b(?:eq|contem)\s*\([^,)]+,\s*["'`][^"'`)]/, msg: "assercoes (eq/contem)", cru: true },
   { re: /\bthrow new Error\s*\(/, msg: "assercoes (throw)" },
   // `test.each([...])` com a tabela esvaziada para `[]` mantem o `test(` e nao corre nada —
   // a mesma forma do `includes: []`. So as tabelas NAO VAZIAS contam.
@@ -44,7 +53,10 @@ const CONTAGENS = [
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
   // forma YAML/JS equivalente (`- run:` inline, `{ alvo: ... }` na mesma linha). Um teste com
   // a outra forma apanhou-o.
-  { re: /^\s*-?\s*run:\s*node\s+\S*test/m, msg: "steps de teste no CI" },
+  // `\S*test` so casava os steps que TESTAM os guards; os que os APLICAM
+  // (`check-doc-versions`, `check-backlog`) podiam ser apagados do `ci.yml` sem a superficie
+  // reagir — medido. Um guard aplicado e superficie tanto como um teste.
+  { re: /^\s*-?\s*run:\s*node\s+\S*(?:test|check|sweep|simulate)/m, msg: "steps de verificacao no CI" },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
   // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
   // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
@@ -69,6 +81,11 @@ const CONTAGENS = [
   // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
   // variante do `AP1` que este repo documenta.
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
+  // A mesma ideia do lado dos HOOKS: o que eles tem nao e um `warn(`, e uma decisao de
+  // negacao. Reduzir o numero de negacoes no `guard-protected-branch.mjs` enfraquece a rede
+  // sem que nenhum teste tenha de ser tocado. `cru` porque a chave e um literal e o
+  // `semStrings` apagava-a.
+  { re: /permissionDecision\s*:\s*["']deny["']/, msg: "decisoes de negacao dos hooks", cru: true },
   // O invariante 2 do `AP4` ("estreitar a seleccao do runner") na forma que ESTE repo tem.
   // Os entry points chamavam cada modulo `tests-*.mjs` a mao; comentar uma dessas linhas
   // levava `test-hooks.mjs` de 156 para 39 testes com exit 0 e "todos passaram" — medido

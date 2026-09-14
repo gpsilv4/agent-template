@@ -96,9 +96,14 @@ The AI will:
 git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
   | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
 
-# Initial commit
+# Initial commit — on a branch, not on `main`.
+# The bundled hook denies `git commit` on a protected branch, and the project's own Branch
+# Rule says the same to every agent. Bootstrapping is a change like any other: branch, PR,
+# green CI, merge — so day 1 already runs the flow the project will use.
+git switch -c chore/bootstrap
 git add .
 git commit -m "chore: bootstrap agent config"
+gh pr create --fill     # then merge once CI is green
 ```
 
 ### 4. Start developing
@@ -126,9 +131,14 @@ git commit -m "chore: bootstrap agent config"
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
+│   ├── anti-patterns-template.md <- AP1-AP7: the template's own machinery (NOT loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
+│   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
-│   └── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
+│   ├── backlog-method.md       <- Step-by-step backlog procedure (NOT loaded; on-demand)
+│   ├── mcp-policy.md           <- When an MCP server is worth it, and what it may not hold (NOT loaded)
+│   ├── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
+│   └── hooks-guide.md          <- What each hook does, and why it can't be prose (NOT loaded)
 ├── context/
 │   ├── session.md              <- Current session state
 │   ├── task.md                 <- Tasks in progress
@@ -142,6 +152,7 @@ git commit -m "chore: bootstrap agent config"
 │   └── walkthrough-archive.md  <- Archived old releases (NOT imported)
 ├── workflows/
 │   ├── setup.md                <- /setup — Developer onboarding
+│   ├── grill.md                <- /grill — Interrogate the request before any code exists
 │   ├── plan.md                 <- /plan — Plan new feature
 │   ├── review.md               <- /review — Code review + CI check
 │   ├── design-review.md        <- /design-review — UI/UX quality rubric (tier-based)
@@ -163,7 +174,12 @@ git commit -m "chore: bootstrap agent config"
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed (bilingual)
     │   ├── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
-    │   └── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (AP7)
+    │   ├── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (AP7)
+    │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
+    │   └── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
+    ├── lib/
+    │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
+    │   └── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (AP4)
     ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear
@@ -177,6 +193,9 @@ git commit -m "chore: bootstrap agent config"
     ├── tests-placeholders.mjs  <- Guard 13 tests (simulates a completed bootstrap)
     ├── tests-anti-patterns.mjs <- Guard 15 tests (fixture derives its own definitions)
     ├── tests-budgets.mjs       <- Series-1 guard tests (mirrors guards/budgets.mjs)
+    ├── tests-mcp.mjs           <- Guard 16 tests (mirrors guards/mcp.mjs)
+    ├── tests-sizes.mjs         <- Guard 17 tests (mirrors guards/sizes.mjs)
+    ├── test-registo.mjs        <- Negative tests for the suite discovery in lib/registo.mjs
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
@@ -206,8 +225,8 @@ git commit -m "chore: bootstrap agent config"
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
 │   ├── prompt-fase0.mjs            <- UserPromptSubmit: reminds of Fase 0 when the
 │   │                                  prompt looks like an order to implement
-│   ├── precompact-reinject.mjs     <- PreCompact: re-injects the Fronteiras block before
-│   │                                  compaction drops the imported rules from context
+│   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
+│   │                                  block AFTER compaction dropped the imported rules
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)

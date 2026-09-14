@@ -12,7 +12,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 
 ## Escala por tamanho do ticket
 
-> Esta checklist corria igual num ticket `S` e num `L`. Com o `/review` a pagar 56 caixas ao
+> Esta checklist corria igual num ticket `S` e num `L`. Com o `/review` a pagar dezenas de caixas ao
 > lado, um ticket de **< 30 min** pagava ~100 itens de processo — e um processo mais caro que
 > o trabalho deixa de ser corrido. O que nao escala nao e seguido.
 
@@ -36,7 +36,8 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 2. [ ] `CLAUDE.md` — referencias a `.agent/` files corretas
 3. [ ] `GEMINI.md` — **espelho** de `CLAUDE.md` (atualizar **em par** — so difere a sintaxe `@[...]`). Verificar paridade: `node .agent/scripts/check-doc-versions.mjs`
 4. [ ] `.agent/rules/` — todas as regras refletem o estado atual do codigo (e dentro do orcamento de bytes)
-5. [ ] `.agent/rules/scripts-guide.md` — se acrescentaste ou alteraste um verificador (`.agent/scripts/`) ou um hook (`.claude/hooks/`): o detalhe vive la, e nao nas rules carregadas, porque o orcamento de bytes ja foi excedido a serio quando vivia
+5. [ ] **Backlog** mexido -> o procedimento vive em `.agent/rules/backlog-method.md`; `check-backlog.mjs` a sair 0
+5b. [ ] **Verificador** alterado (`.agent/scripts/`) -> `.agent/rules/scripts-guide.md`; **hook** alterado (`.claude/hooks/` ou `.githooks/`) -> `.agent/rules/hooks-guide.md`. Sao dois catalogos separados desde que juntos passaram o orcamento; o detalhe vive la e nao nas rules carregadas
 6. [ ] **Pares rule/evidencia** — as instrucoes vivem na rule carregada, a historia no ficheiro
    nao-carregado, e as duas atualizam-se **juntas**: `.agent/rules/anti-patterns.md` **e**
    `src/docs/anti-patterns-why.md` (ao acrescentar ou reescrever um anti-padrao: os quatro
@@ -63,6 +64,9 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     **Guard extraido para `guards/*.mjs`, ou hook novo em `.claude/hooks/`?** A entrada em `PARES` e obrigatoria: os avisos
     passam a viver no modulo, e sem ela a varredura cobre so o ficheiro de entrada e reporta
     100% a mentir. A soma dos sitios antes e depois de um refactor tem de ser a MESMA.
+    **Ficheiro acima das 500 linhas?** O Guard 17 reprova. Dividi-lo (dados para um modulo
+    proprio e o corte mais barato) ou, com razao escrita, congela-lo em `TETOS` de
+    `guards/sizes.mjs` — congelar e uma catraca (so encolhe), nao uma isencao.
     **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
     (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
     permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre

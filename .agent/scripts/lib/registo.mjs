@@ -18,7 +18,7 @@
  * modulo que nao contribui nenhum teste sao todos `exit 1` com a razao dita — nunca um
  * "nao havia nada a correr" silencioso.
  */
-import { readdirSync } from "fs";
+import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 
@@ -62,6 +62,13 @@ export function descobreModulos(dir) {
 export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, conhecidos }) {
   if (typeof contagem !== "function") fatal("registaDescobertos precisa de `contagem()` para medir o contributo de cada modulo");
   if (!entryPoint) fatal("registaDescobertos precisa de `entryPoint` — sem ele nao sabe que modulos sao seus");
+  // `conhecidos` era OPCIONAL (`if (conhecidos && ...)`), logo um entry point que o
+  // esquecesse perdia a rede em silencio. Medido: apagar a linha `conhecidos:` e escrever
+  // `test-guardz.mjs` num modulo levava a suite de 196 para 133 testes, com exit 0 e "todos
+  // passaram". Uma rede opcional nao e uma rede.
+  if (!Array.isArray(conhecidos) || conhecidos.length === 0) {
+    fatal("registaDescobertos precisa de `conhecidos` — a lista dos entry points do repo. Sem ela, um `entryPoint` mal escrito desliga uma suite em silencio");
+  }
 
   const nomes = descobreModulos(dir);
   if (nomes.length === 0) {
@@ -100,10 +107,18 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
       // este ficheiro veio fechar, com outro caractere. Medido por uma leitura independente:
       // trocar `"test-guards.mjs"` por `"test-guard.mjs"` num modulo levava a suite de 188
       // para 171 testes, com `exit 0` e "Todos os testes dos guards passaram".
-      if (conhecidos && !conhecidos.includes(mod.entryPoint)) {
+      // Tambem reprova quando o entry point declarado e conhecido mas vive NOUTRA PASTA: o
+      // modulo nunca seria descoberto por ele (a descoberta e por pasta), logo nao corre em
+      // lado nenhum. Medido: `tests-budgets.mjs` a declarar `test-hooks.mjs` levava a suite
+      // de 196 para 179, verde, e o `test-hooks` nao o apanhava porque esta noutra pasta.
+      // O criterio e "existe como ficheiro NESTA pasta", nao um padrao de nome: a descoberta
+      // e por pasta, logo um modulo cujo entry point declarado nao esta aqui nao e corrido
+      // por ninguem. Um padrao de nome assumiria a convencao e partia em fixtures legitimas.
+      const aqui = existsSync(join(dir, mod.entryPoint));
+      if (!conhecidos.includes(mod.entryPoint) || !aqui) {
         fatal(
-          `${nome} declara \`entryPoint: "${mod.entryPoint}"\`, que nao e nenhum entry point deste repo.\n` +
-            `  Conhecidos: ${conhecidos.join(", ")}.\n` +
+          `${nome} declara \`entryPoint: "${mod.entryPoint}"\`, que nao e um entry point DESTA pasta.\n` +
+            `  Conhecidos no repo: ${conhecidos.join(", ")}. Existe nesta pasta: ${aqui ? "sim" : "NAO"}.\n` +
             `  Um modulo com um entry point que nao existe nao e corrido por ninguem — e um\n` +
             `  erro de escrita desliga a suite inteira em silencio.`
         );

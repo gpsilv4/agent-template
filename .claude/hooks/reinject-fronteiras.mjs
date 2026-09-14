@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PreCompact: reinjectar as Fronteiras antes de a janela ser compactada — {{PROJECT_NAME}}
+ * SessionStart(compact): reinjectar as Fronteiras DEPOIS de a janela ser compactada — {{PROJECT_NAME}}
  *
  * PORQUE EXISTE: este template gasta tres guards (1/1b/1c) a orcamentar os bytes que entram
  * em cada sessao, e o `CLAUDE.md` importa as rules para elas estarem SEMPRE presentes. Numa
@@ -13,9 +13,19 @@
  * dez minutos.
  *
  * O QUE FAZ: le o bloco **Fronteiras** do `CLAUDE.md` — a seccao que o proprio ficheiro marca
- * como "prioridade maxima" — e devolve-o em `additionalContext`, que o evento `PreCompact`
- * honra. NAO reinjecta as rules inteiras: sao ~26 KB e faze-lo derrotava o proposito da
- * compactacao. As Fronteiras sao ~600 bytes e sao o que nao pode desaparecer.
+ * como "prioridade maxima" — e devolve-o em `additionalContext`. NAO reinjecta as rules
+ * inteiras: sao ~26 KB e faze-lo derrotava o proposito da compactacao. As Fronteiras sao
+ * ~600 bytes e sao o que nao pode desaparecer.
+ *
+ * PORQUE `SessionStart` COM `matcher: "compact"` E NAO `PreCompact`. A primeira versao deste
+ * hook usava `PreCompact` e **nao entregava nada**: a documentacao do Claude Code lista os
+ * eventos que honram `additionalContext` e o `PreCompact` nao consta — a seccao dele so diz
+ * que campos sao descartados. Uma auditoria independente apanhou-o; a afirmacao "o evento
+ * PreCompact honra" nunca tinha sido medida, num repo cuja regra e medir.
+ *
+ * E o evento certo tambem por desenho: injectar ANTES da compactacao significa que a propria
+ * injeccao e compactada. `SessionStart(compact)` dispara **depois**, que e quando as rules ja
+ * desapareceram e a reinjeccao vale alguma coisa.
  *
  * FALHA ABERTA, de propósito: qualquer problema (sem `CLAUDE.md`, seccao renomeada, JSON
  * invalido a entrada) sai `0` sem dizer nada. Um hook avariado nunca deve impedir uma
@@ -90,7 +100,7 @@ function main() {
   console.log(
     JSON.stringify({
       hookSpecificOutput: {
-        hookEventName: "PreCompact",
+        hookEventName: "SessionStart",
         additionalContext:
           "A janela foi compactada e as rules importadas pelo CLAUDE.md sairam do contexto.\n" +
           "As Fronteiras do projeto (prioridade maxima) continuam a valer:\n\n" +
@@ -102,7 +112,7 @@ function main() {
 }
 
 // Nao corre ao ser importado pela suite.
-if (process.argv[1] && process.argv[1].endsWith("precompact-reinject.mjs")) {
+if (process.argv[1] && process.argv[1].endsWith("reinject-fronteiras.mjs")) {
   try {
     main();
   } catch {

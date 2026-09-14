@@ -476,27 +476,34 @@ function comPrompt(texto) {
   return { vazio: false, ctx: JSON.parse(out).hookSpecificOutput?.additionalContext ?? "" };
 }
 
-// As formas que um leitor independente mediu como FALSOS NEGATIVOS: o hook calava-se
-// precisamente nas ordens mais naturais. Tres causas distintas — o ID sozinho (`B3`) nunca
-// casava apesar de o comentario o prometer, o ramo ingles exigia a palavra "ticket", e
-// `plano`/`fase 0` soltos suprimiam o lembrete.
+// CORPUS MEDIDO, nao derivado de exemplos.
+//
+// A versao anterior deste corpus foi escrita a partir das frases de um revisor — logo testava
+// o que a implementacao ja fazia. Uma auditoria independente mediu o espaco de entrada a
+// serio: **14 de 15** frases de conversa normal disparavam, e **6 de 6** ordens reais eram
+// perdidas. E o `AP1` ("assercao satisfeita por outra verificacao") aplicado a um corpus de
+// teste, no ficheiro escrito para fazer cumprir o metodo.
+//
+// Estas duas listas sao agora o contrato do hook. Acrescentar uma frase quando aparecer outra
+// forma — e a mesma disciplina da tabela `BYPASSES`.
+
 for (const ordem of [
-  "faz o ticket B3",
-  "implementa o export mensal",
-  "corrige o bug do login",
-  "acrescenta um filtro a tabela",
+  // Imperativo directo
+  "faz o ticket B3", "implementa o export mensal", "corrige o bug do login",
+  "acrescenta um filtro a tabela", "comeca o sprint 2",
+  // ID sozinho (a forma que este template ensina a usar)
+  "faz o B3", "avanca para o F12", "trata do ticket B3",
+  // 2a pessoa — o comentario prometia-a e a regex nao a casava
+  "implementas o export mensal", "adicionas um teste negativo a este guard",
+  // Pedido educado, que acaba em `?` — a forma mais comum de todas
+  "Podes implementar o filtro de datas?", "Implementa o export mensal, podes avancar?",
+  // Ingles: o ramo exigia a palavra "ticket", que ninguem escreve
+  "implement the export module", "fix the login timeout", "add a monthly filter",
   "implement the ticket F2",
-  "comeca o sprint 2",
-  "faz o B3",
-  "comeca o B3",
-  "avanca para o F12",
-  "trata do ticket B3",
-  "implement the export module",
-  "fix the login timeout",
-  "add a monthly filter",
-  "escreve o hook que falta",
-  "muda o check-backlog para aceitar XL",
-  "implementa o plano de contas",
+  // Ordem composta com bookkeeping colado — o bookkeeping nao a pode suprimir
+  "implementa o ticket B3 do backlog", "corrige o bug B7 e depois atualiza o backlog",
+  // Objecto que CONTEM "backlog" mas e um script
+  "muda o check-backlog para aceitar XL", "escreve o hook que falta",
 ]) {
   test(`fase0: lembra em "${ordem}"`, () => {
     const r = comPrompt(ordem);
@@ -505,24 +512,24 @@ for (const ordem of [
   });
 }
 
-// E os FALSOS POSITIVOS: ruido no caminho de cada prompt, e pior — disparava exactamente em
-// quem estava a seguir o processo (mexer no backlog e no CHANGELOG e o que o
-// `process-rules.md` manda fazer). Um lembrete que aparece onde nao deve ensina a ignora-lo.
 for (const naoOrdem of [
-  "como implementar isto?",
-  "porque e que o teste falha?",
-  "o que faz este guard?",
-  "explica-me o ticket B3",
-  "qual e a diferenca entre os dois?",
-  "adiciona uma entrada ao backlog",
-  "acrescenta uma linha ao CHANGELOG",
-  "nao implementar nada ainda, so analisa",
-  "reve o diff e diz se alguma coisa corrige o bug B3",
+  // Perguntas
+  "como implementar isto?", "porque e que o teste falha?", "o que faz este guard?",
+  "explica-me o ticket B3", "qual e a diferenca entre os dois?", "resolve-se assim?",
   "este script adiciona a linha certa ao resumo?",
-  "resolve-se assim?",
+  // DECLARATIVAS — a categoria inteira que faltava ao corpus anterior
+  "the fix did not work", "this change broke the build", "o teu ultimo change partiu o CI",
+  "concordo, isso resolve o problema", "esta abordagem adiciona complexidade sem valor",
+  "o build esta a falhar", "acho que o teste cria ruido", "esse write esta errado",
+  "o refactor que fizeste ontem", "isso altera o comportamento", "obrigado, ja resolve",
+  "o guard adiciona demasiada friccao", "a correcao anterior criou outro bug",
+  // Bookkeeping como unica tarefa
+  "adiciona uma entrada ao backlog", "acrescenta uma linha ao CHANGELOG",
+  // Avaliacao e negacao explicita
+  "reve o diff e diz se alguma coisa corrige o bug B3", "nao implementar nada ainda, so analisa",
 ]) {
   test(`fase0: CALA-SE em "${naoOrdem}"`, () => {
-    if (!comPrompt(naoOrdem).vazio) throw new Error("era uma pergunta — um lembrete aqui e ruido");
+    if (!comPrompt(naoOrdem).vazio) throw new Error("nao era uma ordem — um lembrete aqui e ruido");
   });
 }
 
@@ -555,14 +562,14 @@ test("fase0: NUNCA bloqueia — nao emite decision/deny", () => {
 // o bloco Fronteiras em `additionalContext` (campo honrado no PreCompact). Falha ABERTA:
 // qualquer problema sai 0 em silencio, porque bloquear uma compactacao custa mais do que
 // perder a reinjeccao.
-const PRECOMPACT = join(ROOT, ".claude/hooks/precompact-reinject.mjs");
+const REINJECT = join(ROOT, ".claude/hooks/reinject-fronteiras.mjs");
 
-test("precompact: devolve o bloco Fronteiras do CLAUDE.md do projeto medido", () => {
+test("reinject: devolve o bloco Fronteiras do CLAUDE.md do projeto medido", () => {
   const d = repo("feature/x");
   try {
     writeFileSync(join(d, "CLAUDE.md"),
       "# P\n\n## Fronteiras (prioridade maxima)\n\n- **Nunca**: MARCA-DE-TESTE-XYZ\n\n## Outra\n\nx\n");
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     contem(r.ctx, "MARCA-DE-TESTE-XYZ");
     contem(r.ctx, "Fronteiras");
   } finally {
@@ -570,12 +577,12 @@ test("precompact: devolve o bloco Fronteiras do CLAUDE.md do projeto medido", ()
   }
 });
 
-test("precompact: NAO reinjecta as rules inteiras (so as Fronteiras)", () => {
+test("reinject: NAO reinjecta as rules inteiras (so as Fronteiras)", () => {
   const d = repo("feature/x");
   try {
     writeFileSync(join(d, "CLAUDE.md"),
       "# P\n\n## Fronteiras\n\n- so isto\n\n## Regras\n\n@.agent/rules/core-rules.md\nNAO-DEVIA-APARECER\n");
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     contem(r.ctx, "so isto");
     if (r.ctx.includes("NAO-DEVIA-APARECER"))
       throw new Error("reinjectou alem das Fronteiras — derrota o proposito da compactacao");
@@ -584,12 +591,12 @@ test("precompact: NAO reinjecta as rules inteiras (so as Fronteiras)", () => {
   }
 });
 
-test("precompact: `##` dentro de bloco de codigo NAO trunca as Fronteiras", () => {
+test("reinject: `##` dentro de bloco de codigo NAO trunca as Fronteiras", () => {
   const d = repo("feature/x");
   try {
     writeFileSync(join(d, "CLAUDE.md"),
       "# P\n\n## Fronteiras\n\n- Sempre: X\n\n```md\n## Exemplo\n```\n\n- Nunca: MARCA-FINAL\n\n## Outra\n\nx\n");
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     // Antes: truncava no `## Exemplo` e perdia tudo o resto, em silencio.
     contem(r.ctx, "MARCA-FINAL");
   } finally {
@@ -597,32 +604,32 @@ test("precompact: `##` dentro de bloco de codigo NAO trunca as Fronteiras", () =
   }
 });
 
-test("precompact: sem CLAUDE.md sai 0 e calado (falha aberta)", () => {
+test("reinject: sem CLAUDE.md sai 0 e calado (falha aberta)", () => {
   const d = repo("feature/x");
   try {
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     if (!r.vazio) throw new Error("sem CLAUDE.md nao ha nada a dizer — devia sair calado");
   } finally {
     rmSync(d, { recursive: true, force: true });
   }
 });
 
-test("precompact: seccao Fronteiras renomeada sai 0 e calado", () => {
+test("reinject: seccao Fronteiras renomeada sai 0 e calado", () => {
   const d = repo("feature/x");
   try {
     writeFileSync(join(d, "CLAUDE.md"), "# P\n\n## Limites\n\n- x\n");
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     if (!r.vazio) throw new Error("seccao ausente nao e erro — devia sair calado");
   } finally {
     rmSync(d, { recursive: true, force: true });
   }
 });
 
-test("precompact: seccao Fronteiras VAZIA nao reinjecta um bloco vazio", () => {
+test("reinject: seccao Fronteiras VAZIA nao reinjecta um bloco vazio", () => {
   const d = repo("feature/x");
   try {
     writeFileSync(join(d, "CLAUDE.md"), "# P\n\n## Fronteiras\n\n## Outra\n\nx\n");
-    const r = correNoCwd(PRECOMPACT, d);
+    const r = correNoCwd(REINJECT, d);
     if (!r.vazio) throw new Error("bloco vazio nao vale a pena reinjectar");
   } finally {
     rmSync(d, { recursive: true, force: true });
