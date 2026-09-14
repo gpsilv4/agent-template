@@ -34,9 +34,10 @@ const PASTAS = [".agent/scripts", ".claude/hooks"];
  */
 export const TETOS = {
   ".claude/hooks/tests/test-hooks.mjs": 696,
-  // Desceu de 668 para 590 ao extrair as tabelas de verbos para `lib/verbos-git.mjs` — e o
-  // teto RE-CONGELA no novo valor, senao a catraca deixava 78 linhas de folga por recuperar.
-  ".claude/hooks/guard-protected-branch.mjs": 590,
+  // 668 -> 590 (tabelas de verbos para `lib/verbos-git.mjs`) -> 554 (a verificacao da
+  // fronteira para `lib/fronteira.mjs`). O teto RE-CONGELA a cada descida, senao a catraca
+  // deixava a folga recuperada por recuperar.
+  ".claude/hooks/guard-protected-branch.mjs": 554,
   ".agent/scripts/test-guards.mjs": 525,
 };
 

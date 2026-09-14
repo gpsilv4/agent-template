@@ -47,6 +47,7 @@ import { readFileSync } from "fs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS } from "./lib/verbos-git.mjs";
+import { alteraFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
 
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
 const PROTEGIDOS_LISTA = ["main", "master", "develop"];
@@ -515,46 +516,9 @@ try {
     }
   );
 
-  // --- A fronteira nao se reescreve a si propria ---------------------------------
-  // O `deny` do settings cobre `Edit`/`Write` e NAO cobre `Bash`. ALLOWLIST dos verbos de
-  // leitura, e nao blocklist dos de escrita (`AP6`). Porque assim: `hooks-guide.md`.
-  const FRONTEIRA = /(?:^|[\s"'`=(])(?:\.\/)?(?:\.claude\/(?:settings(?:\.local)?\.json|hooks\/)|\.githooks\/)/;
-  const LEITURA = new Set([
-    "cat", "bat", "less", "more", "head", "tail", "wc", "grep", "rg", "egrep", "fgrep", "awk",
-    "sed", "jq", "diff", "cmp", "md5", "md5sum", "shasum", "sha256sum", "file", "stat", "ls",
-    "find", "realpath", "dirname", "basename", "node", "test", "wl-copy", "pbcopy", "echo", "printf",
-    // `git` le e encena; o que ele tem de destrutivo ja e tratado pela lista SEGUROS acima.
-    // Sem ele, um `git diff .claude/settings.json` era negado — falso positivo num comando
-    // que e precisamente o que se quer poder correr sobre a fronteira.
-    "git",
-  ]);
-  // `sed`/`awk` so contam como leitura SEM edicao no sitio; `node`/`printf`/`echo` so sem
-  // redireccao. A redireccao e o `tee` sao verificados a parte, no texto inteiro.
-  // Por SEGMENTO, nao pelo primeiro verbo da linha: a primeira versao negava um `for` que
-  // corresse a suite dos hooks. Um guard que nega trabalho normal e contornado.
-  const segmentos = texto.split(/(?:&&|\|\||[;|\n])+|\bdo\b|\bthen\b/);
-  const tocaFronteira = segmentos.filter((seg) => FRONTEIRA.test(seg));
-  if (tocaFronteira.length) {
-    // So os segmentos que TOCAM a fronteira sao julgados.
-    const alvo = tocaFronteira.join("\n");
-    const primeiro = tocaFronteira[0].trim().split(/\s+/)[0].replace(/^.*\//, "");
-    const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
-    // `git` esta na allowlist (um `git diff` e leitura), mas `git rm`/`restore`/`checkout --`
-    // APAGAM um hook e passavam. Uma allowlist por binario e grossa quando ele tem sub-verbos.
-    const gitQueEscreve = /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/.test(alvo.trim());
-    // Um interpretador a correr um FICHEIRO e leitura; codigo INLINE (`node -e`) escreve.
-    const codigoInline = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/.test(alvo);
-    const redireciona = /(?:^|[^>\d])>{1,2}\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
-    if (!LEITURA.has(primeiro) || editaNoSitio || codigoInline || redireciona || gitQueEscreve) {
-      negar(
-        "A configuracao de fronteira (`.claude/settings.json`, `.claude/hooks/`, `.githooks/`) " +
-          "nao se altera por `Bash`. O `deny` do settings so cobre `Edit`/`Write`, logo esta " +
-          "verificacao existe para fechar o resto — um agente que reescreva a propria fronteira " +
-          "deixa a sessao seguinte sem nenhuma. Editar com a ferramenta `Edit` (que pede " +
-          "aprovacao para os hooks e recusa o settings), ou a mao, fora do agente."
-      );
-    }
-  }
+  // A fronteira nao se reescreve a si propria. A logica (e os tres falsos positivos que a
+  // moldaram) vive em `lib/fronteira.mjs`.
+  if (alteraFronteira(texto)) negar(RAZAO_FRONTEIRA);
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando

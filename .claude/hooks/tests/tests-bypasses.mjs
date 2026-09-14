@@ -220,6 +220,10 @@ const BYPASSES = [
   ["git rm sobre um hook", "git rm .claude/hooks/stop-verify.mjs"],
   ["git checkout -- a reverter um hook", "git checkout -- .claude/hooks/stop-verify.mjs"],
   ["git restore sobre o settings", "git restore .claude/settings.json"],
+  // Um wrapper opaco executa o que lhe chega em TEXTO: ai o conteudo citado **e** comando, e
+  // a regra "citado = texto" tem de se inverter. E o par do heredoc, do lado do ataque.
+  ["eval a apagar um hook", 'eval "rm .claude/hooks/stop-verify.mjs"'],
+  ["sh -c a escrever o settings", 'sh -c "printf \'{}\' > .claude/settings.json"'],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -263,6 +267,13 @@ const LEGITIMOS = [
   ["for a correr a suite dos hooks", "for s in a b; do node .claude/hooks/tests/test-hooks.mjs; done"],
   ["suite com redireccao para /tmp", "node .claude/hooks/tests/test-hooks.mjs > /tmp/o 2>&1"],
   ["sed -i NOUTRO ficheiro, na mesma linha", "sed -i '' 's/a/b/' README.md && cat .claude/settings.json"],
+  // Um `|` DENTRO de aspas partia o comando e o "verbo" do segmento seguinte era um pedaco do
+  // padrao de procura. Medido ao tentar ler o proprio hook.
+  ["grep com | dentro das aspas", "grep -n 'soTags\\|FORMA_EXIGIDA' .claude/hooks/guard-protected-branch.mjs"],
+  // Escrever um ficheiro NOUTRO sitio cujo conteudo MENCIONA a fronteira. Um caminho citado e
+  // texto; so um caminho em posicao de argumento e um alvo. Medido ao escrever a mensagem da
+  // tag v0.4.0, que descreve esta mesma regra.
+  ["heredoc que DESCREVE a fronteira", "cat > /tmp/nota.txt <<'EOF'\nfala de .claude/settings.json e .githooks/\nEOF"],
   // Negar trabalho legitimo custa tanto como deixar passar. O `partir()` tratava `(` e `{`
   // como separadores mesmo DENTRO de aspas, logo um comando que apenas MENCIONA git entre
   // parentesis era negado — e o `eForce` corre ANTES da verificacao de branch, logo nao havia
