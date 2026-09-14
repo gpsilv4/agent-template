@@ -49,6 +49,7 @@ Stack: {{STACK}}.
 | Workflow                  | Ficheiro (ler on-demand)               |
 | ------------------------- | -------------------------------------- |
 | Setup / Onboarding        | `.agent/workflows/setup.md`            |
+| Interrogar antes de haver codigo | `.agent/workflows/grill.md`     |
 | Planear funcionalidade    | `.agent/workflows/plan.md`             |
 | Review antes de commit    | `.agent/workflows/review.md`           |
 | Review de qualidade UI/UX | `.agent/workflows/design-review.md`    |

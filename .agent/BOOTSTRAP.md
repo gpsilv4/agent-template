@@ -142,7 +142,7 @@ Guarda as respostas — vais precisar delas para preencher todos os placeholders
 Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo**:
 
 - **Projeto pequeno / prototipo / fim-de-semana** → **Modo minimo**: manter so os workflows essenciais (`plan`, `review`, `debug`, `deploy`) e **remover os restantes** (`refactor`, `e2e-tests`, `security-tests`, `design-review`, `audit`, `market-scan`, `setup`) na Fase 2 — ver §2.6. Menos cerimonia, menos ficheiros a manter.
-- **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 12 workflows + ritual de backlog/sprint + guards.
+- **Projeto sustentado / produto / equipa** → **Modo completo** (default do template): manter os 13 workflows + ritual de backlog/sprint + guards.
 
 > Registar a escolha; ela determina a poda de workflows na Fase 2 (§2.6). Adicionar workflows mais tarde e trivial (Matriz de Propagacao em `sync-docs.md`). Na duvida, comecar no Modo minimo — expandir e barato, podar depois e chato.
 
