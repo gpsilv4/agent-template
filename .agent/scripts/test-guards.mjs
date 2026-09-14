@@ -512,10 +512,14 @@ test("G12e: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
 }, { synthetic: true, code: 0, includes: ["SKIP  Guard 12e"] });
 
 // AP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
-console.log(resumoDescoberta(await registaDescobertos({
+const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-guards.mjs",
   contagem,
-})));
+  // Os entry points DESTE repo. Um modulo que declare outro qualquer nao e corrido por
+  // ninguem, e sem esta lista esse erro de escrita era silencioso.
+  conhecidos: ["test-guards.mjs", "test-test-surface.mjs", "test-hooks.mjs"],
+});
+console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
 resumo();

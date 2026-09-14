@@ -415,10 +415,14 @@ test("apostrofo num comentario nao dessincroniza a contagem", (dir) => {
 }, { code: 0 });
 
 // AP4: descoberta em disco, nao chamada a mao. Ver `lib/registo.mjs`.
-console.log(resumoDescoberta(await registaDescobertos({
+const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-test-surface.mjs",
   contagem,
-})));
+  // Os entry points DESTE repo. Um modulo que declare outro qualquer nao e corrido por
+  // ninguem, e sem esta lista esse erro de escrita era silencioso.
+  conhecidos: ["test-guards.mjs", "test-test-surface.mjs", "test-hooks.mjs"],
+});
+console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
 resumo();

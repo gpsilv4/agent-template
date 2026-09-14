@@ -24,7 +24,7 @@ let passed = 0;
 const falhas = [];
 
 /** Monta uma pasta com os modulos dados e corre um entry point sintetico. */
-function corre({ modulos = {}, entryPoint = "entry.mjs" }) {
+function corre({ modulos = {}, entryPoint = "entry.mjs", conhecidos = ["entry.mjs", "outro.mjs"] }) {
   const dir = mkdtempSync(join(tmpdir(), "registo-"));
   try {
     for (const [nome, conteudo] of Object.entries(modulos)) {
@@ -36,12 +36,13 @@ function corre({ modulos = {}, entryPoint = "entry.mjs" }) {
       join(dir, "entry.mjs"),
       `import { registaDescobertos } from ${JSON.stringify(REGISTO)};\n` +
         `globalThis.__n = 0;\n` +
-        `const registados = await registaDescobertos({\n` +
+        `const r = await registaDescobertos({\n` +
         `  dir: ${JSON.stringify(dir)},\n` +
         `  entryPoint: ${JSON.stringify(entryPoint)},\n` +
+        `  conhecidos: ${JSON.stringify(conhecidos)},\n` +
         `  contagem: () => globalThis.__n,\n` +
         `});\n` +
-        `console.log("REGISTADOS:" + registados.join(","));\n`
+        `console.log("REGISTADOS:" + r.registados.join(",") + "|OUTROS:" + r.deOutros.join(","));\n`
     );
     try {
       const out = execFileSync(process.execPath, [join(dir, "entry.mjs")], { encoding: "utf8" });
@@ -169,7 +170,11 @@ test(
       "tests-alheio.mjs": OK("outro.mjs"),
     },
   },
-  { code: 0, includes: ["REGISTADOS:tests-a.mjs,tests-b.mjs"], excludes: ["tests-alheio.mjs"] }
+  // O `excludes: ["tests-alheio.mjs"]` que aqui estava CONSAGRAVA o salto silencioso: afirmava
+  // que um modulo de outro entry point nao devia aparecer em lado nenhum. Um leitor
+  // independente apanhou-o — um modulo saltado tem de ser visivel, mesmo quando o salto e
+  // legitimo, senao um erro de escrita no `entryPoint` desliga uma suite sem ninguem ver.
+  { code: 0, includes: ["REGISTADOS:tests-a.mjs,tests-b.mjs|OUTROS:tests-alheio.mjs"] }
 );
 
 test(
@@ -198,6 +203,18 @@ testCru(
   "pasta ilegivel reprova a dizer que NAO LEU — nao 'nao ha nada' (AP2)",
   '{ dir: "/nao/existe/em/lado/nenhum", entryPoint: "x.mjs", contagem: () => 0 }',
   { code: 1, includes: ["nao consegui ler"] }
+);
+
+test(
+  "entryPoint que nao existe em NENHUM entry point reprova (era saltado em silencio)",
+  { modulos: { "tests-a.mjs": OK(), "tests-erro.mjs": OK("test-guard.mjs") }, conhecidos: ["entry.mjs", "outro.mjs"] },
+  { code: 1, includes: ["nao e nenhum entry point deste repo"] }
+);
+
+test(
+  "um modulo de OUTRO entry point conhecido e saltado, mas dito em voz alta",
+  { modulos: { "tests-a.mjs": OK(), "tests-alheio.mjs": OK("outro.mjs") } },
+  { code: 0, includes: ["REGISTADOS:tests-a.mjs|OUTROS:tests-alheio.mjs"] }
 );
 
 console.log("");
