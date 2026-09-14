@@ -122,6 +122,7 @@ Antes de tocar no codigo, ler:
 | `/security-tests` | Para correr testes de seguranca |
 | `/audit`    | Auditoria completa (milestone/estado da app) |
 | `/upgrade` | Trazer melhorias do template de origem sem apagar o que e do projeto |
+| `/grill` | Interrogar o pedido ate nao sobrar ramo de decisao por resolver |
 | `/market-scan` | Analise de mercado e ideacao de features |
 | `/setup`    | Este guia (onboarding)               |
 

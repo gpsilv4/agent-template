@@ -117,6 +117,7 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 |------|-------|
 | Ticket bug | `/debug` -> implementar -> `/review` |
 | Ticket feature | `/plan` -> implementar -> `/review` |
+| Ticket `L`, ou `M` ambiguo | `/grill` -> `/plan` -> implementar -> `/review` |
 | Ticket refactor | `/refactor` -> implementar -> `/review` |
 | Sprint completo | implementar todos -> `/review` -> `/deploy` |
 

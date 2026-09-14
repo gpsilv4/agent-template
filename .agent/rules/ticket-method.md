@@ -58,9 +58,17 @@ uma regra que vive em prosa repete o esquecimento mais depressa.
 
 ## Fase 0 — Explicar, e esperar
 
-Antes de tocar no codigo: o problema, os ficheiros que vao mudar, a abordagem, **as
-alternativas rejeitadas e porque**, e o que conta como "pronto" em criterios testaveis.
-Depois **espera-se pela aprovacao**.
+**Primeiro perguntar, depois explicar** (`L`, ou `M` cujo pedido admita mais do que uma
+leitura razoavel): correr `.agent/workflows/grill.md` **antes** de escrever o plano. Todo o
+resto do metodo tem o agente a falar — a Fase 0 explica, o `plan-auditor` julga um plano ja
+escrito, o `/plan` estrutura o que o agente ja decidiu. Em nenhum ponto alguem **pergunta** o
+que nao foi dito, e um "sim" a um plano so significa que a explicacao era plausivel. As
+"Decisoes fechadas" que saem do interrogatorio sao o input desta fase. Num `S` **nao corre**:
+mudar um numero nao tem ramos de decisao, e perguntar na mesma ensina a saltar o processo.
+
+Depois: o problema, os ficheiros que vao mudar, a abordagem, **as alternativas rejeitadas e
+porque**, e o que conta como "pronto" em criterios testaveis. Depois **espera-se pela
+aprovacao**.
 
 | Ticket | Forma |
 |--------|-------|

@@ -18,6 +18,7 @@ Follow the workflows in `.agent/workflows/`:
 | Task | Workflow |
 |------|----------|
 | New feature | `/plan` -> implement -> `/review` |
+| Large or ambiguous ticket | `/grill` -> `/plan` -> implement -> `/review` |
 | Bug fix | `/debug` -> implement -> `/review` |
 | Refactor | `/refactor` -> implement -> `/review` |
 | Full sprint | implement all -> `/review` -> `/deploy` |

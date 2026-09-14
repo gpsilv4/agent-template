@@ -1,0 +1,2 @@
+description = "Interrogar quem pediu ate nao sobrar ramo de decisao por resolver"
+prompt = "Le e segue o workflow em .agent/workflows/grill.md para interrogar o pedido ate nao sobrar ramo de decisao por resolver. Contexto: {{args}}"
