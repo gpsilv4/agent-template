@@ -1,66 +1,102 @@
-# /e2e-tests — Testes E2E Funcionais ({{TEST_FRAMEWORK}})
+# /e2e-tests — Correr e manter a suite E2E ({{TEST_FRAMEWORK}})
 
-Checklist para execucao e manutencao da suite de testes {{TEST_FRAMEWORK}} do {{PROJECT_NAME}}.
+Levar a suite E2E a um **veredicto**: verde, ou uma lista de falhas com causa atribuida. E
+manter a cobertura dos fluxos criticos honesta — um fluxo sem spec e divida, nao ausencia de
+risco.
 
-> **Nota:** os comandos concretos abaixo (instalacao de browser, `test:ui`/`test:headed`, `PLAYWRIGHT_BASE_URL`) assumem **Playwright** como default. Se `{{TEST_FRAMEWORK}}` for outro (Cypress, Vitest browser mode, …), adaptar os comandos.
+> **Nota:** os comandos abaixo assumem **Playwright**. Se `{{TEST_FRAMEWORK}}` for outro
+> (Cypress, Vitest browser mode, …), adaptar — e adaptar tambem o `e2e.yml`, que corre
+> `test:e2e`.
 
-## 1. Variaveis de Ambiente Necessarias
+## 0. Entrada e saida
 
-Antes de correr os testes, garante que o teu ficheiro `.env.local` contem as credenciais de teste validas.
+**Corre quando**: acabaste uma feature com UI, mexeste num fluxo critico, ou antes de um
+`/deploy`. Nao corre a cada commit — e caro e lento.
+
+**Esta feito quando** as tres coisas forem verdade, e nao antes:
+
+1. `npm run test:e2e` sai **0** — o veredicto e o exit code do runner, nunca a leitura do
+   output. Um resumo verde com exit != 0 e um runner a falhar depois dos testes.
+2. **Todo o fluxo critico tem spec.** A lista de fluxos criticos vive em
+   `.agent/rules/pages-architecture.md`; cada um tem um spec ou um ticket no backlog.
+3. **Nenhuma falha ficou sem causa atribuida.** Um teste que passa a segunda vez sem ninguem
+   tocar em nada e *flaky* — ver §5 —, e isso e um achado, nao um sucesso.
+
+## 1. Ambiente
+
+`.env.local` com as credenciais de teste:
 
 ```env
-# Adaptar ao projeto
 {{TEST_ENV_VARS}}
 ```
 
-## 2. Preparacao e Dependencias
+## 2. Preparar
 
-- Correr `npm install`
-- Instalar o runner/browser de testes — ex. Playwright: `npx playwright install chromium` (adaptar ao `{{TEST_FRAMEWORK}}`)
+- `npm install`
+- `npx playwright install chromium` (adaptar ao `{{TEST_FRAMEWORK}}`)
 
-## 3. Execucao da Suite de Testes
+## 3. Correr
 
-Os testes dependem de um ficheiro de global setup que gera o estado de autenticacao.
+- `npm run test:e2e` — headless, arranca o servidor sozinho. **E este o comando cujo exit
+  code decide.**
+- `npm run test:e2e:ui` — modo interativo, para investigar.
+- `npm run test:e2e:headed` — browser visivel.
+- Contra uma preview: `PLAYWRIGHT_BASE_URL=<url> npm run test:e2e` (timeouts maiores
+  automaticamente).
 
-- Correr `npm run test` — Executa todos os testes em modo Headless. O servidor de desenvolvimento sera iniciado automaticamente.
+> **Nunca filtrar o sumario** (`| tail`, `| grep`). A linha que interessa costuma ser a que se
+> corta, e um resumo filtrado ja escondeu falhas neste repo (ver `/review` §9).
 
-### Outras formas de execucao:
+## 4. Cobertura — o que tem de ter spec
 
-- `npm run test:ui` — Interface de debugging do runner (ex. Playwright UI mode).
-- `npm run test:headed` — Abre o browser de forma visivel.
+Derivar a lista de `.agent/rules/pages-architecture.md`, nao de memoria. Para cada fluxo
+critico, existe spec?
 
-## 4. O que testamos?
+| Fluxo | Spec | Se nao existe |
+|-------|------|---------------|
+| (derivar de `pages-architecture.md`) | | ticket no backlog, com o risco escrito |
 
-<!-- Preencher com os specs do projeto. Exemplos: -->
+**Um fluxo critico sem spec e um item de backlog, nao uma nota mental.** O que nao esta
+rastreado nao volta.
 
-<!-- 1. **`auth.spec.ts`**: Login, registo, recuperacao de passwords, erro com credenciais incorretas. -->
-<!-- 2. **`dashboard.spec.ts`**: Navegacao, metricas, KPIs. -->
-<!-- 3. **`workflow.spec.ts`**: Ciclo de vida completo (criar, editar, eliminar). -->
+## 5. Testes flaky
 
-## 5. Regras para Novos Testes E2E
+Um teste que passa a segunda vez **sem ninguem tocar em nada** nao "passou": e uma falha
+intermitente que ainda nao foi diagnosticada. Retry nao e correcao — e o volume de sinal a
+baixar.
 
-1. Utilizar helpers partilhados (ex: `waitForDataLoad(page)`) para detetar states de loading.
-2. Preferir locators de estrutura DOM e `data-testid` em vez de titulos textuais literais.
-3. Codigos/IDs unicos para dados de teste (evitar colisoes com dados reais).
-4. Limpeza de dados no final do teste (manter conta de teste limpa).
+- Correr o teste suspeito isolado, 5x seguidas. Se falhar uma, e flaky.
+- Causas por ordem de frequencia: espera por tempo em vez de por estado; dados partilhados
+  entre testes; ordem de execucao assumida; animacao nao terminada.
+- **Marcar `skip` e a solucao degenerada** (`AP4`): remove a falha sem remover a causa, e o
+  `check-test-surface.mjs` conta-o. Ou se corrige, ou vira ticket com o teste ainda vermelho.
 
-### Principio: testes herméticos e gratuitos
+## 6. Regras para specs novos
 
-- Os E2E **nao devem gastar quota** de APIs pagas/limitadas nem depender de servicos externos vivos. Preferir arrancar o servidor de teste com as keys pagas **em branco** e **asserir o caminho degradado** (ex: resposta 503) em vez de fazer a chamada real.
-- Isolar o servidor de teste do dev do dia-a-dia: **porta dedicada** e `reuseExistingServer: false`; se o framework o permitir, **build dir separado** (ex: `.next-test`) para correr testes em paralelo com um dev server vivo.
+1. Helpers partilhados para estados de loading (ex: `waitForDataLoad(page)`).
+2. `data-testid` e estrutura do DOM, nunca titulos textuais literais.
+3. IDs unicos nos dados de teste, para nao colidir com dados reais.
+4. Limpeza no fim — a conta de teste fica como estava.
 
-## 6. Testes em Preview URL
+### Hermeticos e gratuitos
 
-```bash
-PLAYWRIGHT_BASE_URL=<preview-url> npm run test
-```
+- **Nao gastar quota** de APIs pagas nem depender de servicos externos vivos. Arrancar com as
+  keys pagas **em branco** e afirmar o **caminho degradado** (ex: 503) em vez da chamada real.
+- Isolar do dev do dia-a-dia: porta dedicada, `reuseExistingServer: false` e, se o framework
+  permitir, build dir separado (ex: `.next-test`).
 
-Timeouts sao automaticamente maiores para ambientes remotos.
+## 7. Output
 
-## 7. Sessao (Handoff)
+- Veredicto: **exit code** do runner, e o numero de testes que correram.
+- Falhas, cada uma com causa atribuida (defeito do produto / defeito do teste / flaky).
+- Fluxos criticos **sem spec**, propostos como items de backlog.
+- O que **nao** foi coberto e porque.
+
+## 8. Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 
 - [ ] Atualizar `.agent/context/session.md`?
 - [ ] Atualizar `.agent/context/walkthrough.md`?
 - [ ] Marcar tarefas concluidas em `.agent/context/task.md`?
+- [ ] Specs em falta adicionados ao `backlog.md`?

@@ -1,6 +1,29 @@
 # /security-tests — Testes de Seguranca
 
-Checklist para execucao e manutencao dos testes de seguranca do {{PROJECT_NAME}}. Estes testes validam headers HTTP, flags de cookies, prevencao de XSS/injection, bypass de autenticacao e isolamento de dados.
+Levar a suite de seguranca a um **veredicto**, e manter honesta a lista do que ela cobre.
+Valida headers HTTP, flags de cookies, XSS/injection, bypass de autenticacao e isolamento de
+dados.
+
+## 0. Entrada e saida
+
+**Corre quando**: acrescentaste uma rota, um formulario, um header, uma tabela ou uma
+dependencia; e antes de qualquer release.
+
+**Esta feito quando** as quatro forem verdade:
+
+1. `npm run test:security` sai **0** — o veredicto e o exit code, nunca a leitura do output.
+2. `npm audit --audit-level=high` corrido e **cada advisory alto tem destino**: corrigido, ou
+   um ticket com a razao de ficar. "Transitivo e nao da para atualizar" e uma razao valida
+   **escrita**; nao e razao para o ignorar em silencio.
+3. **Cada categoria da §3 tem pelo menos um teste, ou uma linha a dizer porque nao se
+   aplica.** Uma categoria sem teste e sem justificacao e uma lacuna, nao uma ausencia de
+   risco.
+4. Nenhum achado do ZAP ou de um agente (§5) ficou por verificar contra o codigo real.
+
+> **O que este workflow NAO e**: um exame de penetracao. Cobre o que se testa por automatismo
+> repetivel. Auth complexa, logica de negocio e multi-tenant precisam de leitura humana ou de
+> um agente (§5) — e isso esta dito aqui para nao se confundir "a suite passou" com "a app
+> esta segura".
 
 ## 1. Variaveis de Ambiente Necessarias
 
@@ -19,7 +42,11 @@ npm run test:audit
 npm run test:all
 ```
 
-## 3. Categorias de Testes de Seguranca
+## 3. Categorias — e o teste que prova cada uma
+
+> Isto e o **catalogo do que tem de estar coberto**, nao uma leitura. Para cada linha:
+> existe teste? Se nao, ha uma justificacao escrita de porque nao se aplica a este projeto?
+> Duas colunas mentais, um resultado verificavel.
 
 ### 3.1 Security Headers
 - `X-Frame-Options: DENY` — previne clickjacking
@@ -115,7 +142,15 @@ no mesmo momento do ZAP, pre-release. Se o usares:
 - Novas tabelas -> verificar isolamento de dados
 - Novas dependencias -> correr `npm run test:audit`
 
-## 7. Sessao (Handoff)
+## 7. Output
+
+- Veredicto: **exit code** de `npm run test:security`, e quantos testes correram.
+- Tabela categoria -> coberta? -> se nao, porque (teste em falta vs nao se aplica).
+- `npm audit`: advisories altos, cada um com destino (corrigido / ticket / razao escrita).
+- Achados do ZAP ou de agente, **cada um verificado** contra o codigo real antes de entrar.
+- O que ficou **por cobrir**, dito explicitamente.
+
+## 8. Sessao (Handoff)
 
 > Perguntar ao utilizador antes de terminar:
 

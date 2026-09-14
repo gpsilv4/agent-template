@@ -2,6 +2,15 @@
 
 Guia para configurar o ambiente de desenvolvimento do {{PROJECT_NAME}}.
 
+> **Isto e documentacao para uma PESSOA, nao uma tarefa de agente** — e a excecao entre os
+> workflows. Um agente nao corre `nvm use` na tua maquina nem abre um browser; o que ele pode
+> fazer aqui e ler-te os passos, verificar o que ja esta feito, e confirmar no fim. Vive em
+> `.agent/workflows/` para ter um comando (`/setup`) e uma fonte unica com os outros.
+>
+> **O passo que nao se pode saltar e o `core.hooksPath`** (§2). Sem ele o `commit-msg` nao
+> corre e a regra de mensagens limpas passa a ser so prosa — e um clone novo nao o traz, por
+> mais que o repo esteja bem configurado.
+
 ## Arquitetura de Ambientes
 
 ```
@@ -110,21 +119,13 @@ Antes de tocar no codigo, ler:
 
 ## 9. Workflows Disponiveis
 
-| Comando     | Quando usar                          |
-| ----------- | ------------------------------------ |
-| `/plan`     | Antes de comecar uma feature nova    |
-| `/debug`    | Para resolver bugs de forma metodica |
-| `/review`   | Antes de fazer commit                |
-| `/design-review` | Qualidade de UI/UX antes de concluir feature |
-| `/deploy`   | Antes de ir para producao            |
-| `/refactor` | Ao reorganizar codigo existente      |
-| `/e2e-tests` | Para correr testes E2E funcionais  |
-| `/security-tests` | Para correr testes de seguranca |
-| `/audit`    | Auditoria completa (milestone/estado da app) |
-| `/upgrade` | Trazer melhorias do template de origem sem apagar o que e do projeto |
-| `/grill` | Interrogar o pedido ate nao sobrar ramo de decisao por resolver |
-| `/market-scan` | Analise de mercado e ideacao de features |
-| `/setup`    | Este guia (onboarding)               |
+A tabela completa vive em **`src/docs/agent-guide.md`** (e em `CLAUDE.md`/`GEMINI.md`/
+`AGENTS.md`, que sao espelhos). Nao se repete aqui: era uma **quinta** copia mantida a mao, e
+a unica que nenhum guard verificava — logo era a primeira a envelhecer. Os Guards 7/9/10
+validam as outras quatro.
+
+Os dois que interessam no primeiro dia: **`/grill`** antes de um ticket `L` ou ambiguo, e
+**`/review`** antes de qualquer commit.
 
 ## 10. Convencoes Importantes
 

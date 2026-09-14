@@ -45,7 +45,77 @@ When you open a new AI session in any project using this template, the agent **a
 
 ---
 
-## What's included
+## How to use
+
+### 1. Create repo from template
+
+```bash
+# Via GitHub CLI
+gh repo create my-project --template gpsilv4/agent-template --clone --public
+# or --private / --internal
+cd my-project
+
+# Or via GitHub UI: "Use this template" -> "Create a new repository"
+```
+
+### 2. Open AI and let BOOTSTRAP.md guide you
+
+```bash
+# Open Claude Code (or any other agent)
+claude
+
+# The AI reads BOOTSTRAP.md via CLAUDE.md and starts the process automatically.
+# If it doesn't, ask:
+# "Read .agent/BOOTSTRAP.md and configure the project"
+```
+
+The AI will:
+1. **Phase 0 (if needed)** — If you don't know what stack/architecture to use, the AI analyzes your project description and recommends platforms, stack, architecture, and flags risks — step by step, waiting for your confirmation at each step
+2. Ask questions about your project (or auto-fill from Phase 0 decisions)
+3. Replace all `{{PLACEHOLDER}}` values across files
+4. Generate `business-logic.md` and `pages-architecture.md` from scratch
+5. Adapt workflows, CI/CD, and scripts to your stack
+
+> **Don't know what tech to use?** Just describe your project in 3-5 sentences. The AI will guide you through every technical decision before touching any files.
+
+### 3. Verify and commit
+
+```bash
+# Verify no placeholders remain. Must return zero lines.
+#   git grep --untracked  -> every tracked AND newly generated file, but nothing
+#                            .gitignore'd (no node_modules/dist/.next noise)
+#   sed                   -> blanks out the two non-placeholder uses of {{ }}:
+#                            GitHub Actions ${{ ... }} expressions and Gemini's
+#                            own {{args}} token. Blanking (not dropping the line)
+#                            keeps a line that mixes one of those with a REAL
+#                            placeholder visible.
+#   the two excluded files are the placeholder catalogs themselves — drop the
+#   README exclusion once you replace it with your project's own.
+# NOTE: clean means "no output"; the pipeline then exits 1 (grep found nothing).
+#       Invert it if you ever wire this into CI as a gate.
+git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
+  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
+
+# Initial commit
+git add .
+git commit -m "chore: bootstrap agent config"
+```
+
+### 4. Start developing
+
+```bash
+# Plan a feature
+# -> tell the AI: "run /plan for X"
+
+# Fix a bug
+# -> tell the AI: "run /debug for Y"
+
+# Review before commit
+# -> tell the AI: "run /review"
+```
+
+<details>
+<summary><strong>What's included</strong> — the full file inventory (click to expand)</summary>
 
 ```
 .agent/                         <- AI knowledge management
@@ -170,74 +240,8 @@ src/docs/
 └── CHANGELOG.md                <- Changelog template
 ```
 
-## How to use
 
-### 1. Create repo from template
-
-```bash
-# Via GitHub CLI
-gh repo create my-project --template gpsilv4/agent-template --clone --public
-# or --private / --internal
-cd my-project
-
-# Or via GitHub UI: "Use this template" -> "Create a new repository"
-```
-
-### 2. Open AI and let BOOTSTRAP.md guide you
-
-```bash
-# Open Claude Code (or any other agent)
-claude
-
-# The AI reads BOOTSTRAP.md via CLAUDE.md and starts the process automatically.
-# If it doesn't, ask:
-# "Read .agent/BOOTSTRAP.md and configure the project"
-```
-
-The AI will:
-1. **Phase 0 (if needed)** — If you don't know what stack/architecture to use, the AI analyzes your project description and recommends platforms, stack, architecture, and flags risks — step by step, waiting for your confirmation at each step
-2. Ask questions about your project (or auto-fill from Phase 0 decisions)
-3. Replace all `{{PLACEHOLDER}}` values across files
-4. Generate `business-logic.md` and `pages-architecture.md` from scratch
-5. Adapt workflows, CI/CD, and scripts to your stack
-
-> **Don't know what tech to use?** Just describe your project in 3-5 sentences. The AI will guide you through every technical decision before touching any files.
-
-### 3. Verify and commit
-
-```bash
-# Verify no placeholders remain. Must return zero lines.
-#   git grep --untracked  -> every tracked AND newly generated file, but nothing
-#                            .gitignore'd (no node_modules/dist/.next noise)
-#   sed                   -> blanks out the two non-placeholder uses of {{ }}:
-#                            GitHub Actions ${{ ... }} expressions and Gemini's
-#                            own {{args}} token. Blanking (not dropping the line)
-#                            keeps a line that mixes one of those with a REAL
-#                            placeholder visible.
-#   the two excluded files are the placeholder catalogs themselves — drop the
-#   README exclusion once you replace it with your project's own.
-# NOTE: clean means "no output"; the pipeline then exits 1 (grep found nothing).
-#       Invert it if you ever wire this into CI as a gate.
-git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
-  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
-
-# Initial commit
-git add .
-git commit -m "chore: bootstrap agent config"
-```
-
-### 4. Start developing
-
-```bash
-# Plan a feature
-# -> tell the AI: "run /plan for X"
-
-# Fix a bug
-# -> tell the AI: "run /debug for Y"
-
-# Review before commit
-# -> tell the AI: "run /review"
-```
+</details>
 
 ## CI/CD Pipelines
 
