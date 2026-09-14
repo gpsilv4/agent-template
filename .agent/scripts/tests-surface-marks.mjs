@@ -295,6 +295,20 @@ export function registar() {
     return base;
   }, { code: 1, includes: [".githooks/pre-push", "APAGADO"] });
 
+  // `.claude/hooks/lib/` esteve fora da superficie enquanto `.agent/scripts/lib/` ja estava
+  // dentro: a lacuna foi fechada de um lado e deixada aberta do outro. Medido no CI —
+  // extrair a verificacao de fronteira para `lib/fronteira.mjs` leu-se como PERDA de 6 casos
+  // no ficheiro de origem, porque o destino nao contava para o total.
+  test("modulo em .claude/hooks/lib/ apagado e reportado", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks/lib"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/lib/aux.mjs"), 'export const f = (x) => /a/.test(x);\n');
+    commit(dir, "modulo novo em hooks/lib");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".claude/hooks/lib/aux.mjs"));
+    commit(dir, "apagar o modulo");
+    return base;
+  }, { code: 1, includes: [".claude/hooks/lib/aux.mjs", "APAGADO"] });
+
   // A contagem propria dos hooks: reduzir as decisoes de negacao e enfraquecer a rede sem
   // tocar em nenhum teste — o equivalente, do lado do enforcement, a apagar um `warn(`.
   test("decisoes de negacao a descer sao reportadas", (dir) => {
