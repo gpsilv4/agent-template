@@ -6,7 +6,7 @@
  *
  * NAO e um entry point: o `test-guards.mjs` importa e chama `registar()`.
  */
-import { appendFileSync, rmSync } from "fs";
+import { appendFileSync, readdirSync, rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./test-harness.mjs";
 
@@ -17,6 +17,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   );
   process.exit(1);
 }
+
+/** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
+ *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e
+ *  cada modulo. Ver `lib/registo.mjs`. */
+export const entryPoint = "test-guards.mjs";
 
 export function registar() {
   // --- Guard 1: orcamento de bytes e rules obrigatorias -------------------------
@@ -120,8 +125,16 @@ export function registar() {
   }, { code: 1, anyOut: ["SKIP  Guard 1c"] });
 
   test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
-    for (const f of ["sync-docs", "ticket-method", "scripts-guide"]) {
-      try { rmSync(file(dir, `.agent/rules/${f}.md`)); } catch {}
+    // A lista e DERIVADA do disco: escrever os nomes a mao envelhecia no primeiro ficheiro
+    // de referencia novo — e foi o que aconteceu com o `anti-patterns-template.md`, que
+    // deixava o SKIP por disparar e o teste falhava a apontar para o guard (AP1).
+    for (const f of readdirSync(file(dir, ".agent/rules"))) {
+      if (!f.endsWith(".md")) continue;
+      // Carregadas + catalogos de definicoes: nenhum destes e "rule de referencia" para o
+      // Guard 1b, e apagar o catalogo deixava as citacoes AP do repo a apontar para o vazio.
+      if (["core-rules.md", "process-rules.md", "anti-patterns.md", "business-logic.md",
+           "pages-architecture.md", "anti-patterns-template.md"].includes(f)) continue;
+      try { rmSync(file(dir, `.agent/rules/${f}`)); } catch {}
     }
     // `code: 0`: um SKIP nao e um WARN. O que este teste afirma e que o guard **diz** que nao
     // correu, em vez de desaparecer em silencio — a regra de "todo o skip e visivel".

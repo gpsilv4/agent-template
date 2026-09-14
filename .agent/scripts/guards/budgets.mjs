@@ -90,7 +90,15 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
   const REF_MAX_BYTES = 14000;
   const REF_ABANDONO_BYTES = 20000;
   const CARREGADAS = new Set([...REQUIRED_RULES, ...BOOTSTRAP_RULES]);
-  const refs = (listDir(".agent/rules", ".md") || []).filter((f) => !CARREGADAS.has(`${f}.md`));
+  // Catalogos de DEFINICOES: nao sao manuais reabertos a cada ticket (que e o que este guard
+  // orcamenta), sao tabelas que um verificador le. O `anti-patterns-template.md` guarda as
+  // entradas AP do template, e quem o vigia e o Guard 15 — inclui-lo aqui media a coisa
+  // errada e, pior, fazia uma fixture que apaga "todas as rules de referencia" apagar as
+  // DEFINICOES e produzir dezenas de citacoes mortas sem relacao com o que testava.
+  const DEFINICOES = new Set(["anti-patterns-template.md"]);
+  const refs = (listDir(".agent/rules", ".md") || []).filter(
+    (f) => !CARREGADAS.has(`${f}.md`) && !DEFINICOES.has(`${f}.md`)
+  );
   if (refs.length === 0) {
     skip("Guard 1b — nao ha rules de referencia em .agent/rules");
   } else {
