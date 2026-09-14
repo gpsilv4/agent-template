@@ -7,7 +7,7 @@
 ## Fronteiras (prioridade maxima)
 
 - **Sempre**: TypeScript estrito (`any` proibido, ficheiros ~400 linhas); UI em {{UI_LANGUAGE}}, codigo em ingles, commits em Conventional Commits (`type(scope):` em ingles); antes de commit, correr `.agent/rules/sync-docs.md` + os guards (`.agent/scripts/`).
-- **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias.
+- **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias **ou um servidor MCP** (`.agent/rules/mcp-policy.md`).
 - **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
 
 > Este bloco e uma **copia** do `CLAUDE.md`, de proposito: se o teu tool nao seguir o

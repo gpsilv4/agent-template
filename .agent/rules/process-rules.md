@@ -95,6 +95,7 @@ principio do backlog (ativo vs arquivo) a todo o historico inerte:
 
 ### Checklist de Sync Docs
 
+> Ao **criar um ficheiro novo**, a matriz de **`.agent/rules/propagation.md`** diz onde o registar.
 > A checklist completa (28 pontos) vive em **`.agent/rules/sync-docs.md`** — **nao carregada automaticamente**,
 > para manter o contexto enxuto. O agente deve **abri-la e corre-la** antes de dizer "Estou pronto para commit"
 > (proativamente, sem esperar que o utilizador peca), e sempre nos workflows `/review` e `/deploy`.

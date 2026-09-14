@@ -25,6 +25,11 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 > Ponto **28** (correr os guards) **nunca se dispensa**, em nenhum tamanho: e o unico da lista
 > que nao depende de ninguem se lembrar de nada.
 
+> **A matriz de propagacao vive em `.agent/rules/propagation.md`.** Sao dois catalogos
+> consultados em momentos diferentes: esta checklist corre-se **antes de um commit**, a matriz
+> abre-se **ao criar um ficheiro novo**. Juntos cresciam para la do orcamento a cada tipo de
+> artefacto novo.
+
 ## Checklist
 
 1. [ ] `README.md` — contagens de testes, stack, scripts atualizados
@@ -83,34 +88,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
 28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
-> **A evidencia vive em `src/docs/sync-docs-why.md`** (NAO carregado): porque cada linha da
-> matriz e assim, e o que custou descobri-lo. Aqui ficam as instrucoes.
-
-## Matriz de Propagacao (ao ADICIONAR um ficheiro novo)
-
-> A fonte de verdade vive em `.agent/`. Ao criar um ficheiro novo, replicar/registar nos sitios abaixo
-> para nada ficar desatualizado. Os wrappers `.claude/`/`.gemini/` sao **ponteiros finos** — nunca duplicar logica.
-
-| Novo ficheiro | Onde replicar/registar |
-|---|---|
-| **Workflow** (`.agent/workflows/X.md`) | wrapper `.claude/commands/X.md` + `.gemini/commands/X.toml` (ponteiro fino que **cita o caminho do proprio workflow** — validado pelo Guard 10); tabela de workflows em `CLAUDE.md` + `GEMINI.md` + `AGENTS.md`; `src/docs/agent-guide.md`; `README.md` (arvore); **tabela de fluxo por tipo** em `process-rules.md` e `CONTRIBUTING.md`; listas de essenciais/removiveis do Modo minimo em `BOOTSTRAP.md` |
-| **Rule sempre-carregada** (`.agent/rules/X.md`) | `@import` em `CLAUDE.md` + `GEMINI.md`; **`AGENTS.md`** (enumera as rules pelo nome); array `REQUIRED_RULES` em `check-doc-versions.mjs` (orcamento de bytes); `agent-guide.md`; `README.md` |
-| **Ponto de entrada de uma ferramenta** (`.github/copilot-instructions.md`, `.cursor/rules/*.mdc`, ...) | ponteiro **fino** para `AGENTS.md` — nunca logica; incluir no varrimento de placeholders do `BOOTSTRAP` §2.1 (atencao a extensao: `.mdc` nao e `.md`) e nos alvos do Guard 13; linha na tabela de compatibilidade do `README.md` com o que foi **de facto** verificado |
-| **Rule NAO carregada** (checklist/guia) | referencia on-demand nos workflows que a usam; **ponteiro curto na rule carregada que a torna obrigatoria** (padrao do `sync-docs.md` e do `ticket-method.md`); `README.md`/`agent-guide.md`; ponto novo na checklist acima — **sem** `@import` |
-| **Duplicacao forcada** (o mesmo texto em dois ficheiros porque cada tool le so o seu) | um guard que compare as copias — **nunca** confiar em mante-las iguais a mao (ver *why*) |
-| **Constante adaptavel** num script (`TARGETS`, `BANNED`, `CHECKS`, `TEST_GLOBS`, `CONFIG_GLOBS`, `CONTAGENS`) | a linha correspondente na tabela de categorias do `upgrade.md`; e o `BOOTSTRAP.md`, com a receita que manda adapta-la (ver *why*) |
-| **Script** (`.agent/scripts/X.mjs`) | passo no job **`guard-tests`** do `ci.yml` se nao depender de `package.json` — **nunca no `quality`** (ver *why*); `core-rules.md` (seccao scripts); `README.md` (arvore + tabela); **e os sitios que o INVOCAM**: `review.md`, `deploy.md`, `pull_request_template.md`, `BOOTSTRAP.md` §2.4. Se e um guard, criar tambem `test-X.mjs` com os controlos negativos e a entrada em `PARES` |
-| **Git hook versionado** (`.githooks/X`) | suite `test-X.mjs` em `.agent/scripts/`; entrada em `PARES` no `mutation-sweep.mjs`; passo no job `guard-tests` do `ci.yml`; regra em `stop-verify.mjs` (`SUITES`); passo `git config core.hooksPath .githooks` em `/setup` + `CONTRIBUTING.md`; arvore do `README.md` |
-| **Modulo partilhado** (`.agent/scripts/lib/X.mjs`) | suite `test-X.mjs`; entrada em `PARES`; a descoberta do `mutation-sweep` ja varre `lib/`, logo **sem par o gate reprova**; passo no `ci.yml`; regra em `stop-verify.mjs`; entrada no `allow` de `.claude/settings.json` se for para correr |
-| **Context** (`.agent/context/X.md`) | decidir **importado** (`@` em CLAUDE.md + GEMINI.md) vs **arquivo** (nao importado, historico inerte); **`AGENTS.md`**; `README.md`; `agent-guide.md`; **ponto novo na checklist numerada acima** (sem citar o total: o Guard 12 so valida a forma `(N pontos` em linhas que mencionem `sync-docs`, logo um intervalo escrito a mao escapa-lhe — e este dizia `1-24` com 26 pontos; os antigos `25a`/`25b` foram renumerados para 26/27 precisamente porque o regex `^\d+\. \[ \]` do guard nao apanha sufixos de letra e a contagem citada subestimava em dois); classificacao substituido/acumulado/permanente em `process-rules.md`; nota dos `*-archive.md` em `CLAUDE.md`/`GEMINI.md` |
-
-> **Sentido inverso**: quando o **template de origem** ganha algo e se quer trazer para um
-> projeto derivado, o workflow e `/upgrade` (`.agent/workflows/upgrade.md`). Decide por
-> **categoria de ficheiro** — nunca por lista de nomes, que envelhece — e o `.agent/context/*`
-> nunca se toca. Se acrescentares uma categoria a matriz acima, acrescenta a linha
-> correspondente a tabela do `/upgrade`.
-
-> Regra de paridade: qualquer edicao a `CLAUDE.md` tem espelho em `GEMINI.md` (so difere `@[...]`) — validado por `check-doc-versions.mjs`.
+> **Evidencia em `src/docs/sync-docs-why.md`** (nao carregado): porque cada linha e assim.
 
 ## Contra-verificacao por grep (anti-drift)
 

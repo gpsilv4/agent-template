@@ -72,7 +72,10 @@ As regras sao diretivas que o Agente consulta antes de cada acao.
 - **[business-logic.md]**: Regras de negocio especificas do dominio.
 - **[pages-architecture.md]**: Estrutura visual e arquitetura de paginas.
 - **sync-docs.md**: Checklist de sincronizacao de docs (28 pontos) — **nao carregada**, consultada on-demand no `/review` e `/deploy`.
-- **scripts-guide.md**: O que cada verificador faz, a sua suite, e a regra que os liga (`PARES` + testes negativos) — **nao carregada**, aberta ao mexer em `.agent/scripts/` ou `.claude/hooks/`.
+- **scripts-guide.md**: O que cada **verificador universal** faz, a sua suite, e a regra que os liga (`PARES` + testes negativos) — **nao carregada**, aberta ao mexer em `.agent/scripts/`.
+- **hooks-guide.md**: O que cada **hook** faz e o que ele NAO apanha (`.claude/hooks/`, so-Claude-Code, e `.githooks/`, universal) — **nao carregada**, aberta ao mexer neles. Par do `scripts-guide.md`: sao catalogos que crescem de forma independente.
+- **propagation.md**: A matriz de **o que replicar ao criar um ficheiro novo** (workflow, rule, script, hook, servidor MCP) — **nao carregada**, aberta ao criar. Par do `sync-docs.md`: um consulta-se ao criar, o outro ao fechar.
+- **mcp-policy.md**: Criterios para aceitar um servidor MCP, e a tabela de aprovados que o Guard 16 verifica — **nao carregada**, aberta ao avaliar um servidor.
 - **ticket-method.md** (instrucoes; o **porque** e as medicoes estao em `src/docs/ticket-method-why.md`, leitura de humano uma vez): As 6 fases por ticket, 0 a 5 (explicar e esperar -> desenvolver com controlo negativo -> loop da maquina -> loop do julgamento por angulos -> leitor independente -> relatorio) e a escala `S`/`M`/`L` — **nao carregada**, aberta ao iniciar um ticket `M` ou `L`. O ponteiro obrigatorio esta em `process-rules.md`.
 
 ---

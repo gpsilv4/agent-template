@@ -120,7 +120,9 @@ git commit -m "chore: bootstrap agent config"
 ```
 .agent/                         <- AI knowledge management
 ├── BOOTSTRAP.md                <- Setup guide: Phase 0 (analysis) + Phase 1 (config) — run once
-├── rules/
+├── rules/                     <- loaded (core, process, anti-patterns) + reference,
+│                                 not loaded: scripts-guide, hooks-guide, sync-docs,
+│                                 propagation, ticket-method, mcp-policy
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
