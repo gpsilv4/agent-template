@@ -36,6 +36,7 @@ import { guardSettings } from "./guards/settings.mjs";
 import { guardChangelogVersion, guardDependencyVersions } from "./guards/versions.mjs";
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
+import { guardMcp } from "./guards/mcp.mjs";
 import { guardAntiPatternRefs } from "./guards/anti-patterns.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
 
@@ -374,6 +375,9 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+
+// --- Guard 16: a configuracao MCP respeita a politica ---
+guardsRun += guardMcp({ read, warn, ok, skip });
 
 // --- Guard 15: as referencias a anti-padroes RESOLVEM ---
 // Uma citacao de anti-padrao errada manda o leitor a uma entrada REAL com outro significado,

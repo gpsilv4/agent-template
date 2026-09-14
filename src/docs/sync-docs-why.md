@@ -25,3 +25,21 @@ nota, porque continua verde.
 Acontece com as Fronteiras (`CLAUDE.md` -> `.cursor/rules/*.mdc` + `.github/copilot-instructions.md`,
 Guard 1d) e com `CLAUDE.md`≡`GEMINI.md` (Guard 2). E a regra *"duplicacao nova e flag no
 /review"* de `core-rules.md` levada ao fim: **quando extrair e impossivel, verifica-se**.
+
+
+## Servidor MCP: porque a aprovacao vem ANTES da configuracao
+
+Um `.mcp.json` no repo e **partilhado com quem clona** — e conveniente e perigoso ao mesmo
+tempo. Um servidor que so uma pessoa quer vai na config de utilizador, nao no repo.
+
+E as credenciais vao por variavel de ambiente sempre: um token dentro do ficheiro e um secret
+versionado. O `gitleaks` do CI apanha-o, mas nessa altura o commit ja aconteceu — e um secret
+num repo publico conta-se como comprometido a partir do push, nao a partir da deteccao.
+
+
+## Porque o `25a`/`25b` foi renumerado para 26/27
+
+O Guard 12 conta os pontos da checklist com `^\d+\. \[ \]`, que **nao apanha sufixos de
+letra**. Os pontos `25a` e `25b` existiam e nao contavam: a prosa dizia "26 pontos", o guard
+contava 26, os dois concordavam um com o outro — e ambos subestimavam o trabalho real em dois.
+E o `AP1` dentro do guard escrito para impedir o `AP1`.

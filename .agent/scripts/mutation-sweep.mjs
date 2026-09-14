@@ -88,6 +88,12 @@ function listarDir(rel) {
 // ausencia de um ficheiro, nao a linha em si.
 const PARES = [
   {
+    alvo: ".agent/scripts/guards/mcp.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // Falha aberta por desenho (esta no caminho de CADA prompt), logo nao tem `warn(`.
     // O sitio que DECIDE e o `console.log` do lembrete.
     alvo: ".claude/hooks/prompt-fase0.mjs",
