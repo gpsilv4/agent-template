@@ -53,7 +53,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Nao pertencem a um clone novo. `TEMPLATE-FIXES*` sao relatorios de revisao entregues de
  *  fora (ver `.gitignore`); `node_modules` e `.git` sao obvios. */
-const NAO_COPIAR = [".git", "node_modules"];
+const NAO_COPIAR = [".git", "node_modules", ".env", ".claude/state"];
+/** Segredos e estado local nunca entram na copia. Num projeto derivado a copia inclui tudo o
+ *  que esta na raiz — e ia parar a `/tmp`, onde ficava se o script saisse por `fatal()`. */
+const NAO_COPIAR_SUFIXO = [".pem", ".key", ".p12", ".pfx"];
 const NAO_COPIAR_PREFIXO = ["TEMPLATE-FIXES"];
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Se esta lista ficar curta, sobram
@@ -77,19 +80,6 @@ function rulesGeradas() {
   return [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
 }
 
-/** Os comandos que um projeto derivado corre — os mesmos do `guard-tests` do `ci.yml`. */
-const COMANDOS = [
-  ".agent/scripts/check-doc-versions.mjs",
-  ".agent/scripts/check-backlog.mjs",
-  ".agent/scripts/test-guards.mjs",
-  ".agent/scripts/test-test-surface.mjs",
-  ".agent/scripts/test-bundle-sizes.mjs",
-  ".agent/scripts/test-backlog.mjs",
-  ".agent/scripts/test-mutation-sweep.mjs",
-  ".agent/scripts/test-commit-msg.mjs",
-  ".claude/hooks/tests/test-hooks.mjs",
-];
-
 const leOuNull = (p) => {
   try {
     return readFileSync(p, "utf8");
@@ -97,6 +87,28 @@ const leOuNull = (p) => {
     return null;
   }
 };
+
+/** Os comandos que um projeto derivado corre — DERIVADOS do job `guard-tests` do `ci.yml`.
+ *
+ *  Estava escrito a mao, com um comentario a dizer "os mesmos do `ci.yml`" e nada a
+ *  verifica-lo: acrescentar uma suite ao CI e esquecer aqui fazia a simulacao medir menos,
+ *  em silencio — a mesma classe que o `PARES` ja resolveu com descoberta. O `check-test-surface`
+ *  nao e incluido: precisa de um `.git` com historia, que a copia nao tem. */
+function comandosDoCI() {
+  const ci = leOuNull(join(ROOT, ".github/workflows/ci.yml"));
+  if (ci === null) return null;
+  const job = ci.split(/^  guard-tests:/m)[1];
+  if (!job) return null;
+  const encontrados = [...job.matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]);
+  // EXCLUSOES, cada uma por uma razao concreta:
+  //  - `check-test-surface`: precisa de um `.git` com historia, e a copia nao tem;
+  //  - `simulate-derived` (este ficheiro) e a sua suite: correr-se-iam DENTRO da copia, que
+  //    por sua vez faria outra copia — recursao infinita. Medido: o processo nao terminava e
+  //    deixou dezenas de copias em `/tmp`. E a armadilha obvia de derivar a lista do CI, e
+  //    por isso esta escrita aqui em vez de ser descoberta outra vez.
+  const EXCLUIR = ["check-test-surface", "simulate-derived"];
+  return [...new Set(encontrados)].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
+}
 
 let problemas = 0;
 const warn = (m) => {
@@ -106,11 +118,42 @@ const warn = (m) => {
 const ok = (m) => console.log(`  OK    ${m}`);
 /** Nao consegui medir: reprova na hora. Existe como funcao e nao como `console.log` +
  *  `process.exit` soltos — ver a nota equivalente no `check-test-surface.mjs`. */
+/** Onde a copia vive, para o `fatal()` a poder limpar. Sem isto, cada caminho de recusa
+ *  depois do passo 1 saia com `process.exit(1)` e deixava a copia do REPO INTEIRO em
+ *  `/tmp` — num projeto derivado isso inclui `.env`, `*.pem` e tudo o resto. Medido: 63
+ *  copias orfas acumuladas. */
+let copiaAtiva = null;
+const limpaCopia = () => {
+  if (copiaAtiva && !process.argv.includes("--keep")) {
+    try {
+      rmSync(copiaAtiva, { recursive: true, force: true });
+    } catch {
+      /* melhor esforco: nao mascarar a razao real da saida */
+    }
+    copiaAtiva = null;
+  }
+};
 const fatal = (m) => {
+  limpaCopia();
   console.log(`  WARN  ${m}`);
   console.log("");
   process.exit(1);
 };
+// Tambem numa excepcao nao prevista ou num Ctrl-C.
+process.on("exit", limpaCopia);
+process.on("SIGINT", () => {
+  limpaCopia();
+  process.exit(130);
+});
+
+const COMANDOS = comandosDoCI();
+if (COMANDOS === null || COMANDOS.length === 0) {
+  // AP2: "nao consegui ler o ci.yml" != "nao ha comandos a correr". Uma lista vazia faria a
+  // simulacao passar sem medir nada.
+  console.log("  WARN  nao derivei nenhum comando do job `guard-tests` do ci.yml — o job mudou de nome ou de formato?");
+  console.log("");
+  process.exit(1);
+}
 
 const args = process.argv.slice(2);
 const manter = args.includes("--keep");
@@ -127,10 +170,13 @@ console.log("\n=== Simulacao de projeto derivado ===\n");
 
 // --- 1. copiar -----------------------------------------------------------------
 const dir = mkdtempSync(join(tmpdir(), "derivado-"));
+copiaAtiva = dir;
 let copiados = 0;
 for (const e of readdirSync(ROOT, { withFileTypes: true })) {
   if (NAO_COPIAR.includes(e.name)) continue;
   if (NAO_COPIAR_PREFIXO.some((p) => e.name.startsWith(p))) continue;
+  if (e.name.startsWith(".env")) continue;
+  if (NAO_COPIAR_SUFIXO.some((x) => e.name.endsWith(x))) continue;
   cpSync(join(ROOT, e.name), join(dir, e.name), { recursive: true });
   copiados++;
 }
@@ -203,6 +249,16 @@ if (sobras.length) {
 }
 
 // --- 3. gerar as rules do bootstrap ----------------------------------------------
+// Este simulador so faz sentido NO TEMPLATE: simula derivar um projeto a partir dele. Num
+// projeto ja derivado o `BOOTSTRAP.md` foi apagado (a propria documentacao manda apaga-lo),
+// e reprovar por isso punha o CI de todos os consumidores vermelho no primeiro PR — medido.
+// Sair 0 com a razao VISIVEL, e nao em silencio: "nao se aplica aqui" != "correu e passou".
+if (leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) === null) {
+  console.log("\n  SKIP  simulacao de projeto derivado — este repo ja e um derivado (sem .agent/BOOTSTRAP.md).");
+  console.log("        A simulacao so se aplica ao template de origem.\n");
+  process.exit(0);
+}
+
 const geradas = rulesGeradas();
 if (geradas.length === 0) {
   fatal("nao derivei nenhuma rule gerada da seccao 2.2 do BOOTSTRAP.md — o formato mudou?");
@@ -267,7 +323,7 @@ for (const c of selecionados) {
   }
 }
 
-if (!manter) rmSync(dir, { recursive: true, force: true });
+if (!manter) limpaCopia();
 else console.log(`\n  copia mantida em ${dir}`);
 
 // Zero comandos corridos com uma seleccao valida seria dar OK sem ter medido nada.

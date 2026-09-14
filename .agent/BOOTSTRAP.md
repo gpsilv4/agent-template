@@ -222,6 +222,28 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 
 Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 
+### 2.0 Gravar o marcador de origem (PRIMEIRO passo, antes de tudo o resto)
+
+> **Correr isto antes de mexer em qualquer ficheiro.** O `.agent/.template-version` nao e so
+> para o `/upgrade`: e o **discriminador** que diz aos guards que este repo ja nao e o
+> template. Enquanto nao existir, o Guard 13 (placeholders) salta — e um bootstrap feito a
+> meio (placeholders substituidos, rules nao geradas) ficava com a sua unica rede desligada
+> **para sempre**, em silencio. Medido.
+
+```bash
+# Correr AINDA dentro do clone do template, para que `git rev-parse HEAD` seja o commit DO
+# TEMPLATE. Se ja fizeste "Use this template" no GitHub (que nao copia historico nem tags),
+# o HEAD aqui e o do TEU projeto e o valor fica errado — nesse caso clona o template a parte
+# e le o SHA de la, ou deixa `commit: desconhecido` e o /upgrade usa o Modo B.
+printf 'template: %s\ncommit: %s\nversao: %s\ndata: %s\n' \
+  "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
+  "$(git rev-parse HEAD 2>/dev/null || echo desconhecido)" \
+  "$(git describe --tags --abbrev=0 2>/dev/null || echo desconhecida)" \
+  "$(date +%F)" > .agent/.template-version
+```
+
+- [ ] `.agent/.template-version` criado e **commitado** (nao esta no `.gitignore` de propósito)
+
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
 
 Percorrer todos os `.md`, `.mdc` (regras do Cursor), `.mjs`, `LICENSE`, `.github/CODEOWNERS` e **os ficheiros de `.githooks/`** (nao tem extensao — o git exige o nome exacto do evento) e substituir:
@@ -395,6 +417,12 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 > **Idiomas de toolchain nao sao placeholders.** Os workflows assumem `npm`/`npx tsc`/`npm run lint|build` e Playwright como default. O sweep de placeholders da Fase 3 **nao** apanha estes — se o projeto usa pnpm/yarn/bun, nao e TypeScript, ou usa outro runner de testes, **adaptar manualmente** os comandos em todos os workflows (e no `ci.yml`). O `ci.yml` ja e resiliente (salta typecheck/lint/build/test se o tsconfig/script nao existir), mas a prosa dos workflows precisa de revisao humana.
 
 > **Modo minimo (ver decisao de arranque na Fase 1).** Se escolheste Modo minimo, **remover agora** os workflows nao-essenciais: para cada um, apagar o ficheiro `.agent/workflows/<x>.md` + os dois wrappers `.claude/commands/<x>.md` e `.gemini/commands/<x>.toml` + a linha na tabela de `CLAUDE.md`/`GEMINI.md`/`AGENTS.md`. O Guard 6/7 (`check-doc-versions.mjs`) continua a validar a paridade e as tabelas dos que ficarem. Adicionar mais tarde e trivial (ver Matriz de Propagacao em `sync-docs.md`).
+>
+> **E actualizar as citacoes do NUMERO de workflows.** O Guard 12e compara qualquer `"N
+> workflows"`/`"N comandos"` escrito em prosa com os que existem em disco. Podar parte dos workflows
+> sem mexer na prosa deixa o `README.md` a citar um total que ja nao existe — e o CI
+> reprova. Achar as citacoes com:
+> `grep -rniE '[0-9]+ (workflows|comandos|commands)' README.md .agent/ src/docs/ *.md`
 
 ### 2.7 Customizar GitHub CI/CD e Governance
 
@@ -438,7 +466,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
-- **`.claude/agents/*.md`** (`code-reviewer`, `debugger`): subagentes read-only/investigacao. Ajustar se o processo mudar.
+- **`.claude/agents/*.md`** (`code-reviewer`, `debugger`, `plan-auditor`): subagentes read-only/investigacao. Ajustar se o processo mudar.
 - **`.claude/settings.json`**: **a fronteira de seguranca real** do projeto — e o unico ficheiro
   machine-enforceable, e JSON nao aceita comentarios, por isso o racional vive aqui:
   - `deny` e avaliado **antes** de `ask` e `allow` (primeira match ganha). Cobre leitura de secrets
@@ -519,20 +547,16 @@ Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue temp
 
 Sugerir ao utilizador:
 
-**Gravar de que ponto do template este projeto nasceu** — sem isto, o `/upgrade` nao sabe o
-que ja tens e tem de adivinhar por deteccao de capacidades em vez de por diff:
+**Confirmar o marcador de origem** — criado no passo **2.0**, nao aqui. Se por alguma razao
+nao existir, voltar ao 2.0 e cria-lo agora:
 
-```bash
-# Correr AINDA dentro do clone do template, antes de apagar a origem, ou apontando-lhe:
-printf 'template: %s\ncommit: %s\ndata: %s\n' \
-  "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
-  "$(git rev-parse HEAD)" \
-  "$(date +%F)" > .agent/.template-version
-```
+- [ ] `.agent/.template-version` existe, tem um `commit:` que **nao** e um commit deste
+      projeto, e esta commitado
 
-> Este ficheiro **nao existe no template** — nasce aqui, com o commit de origem deste
-> projeto. O `/upgrade` le-o para saber o que mudou desde entao (Modo A). Sem ele cai no
-> Modo B, que funciona mas propoe mais e com menos precisao.
+> O `/upgrade` le-o para saber o que mudou desde entao (Modo A). Sem ele cai no Modo B, que
+> funciona mas propoe mais e com menos precisao. Um `commit:` apontando para o proprio
+> projeto e **pior que nenhum**: o Modo A escolhe-se por o ficheiro existir, e depois o
+> `git log <sha>..<branch>` no template falha com `unknown revision`.
 
 ```bash
 # Verificar que nao ficou nenhum placeholder (mesmo sweep da Fase 3 — zero linhas)

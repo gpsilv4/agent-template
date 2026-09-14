@@ -11,11 +11,11 @@
  * Encontrado a USAR: criar um projeto a partir do template e correr o bootstrap revelou-o.
  * Nenhuma das rondas de review o viu, porque no template puro nao ha nada de errado.
  *
- * COMO SABE SE O BOOTSTRAP JA CORREU: pela existencia de `.agent/rules/business-logic.md`,
- * que a Fase 2.2 do bootstrap GERA e o template nu nao tem. E um sinal POSITIVO de bootstrap
- * concluido — ao contrario de "o CLAUDE.md ja nao tem `{{PROJECT_NAME}}`", que a primeira
- * versao usava e que qualquer fixture de teste com um `CLAUDE.md` minimo satisfazia por
- * acidente, fazendo o guard disparar em meia suite.
+ * COMO SABE SE O BOOTSTRAP JA CORREU: pelo `ehDerivado()` do orquestrador, que olha para
+ * `.agent/.template-version`. A versao anterior usava `.agent/rules/business-logic.md` —
+ * um artefacto de DOMINIO que uma CLI ou uma lib legitimamente nao geram. Medido: um
+ * meio-bootstrap (placeholders substituidos, rules nao geradas) saia 0 com dois `@import`
+ * pendurados e este guard — a unica rede de placeholders — desligado para sempre.
  */
 
 // `.agent/BOOTSTRAP.md` e `README.md` DOCUMENTAM os placeholders — citam-nos por design.
@@ -34,9 +34,9 @@ const PLACEHOLDER = /\{\{([A-Z_]+)\}\}/g;
 /**
  * @returns {number} guards executados
  */
-export function guardPlaceholders({ read, warn, ok, skip, listDir }) {
-  if (read(".agent/rules/business-logic.md") === null) {
-    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/rules/business-logic.md)");
+export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado }) {
+  if (!ehDerivado()) {
+    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version)");
     return 0;
   }
 

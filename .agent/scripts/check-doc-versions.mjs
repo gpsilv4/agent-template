@@ -4,7 +4,7 @@
  * Guards de consistencia de documentacao que correm SEMPRE (sem config):
  *   1. Orcamento de bytes das rules sempre-carregadas (`.agent/rules/*`) — o contexto
  *      do agente e finito; rules que incham degradam foco e custam tokens a cada sessao.
- *   2. Paridade CLAUDE.md === GEMINI.md (normalizando a diferenca de sintaxe `@[...]`) —
+ *   2. Paridade CLAUDE.md === GEMINI.md (normalizando a diferenca de sintaxe `@./`) —
  *      sao espelhos; tocar so num e erro recorrente.
  *   3. Versao do `package.json` === ultima entrada de `src/docs/CHANGELOG.md`.
  *   4. Scanner de termos obsoletos/banidos nos docs vivos (config em BANNED).
@@ -105,19 +105,46 @@ console.log(`  raiz: ${ROOT}\n`);
 // `guards/budgets.mjs` (o bloco mais coeso deste ficheiro, que passou o flag das 500 linhas);
 // a entrada em `PARES` do `mutation-sweep.mjs` e obrigatoria, senao a varredura mede este
 // ficheiro e reporta 100% a mentir.
+/**
+ * O projeto ja passou pelo bootstrap? E o discriminador PARTILHADO entre os guards que se
+ * comportam de forma diferente no template e num projeto derivado.
+ *
+ * Porque nao `.agent/rules/business-logic.md` (a versao anterior): essa rule e um artefacto
+ * de DOMINIO, gerado na Fase 2.2, e ha projetos legitimos que nao a geram (uma CLI, uma
+ * lib). Medido: substituir os placeholders sem gerar as rules dava exit 0 com dois
+ * `@import` pendurados e o Guard 13 — a unica rede de placeholders — desligado para sempre.
+ *
+ * `.agent/.template-version` e escrito pelo bootstrap no PRIMEIRO passo da Fase 2 e nao
+ * depende de nenhuma escolha de dominio. A ausencia do `BOOTSTRAP.md` conta como segundo
+ * sinal: o bootstrap manda apaga-lo no fim, e um projeto que o fez ja nao e o template.
+ */
+const ehDerivado = () =>
+  read(".agent/.template-version") !== null || read(".agent/BOOTSTRAP.md") === null;
+
 guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir });
 
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
-// Gemini usa `@[path]`, Claude/Cursor usa `@path`. Normalizar antes de comparar
+// Gemini usa `@./path`, Claude/Cursor usa `@path`. Normalizar antes de comparar
 // para apanhar drift de CONTEUDO sem falsos positivos na diferenca de sintaxe.
+//
+// A versao anterior normalizava `@[path]` — uma forma que **nao existe** na documentacao do
+// Gemini CLI (o Memory Import Processor define `@./file.md`, `@../file.md` e `@/abs/path`).
+// Consequencia provavel: o Gemini carregava o `GEMINI.md` e ZERO das rules importadas, e
+// quatro guards certificavam a "paridade" sem que nada verificasse que ele carrega alguma
+// coisa — paridade textual lida como paridade funcional, que e o `AP2`. O guard defendia a
+// sintaxe errada como invariante.
+//
+// POR VERIFICAR (a unica medicao que fecha isto): abrir o Gemini CLI num clone e correr
+// `/memory show`, para ver o que ele de facto carregou. Ate la, a forma documentada e a
+// aposta certa; a anterior era uma aposta errada com um guard a defende-la.
 const claude = readMeaningful("CLAUDE.md");
 const gemini = readMeaningful("GEMINI.md");
 if (claude !== null && gemini !== null) {
-  // Normaliza a sintaxe de import (@[x] -> @x) e colapsa espacamento/padding
-  // (as celulas @[...] sao mais largas, logo o alinhamento das tabelas difere de forma cosmetica).
+  // Normaliza a sintaxe de import (@./x -> @x) e colapsa espacamento/padding
+  // (as celulas do Gemini sao mais largas, logo o alinhamento das tabelas difere de forma cosmetica).
   const normalize = (s) =>
     s
-      .replace(/@\[([^\]]+)\]/g, "@$1")
+      .replace(/^@\.\/(?=\S)/gm, "@")
       .split("\n")
       .map((l) => {
         const c = l.replace(/[ \t]+/g, " ").trimEnd();
@@ -126,9 +153,9 @@ if (claude !== null && gemini !== null) {
       })
       .join("\n");
   if (normalize(claude) === normalize(gemini)) {
-    ok("CLAUDE.md === GEMINI.md (modulo sintaxe @[...])");
+    ok("CLAUDE.md === GEMINI.md (modulo sintaxe @./ do Gemini)");
   } else {
-    warn("CLAUDE.md e GEMINI.md DIVERGEM (alem da sintaxe @[...]) — sao espelhos, sincroniza-os");
+    warn("CLAUDE.md e GEMINI.md DIVERGEM (alem da sintaxe @./ do Gemini) — sao espelhos, sincroniza-os");
   }
   guardsRun++;
 } else if (claude !== null || gemini !== null) {
@@ -342,11 +369,11 @@ guardsRun += guardSettings({ read, warn, ok, note, skip });
 
 // --- Guards 12 e 12c: contagens citadas em prosa como dados DERIVADOS ---
 // Extraidos para `guards/derived-counts.mjs`.
-guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir });
+guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, listDir, ehDerivado });
 // --- Guard 13: placeholders esquecidos apos o bootstrap ---
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
-guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir });
+guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
 
 // --- Guard 15: as referencias a anti-padroes RESOLVEM ---
 // Uma citacao de anti-padrao errada manda o leitor a uma entrada REAL com outro significado,
