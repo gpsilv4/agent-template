@@ -199,7 +199,14 @@ for (const e of readdirSync(ROOT, { withFileTypes: true })) {
   });
   copiados++;
 }
-if (copiados === 0) fatal("nao copiei nada do repo — a simulacao nao mediria nada");
+// NAO ha um `if (copiados === 0) fatal(...)` aqui, e a ausencia e deliberada: este script vive
+// em `.agent/scripts/`, logo `.agent` esta SEMPRE na raiz e e sempre copiado — `copiados` nunca
+// pode ser zero. Era codigo de defesa que nenhum teste podia alcancar.
+//
+// Quem o apanhou foi a varredura de mutacao, na PRIMEIRA vez que este ficheiro foi medido: ele
+// nao casava a convencao `check-*.mjs` da descoberta e por isso nunca tinha sido varrido, apesar
+// de ter sitios de recusa e suite propria. Codigo de defesa que nenhum teste cobre e peso morto
+// — e a varredura reprova-o, com razao (a mesma nota existe no `check-test-surface.mjs`).
 
 // --- 2. substituir placeholders -------------------------------------------------
 let tocados = 0;
@@ -307,6 +314,43 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
     } else {
       ok("anti-patterns.md sem exemplo comentado a remover");
     }
+  }
+}
+
+// --- 3c. o derivado com HISTORIA, e nao so o dia 1 --------------------------------
+// PORQUE EXISTE: este simulador validava o **dia 1**. O derivado que ele construia tinha zero
+// anti-padroes proprios, os TETOS do template e nenhum ficheiro seu acima de 500 linhas — e
+// por isso tres dos quatro achados da terceira ronda de revisao escaparam-lhe. Todos vivem no
+// **dia 100**: so aparecem depois de o projeto escrever a primeira entrada `APn` sua, o
+// primeiro teto seu, ou o primeiro ficheiro grande.
+//
+// O que se acrescenta aqui e a MATURIDADE: o derivado passa a ter um anti-padrao proprio, com
+// um numero que NAO colide, e os guards tem de continuar verdes. Se um dia colidir — ou se o
+// Guard 15 deixar de detetar a colisao — esta simulacao passa a reprovar sozinha, em vez de
+// esperar que alguem corra o `/upgrade` num projeto real e o descubra.
+{
+  const rel = ".agent/rules/anti-patterns.md";
+  const p2 = join(dir, rel);
+  const c = leOuNull(p2);
+  if (c !== null) {
+    // O proximo ID livre, DERIVADO dos dois ficheiros — e exactamente o que o cabecalho do
+    // `anti-patterns.md` manda fazer. Escrever um numero a mao aqui criaria a colisao que
+    // esta simulacao existe para provar que nao acontece.
+    const usados = new Set();
+    for (const f of [rel, ".agent/rules/anti-patterns-template.md"]) {
+      const t = leOuNull(join(dir, f));
+      if (t === null) continue;
+      for (const m of t.matchAll(/^#{2,3}\s+AP(\d+)\b/gm)) usados.add(Number(m[1]));
+    }
+    const livre = usados.size ? Math.max(...usados) + 1 : 1;
+    writeFileSync(
+      p2,
+      c +
+        `\n### AP${livre} — Entrada propria deste projeto (simulacao de derivado maduro)\n\n` +
+        `- **Origem**: simulacao\n- **Anti-padrao**: o que nao fazer\n` +
+        `- **Correto**: o que fazer\n- **Detecao em review**: \`grep -rn "exemplo" src/\`\n`
+    );
+    ok(`derivado com historia: anti-padrao proprio AP${livre} acrescentado (o proximo ID livre)`);
   }
 }
 

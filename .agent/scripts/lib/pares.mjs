@@ -48,6 +48,16 @@ export const PARES = [
   {
     // Guard 17 (tamanho de ficheiro). A catraca so vale se cada um dos seus sitios de recusa
     // estiver medido: uma excecao que deixa de avisar e uma catraca aberta, e ninguem repara.
+    // O simulador NAO casava a convencao `check-*.mjs` da descoberta, logo nunca foi medido —
+    // e tem 8 sitios `fatal()`. E o proprio caso que a descoberta existe para nao ter: um
+    // verificador com sitios de recusa, com suite propria, e sem rede que prove que eles ficam
+    // vermelhos. Nao veio de nenhum relatorio: apareceu ao tentar varre-lo.
+    alvo: ".agent/scripts/simulate-derived.mjs",
+    suite: ".agent/scripts/test-simulate-derived.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/sizes.mjs",
     suite: ".agent/scripts/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
