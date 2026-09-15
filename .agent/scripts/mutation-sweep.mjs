@@ -117,6 +117,10 @@ if (!only) {
     ...listarDir(".agent/scripts/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/lib/${f}`),
     // Os harnesses: decidem o veredicto de todas as suites e estavam fora da descoberta.
     ...listarDir(".agent/scripts").filter((f) => /^test-.*harness\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
+    // O `simulate-derived.mjs` nao e um `check-*` nem um harness, mas TEM sitios de recusa
+    // (8 `fatal()`) — e escapava a descoberta pelo NOME. A convencao e util mas nao e a
+    // verdade: o que faz de um ficheiro um verificador e ter sitios de recusa, nao o prefixo.
+    ...listarDir(".agent/scripts").filter((f) => /^simulate-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
     // Os hooks tambem: sao codigo de enforcement com sitios de decisao, e estavam fora da
     // regra que o template impoe a todos os verificadores ("cada um com a sua suite"). Um
     // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard

@@ -84,6 +84,16 @@ function manifestoRsc(dir, route, chunksPorModulo, { chaveLiteral = null, corpo 
   return f;
 }
 
+/** Poe o interruptor do gate em `false` na copia do checker. O patch falha ALTO se o literal
+ *  mudar de forma: um patch que nao aplica e um teste que mede a versao errada em silencio. */
+function suspenderAlvos(dir) {
+  const f = join(dir, CHECKER);
+  const src = readFileSync(f, "utf8");
+  const out = src.replace(/const ALVOS_REPROVAM = true;/, "const ALVOS_REPROVAM = false;");
+  if (out === src) throw new Error("o patch de ALVOS_REPROVAM nao aplicou — o literal mudou de forma");
+  writeFileSync(f, out);
+}
+
 function manifest(dir, obj) {
   writeFileSync(join(dir, ".next", "build-manifest.json"), JSON.stringify(obj));
 }
@@ -383,6 +393,17 @@ test("RSC: o mesmo chunk em dois modulos conta uma vez", (dir) => {
   withTargets(dir, { "/": { name: "Home", target: (n * 1.5) / 1024, alarm: (n * 1.5) / 1024 } });
 }, { code: 0, includes: ["[OK]"], excludes: ["[ALARM]", "[?]"] });
 
+// O confinamento a `.next/` tem de valer TAMBEM pelo caminho RSC. Os testes que ja existiam
+// cobriam o manifesto e o varrimento de diretorio; este caminho e novo e um manifesto e um
+// ficheiro gerado — se alguem lhe puser um `../`, o verificador media ficheiros de fora e
+// reportava um numero que nao e o bundle.
+test("RSC: chunk que SAI do .next/ e reportado, nao contado", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  writeFileSync(join(dir, "FORA-RSC.txt"), "F".repeat(50_000));
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  manifestoRsc(dir, "/", [["/_next/../FORA-RSC.txt"]]);
+}, { code: 1, includes: ["FORA de .next/"] });
+
 // --- Os polyfills na baseline ------------------------------------------------
 // E UM ficheiro, carregado em TODAS as paginas, e media 38,7 kB num derivado real — 20% do
 // First Load. Nao tem nada a ver com a versao do Next: era uma omissao pura.
@@ -394,6 +415,43 @@ test("polyfillFiles entram na baseline", (dir) => {
   // alarme a metade do polyfill: so dispara se ele entrar na baseline.
   withTargets(dir, { "/": { name: "Home", target: n / 2048, alarm: n / 2048 } });
 }, { code: 1, includes: ["[ALARM]"] });
+
+// --- O interruptor do gate: os DOIS lados, e o que ele NAO suspende ----------
+// Existe porque, quando um projeto liga a medicao a serio, os alvos que la estavam foram
+// escritos contra um numero que nao era medicao (1,4x a 2,0x acima, medido num derivado real).
+// Sem estes testes, o interruptor era uma afirmacao em prosa — que e o defeito que este repo
+// persegue em todo o lado.
+
+test("gate LIGADO: exceder o alarme reprova", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  const n = chunk(dir, "static/chunks/app/page-x.js", 80_000);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  withTargets(dir, { "/": { name: "Home", target: n / 2048, alarm: n / 2048 } });
+}, { code: 1, includes: ["[ALARM]"] });
+
+test("gate SUSPENSO: exceder o alarme avisa mas nao reprova", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  const n = chunk(dir, "static/chunks/app/page-x.js", 80_000);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  withTargets(dir, { "/": { name: "Home", target: n / 2048, alarm: n / 2048 } });
+  suspenderAlvos(dir);
+  // O `[ALARM]` continua a aparecer: suspende-se o VEREDICTO, nao o diagnostico. Um gate
+  // suspenso que tambem calasse a mensagem seria indistinguivel de nao ter gate nenhum.
+}, { code: 0, includes: ["[ALARM]"] });
+
+// A terceira assercao, e a que interessa mais: **nao conseguir medir continua a reprovar**,
+// mesmo com o gate suspenso. O interruptor cobre o juizo sobre o TAMANHO e mais nada — se
+// cobrisse a integridade da medicao, seria um `|| true` com outro nome.
+test("gate SUSPENSO: uma rota por resolver continua a reprovar", (dir) => {
+  chunk(dir, "static/chunks/shared.js", 50_000);
+  manifest(dir, { rootMainFiles: ["static/chunks/shared.js"], pages: {} });
+  suspenderAlvos(dir);
+}, { code: 1, includes: ["nao foi possivel resolver os chunks proprios", "[?]"] });
+
+test("gate SUSPENSO: ficheiro ausente do disco continua a reprovar", (dir) => {
+  manifest(dir, { rootMainFiles: ["static/chunks/falta.js"], pages: {} });
+  suspenderAlvos(dir);
+}, { code: 1, includes: ["AUSENTES do disco"] });
 
 // --- Resumo -----------------------------------------------------------------
 

@@ -48,7 +48,7 @@ const falhas = [];
 
 /** Repo minimo, limpo por construcao: um placeholder para substituir, uma seccao 2.2 no
  *  BOOTSTRAP para derivar, e um stub por cada comando que o simulador chama. */
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -76,6 +76,13 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
 
   w(".agent/rules/anti-patterns.md",
     "# Anti-Padroes\n\n<!-- Exemplo a remover no bootstrap.\n\n## AP1 — exemplo\n\n-->\n\n## AP1 — real\n");
+  if (apTemplate) {
+    // O ficheiro do TEMPLATE ao lado do do projeto. E o que torna a fixture um derivado com
+    // historia: o simulador acrescenta um anti-padrao proprio, e ele tem de escolher um numero
+    // que nao colida com estes.
+    w(".agent/rules/anti-patterns-template.md",
+      "# Anti-Padroes do template\n\n## AP1 — um\n\n## AP2 — dois\n\n## AP7 — sete\n");
+  }
 
   const listaStubs = comandoExtra ? [...COMANDOS, ".agent/scripts/test-delta.mjs"] : COMANDOS;
   for (const [i, c] of semStubs ? [] : listaStubs.entries()) {
@@ -245,6 +252,28 @@ test("job sem nenhum `node ...mjs` reprova", { ciSemComandos: true }, {
 test("um comando ACRESCENTADO ao ci.yml passa a ser corrido pela simulacao", { comandoExtra: true }, {
   code: 0,
   includes: [".agent/scripts/test-delta.mjs"],
+});
+
+// --- O derivado com HISTORIA, e nao so o dia 1 -------------------------------
+// O simulador validava o **dia 1**: zero anti-padroes proprios, os TETOS do template, nenhum
+// ficheiro grande. Tres dos quatro achados da terceira ronda de revisao escaparam-lhe por
+// isso — todos vivem no dia 100. O passo 3c acrescenta um anti-padrao PROPRIO, e o numero
+// tem de ser DERIVADO dos dois ficheiros: escrito a mao, criava a colisao que o Guard 15
+// existe para reprovar.
+// Os numeros CONSTROEM-SE: escritos por extenso, este ficheiro passava a CITAR um `APn` que
+// nao existe e o Guard 15 reprovava-o — e foi o que aconteceu ao escrever estes dois testes.
+// E a mesma convencao do `tests-anti-patterns.mjs`.
+const ap = (n) => "AP" + n;
+
+test("derivado maduro: o anti-padrao proprio usa o proximo ID LIVRE", { apTemplate: true }, {
+  code: 0,
+  // AP1, AP2 e AP7 no template + AP1 no projeto -> o proximo livre e o 8.
+  includes: [`anti-padrao proprio ${ap(8)} acrescentado`],
+});
+
+test("sem o ficheiro do template, o proximo livre e 2", {}, {
+  code: 0,
+  includes: [`anti-padrao proprio ${ap(2)} acrescentado`],
 });
 
 // --- A lista de exclusao tem de valer em profundidade ------------------------
