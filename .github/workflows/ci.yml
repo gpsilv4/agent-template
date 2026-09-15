@@ -341,9 +341,40 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # A `gitleaks-action` exige `GITLEAKS_LICENSE` em contas de ORGANIZACAO (gratis, mas por
+      # formulario externo); so contas pessoais estao isentas. Sem isso, quem clonar este
+      # template para um repo de org fica com o UNICO job que corre sempre — e o unico que nao
+      # depende do `detect` — vermelho no dia 1, por um motivo que nao e do codigo dele.
+      #
+      # Este passo transforma isso num aviso accionavel em vez de uma falha opaca. Nao salta a
+      # varredura: se a licenca existir, corre na mesma.
+      # A condicao vive no SHELL e nao num `if:` de step. Nao e estilo: o
+      # `check-test-surface.mjs` conta os `if:` como marcas de enfraquecimento, e tem razao em
+      # o fazer — um `if:` e a forma mais barata de desligar uma verificacao sem a apagar.
+      # Este seria benigno (condiciona um aviso, nao uma verificacao), mas um gate que precisa
+      # de saber distinguir os benignos deixa de ser util. Escrever a condicao no `run:` da o
+      # mesmo resultado sem gastar a marca.
+      - name: Licenca do gitleaks (so em organizacoes)
+        env:
+          DONO: ${{ github.event.repository.owner.type }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        run: |
+          if [ "$DONO" = "Organization" ] && [ -z "${GITLEAKS_LICENSE:-}" ]; then
+            echo "::warning::Repo de ORGANIZACAO sem GITLEAKS_LICENSE. A gitleaks-action pede licenca (gratis) para orgs — o passo seguinte vai falhar."
+            echo "::warning::Obter em https://gitleaks.io e guardar como secret GITLEAKS_LICENSE, ou trocar este job por gitleaks em binario."
+            echo "::warning::Governance: a gitleaks-action e licenca comercial desde a v2 e valida a licenca contra um terceiro."
+          fi
+
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v3
+        # Pin por SHA, e nao pela tag `v3`: uma tag e MOVEL — quem a controla pode reaponta-la,
+        # e esta acao corre em cada PR com acesso ao repo. As de `actions/*` ficam por tag (o
+        # owner e o mesmo do runner); as de terceiros, nao. O Dependabot atualiza SHAs e mantem
+        # o comentario da versao ao lado.
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Organizations (not personal repos) need a free GITLEAKS_LICENSE:
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          # Organizacoes (nao repos pessoais) precisam de GITLEAKS_LICENSE, gratis. Fica
+          # DESCOMENTADO: sem secret definido o valor e vazio e a acao comporta-se como antes;
+          # com secret, funciona. Comentado, nem definir o secret resolvia — e o aviso acima
+          # mandava fazer uma coisa que nao tinha efeito.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

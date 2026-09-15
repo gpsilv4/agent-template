@@ -62,6 +62,9 @@ const FIXTURE_PATHS = [
   // ficheiros desta pasta — sem ela, o guard reportava-os como "nao existe" em TODOS os
   // testes e a fixture media o oposto do repo.
   ".claude/hooks",
+  // Os subagentes: o Guard 13 passou a varre-los (tem `{{PROJECT_NAME}}` como todos), e sem
+  // eles na fixture o teste falhava por o ficheiro nao existir, nao por o guard estar errado.
+  ".claude/agents",
   ".claude/settings.json",
   ".cursor/rules",
   ".github/copilot-instructions.md",
