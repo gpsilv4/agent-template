@@ -18,6 +18,12 @@
  * ---------------------------------------------------------------------------
  * LIMITE CONHECIDO — App Router (verificado na fonte do Next.js, 2026-08-26)
  *
+ * ATUALIZADO (2026-09-15, achado de um derivado real em Next 16): a fonte por rota passa a ser
+ * o **manifesto RSC** (`.next/server/app/<rota>/page_client-reference-manifest.js`). O
+ * varrimento de diretorio abaixo era "o unico caminho" e **no Next 16 a pasta nao existe** —
+ * dez rotas devolviam o mesmo valor e dez `[OK]`, sem nunca medir rota nenhuma. O varrimento
+ * fica como caminho para versoes anteriores.
+ *
  * As rotas do App Router **nao aparecem** em `build-manifest.json.pages`. O
  * `build-manifest-plugin` chama `getRouteFromEntrypoint(entrypoint.name)` SEM a flag
  * `app`; sem ela, o ramo que resolve entrypoints `app/...` nunca corre, a funcao
@@ -57,6 +63,28 @@ const TARGETS = {
   // "/about":   { name: "About",    target: 155, alarm: 175 },
   // "/dashboard": { name: "Dashboard", target: 160, alarm: 180 },
 };
+
+/** Os alvos de tamanho reprovam, ou so avisam?
+ *
+ *  **`true` por omissao** — um orcamento que nao reprova nao e um orcamento.
+ *
+ *  Porque existe o interruptor: quando um projeto liga a medicao a serio pela primeira vez (o
+ *  manifesto RSC acima), os alvos que ja la estavam foram escritos contra um numero que **nao
+ *  era medicao**. Medido num derivado real: as dez rotas ficaram **1,4x a 2,0x** acima. Nessa
+ *  altura ha tres saidas, e duas sao mas:
+ *    - subir os alvos -> transforma um diagnostico em norma, e o orcamento passa a descrever
+ *      o que ha em vez de o que se quer;
+ *    - deixar o gate vermelho -> bloqueia todos os PRs por um problema que nao e deles;
+ *    - **suspender o JUIZO sobre o tamanho**, com um ticket aberto e a razao escrita — e o
+ *      que esta linha permite.
+ *
+ *  O que NAO se suspende: **nao conseguir medir continua a reprovar** (rota por resolver,
+ *  ficheiro ausente, caminho fora do `.next/`). So o juizo sobre o numero e que fica de fora.
+ *
+ *  A alternativa que se tentou primeiro e que NAO se deve usar: `|| true` no `ci.yml`. O
+ *  `check-test-surface` apanhou-a, e com razao — e a neutralizacao silenciosa que ele existe
+ *  para detetar. A decisao vive aqui, visivel e com data, ou nao vive. */
+const ALVOS_REPROVAM = true;
 
 const missing = [];
 const outside = []; // caminhos do manifest que saem de .next/
@@ -107,6 +135,50 @@ function addFiles(files, seen) {
   return { total, counted };
 }
 
+/** Os chunks proprios de uma rota, lidos do **manifesto RSC** que o Next escreve por rota.
+ *
+ *  PORQUE EXISTE: o varrimento de `.next/static/chunks/app/<rota>/` era "o unico caminho que
+ *  conta chunks proprios no App Router" — e **no Next 16 essa pasta nao existe**. Os chunks
+ *  sao escritos achatados, com nomes com hash. Medido num derivado real: dez rotas devolviam
+ *  o MESMO valor (a baseline partilhada) e dez `[OK]`. O verificador nunca mediu rota nenhuma,
+ *  e como o numero era plausivel ninguem deu por isso durante meses.
+ *
+ *  Devolve `null` quando **nao consegue ler** — nunca `[]`, que diria "esta rota nao tem
+ *  chunks" e produziria zero com `[OK]`, que e o defeito que este ficheiro existe para nao ter.
+ *
+ *  ARMADILHA que custa tempo: a chave de uma rota dinamica leva parenteses rectos —
+ *  `__RSC_MANIFEST["/resultados/[id]/page"]`. Uma regex com `\[[^\]]+\]` para no `]` de `[id]`
+ *  e a rota fica por resolver com o manifesto ali ao lado. Casa-se a STRING entre aspas. */
+function chunksDoManifestoRsc(route) {
+  const rel = route === "/" ? "" : route.slice(1);
+  const f = join(NEXT_DIR, "server", "app", rel, "page_client-reference-manifest.js");
+  if (!existsSync(f)) return null;
+  let bruto;
+  try {
+    bruto = readFileSync(f, "utf8");
+  } catch {
+    return null;
+  }
+  const m = bruto.match(/globalThis\.__RSC_MANIFEST\[\s*"(?:[^"\\]|\\.)*"\s*\]\s*=\s*(\{[\s\S]*?\});?\s*$/);
+  if (!m) return null;
+  let obj;
+  try {
+    obj = JSON.parse(m[1]);
+  } catch {
+    return null; // manifesto ilegivel != rota sem chunks (`AP2`)
+  }
+  const mods = obj?.clientModules;
+  if (!mods || typeof mods !== "object") return null;
+  const out = new Set();
+  for (const mod of Object.values(mods)) {
+    for (const c of mod?.chunks ?? []) {
+      // Os caminhos vem com prefixo `/_next/`; em disco sao relativos a `.next/`.
+      if (typeof c === "string") out.add(c.replace(/^\/_next\//, ""));
+    }
+  }
+  return [...out];
+}
+
 /** Diretorio dos chunks proprios de uma rota. Nao cobre route groups — ver cabecalho. */
 function pageChunkDir(route) {
   return join(NEXT_DIR, "static", "chunks", "app", route === "/" ? "" : route.slice(1));
@@ -140,6 +212,13 @@ const sharedSeen = new Set();
 const shared = addFiles(manifest.rootMainFiles || [], sharedSeen);
 let sharedSize = shared.total;
 
+// Os POLYFILLS ficavam de fora da baseline. E **um** ficheiro, carregado em TODAS as paginas,
+// e num derivado real media 38,7 kB — 20% do First Load. Nao tem nada a ver com a versao do
+// Next: era uma omissao pura, e vale em qualquer versao. Pelo mesmo `addFiles`/`sharedSeen`
+// do resto, para nao contar duas vezes o que ja esteja em `rootMainFiles`.
+const polyfills = addFiles(manifest.polyfillFiles || [], sharedSeen);
+sharedSize += polyfills.total;
+
 // Chunk do layout do App Router (carregado em todas as paginas).
 // Passa pelo MESMO addFiles/sharedSeen: um layout tambem listado em rootMainFiles era
 // contado duas vezes na baseline, inflando todas as rotas e podendo disparar ALARM falso.
@@ -172,7 +251,17 @@ for (const [route, config] of Object.entries(TARGETS)) {
   let pageSize = fromManifest.total;
   let pageChunks = fromManifest.counted;
 
-  // Varrimento de diretorio: o unico caminho que funciona para App Router.
+  // Manifesto RSC PRIMEIRO: e a fonte por rota que existe no Next moderno. O varrimento de
+  // diretorio a seguir fica como caminho para versoes anteriores — nao se apaga, porque um
+  // derivado pode estar em Next antigo e ai a pasta existe e o manifesto nao.
+  const rsc = chunksDoManifestoRsc(route);
+  if (rsc !== null) {
+    const doRsc = addFiles(rsc, routeSeen);
+    pageSize += doRsc.total;
+    pageChunks += doRsc.counted;
+  }
+
+  // Varrimento de diretorio: o caminho das versoes anteriores do App Router.
   // Usa o MESMO `seen` (com a chave relativa a .next/) — um chunk listado no
   // manifest e tambem presente no diretorio era contado duas vezes.
   const dir = pageChunkDir(route);
@@ -209,7 +298,9 @@ for (const [route, config] of Object.entries(TARGETS)) {
   if (totalKB > config.alarm) {
     status = "ALARM";
     hasAlarm = true;
-    hasFail = true;
+    // So o JUIZO sobre o tamanho e que o interruptor suspende. Nao conseguir medir (rota por
+    // resolver, ficheiro ausente, caminho fora do `.next/`) continua a reprovar mais abaixo.
+    if (ALVOS_REPROVAM) hasFail = true;
   } else if (totalKB > config.target) {
     status = "WARN";
     hasAlarm = true;
