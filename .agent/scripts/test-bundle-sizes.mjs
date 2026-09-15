@@ -37,6 +37,9 @@ function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "bundle-test-"));
   mkdirSync(join(dir, ".agent", "scripts"), { recursive: true });
   cpSync(join(ROOT, CHECKER), join(dir, CHECKER));
+  // Normalizar a configuracao ANTES de qualquer teste correr: nenhum deles pode depender das
+  // rotas deste projeto. Rebenta se o literal mudar de forma, em vez de herdar em silencio.
+  withTargets(dir, TARGETS_FIXTURE);
   mkdirSync(join(dir, ".next", "static", "chunks", "app"), { recursive: true });
   return dir;
 }
@@ -49,6 +52,19 @@ function chunk(dir, relPath, bytes, filler = "x") {
   writeFileSync(full, body);
   return gzipSync(Buffer.from(body)).length;
 }
+
+/** O `TARGETS` da FIXTURE, escrito aqui e **nao herdado do repo**.
+ *
+ *  A `sandbox()` copia o checker deste projeto, e com ele a configuracao DELE. Num consumidor
+ *  essa configuracao e outra: acrescentar **uma** rota — a primeira coisa que o `BOOTSTRAP.md`
+ *  §2.4 manda fazer — punha **7 destes 27 testes** vermelhos, todos com
+ *  "nao foi possivel resolver os chunks proprios destas rotas". Verde no template, vermelho em
+ *  todos os consumidores com UI, no dia 1: e o `TP3` na sua forma mais cara.
+ *
+ *  O mecanismo para evitar isto ja existia (`withTargets`) e **nunca era chamado** — codigo
+ *  morto ao lado do defeito que ele resolvia. Medido pelo `simulate-upgrade.mjs`, que hoje e o
+ *  controlo desta correccao: ele customiza o `TARGETS` do consumidor e exige verde. */
+const TARGETS_FIXTURE = { "/": { name: "Home", target: 160, alarm: 180 } };
 
 /** Reescreve o literal TARGETS na copia do checker (para exercitar varias rotas). */
 function withTargets(dir, targets) {

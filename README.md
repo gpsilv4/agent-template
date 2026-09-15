@@ -200,6 +200,9 @@ gh pr create --fill     # then merge once CI is green
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── test-simulate-derived.mjs<- Negative tests for it (minimal fixture repo, stubbed checkers)
+    ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
+    │                              (lib/upgrade-mecanico.mjs holds the mechanical engine)
+    ├── test-simulate-upgrade.mjs<- Negative tests for it (each refusal path refuses)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     └── test-mutation-sweep.mjs <- Negative tests for the sweep itself (fake checker + fake suite)
 

@@ -58,6 +58,27 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O simulador do OUTRO caminho: o `/upgrade`. Mesma razao que o de cima, e a mesma forma
+    // de recusa (`fatal()`), porque o veredicto dele tambem e o exit code das suites que
+    // orquestra. Um simulador que falhe ABERTO da por verificada metade do produto.
+    alvo: ".agent/scripts/simulate-upgrade.mjs",
+    suite: ".agent/scripts/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // O motor mecanico, em `lib/`. A descoberta varre `lib/`, logo sem par aqui o gate reprova
+    // — e com razao: e este modulo que ESCREVE por cima dos ficheiros de um consumidor, e um
+    // `fatal()` que deixe de disparar a esse nivel nao custa um aviso, custa dados.
+    //
+    // A `suite` e a mesma do simulador: o `test-simulate-upgrade.mjs` exercita o motor
+    // directamente (chama-o com fixtures proprias), logo cada sitio daqui tem quem o meca.
+    alvo: ".agent/scripts/lib/upgrade-mecanico.mjs",
+    suite: ".agent/scripts/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/sizes.mjs",
     suite: ".agent/scripts/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,

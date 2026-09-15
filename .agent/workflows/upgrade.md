@@ -67,12 +67,21 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 
 ## 2. Decidir por categoria, nao por ficheiro
 
+> **Regra geral, antes da tabela.** Um ficheiro que o projeto **nao modificou** desde o
+> bootstrap traz-se por inteiro: nao ha julgamento a fazer sobre uma copia intacta, e mante-la
+> so a deixa a apodrecer. O "diff e decidir" da tabela aplica-se ao que ele **customizou**.
+>
+> Compara-se contra a versao do template **de onde o projeto saiu** (`.template-version`), com
+> os placeholders ja substituidos — nao contra o template nu, ou tudo aparece customizado.
+>
+> Nao e detalhe — porque custa (`src/docs/upgrade-why.md`).
+
 | Categoria | O que fazer | Porque |
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`) | Copia limpa, **preservando** as constantes deste projeto: `TARGETS` em `check-bundle-sizes.mjs`, `BANNED` em `check-doc-versions.mjs`, `CHECKS` em **`guards/versions.mjs`** (mudou de ficheiro quando os guards foram divididos, e um glob `*.mjs` sem `**` nao o apanha) e **`TEST_GLOBS`, `CONFIG_GLOBS` e `CONTAGENS` em `check-test-surface.mjs`**. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. As tres do `check-test-surface` sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero** e ele passa a dizer "superficie intacta" sobre uma suite apagada |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`) | Copia limpa, **preservando** as constantes deste projeto: `TARGETS` em `check-bundle-sizes.mjs`, `BANNED` em `check-doc-versions.mjs`, `CHECKS` em **`guards/versions.mjs`** (mudou de ficheiro quando os guards foram divididos, e um glob `*.mjs` sem `**` nao o apanha) e **`TEST_GLOBS` e `CONFIG_GLOBS` em `check-test-surface.mjs`, `CONTAGENS` em `surface-patterns.mjs`**. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Essas tres sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero** e ele passa a dizer "superficie intacta" sobre uma suite apagada |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
-| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro** — e do template, e os `TPn` dele sao os mesmos em todos os projetos. `anti-patterns.md`: **nunca tocar** — sao os `APn` deste projeto. As citacoes `TPn` que vierem nos scripts e nos workflows **copiam-se como estao** | Os prefixos separados sao o que torna isto uma copia em vez de uma reescrita. Antes deles esta linha mandava reescrever as citacoes a mao — mais de vinte de uma vez, medido num consumidor, e as que resolviam **para a entrada errada** so se apanhavam a ler |
+| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro e substituir os placeholders** (traz `{{...}}` no titulo; sem isso o Guard 13 reprova) — e do template, e os `TPn` dele sao os mesmos em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto), mas o **cabecalho** e prosa do template e traz-se: o antigo cita IDs que deixaram de existir, e o Guard 15 lista-os. As citacoes `TPn` que vierem nos scripts e nos workflows **copiam-se como estao** | Os prefixos tornam isto copia em vez de reescrita a mao (eram mais de vinte citacoes por ronda) |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Se o projeto nao as customizou, copia; se customizou, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao do projeto; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
@@ -98,22 +107,15 @@ que cada uma custa neste projeto, medido ANTES de aplicar.**
 | **Verbo negado** | um hook passa a recusar algo que o projeto usa | listar os comandos do projeto que passariam a ser negados |
 | **Verificacao nova sem dados** | um guard novo exige um ficheiro/seccao que o projeto nao tem | acrescentar o que falta, ou nao trazer o guard — nunca trazer e deixar vermelho |
 
-**Trazidos nesta ronda, e cada um reprova projetos que estavam verdes:**
+**A lista deste upgrade nao se escreve aqui — mede-se:**
 
-- **Tecto unico de 12 000 bytes** para *tudo o que o agente le* — rules carregadas, rules de
-  referencia, **workflows** e catalogos. Antes as referencias tinham 12 500/14 000 e os
-  workflows **nao tinham limite nenhum**. Medir primeiro:
-  `for f in .agent/rules/*.md .agent/workflows/*.md; do wc -c "$f"; done | sort -rn | head`
-- **Guard 17 (tamanho de ficheiro)**: `> 500` linhas reprova. Os ficheiros que o projeto ja
-  tenha acima disso entram em `TETOS` (em `guards/sizes.mjs`) com a contagem **do dia da
-  migracao** — e uma catraca, nao uma isencao: podem encolher, crescer reprova.
-  Medir: `find .agent/scripts .claude/hooks -name '*.mjs' -exec wc -l {} + | sort -rn | head`
-- **A fronteira nao se reescreve por `Bash`** (`guard-protected-branch.mjs`): passam a ser
-  negados `sed -i`, redireccao, `node -e`, `mv`, `rm` e `chmod` sobre `.claude/settings.json`,
-  `.claude/hooks/` e `.githooks/`. Um projeto com um script de manutencao que toque nesses
-  caminhos deixa de o poder correr pelo agente.
-- **Guard 16 (MCP) alargado** de `.mcp.json` aos quatro agentes: um servidor que ja estivesse
-  configurado no Cursor, no VS Code ou no Gemini passa a exigir linha em *Servidores aprovados*.
+```bash
+node .agent/scripts/simulate-upgrade.mjs   # FASE 1 = o que passa a reprovar, nomeado
+```
+
+Ele monta um derivado da ultima release, aplica o upgrade mecanico e imprime o que reprova.
+Uma lista escrita a mao aqui envelhecia a cada release e ninguem a recalculava; esta e medida
+contra a versao de onde SAIS. O historico das rondas anteriores vive em `src/docs/upgrade-why.md`.
 
 > Um upgrade que deixa o projeto vermelho sem que ninguem tenha decidido isso e pior do que
 > nao ter feito upgrade nenhum.

@@ -240,6 +240,8 @@ jobs:
         run: node .agent/scripts/test-commit-msg.mjs
       - name: Simulador de projeto derivado — negative tests
         run: node .agent/scripts/test-simulate-derived.mjs
+      - name: Simulador de /upgrade — negative tests
+        run: node .agent/scripts/test-simulate-upgrade.mjs
       # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
