@@ -393,6 +393,17 @@ test("RSC: o mesmo chunk em dois modulos conta uma vez", (dir) => {
   withTargets(dir, { "/": { name: "Home", target: (n * 1.5) / 1024, alarm: (n * 1.5) / 1024 } });
 }, { code: 0, includes: ["[OK]"], excludes: ["[ALARM]", "[?]"] });
 
+// O confinamento a `.next/` tem de valer TAMBEM pelo caminho RSC. Os testes que ja existiam
+// cobriam o manifesto e o varrimento de diretorio; este caminho e novo e um manifesto e um
+// ficheiro gerado — se alguem lhe puser um `../`, o verificador media ficheiros de fora e
+// reportava um numero que nao e o bundle.
+test("RSC: chunk que SAI do .next/ e reportado, nao contado", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  writeFileSync(join(dir, "FORA-RSC.txt"), "F".repeat(50_000));
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  manifestoRsc(dir, "/", [["/_next/../FORA-RSC.txt"]]);
+}, { code: 1, includes: ["FORA de .next/"] });
+
 // --- Os polyfills na baseline ------------------------------------------------
 // E UM ficheiro, carregado em TODAS as paginas, e media 38,7 kB num derivado real — 20% do
 // First Load. Nao tem nada a ver com a versao do Next: era uma omissao pura.
