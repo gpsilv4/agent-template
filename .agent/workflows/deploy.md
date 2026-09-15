@@ -112,6 +112,8 @@ npm run test:all
 ### Fase 2 — Preview (antes do merge para main)
 
 ```bash
+# `PLAYWRIGHT_BASE_URL` assume Playwright. Noutro runner (Cypress: `CYPRESS_baseUrl`,
+# WebdriverIO, Vitest browser), trocar pela variavel equivalente.
 PLAYWRIGHT_BASE_URL=<preview-url> npm run test:e2e
 PLAYWRIGHT_BASE_URL=<preview-url> npm run test:security
 npm run test:audit

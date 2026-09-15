@@ -37,6 +37,10 @@ main branch              ->  git push  ->  {{HOSTING}} PRODUCAO
 - npm >= 9
 - Acesso ao projeto backend **Staging**
 - Git configurado
+- **`gh`** (GitHub CLI), autenticado — o gate de CI do `/review` e do `/deploy` corre
+  `gh pr checks`, e o `/audit` tambem o usa. **Sem ele o gate falha com "command not found",
+  que e indistinguivel de "nao ha checks"** — e ai o `/deploy` avanca sobre um CI que ninguem
+  viu. Verificar com `gh auth status`.
 <!-- Adicionar outros pre-requisitos especificos do projeto -->
 
 ## 2. Instalacao
@@ -99,7 +103,7 @@ gh pr create --title "feat: descricao" \
 npm run dev
 ```
 
-Abre `http://localhost:3000`.
+Abre o URL de dev do projeto (`http://localhost:3000` no default do Next; ver o `dev` do `package.json`).
 
 ## 7. Build e Verificacao
 

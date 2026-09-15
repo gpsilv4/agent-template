@@ -107,3 +107,14 @@ e o custo dela vira **ticket**. Assim qualquer salto **novo** maior continua a f
 > Perguntar ao utilizador antes de terminar:
 - [ ] Atualizar `.agent/context/session.md` / `walkthrough.md`?
 - [ ] Algum achado vira ticket no `backlog.md` ou entrada em `anti-patterns.md`?
+
+## Layout responsivo — os quatro que mais falham
+
+> Vieram do `/review` §5: sao UI pura, e o sitio delas e aqui. Os exemplos sao **Tailwind** —
+> noutra stack de estilos, os equivalentes. O que se verifica e "aguenta um ecra estreito",
+> nao estas classes.
+
+- [ ] Sem `grid-cols-*` fixo sem fallback (`flex flex-col sm:flex-row`)
+- [ ] Popovers com `w-[min(300px,calc(100vw-2rem))]`
+- [ ] Modals/Sheets com `w-full` e `overflow-x-hidden`
+- [ ] Sticky headers com `min-w-0 shrink` no texto

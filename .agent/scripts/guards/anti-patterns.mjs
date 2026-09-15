@@ -95,9 +95,38 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
 
   // O exemplo ilustrativo do template esta dentro de `<!-- -->` e nao e uma definicao.
   // A UNIAO dos dois ficheiros: uma citacao resolve se a entrada existir em qualquer um.
-  const existentes = new Set(
-    conteudos.flatMap(([, c]) => [...semHtml(c).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]))
-  );
+  const porFicheiro = conteudos.map(([f, c]) => [
+    f,
+    [...semHtml(c).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]),
+  ]);
+  const existentes = new Set(porFicheiro.flatMap(([, ns]) => ns));
+
+  // COLISAO entre os dois ficheiros. A uniao fazia uma citacao resolver sem verificar se o
+  // numero estava definido nos DOIS — e ai o guard diz "resolve" enquanto manda o leitor a
+  // uma entrada **real com outro significado**. E pior do que uma referencia morta: a morta
+  // denuncia-se, esta confirma uma leitura errada e nada no ecra a contradiz.
+  //
+  // Nao e teorico: um derivado real tinha `AP1`, `AP2`, `AP4` e `AP6` proprios ao lado dos
+  // sete do template — quatro numeros com dois significados cada. O `simulate-derived.mjs`
+  // nao o apanha porque o derivado que ele constroi nao escreve anti-padroes proprios: e um
+  // defeito do dia 100, nao do dia 1.
+  if (porFicheiro.length > 1) {
+    const vistos = new Map(); // numero -> [ficheiros]
+    for (const [f, ns] of porFicheiro) {
+      for (const n of ns) {
+        if (!vistos.has(n)) vistos.set(n, []);
+        if (!vistos.get(n).includes(f)) vistos.get(n).push(f);
+      }
+    }
+    const colisoes = [...vistos].filter(([, fs]) => fs.length > 1);
+    for (const [n, fs] of colisoes) {
+      warn(
+        `AP${n} esta definido em ${fs.join(" E EM ")} — uma citacao a \`AP${n}\` resolve, mas para ` +
+          `qual? Renumerar os do projeto a partir do proximo ID livre, ou dar um prefixo proprio ` +
+          `aos do template (ver o cabecalho de anti-patterns.md)`
+      );
+    }
+  }
 
   let citacoes = 0;
   // Citacoes em DOCUMENTACAO, separadas das que vivem em codigo. Ver o ramo do "ninguem cita".

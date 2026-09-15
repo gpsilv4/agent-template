@@ -41,7 +41,7 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 - Verificar se sao necessarias novas migracoes
 - Verificar se as politicas de seguranca existentes cobrem os novos dados
 
-## 3. Arquitetura de Componentes
+## 3. Arquitetura de Componentes — *so para apps com UI; noutra stack, a arquitetura equivalente (modulos, servicos, comandos)*
 
 - Propor a estrutura seguindo o padrao estabelecido:
   - **Parent**: Detem o estado, hooks de data fetching, handlers e `useMemo` para dados computados

@@ -10,6 +10,10 @@
 > projetos, incluindo aos que nao sao Node. O Guard 15 varre os dois ficheiros, logo as
 > citacoes continuam a resolver.
 >
+> **O Guard 15 reprova se o mesmo numero estiver definido nos DOIS ficheiros.** Uma citacao a
+> `AP4` resolveria — mas para qual dos dois, que tem significados diferentes? E pior do que uma
+> referencia morta: a morta denuncia-se, esta confirma uma leitura que nao e a do autor.
+>
 > **Comeca no proximo ID livre** — os sete do template estao tomados e sao citados em dezenas
 > de sitios. Confirma com: `git grep -hoE '^#{2,3}[[:space:]]+AP[0-9]+' .agent/rules/ | sort -uV | tail -1`
 

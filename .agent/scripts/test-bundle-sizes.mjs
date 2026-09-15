@@ -62,6 +62,28 @@ function withTargets(dir, targets) {
   writeFileSync(p, out);
 }
 
+/** Escreve o manifesto RSC de uma rota, na forma que o Next escreve.
+ *  A chave leva o caminho da rota — e numa rota dinamica leva parenteses rectos, que e a
+ *  armadilha que a regex tem de sobreviver. */
+function manifestoRsc(dir, route, chunksPorModulo, { chaveLiteral = null, corpo = null } = {}) {
+  const rel = route === "/" ? "" : route.slice(1);
+  const f = join(dir, ".next", "server", "app", rel, "page_client-reference-manifest.js");
+  mkdirSync(dirname(f), { recursive: true });
+  const chave = chaveLiteral ?? `${route === "/" ? "" : route}/page`;
+  const obj = corpo ?? {
+    moduleLoading: { prefix: "/_next/" },
+    clientModules: Object.fromEntries(
+      chunksPorModulo.map((chunks, i) => [`mod${i}`, { id: i, name: "*", chunks }])
+    ),
+  };
+  writeFileSync(
+    f,
+    `globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});\n` +
+      `globalThis.__RSC_MANIFEST[${JSON.stringify(chave)}]=${typeof obj === "string" ? obj : JSON.stringify(obj)}\n`
+  );
+  return f;
+}
+
 function manifest(dir, obj) {
   writeFileSync(join(dir, ".next", "build-manifest.json"), JSON.stringify(obj));
 }
@@ -307,6 +329,71 @@ test("bundle acima do alarme FALHA", (dir) => {
   code: 1,
   includes: ["[ALARM]", "excedem o limite de alarme", "imports sincronos"],
 });
+
+// --- O manifesto RSC: a fonte por rota no Next moderno -----------------------
+// PORQUE: o varrimento de `.next/static/chunks/app/<rota>/` era "o unico caminho" e no Next 16
+// essa pasta NAO existe. Medido num derivado real: dez rotas, o mesmo valor, dez `[OK]` — o
+// verificador nunca mediu rota nenhuma, e o numero era plausivel.
+
+// O limiar deriva do tamanho MEDIDO: assim o teste falha se o chunk da rota nao for contado
+// (fica abaixo e da `[OK]`) e falha se a rota nem sequer resolver (da `[?]`). Sem o resolvedor
+// RSC, esta rota nao tem chunks proprios em lado nenhum — era exactamente o caso do Next 16.
+test("RSC: os chunks da rota sao contados a partir do manifesto", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  const n = chunk(dir, "static/chunks/rota-abc.js", 80_000);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  manifestoRsc(dir, "/", [["/_next/static/chunks/rota-abc.js"]]);
+  // alarme a metade do chunk da rota: so dispara se ele for de facto contado.
+  withTargets(dir, { "/": { name: "Home", target: n / 2048, alarm: n / 2048 } });
+}, { code: 1, includes: ["[ALARM]"], excludes: ["[?]"] });
+
+// A ARMADILHA: a chave de uma rota dinamica leva `[` e `]`. Uma regex com `\[[^\]]+\]` para
+// no `]` de `[id]` e a rota fica por resolver com o manifesto ali ao lado.
+test("RSC: rota DINAMICA (chave com parenteses rectos) resolve na mesma", (dir) => {
+  withTargets(dir, { "/resultados/[id]": { name: "Resultado", target: 200, alarm: 250 } });
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  chunk(dir, "static/chunks/base.js", 1000);
+  chunk(dir, "static/chunks/din.js", 3000);
+  manifestoRsc(dir, "/resultados/[id]", [["/_next/static/chunks/din.js"]]);
+}, { code: 0, includes: ["[OK]"], excludes: ["[?]"] });
+
+// "Nao consegui ler" != "esta rota nao tem chunks" (`AP2`). Um manifesto ilegivel tem de
+// deixar a rota por resolver — que ja reprova — e nunca dar zero com `[OK]`.
+test("RSC: manifesto ilegivel deixa a rota por resolver, nao a zero", (dir) => {
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  chunk(dir, "static/chunks/base.js", 1000);
+  manifestoRsc(dir, "/", [], { corpo: "{ isto nao e json" });
+}, { code: 1, includes: ["[?]"] });
+
+test("RSC: chunk citado no manifesto mas AUSENTE do disco reprova", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  manifestoRsc(dir, "/", [["/_next/static/chunks/nao-existe.js"]]);
+}, { code: 1, includes: ["AUSENTES do disco", "static/chunks/nao-existe.js"] });
+
+// O mesmo chunk em dois modulos do manifesto conta UMA vez — o First Load e por rota, e um
+// ficheiro carregado duas vezes nao pesa a dobrar.
+// O First Load e por rota: um ficheiro carregado por dois modulos nao pesa a dobrar. O
+// alarme fica entre 1x e 2x — passa se contar uma vez, reprova se contar duas.
+test("RSC: o mesmo chunk em dois modulos conta uma vez", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  const n = chunk(dir, "static/chunks/partilhado.js", 80_000);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
+  manifestoRsc(dir, "/", [["/_next/static/chunks/partilhado.js"], ["/_next/static/chunks/partilhado.js"]]);
+  withTargets(dir, { "/": { name: "Home", target: (n * 1.5) / 1024, alarm: (n * 1.5) / 1024 } });
+}, { code: 0, includes: ["[OK]"], excludes: ["[ALARM]", "[?]"] });
+
+// --- Os polyfills na baseline ------------------------------------------------
+// E UM ficheiro, carregado em TODAS as paginas, e media 38,7 kB num derivado real — 20% do
+// First Load. Nao tem nada a ver com a versao do Next: era uma omissao pura.
+test("polyfillFiles entram na baseline", (dir) => {
+  chunk(dir, "static/chunks/base.js", 1000);
+  const n = chunk(dir, "static/chunks/poly.js", 80_000);
+  chunk(dir, "static/chunks/app/page-x.js", 100);
+  manifest(dir, { rootMainFiles: ["static/chunks/base.js"], polyfillFiles: ["static/chunks/poly.js"] });
+  // alarme a metade do polyfill: so dispara se ele entrar na baseline.
+  withTargets(dir, { "/": { name: "Home", target: n / 2048, alarm: n / 2048 } });
+}, { code: 1, includes: ["[ALARM]"] });
 
 // --- Resumo -----------------------------------------------------------------
 

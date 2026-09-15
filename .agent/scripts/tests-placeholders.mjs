@@ -93,6 +93,24 @@ export function registar() {
        includes: [`.agent/rules/core-rules.md: placeholder(s) nao substituido(s) apos o bootstrap — ${ph("HOSTING")}`],
        excludes: ["SKIP  Guard 13"] });
 
+  // Sete ficheiros com `{{PROJECT_NAME}}` estavam FORA da lista de alvos: os hooks, os
+  // modulos de `lib/` (um nivel abaixo, que o `listDir` de `.agent/scripts/` nao alcanca) e
+  // os subagentes. O sweep do bootstrap substitui-os por EXTENSAO, logo na pratica saiam bem
+  // — o que faltava era a rede que apanha um sweep FALHADO. Um guard que so cobre o caminho
+  // feliz nao e uma rede.
+  for (const alvo of [
+    ".claude/hooks/stop-verify.mjs",
+    ".claude/hooks/lib/fronteira.mjs",
+    ".claude/hooks/tests/tests-bypasses.mjs",
+    ".claude/agents/code-reviewer.md",
+    ".agent/scripts/lib/registo.mjs",
+  ]) {
+    test(`G13: placeholder esquecido em ${alvo} avisa`, (dir) => {
+      bootstrapado(dir);
+      writeF(dir, alvo, readF(dir, alvo) + `\n// ${ph("HOSTING")}\n`);
+    }, { code: 1, includes: [`${alvo}: placeholder(s) nao substituido(s)`], excludes: ["SKIP  Guard 13"] });
+  }
+
   test("G13: varios placeholders no mesmo ficheiro sao nomeados todos", (dir) => {
     bootstrapado(dir);
     writeF(dir, ".agent/rules/core-rules.md",

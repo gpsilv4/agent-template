@@ -250,4 +250,24 @@ export function registar() {
   test("G15: cabecalho `## APn` NOUTRO ficheiro continua a contar como citacao", (dir) => {
     const f = ".agent/rules/core-rules.md";
     writeF(dir, f, readF(dir, f) + `\n## ${AP_INEXISTENTE} — cabecalho copiado de outro projeto\n`);
-  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });}
+  }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
+
+  // --- COLISAO entre os dois ficheiros de anti-padroes ------------------------
+  // A separacao (template vs projeto) resolveu o orcamento de bytes, mas a leitura unia os
+  // dois sem verificar numeros repetidos — e ai uma citacao "resolve" para a entrada errada.
+  // Pior que uma referencia morta: a morta denuncia-se, esta confirma uma leitura que nao e a
+  // do autor. Medido num derivado real, com QUATRO numeros duplicados.
+  test("G15: o mesmo APn definido nos DOIS ficheiros avisa", (dir) => {
+    const f = ".agent/rules/anti-patterns.md";
+    writeF(dir, f, readF(dir, f) + "\n### AP1 — anti-padrao proprio deste projeto\n\nTexto.\n");
+  }, { code: 1, includes: ["AP1 esta definido em", "resolve, mas para qual?"] });
+
+  // O contra-caso: um numero que so existe num dos ficheiros nao e colisao. Sem ele, um guard
+  // que avisasse de TODOS os numeros passaria o teste acima.
+  test("G15: APn so num dos ficheiros NAO e colisao", (dir) => {
+    const f = ".agent/rules/anti-patterns.md";
+    // Construido em pedacos, como o `AP_INEXISTENTE` acima: escrito por extenso, este
+    // ficheiro passaria a CITAR um numero que nao existe e o Guard 15 reprovava-o — e foi
+    // exactamente o que aconteceu ao escrever este teste.
+    writeF(dir, f, readF(dir, f) + `\n### ${AP_INEXISTENTE} — anti-padrao proprio, numero livre\n\nTexto.\n`);
+  }, { code: 0, excludes: ["esta definido em"] });}

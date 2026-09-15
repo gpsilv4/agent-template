@@ -190,13 +190,28 @@ jobs:
   guard-tests:
     name: Guard Tests
     runs-on: ubuntu-latest
-    # 40, e o numero vem de uma MEDICAO e nao de um palpite: a primeira corrida com a
-    # varredura de mutacao ligada levou **20m29s** (PR #36, que tocou nos verificadores).
-    # Um tecto de 25 deixava ~18% de folga, e cada verificador novo empurra isto para cima.
-    # O modo de falha de um timeout apertado e feio — o job morre por tempo e parece um
-    # defeito, em vez de dizer que faltou tempo. Sobe-se antes de doer, nao depois.
+    # 75, e o numero vem de MEDICOES sucessivas e nao de um palpite. O historico e o que
+    # interessa aqui, porque mostra uma TENDENCIA e nao um valor:
+    #
+    #   PR #36   20m29s   primeira corrida com a varredura ligada
+    #   PR #47   39m09s   depois de o template ganhar guards e suites
+    #   PR #56   >40m     **morreu no tecto de 40** — 163 sitios, e a medir ainda
+    #
+    # O comentario anterior dizia "cada verificador novo empurra isto para cima" e
+    # "sobe-se antes de doer, nao depois". Doeu: o job foi cancelado a meio da varredura e o
+    # PR ficou bloqueado por **falta de tempo**, nao por defeito. E o pior modo de falha
+    # possivel — parece um erro e nao e.
+    #
+    # 75 nao e generosidade: e ~85% de folga sobre a ultima medicao completa, porque a
+    # varredura cresce com o produto (sitios x tamanho das suites) e cada teste novo no
+    # `test-guards` multiplica por ~90.
+    #
+    # A alternativa estrutural — derivar um `--only` do diff, para varrer so os alvos
+    # tocados — esta na issue do repo com a analise feita. Enquanto nao existir, o tecto e
+    # que segura isto, e um tecto apertado transforma crescimento legitimo em CI vermelho.
+    #
     # Quando o PR NAO toca nos verificadores a varredura salta e o job leva ~1m10s.
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
@@ -341,9 +356,40 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # A `gitleaks-action` exige `GITLEAKS_LICENSE` em contas de ORGANIZACAO (gratis, mas por
+      # formulario externo); so contas pessoais estao isentas. Sem isso, quem clonar este
+      # template para um repo de org fica com o UNICO job que corre sempre — e o unico que nao
+      # depende do `detect` — vermelho no dia 1, por um motivo que nao e do codigo dele.
+      #
+      # Este passo transforma isso num aviso accionavel em vez de uma falha opaca. Nao salta a
+      # varredura: se a licenca existir, corre na mesma.
+      # A condicao vive no SHELL e nao num `if:` de step. Nao e estilo: o
+      # `check-test-surface.mjs` conta os `if:` como marcas de enfraquecimento, e tem razao em
+      # o fazer — um `if:` e a forma mais barata de desligar uma verificacao sem a apagar.
+      # Este seria benigno (condiciona um aviso, nao uma verificacao), mas um gate que precisa
+      # de saber distinguir os benignos deixa de ser util. Escrever a condicao no `run:` da o
+      # mesmo resultado sem gastar a marca.
+      - name: Licenca do gitleaks (so em organizacoes)
+        env:
+          DONO: ${{ github.event.repository.owner.type }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        run: |
+          if [ "$DONO" = "Organization" ] && [ -z "${GITLEAKS_LICENSE:-}" ]; then
+            echo "::warning::Repo de ORGANIZACAO sem GITLEAKS_LICENSE. A gitleaks-action pede licenca (gratis) para orgs — o passo seguinte vai falhar."
+            echo "::warning::Obter em https://gitleaks.io e guardar como secret GITLEAKS_LICENSE, ou trocar este job por gitleaks em binario."
+            echo "::warning::Governance: a gitleaks-action e licenca comercial desde a v2 e valida a licenca contra um terceiro."
+          fi
+
       - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v3
+        # Pin por SHA, e nao pela tag `v3`: uma tag e MOVEL — quem a controla pode reaponta-la,
+        # e esta acao corre em cada PR com acesso ao repo. As de `actions/*` ficam por tag (o
+        # owner e o mesmo do runner); as de terceiros, nao. O Dependabot atualiza SHAs e mantem
+        # o comentario da versao ao lado.
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Organizations (not personal repos) need a free GITLEAKS_LICENSE:
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+          # Organizacoes (nao repos pessoais) precisam de GITLEAKS_LICENSE, gratis. Fica
+          # DESCOMENTADO: sem secret definido o valor e vazio e a acao comporta-se como antes;
+          # com secret, funciona. Comentado, nem definir o secret resolvia — e o aviso acima
+          # mandava fazer uma coisa que nao tinha efeito.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

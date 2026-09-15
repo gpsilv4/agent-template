@@ -597,6 +597,13 @@ git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 > nao e commitar em `main` por baixo do hook, e decidir por escrito que este repo nao tem
 > branch protegido e tirar `main` de `PROTEGIDOS` em `.claude/hooks/guard-protected-branch.mjs`.
 
+> **No template por estrear, o Gemini imprime dois `[ERROR]` ao arrancar — e esperado.**
+> O `GEMINI.md` importa `business-logic.md` e `pages-architecture.md`, que so nascem neste
+> bootstrap (§2.2). Ate la, o `ImportProcessor` do Gemini CLI diz `ENOENT` nesses dois e
+> carrega os restantes. **Desaparecem assim que o bootstrap correr.** Verificado com o
+> `@google/gemini-cli` 0.59.0 — e sao essas mesmas linhas que provam que a sintaxe `@./`
+> **e** honrada, que era uma duvida em aberto.
+
 > **O primeiro PR demora, e e normal.** O CI corre a varredura de mutacao quando o diff toca
 > `.agent/scripts/` — e o bootstrap toca, ao substituir os placeholders la dentro. Ela desliga
 > **cada sitio de recusa, um a um**, e exige que a suite fique vermelha em cada um: sao

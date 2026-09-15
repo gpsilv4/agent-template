@@ -70,7 +70,18 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     ...(listDir(".agent/context", ".md") || []).map((f) => `.agent/context/${f}.md`),
     ...(listDir(".agent/scripts", ".mjs") || []).map((f) => `.agent/scripts/${f}.mjs`),
     ...(listDir(".agent/scripts/guards", ".mjs") || []).map((f) => `.agent/scripts/guards/${f}.mjs`),
+    // `lib/` e um nivel abaixo, logo o `listDir` de `.agent/scripts/` nao o alcanca — e os
+    // modulos partilhados tem `{{PROJECT_NAME}}` no cabecalho como todos os outros.
+    ...(listDir(".agent/scripts/lib", ".mjs") || []).map((f) => `.agent/scripts/lib/${f}.mjs`),
     ...(listDir(".claude/commands", ".md") || []).map((f) => `.claude/commands/${f}.md`),
+    // Os HOOKS e os subagentes. Sete ficheiros com `{{PROJECT_NAME}}` estavam fora desta
+    // lista: o sweep do bootstrap substitui-os por EXTENSAO, logo na pratica saiam bem — o
+    // que faltava era a rede que apanha um sweep falhado. Um guard que so cobre o caminho
+    // feliz nao e uma rede.
+    ...(listDir(".claude/hooks", ".mjs") || []).map((f) => `.claude/hooks/${f}.mjs`),
+    ...(listDir(".claude/hooks/lib", ".mjs") || []).map((f) => `.claude/hooks/lib/${f}.mjs`),
+    ...(listDir(".claude/hooks/tests", ".mjs") || []).map((f) => `.claude/hooks/tests/${f}.mjs`),
+    ...(listDir(".claude/agents", ".md") || []).map((f) => `.claude/agents/${f}.md`),
     ...(listDir(".gemini/commands", ".toml") || []).map((f) => `.gemini/commands/${f}.toml`),
     // Os hooks do git. Nao tem extensao — o git exige o nome exacto do evento — e por isso
     // escaparam a Fase 2.1 do bootstrap **e** a esta lista quando foram criados: um

@@ -14,6 +14,63 @@
  * assim que `git switch -C main` (que faz o que o `reset --hard` faz) passou a ser negado.
  */
 
+/** Verbos que exigem uma FORMA para serem seguros (nao basta faltar-lhes a forma insegura).
+ *
+ *  Existe porque o `deploy.md`, o `CONTRIBUTING.md` e o `process-rules.md` mandam correr
+ *  `git pull` e `git push origin --tags` em `main`: negar isso punha o guard em contradicao
+ *  com o procedimento de release documentado — e um falso positivo que bloqueia trabalho
+ *  documentado custa tanto como um bypass.
+ *
+ *  Recebe `ctx` com `ehProtegido` e `refsApagados`, que vivem no hook: a lista de branches
+ *  protegidos e o que cada projeto adapta no bootstrap. */
+export const FORMA_EXIGIDA = {
+  pull: (args) => args.includes("--ff-only"),
+  push: (args, ctx) => {
+    const ehProtegido = ctx?.ehProtegido ?? (() => true);
+    // (a) So tags: e o procedimento de release, que corre em `main`.
+    //
+    // `--follow-tags` SAIU daqui: nao e `--tags`. Publica o refspec normal **mais** as tags
+    // anotadas, logo publica o branch atual — medido com `--dry-run --porcelain` contra um
+    // remoto real, a enviar um commit de `main` que ninguem reviu.
+    const semFlags = args.filter((a) => !a.startsWith("-"));
+    const soTags =
+      args.includes("--tags") &&
+      semFlags.length <= 1 && // no maximo o nome do remoto
+      !args.some((a) => a.includes(":"));
+    if (soTags) return true;
+    // (a2) Uma tag de VERSAO nomeada: `git push origin v0.4.0`. Publicar uma tag nao pode
+    // mover um branch, e as `process-rules` mandam faze-lo depois de mergear para `main`.
+    // Medido ao marcar a v0.4.0 deste repo — o guard negava o seu proprio procedimento.
+    //
+    // Pela FORMA do ref, e nao perguntando ao git: o `seguro()` nao conhece o diretorio (por
+    // desenho — o alvo so e resolvido depois), logo um `git tag --list` aqui correria no cwd
+    // do HOOK e responderia sobre o repo errado. Perguntar ao sitio errado e pior que nada.
+    //
+    // O que torna isto seguro nao e "parece uma tag": e a exclusao dos nomes protegidos. Se
+    // `v1.2.3` for um BRANCH, publica-se um branch nao protegido — ja permitido.
+    const semVersao = /^v?\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?$/;
+    if (
+      semFlags.length >= 2 &&
+      !args.some((a) => a.includes(":") || a === "--delete" || a === "-d") &&
+      semFlags.slice(1).every((r) => semVersao.test(r) && !ehProtegido(r))
+    ) {
+      return true;
+    }
+    // (b) O comando **so apaga**, e nenhum dos refs apagados e protegido. Um
+    // `git push origin --delete fix/algo` estando em `main` nao toca no `main`.
+    //
+    // **So as remocoes sao julgadas pelo alvo**; para todo o resto vale o branch onde se
+    // esta. `todosApagam` e a correcao de uma leitura independente: bastava UMA remocao nao
+    // protegida para branquear o comando inteiro, logo `git push origin :fix/x main`
+    // empurrava o `main`.
+    const refs = semFlags.slice(1); // o primeiro posicional e o remoto
+    const temDelete = args.some((a) => a === "--delete" || /^-[a-zA-Z]*d[a-zA-Z]*$/.test(a));
+    const todosApagam = refs.length > 0 && refs.every((r) => temDelete || r.startsWith(":"));
+    if (!todosApagam) return false;
+    return !(ctx?.refsApagados?.(args) ?? []).some((r) => ehProtegido(r));
+  },
+};
+
 /** Verbos permitidos num branch protegido: leitura, inspecao, e escrita local que nao cria
  *  commits, nao reescreve historia e nao publica. **Tudo o que nao esta aqui e negado.**
  *  `switch` esta ca dentro de proposito: e como se SAI de um branch protegido, e (ao
@@ -72,7 +129,30 @@ export const FORMAS_INSEGURAS = {
   // `-c`/`-C` COPIAM um branch (`git branch -c antigo novo`) — nao destroem nada e sao a
   // forma normal de duplicar. Ficam de fora; `-m`/`-M` (mover/renomear) continuam, porque
   // renomear um branch protegido fa-lo desaparecer.
-  branch: /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/,
+  //
+  // Julgado pelo ALVO e nao pela flag — a mesma regra que o `push --delete` ja seguia, e a
+  // incoerencia que faltava fechar: `git push origin --delete fix/x` passava, `git branch -d
+  // fix/x` nao. Um derivado real bateu nisto logo a seguir a mergear um PR, a fazer a limpeza
+  // que as `process-rules` mandam fazer.
+  //
+  // Porque nao a correcao mais obvia (tirar so o `-d`, que "o git ja protege"): ela deixaria
+  // passar `git branch -d develop` — o git apaga-o de facto quando esta mergeado, e `develop`
+  // e um branch PROTEGIDO. Julgar pelo alvo destrava a limpeza legitima **e** fecha esse caso.
+  //
+  // Sem alvo nomeado (`git branch -d` sozinho, ou so com flags) nao ha o que julgar: nega-se,
+  // que e o lado seguro do erro.
+  branch: (args, ctx) => {
+    // Pelas flags NORMALIZADAS: `git branch -Df old` agrupa duas flags num token e nenhuma
+    // casa por igualdade. A versao anterior desta regra era uma regex aplicada ao resultado
+    // de `normalizaFlags`; ao passar a predicado, a normalizacao tinha de vir com ela — e
+    // sem isso o proprio teste do `-Df` ficou vermelho, que e o que ele existe para fazer.
+    const flags = ctx?.normalizaFlags?.(args) ?? args;
+    const destrutiva = flags.some((a) => /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/.test(a));
+    if (!destrutiva) return false;
+    const alvos = args.filter((a) => !a.startsWith("-"));
+    if (alvos.length === 0) return true;
+    return alvos.some((a) => ctx?.ehProtegido?.(a) ?? true);
+  },
   tag: /^(?:-d|--delete|-f|--force)$/,
   // `symbolic-ref` LE o HEAD com um argumento e ESCREVE-O com dois. E a forma que permitia
   // `git symbolic-ref HEAD refs/heads/MAIN` seguido de `git commit` — medido a fazer `main`
