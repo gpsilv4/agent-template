@@ -61,7 +61,7 @@ const SUITES = [
  *  ou bytes nao-ASCII (`?? ".agent/guards/caf\303\251.mjs"`), e o `slice(3)` entrega a aspa
  *  e os escapes octais ao matcher — nenhuma regra casa e a divida e sub-reportada em
  *  SILENCIO, que e o defeito que este hook existe para evitar. Medido: 1 de 3 ficheiros
- *  vistos. E a segunda cara do `AP5` (o `.trim()` foi a primeira).
+ *  vistos. E a segunda cara do `TP5` (o `.trim()` foi a primeira).
  *
  *  Com `-z` as entradas vem separadas por NUL e os caminhos crus. Renomeacoes e copias
  *  ocupam DUAS entradas (`R  novo\0antigo\0`): a segunda e um caminho nu, sem coluna de
@@ -89,7 +89,7 @@ try {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "ignore"],
     // Nada de `.trim()` nem de `.replace(/\n+$/)`: com `-z` o separador e NUL e o caminho e
-    // cru. Aparar bloco a bloco foi o `AP5` original (comia o espaco da coluna de estado).
+    // cru. Aparar bloco a bloco foi o `TP5` original (comia o espaco da coluna de estado).
   });
   if (!porcelain.replace(/\0+$/, "")) process.exit(0); // nada tocado: nada em divida
 

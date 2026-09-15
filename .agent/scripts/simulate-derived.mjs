@@ -9,7 +9,7 @@
  * Nao e teorico. A primeira corrida desta simulacao encontrou a checklist do `BOOTSTRAP.md` a
  * mandar deixar o `anti-patterns.md` "sem entradas" — estado em que os ficheiros do template
  * deixam dezenas de citacoes penduradas e o consumidor leva exit 1 **no dia 1**. Tres leituras
- * independentes nao viram; uma corrida viu em minutos. E a licao do `AP2` e do `ticket-method`
+ * independentes nao viram; uma corrida viu em minutos. E a licao do `TP2` e do `ticket-method`
  * ("correr os comandos que a documentacao manda correr") com instrumento.
  *
  * NAO E UM `check-*.mjs`, e o nome e deliberado: a descoberta do `mutation-sweep.mjs` varre
@@ -29,7 +29,7 @@
  * confianca: se faltar alguma, sobram placeholders e o **Guard 13 dispara** no passo 4. A
  * simulacao denuncia-se a si mesma em vez de passar a medir menos.
  *
- * O LIMITE, dito por inteiro porque e o mesmo erro que o `AP7` documenta: isto simula o
+ * O LIMITE, dito por inteiro porque e o mesmo erro que o `TP7` documenta: isto simula o
  * **estado** "bootstrap concluido", e nao **executa a checklist** do `BOOTSTRAP.md` passo a
  * passo. Aplica os que sao mecanicos (2.1 substituir, 2.2 gerar, e o unico passo destrutivo do
  * 2.8 — apagar o exemplo comentado do `anti-patterns.md`). Uma instrucao errada noutro passo —
@@ -148,7 +148,7 @@ process.on("SIGINT", () => {
 
 const COMANDOS = comandosDoCI();
 if (COMANDOS === null || COMANDOS.length === 0) {
-  // AP2: "nao consegui ler o ci.yml" != "nao ha comandos a correr". Uma lista vazia faria a
+  // TP2: "nao consegui ler o ci.yml" != "nao ha comandos a correr". Uma lista vazia faria a
   // simulacao passar sem medir nada.
   console.log("  WARN  nao derivei nenhum comando do job `guard-tests` do ci.yml — o job mudou de nome ou de formato?");
   console.log("");
@@ -234,7 +234,7 @@ ok(`${copiados} entrada(s) copiada(s), ${tocados} ficheiro(s) com placeholders s
 // versao reprovava com `tocados === 0`, e isso era **inalcancavel**: este proprio ficheiro tem
 // um placeholder no cabecalho, logo a contagem nunca e zero enquanto ele existir. Pior, o unico
 // sitio onde chegaria a ser zero e um projeto ja bootstrapado — onde zero e o estado CORRECTO —
-// e o script reprovava em todos os consumidores. E o `AP7` e o `AP3` no mesmo sitio.
+// e o script reprovava em todos os consumidores. E o `TP7` e o `TP3` no mesmo sitio.
 //
 // Isto, sim, dispara quando a lista de extensoes fica curta: sobra um `{{...}}` na copia e a
 // simulacao deixa de ser fiel. O `BOOTSTRAP.md` e o `README.md` ficam de fora porque
@@ -333,15 +333,13 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
   const p2 = join(dir, rel);
   const c = leOuNull(p2);
   if (c !== null) {
-    // O proximo ID livre, DERIVADO dos dois ficheiros — e exactamente o que o cabecalho do
-    // `anti-patterns.md` manda fazer. Escrever um numero a mao aqui criaria a colisao que
-    // esta simulacao existe para provar que nao acontece.
+    // O proximo ID livre no prefixo do PROJETO, e so nesse. Os `TPn` do template NAO entram
+    // na conta: e essa a razao de ser dos prefixos separados — a numeracao do template nao
+    // consome a do projeto, logo um derivado comeca no primeiro numero com o espaco todo
+    // livre. Derivar daqui, em vez de escrever um numero a mao, e o que faz esta simulacao
+    // reprovar sozinha no dia em que isso deixar de ser verdade.
     const usados = new Set();
-    for (const f of [rel, ".agent/rules/anti-patterns-template.md"]) {
-      const t = leOuNull(join(dir, f));
-      if (t === null) continue;
-      for (const m of t.matchAll(/^#{2,3}\s+AP(\d+)\b/gm)) usados.add(Number(m[1]));
-    }
+    for (const m of c.matchAll(/^#{2,3}\s+AP(\d+)\b/gm)) usados.add(Number(m[1]));
     const livre = usados.size ? Math.max(...usados) + 1 : 1;
     writeFileSync(
       p2,
@@ -396,7 +394,7 @@ console.log("");
 if (problemas > 0) {
   console.log(`WARNING: ${problemas} verificacao(oes) falham num projeto DERIVADO.`);
   console.log("         Passam no template nu — logo o defeito e do bootstrap ou de uma");
-  console.log("         assercao que depende do estado deste repo (ver AP3).\n");
+  console.log("         assercao que depende do estado deste repo (ver TP3).\n");
   process.exit(1);
 }
 console.log(`  ${corridos} verificacao(oes) verdes num projeto derivado.\n`);

@@ -95,7 +95,7 @@ export function registar() {
   }, { code: 0, includes: ["NOTE", "perto do limite"] });
 
   // O veredicto de sucesso nomeia o MAIOR e o numero. Um "ok" sem numero e indistinguivel de
-  // um guard que nao mediu nada (`AP2`), e com 14 ficheiros ninguem os conta a mao.
+  // um guard que nao mediu nada (`TP2`), e com 14 ficheiros ninguem os conta a mao.
   test("G1e: o OK diz qual e o maior e quantos bytes tem", null, {
     code: 0,
     anyOut: ["catalogos e workflows:", "maior ", "tecto 12000"],
@@ -133,7 +133,7 @@ export function registar() {
   // O Guard 1 orcamenta ficheiro a ficheiro; ninguem orcamentava a soma, e e a soma que o
   // agente paga por sessao. Os ficheiros extra ficam ABAIXO do limite por ficheiro de
   // proposito: se um deles o excedesse, o Guard 1 tambem avisava e a assercao passava a ser
-  // satisfeita por outra verificacao — o `AP1`.
+  // satisfeita por outra verificacao — o `TP1`.
 
   test("G1c: contexto acima do maximo avisa (as rules nao contam — tem dono proprio)", (dir) => {
     // Os ficheiros extra vao para `.agent/context/` e nao para `.agent/rules/`: o 1c orcamenta
@@ -170,7 +170,7 @@ export function registar() {
   // --- Os SKIP/NOTE que ninguem observava (varredura `--skips`) -----------------
   // "Todo o skip e visivel" e uma regra que o repo repete em dezenas de comentarios, e nada
   // media se um skip podia ser apagado em silencio. Um guard que deixa de ANUNCIAR que nao
-  // correu e o `AP2` em forma pura. Medido com `mutation-sweep --skips`: 17 de 39 cobertos.
+  // correu e o `TP2` em forma pura. Medido com `mutation-sweep --skips`: 17 de 39 cobertos.
 
   test("G1: rule perto do limite da NOTE (nao WARN)", (dir) => {
     // 11 500 <= bytes < 12 000: avisa que esta perto, sem reprovar. Sem teste, despromover
@@ -215,7 +215,7 @@ export function registar() {
   test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
     // A lista e DERIVADA do disco: escrever os nomes a mao envelhecia no primeiro ficheiro
     // de referencia novo — e foi o que aconteceu com o `anti-patterns-template.md`, que
-    // deixava o SKIP por disparar e o teste falhava a apontar para o guard (AP1).
+    // deixava o SKIP por disparar e o teste falhava a apontar para o guard (TP1).
     for (const f of readdirSync(file(dir, ".agent/rules"))) {
       if (!f.endsWith(".md")) continue;
       // Carregadas + catalogos de definicoes: nenhum destes e "rule de referencia" para o

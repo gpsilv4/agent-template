@@ -368,7 +368,7 @@ Correr antes de commit e apos merge de PRs do Dependabot. **Corre no CI** no job
 #### Adaptar o `check-test-surface.mjs` a stack
 
 Este verificador responde a "a superficie de teste foi enfraquecida desde a baseline?" (ver
-`AP4`). Tres listas no topo do ficheiro tem de reconhecer o **vocabulario do teu projeto**,
+`TP4`). Tres listas no topo do ficheiro tem de reconhecer o **vocabulario do teu projeto**,
 senao ele mede zero e passa:
 
 - **`TEST_GLOBS`** — onde vivem os testes. Cobre `tests/`, `*.test.ts`, `test_*.py` e
@@ -444,7 +444,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
-- **`.agent/rules/anti-patterns.md`**: apagar **so** o exemplo comentado (esse e ilustrativo). As entradas preenchidas sao reais e herdadas do template, e **os ficheiros do template citam-nas** — as rules, os workflows, os verificadores de `.agent/scripts/` e os hooks de `.claude/`. **Manter enquanto mantiveres esses ficheiros**, e acrescentar os teus com o proximo ID livre. Apagar uma entrada obriga a apagar tambem as citacoes dela, ou o Guard 15 reprova o commit (e diz-te, ficheiro e linha, quais ficaram penduradas). Medido: seguir a versao anterior desta instrucao — deixar o ficheiro sem entradas — dava 68 avisos e exit 1 no dia 1. A evidencia de cada entrada vive em `src/docs/anti-patterns-why.md`, que podes esvaziar sem consequencia nenhuma: nada o cita por numero.
+- **`.agent/rules/anti-patterns.md`**: apagar **so** o exemplo comentado (esse e ilustrativo). As entradas preenchidas sao reais e herdadas do template, e **os ficheiros do template citam-nas** — as rules, os workflows, os verificadores de `.agent/scripts/` e os hooks de `.claude/`. **Manter enquanto mantiveres esses ficheiros**, e acrescentar os teus no `anti-patterns.md` a comecar no primeiro numero — o prefixo `AP` e teu e nao colide com os `TPn` do template. Apagar uma entrada obriga a apagar tambem as citacoes dela, ou o Guard 15 reprova o commit (e diz-te, ficheiro e linha, quais ficaram penduradas). Medido: seguir a versao anterior desta instrucao — deixar o ficheiro sem entradas — dava 68 avisos e exit 1 no dia 1. A evidencia de cada entrada vive em `src/docs/anti-patterns-why.md`, que podes esvaziar sem consequencia nenhuma: nada o cita por numero.
 - **`.agent/rules/ticket-method.md`**: adaptar duas coisas ao projeto — o **nucleo do dominio** (os sitios onde um erro destroi dados ou a confianca, nao apenas da uma resposta errada: reducer, seed, pontuacao, migracoes, precos) e a **lista de angulos** da Fase 3 (os de UI nao servem a uma CLI ou lib). Nao importar — o ponteiro obrigatorio vive em `process-rules.md`.
 - **`.agent/rules/anti-patterns-template.md`**: **manter**. Sao as licoes do template, citadas por dezenas de ficheiros que vais herdar; o Guard 15 reprova se as apagares e diz quais citacoes ficaram penduradas. Os teus anti-padroes vao para `anti-patterns.md`.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em **nenhum** dos tres pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`).
@@ -613,7 +613,7 @@ git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 > `.agent/scripts/`, `.claude/hooks/` e `.githooks/`.
 >
 > (Sem numero de minutos de proposito: ele muda a cada verificador ou teste que se acrescente,
-> e um numero escrito a mao que ninguem recalcula envelhece sozinho — `AP1`.)
+> e um numero escrito a mao que ninguem recalcula envelhece sozinho — `TP1`.)
 
 ---
 

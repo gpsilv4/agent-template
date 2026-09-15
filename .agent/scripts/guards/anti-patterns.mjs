@@ -27,9 +27,14 @@
  *  on-demand). A separacao existe por orcamento de contexto: as entradas do template sao
  *  sobre a maquinaria dele e custavam 24% do contexto de cada sessao a todos os derivados.
  *
- *  Contar os dois e obrigatorio: dezenas de ficheiros citam `AP1`..`AP7`, e olhar so para o
- *  primeiro ficheiro dava essas citacoes como MORTAS — o guard passaria a reprovar o repo
- *  inteiro pela sua propria arrumacao. */
+ *  Cada ficheiro tem o seu PREFIXO: `TP` no do template, `AP` no do projeto. E o que faz
+ *  com que os numeros do template nao consumam a numeracao de ninguem — um derivado comeca no
+ *  primeiro numero do seu prefixo, com o espaco todo livre, e um `/upgrade` deixa de ter de
+ *  reescrever citacoes.
+ *
+ *  Contar os dois e obrigatorio na mesma: dezenas de ficheiros citam `TP1`..`TP7`, e olhar so
+ *  para o primeiro ficheiro dava essas citacoes como MORTAS — o guard passaria a reprovar o
+ *  repo inteiro pela sua propria arrumacao. */
 export const AP_FILES = [".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"];
 
 /** O ficheiro sempre-carregado, onde o projeto acrescenta os seus. */
@@ -51,8 +56,26 @@ const semHtml = (t) => t.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => m.replace(/[^\
  *  silencio o codigo morto que este guard fechou: os cabecalhos voltavam a contar como
  *  citacoes de si mesmos, e nenhum teste via.
  *
- *  `#{2,3}`: as entradas deste repo usam `##`, e um derivado pode usar `###`. */
-const CABECALHO_AP = /^#{2,3}\s+AP(\d+)\b/;
+ *  `#{2,3}`: as entradas deste repo usam `##`, e um derivado pode usar `###`.
+ *
+ *  Captura o ID **inteiro**, prefixo incluido. Capturar so o numero fazia o quarto de cada
+ *  prefixo contar como o mesmo anti-padrao: a colisao que a separacao de prefixos existe para
+ *  eliminar voltava por dentro do guard, e em silencio.
+ *
+ *  (Nenhum ID concreto se escreve nestes comentarios: o guard varre-se a si mesmo, e um do
+ *  prefixo do projeto seria uma citacao morta num template por estrear. Foi o que aconteceu
+ *  ao escrever este bloco.) */
+const CABECALHO_AP = /^#{2,3}\s+((?:AP|TP)\d+)\b/;
+
+/** Uma CITACAO no meio do texto. **O mesmo alfabeto de IDs que o cabecalho** — se divergirem,
+ *  um prefixo passa a ser definivel e nao citavel (ou o contrario) e o guard mente dos dois
+ *  lados ao mesmo tempo.
+ *
+ *  Os DOIS prefixos continuam a ser lidos depois da separacao: `TP` e do template, `AP` e do
+ *  projeto, mas um derivado que ainda nao renomeou — ou que escreva `AP` no ficheiro do
+ *  template por engano — nao pode ficar com o guard cego. Seria trocar a colisao por um ponto
+ *  cego, que e o pior dos dois. */
+const CITACAO_AP = /\b(?:AP|TP)\d+\b/g;
 
 /** Onde vive CODIGO em vez de documentacao. A distincao nao e cosmetica: decide o ramo do
  *  "ninguem cita" la baixo. */
@@ -106,12 +129,16 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
   // uma entrada **real com outro significado**. E pior do que uma referencia morta: a morta
   // denuncia-se, esta confirma uma leitura errada e nada no ecra a contradiz.
   //
-  // Nao e teorico: um derivado real tinha `AP1`, `AP2`, `AP4` e `AP6` proprios ao lado dos
-  // sete do template — quatro numeros com dois significados cada. O `simulate-derived.mjs`
+  // Nao e teorico: antes de os prefixos se separarem, um derivado real tinha QUATRO
+  // anti-padroes proprios com os mesmos numeros de quatro do template — quatro IDs com dois
+  // significados cada. (Escritos aqui por extenso seriam eles proprios citacoes, e o guard
+  // varre este ficheiro.) Os prefixos tornaram essa forma impossivel; o que sobra, e que este
+  // ramo continua a apanhar, e a entrada escrita no ficheiro do prefixo errado — que e
+  // exactamente o que um `/upgrade` desatento faz. O `simulate-derived.mjs`
   // nao o apanha porque o derivado que ele constroi nao escreve anti-padroes proprios: e um
   // defeito do dia 100, nao do dia 1.
   if (porFicheiro.length > 1) {
-    const vistos = new Map(); // numero -> [ficheiros]
+    const vistos = new Map(); // ID (prefixo incluido) -> [ficheiros]
     for (const [f, ns] of porFicheiro) {
       for (const n of ns) {
         if (!vistos.has(n)) vistos.set(n, []);
@@ -119,11 +146,12 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
       }
     }
     const colisoes = [...vistos].filter(([, fs]) => fs.length > 1);
-    for (const [n, fs] of colisoes) {
+    for (const [id, fs] of colisoes) {
       warn(
-        `AP${n} esta definido em ${fs.join(" E EM ")} — uma citacao a \`AP${n}\` resolve, mas para ` +
-          `qual? Renumerar os do projeto a partir do proximo ID livre, ou dar um prefixo proprio ` +
-          `aos do template (ver o cabecalho de anti-patterns.md)`
+        `${id} esta definido em ${fs.join(" E EM ")} — uma citacao a \`${id}\` resolve, mas para ` +
+          `qual? Cada prefixo tem o seu ficheiro: \`TP\` no do template, \`AP\` no do projeto. ` +
+          `Mover a entrada para o ficheiro do seu prefixo, ou renumerar (ver o cabecalho de ` +
+          `anti-patterns.md)`
       );
     }
   }
@@ -149,8 +177,9 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
     // com exit 0.
     const c = alvo.endsWith(".md") ? semHtml(bruto) : bruto;
     c.split("\n").forEach((linha, i) => {
-      // Um cabecalho de DEFINICAO nao e uma citacao de si mesmo. So no `anti-patterns.md`: um
-      // `## APn` em QUALQUER outro alvo e uma citacao como as outras (um cabecalho copiado
+      // Um cabecalho de DEFINICAO nao e uma citacao de si mesmo. So nos ficheiros de
+      // definicoes: um cabecalho de anti-padrao em QUALQUER outro alvo e uma citacao como as
+      // outras (um cabecalho copiado
       // por `/upgrade` e precisamente o caso que este guard existe para apanhar), logo
       // excluir cabecalhos em todo o lado abriria um ponto cego novo.
       //
@@ -158,11 +187,11 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
       // so neste: cada definicao contribuia com a sua propria linha para a contagem, logo
       // `citacoes >= existentes.size` sempre.
       if (AP_FILES.includes(alvo) && CABECALHO_AP.test(linha)) return;
-      for (const m of linha.matchAll(/\bAP(\d+)\b/g)) {
+      for (const m of linha.matchAll(CITACAO_AP)) {
         citacoes++;
         if (!ehCodigo(alvo)) citacoesDoc++;
-        if (!existentes.has(m[1])) {
-          warn(`${alvo}:${i + 1}: cita AP${m[1]}, que nao existe em nenhum dos ficheiros de anti-padroes`);
+        if (!existentes.has(m[0])) {
+          warn(`${alvo}:${i + 1}: cita ${m[0]}, que nao existe em nenhum dos ficheiros de anti-padroes`);
           mortas++;
         }
       }

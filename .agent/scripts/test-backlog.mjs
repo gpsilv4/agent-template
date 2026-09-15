@@ -146,7 +146,7 @@ function test(name, mutate, expect) {
     if (code !== expect.code) problems.push(`exit ${code}, esperado ${expect.code}`);
 
     // Afirmar contra as linhas WARN, nao o output inteiro: um `includes` sobre tudo e
-    // satisfeito por outra verificacao que a mesma mutacao tambem disparou (AP1).
+    // satisfeito por outra verificacao que a mesma mutacao tambem disparou (TP1).
     const alvo =
       expect.code === 0
         ? out
@@ -183,7 +183,7 @@ test("baseline: fixture valida passa sem avisos", null, {
 
 // --- A linha `**Total**` (era FILTRADA e nunca comparada) --------------------
 // Achado de auditoria: um Resumo com Total a 999/888/777/666/555 saia `OK — contadores
-// consistentes` com exit 0. O gate afirmava o que nao media (AP1).
+// consistentes` com exit 0. O gate afirmava o que nao media (TP1).
 test("Resumo: linha Total divergente avisa", (dir) => {
   writeF(dir, ".agent/context/backlog.md",
     ACTIVE_OK.replace("| **Total** | **6** | **2** | **1** | **2** | **1** |",
@@ -196,7 +196,7 @@ test("Resumo: linha Total em falta avisa", (dir) => {
 }, { code: 1, includes: ['nao tem linha "**Total**"'] });
 
 test("Resumo: celula ilegivel e reportada como tal, nao lida como zero", (dir) => {
-  // `parseInt(x) || 0` transformava `?`/`n/a`/`—` num zero silencioso — o AP2 ao nivel da
+  // `parseInt(x) || 0` transformava `?`/`n/a`/`—` num zero silencioso — o TP2 ao nivel da
   // celula — e a mensagem acusava o ficheiro de dizer [0,0,0,0,0].
   writeF(dir, ".agent/context/backlog.md",
     ACTIVE_OK.replace("| Melhorias UX | 1 | 1 | 0 | 0 | 0 |", "| Melhorias UX | 1 | 1 | ? | n/a | — |"));
@@ -216,7 +216,7 @@ test("Barra: largura diferente de 20 avisa", (dir) => {
 
 test("Barra: glifos fora do BMP contam como UM bloco, nao dois", (dir) => {
   // 🟩/⬜ sao pares surrogate: `.length` contava 30 numa barra legitima de 20, e a mensagem
-  // AFIRMAVA "tem 30 blocos" sobre um ficheiro que tem 20 — o AP1 dentro do verificador
+  // AFIRMAVA "tem 30 blocos" sobre um ficheiro que tem 20 — o TP1 dentro do verificador
   // escrito para o combater. Regressao para qualquer derivado que troque o glifo.
   // Glifo preenchido fora do BMP + o `_` que o verificador ja conhece como vazio. O que se
   // afirma e a CONTAGEM, nao o vocabulario: 8 preenchidos e largura 20, como o baseline.
@@ -272,7 +272,7 @@ test("Estado em **negrito** conta como o mesmo estado", (dir) => {
   writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace("| B1 | Pendente |", "| B1 | **Pendente** |"));
 }, { code: 0, includes: ["OK — contadores"] });
 
-// --- A barra: allowlist dos dois lados (AP6) ---------------------------------
+// --- A barra: allowlist dos dois lados (TP6) ---------------------------------
 // `⬜` e o quadrado BRANCO — um bloco VAZIO. O teste antigo era `!/[_\s]/`, logo contava-o
 // como preenchido: uma barra de 20 `⬜` (zero feito) media 20/20 e passava por 100%.
 test("Barra: `⬜` conta como VAZIO, nao como preenchido", (dir) => {

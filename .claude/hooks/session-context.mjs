@@ -26,7 +26,7 @@ import { execFileSync } from "child_process";
  *  ou bytes nao-ASCII (`?? ".agent/guards/caf\303\251.mjs"`), e o `slice(3)` entrega a aspa
  *  e os escapes octais ao matcher — nenhuma regra casa e a divida e sub-reportada em
  *  SILENCIO, que e o defeito que o `stop-verify` existe para evitar. Medido: 1 de 3 ficheiros
- *  vistos. E a segunda cara do `AP5` (o `.trim()` foi a primeira).
+ *  vistos. E a segunda cara do `TP5` (o `.trim()` foi a primeira).
  *
  *  Com `-z` as entradas vem separadas por NUL e os caminhos crus. Renomeacoes e copias
  *  ocupam DUAS entradas (`R  novo\0antigo\0`): a segunda e um caminho nu, sem coluna de
@@ -54,7 +54,7 @@ function git(args) {
   // linha e desloca o caminho um caractere — `.agent/x` chegava como `agent/x`. Media-se: o
   // caminho aparecia sem o ponto e (no `stop-verify`) nao casava com regra nenhuma.
   // Apara so o que sobra no fim, e os DOIS separadores possiveis (`\n` nas saidas normais,
-  // `\0` nas que usam `-z`). Nunca `.trim()` em bloco: era o `AP5`.
+  // `\0` nas que usam `-z`). Nunca `.trim()` em bloco: era o `TP5`.
   return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).replace(/[\n\0]+$/, "");
 }
 

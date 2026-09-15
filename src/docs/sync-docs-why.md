@@ -42,4 +42,4 @@ num repo publico conta-se como comprometido a partir do push, nao a partir da de
 O Guard 12 conta os pontos da checklist com `^\d+\. \[ \]`, que **nao apanha sufixos de
 letra**. Os pontos `25a` e `25b` existiam e nao contavam: a prosa dizia "26 pontos", o guard
 contava 26, os dois concordavam um com o outro — e ambos subestimavam o trabalho real em dois.
-E o `AP1` dentro do guard escrito para impedir o `AP1`.
+E o `TP1` dentro do guard escrito para impedir o `TP1`.

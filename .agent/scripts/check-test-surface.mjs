@@ -6,7 +6,7 @@
  * enfraquecida?
  *
  * PORQUE EXISTE: um ciclo de correcao com o objetivo "ficar verde" tem uma solucao
- * degenerada — enfraquecer o teste em vez de corrigir o codigo (ver `AP4` em
+ * degenerada — enfraquecer o teste em vez de corrigir o codigo (ver `TP4` em
  * `anti-patterns.md`). Apagar a assercao, marcar `skip`, ou **estreitar a selecao do runner**,
  * que remove falhas igualmente bem sem tocar em nenhum ficheiro de teste.
  *
@@ -43,7 +43,7 @@ const TEST_GLOBS = [
   // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
   // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**, que e como quase todas as
   // deste repo se chamam. Apagar TODAS dava "superficie intacta" com exit 0 — um gate a
-  // afirmar que estava bem. E o `AP2` na sua forma mais cara.
+  // afirmar que estava bem. E o `TP2` na sua forma mais cara.
   //
   // **A fracao nao se escreve aqui.** Foi escrita tres vezes e esteve errada tres vezes: "9
   // das 10" envelheceu ao dividir-se uma suite em duas; "todas menos uma" tambem estava
@@ -67,7 +67,7 @@ const CONFIG_GLOBS = [
 // Configuracao **contavel**: o que seleciona os testes NESTE repo nao e um `vitest.config`,
 // e a lista de steps do `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step
 // do CI desliga uma suite inteira sem tocar em nenhum ficheiro de teste (invariante 2 do
-// `AP4`). Estes entram na superficie mas **nunca** dao o aviso generico de "confirmar": o que
+// `TP4`). Estes entram na superficie mas **nunca** dao o aviso generico de "confirmar": o que
 // deles interessa mede-se por contagem.
 //
 // A separacao nao e cosmetica. Na primeira versao estavam em `CONFIG_GLOBS` e qualquer
@@ -104,7 +104,7 @@ const CONFIG_CONTAVEIS = [
   // `lib/`: os modulos partilhados. A mesma lacuna, encontrada ao extrair a tabela `PARES`
   // para `lib/pares.mjs` — a extracao lia-se como perda de 19 pares porque o destino nao
   // estava na superficie. E ja valia antes disso para o `lib/registo.mjs`, que **e** o
-  // invariante 2 do `AP4` (a seleccao do runner) e estava fora da superficie congelada.
+  // invariante 2 do `TP4` (a seleccao do runner) e estava fora da superficie congelada.
   // Ancorado a `.agent/scripts/`: sem isso casava `src/lib/utils.mjs` e `packages/x/lib/y.mjs`
   // de qualquer projeto derivado, e apagar um ficheiro normal da app dava
   // "ficheiro da superficie de teste APAGADO" com exit 1 — a mesma classe de falso positivo
@@ -183,7 +183,7 @@ try {
     // acabado de clonar, o branch de trabalho e `fix/...` e nao existe `main` LOCAL — so
     // `origin/main`. Sem estes candidatos o verificador nao conseguia medir e saia `!= 0` no
     // dia 1 de cada consumidor, com uma mensagem que nao dizia o que fazer. Medido a correr
-    // o bootstrap: e a classe do `AP3` (verde no template, vermelho no derivado).
+    // o bootstrap: e a classe do `TP3` (verde no template, vermelho no derivado).
     const principal = ["main", "master", "develop", "origin/main", "origin/master", "origin/develop", "origin/HEAD"].find((b) => {
       try {
         git(["rev-parse", "--verify", `${b}^{commit}`]);
@@ -211,7 +211,7 @@ console.log(`  baseline: ${base}\n`);
 
 // A superficie tem de existir **nalgum lado** — na baseline ou no disco. Se os `TEST_GLOBS`
 // nao casam nada em nenhum dos dois, este verificador imprimia `superficie intacta` e saia
-// `0`, **para sempre**, sobre uma suite apagada: e o `AP2` aplicado a si mesmo, e a unica
+// `0`, **para sempre**, sobre uma suite apagada: e o `TP2` aplicado a si mesmo, e a unica
 // mitigacao era prosa.
 //
 // **Os dois lados, e nao so um.** Olhar so para o disco roubava a mensagem ao caso do
@@ -313,7 +313,7 @@ if (tocados.length === 0) {
     // parcial (`--filter=blob:none`) ou com o objeto ausente isso corria nas duas direcoes
     // erradas ao mesmo tempo: `antes = ""` fazia com que nada pudesse **descer** (exit 0
     // sobre uma suite esvaziada) e, ao mesmo tempo, qualquer `skip` **pre-existente** contava
-    // como acrescentado (falso positivo). E o `AP2`: "nao ha nada" nao e "nao consegui ler".
+    // como acrescentado (falso positivo). E o `TP2`: "nao ha nada" nao e "nao consegui ler".
     let antes = "";
     let existiaAntes = true;
     // `ls-tree` e nao `cat-file -e`: o `-e` resolve o caminho **e** verifica o blob, logo
@@ -353,7 +353,7 @@ if (tocados.length === 0) {
   }
 
   // --- Totais da superficie: distinguir o que se PERDEU do que se MOVEU -------------
-  // O invariante do `AP4` e "a contagem de testes nao desce" — a contagem, ou seja o TOTAL.
+  // O invariante do `TP4` e "a contagem de testes nao desce" — a contagem, ou seja o TOTAL.
   // A implementacao comparava so por ficheiro, e por isso punia uma **extracao**: mover testes
   // de um ficheiro que passou o flag das 500 linhas para um modulo novo lia-se como perda no
   // ficheiro de origem, com exit 1, embora o total tivesse subido. Medido: as tres extracoes
@@ -394,7 +394,7 @@ if (tocados.length === 0) {
     //
     // A rede tem de estar FORA dos dados: este padrao esta escrito a mao aqui e conta as
     // ENTRADAS da tabela no texto, sem consultar a tabela. Nao e imune a quem edite este
-    // ficheiro — nada aqui e, e o `AP4` di-lo por escrito — mas fecha o degrau de esvaziar as
+    // ficheiro — nada aqui e, e o `TP4` di-lo por escrito — mas fecha o degrau de esvaziar as
     // tabelas, que nao tocava em nenhum teste e nao deixava marca nenhuma.
     const entradasDeTabela = /\{\s*re:\s*\//;
     const tabelasEncolheram =
@@ -444,7 +444,7 @@ if (tocados.length === 0) {
 console.log("");
 if (problemas > 0) {
   console.log(`WARNING: ${problemas} sinal(is) de enfraquecimento da superficie de teste.`);
-  console.log("         Corrigir o codigo, nao o teste. Ver AP4 em .agent/rules/anti-patterns.md\n");
+  console.log("         Corrigir o codigo, nao o teste. Ver TP4 em .agent/rules/anti-patterns-template.md\n");
 } else {
   console.log("  Superficie de teste nao enfraquecida.\n");
 }

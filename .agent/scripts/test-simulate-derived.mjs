@@ -48,6 +48,13 @@ const falhas = [];
 
 /** Repo minimo, limpo por construcao: um placeholder para substituir, uma seccao 2.2 no
  *  BOOTSTRAP para derivar, e um stub por cada comando que o simulador chama. */
+/** Os IDs CONSTROEM-SE, nunca se escrevem por extenso: o Guard 15 varre os `.agent/scripts/`,
+ *  e um `APn` literal aqui seria uma citacao a um ID que o template nu nao define — o guard
+ *  reprovava o repo, e foi o que aconteceu ao escrever estes testes. E a mesma convencao do
+ *  `tests-anti-patterns.mjs`. Os `TPn` nao precisam disto (o template define-os), mas a
+ *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
+const ap = (n) => "AP" + n;
+
 function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
@@ -75,13 +82,15 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   if (sobraPlaceholder) w("NOTAS.txt", `Projeto: ${ph}\n`);
 
   w(".agent/rules/anti-patterns.md",
-    "# Anti-Padroes\n\n<!-- Exemplo a remover no bootstrap.\n\n## AP1 — exemplo\n\n-->\n\n## AP1 — real\n");
+    `# Anti-Padroes\n\n<!-- Exemplo a remover no bootstrap.\n\n## ${ap(1)} — exemplo\n\n-->\n\n## ${ap(1)} — real\n`);
   if (apTemplate) {
     // O ficheiro do TEMPLATE ao lado do do projeto. E o que torna a fixture um derivado com
-    // historia: o simulador acrescenta um anti-padrao proprio, e ele tem de escolher um numero
-    // que nao colida com estes.
+    // historia: o simulador acrescenta um anti-padrao proprio, e tem de o numerar sem olhar
+    // para estes. Os numeros escolhidos SOBREPOEM-SE aos do projeto de proposito (o `1` esta
+    // nos dois ficheiros, em prefixos diferentes): e a unica forma de a fixture distinguir
+    // "ignorou o ficheiro do template" de "somou os dois".
     w(".agent/rules/anti-patterns-template.md",
-      "# Anti-Padroes do template\n\n## AP1 — um\n\n## AP2 — dois\n\n## AP7 — sete\n");
+      "# Anti-Padroes do template\n\n## TP1 — um\n\n## TP2 — dois\n\n## TP7 — sete\n");
   }
 
   const listaStubs = comandoExtra ? [...COMANDOS, ".agent/scripts/test-delta.mjs"] : COMANDOS;
@@ -128,7 +137,7 @@ function test(nome, opcoes, expect) {
     const problemas = [];
     if (code !== expect.code) problemas.push(`exit ${code}, esperado ${expect.code}`);
     // Quando se espera reprovacao, afirma-se contra as linhas WARN e nada mais: um `includes`
-    // sobre o output inteiro seria satisfeito por uma linha OK com o mesmo texto (`AP1`).
+    // sobre o output inteiro seria satisfeito por uma linha OK com o mesmo texto (`TP1`).
     const alvo = expect.code === 0
       ? out
       : out.split("\n").filter((l) => l.trimStart().startsWith("WARN")).join("\n");
@@ -180,7 +189,7 @@ test("um verificador a falhar reprova a simulacao, e e nomeado", { stubFalha: CO
   includes: [COMANDOS[0], "exit 1"],
 });
 
-// --- "Nao consegui medir" tem de REPROVAR, nao dar OK (AP2) ---------------------
+// --- "Nao consegui medir" tem de REPROVAR, nao dar OK (TP2) ---------------------
 // A primeira versao deste teste afirmava "zero placeholders substituidos reprova". Era
 // inalcancavel: o proprio simulador tem um placeholder no cabecalho, logo a contagem nunca e
 // zero — e o ramo do script que ele testava so dispararia num projeto ja bootstrapado, onde
@@ -199,7 +208,7 @@ test("sem sobras, a varredura de placeholders nao acusa nada", {}, {
 
 // O ramo mais facil de esquecer: todos os comandos ausentes. Sem o `fatal`, o script chegava
 // ao fim a contar avisos em vez de dizer que nao mediu nada — e a diferenca importa, porque
-// "falharam" e "nao correram" pedem accoes diferentes a quem le. E o `AP2`.
+// "falharam" e "nao correram" pedem accoes diferentes a quem le. E o `TP2`.
 test("nenhum comando a correr reprova a dizer que nao mediu", { semStubs: true }, {
   code: 1,
   includes: ["nao mediu nada"],
@@ -234,7 +243,7 @@ test("`--only` valido corre so o seleccionado", {}, {
 // verifica-lo: acrescentar uma suite ao CI e esquecer aqui fazia a simulacao medir menos,
 // em silencio. Estes tres casos fixam a derivacao nos dois sentidos.
 
-test("sem ci.yml reprova a dizer que NAO DERIVOU — nao 'nada a correr' (AP2)", { ciAusente: true }, {
+test("sem ci.yml reprova a dizer que NAO DERIVOU — nao 'nada a correr' (TP2)", { ciAusente: true }, {
   code: 1,
   includes: ["nao derivei nenhum comando"],
 });
@@ -257,21 +266,20 @@ test("um comando ACRESCENTADO ao ci.yml passa a ser corrido pela simulacao", { c
 // --- O derivado com HISTORIA, e nao so o dia 1 -------------------------------
 // O simulador validava o **dia 1**: zero anti-padroes proprios, os TETOS do template, nenhum
 // ficheiro grande. Tres dos quatro achados da terceira ronda de revisao escaparam-lhe por
-// isso — todos vivem no dia 100. O passo 3c acrescenta um anti-padrao PROPRIO, e o numero
-// tem de ser DERIVADO dos dois ficheiros: escrito a mao, criava a colisao que o Guard 15
-// existe para reprovar.
-// Os numeros CONSTROEM-SE: escritos por extenso, este ficheiro passava a CITAR um `APn` que
-// nao existe e o Guard 15 reprovava-o — e foi o que aconteceu ao escrever estes dois testes.
-// E a mesma convencao do `tests-anti-patterns.mjs`.
-const ap = (n) => "AP" + n;
-
-test("derivado maduro: o anti-padrao proprio usa o proximo ID LIVRE", { apTemplate: true }, {
+// isso — todos vivem no dia 100. O passo 3c acrescenta um anti-padrao PROPRIO, e o numero sai
+// do ficheiro do projeto e **so** dele.
+//
+// Os dois testes sao um PAR e valem pela igualdade: com o ficheiro do template presente ou
+// ausente, o proximo ID do projeto e o mesmo. E isso que os prefixos separados garantem — a
+// numeracao do template nao consome a do projeto. Voltar a somar os dois ficheiros da 8 no
+// primeiro caso e 2 no segundo, e o par reprova. Um teste sozinho aqui nao distinguia nada:
+// qualquer dos dois, isolado, e satisfeito por uma implementacao errada.
+test("derivado maduro: os `TPn` do template NAO consomem a numeracao do projeto", { apTemplate: true }, {
   code: 0,
-  // AP1, AP2 e AP7 no template + AP1 no projeto -> o proximo livre e o 8.
-  includes: [`anti-padrao proprio ${ap(8)} acrescentado`],
+  includes: [`anti-padrao proprio ${ap(2)} acrescentado`],
 });
 
-test("sem o ficheiro do template, o proximo livre e 2", {}, {
+test("derivado maduro: sem o ficheiro do template, o proximo e o MESMO", {}, {
   code: 0,
   includes: [`anti-padrao proprio ${ap(2)} acrescentado`],
 });

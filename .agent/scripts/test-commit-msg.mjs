@@ -32,7 +32,7 @@ const falhas = [];
  * @param expect  { code, includes?: string[], caminhoAusente?: boolean } — `includes` afirma
  *                contra o STDERR do hook,
  *                que e onde a recusa e explicada. Afirmar contra stdout+stderr juntos deixava
- *                um teste passar por causa de output que nao e o da recusa (o `AP1`).
+ *                um teste passar por causa de output que nao e o da recusa (o `TP1`).
  */
 function test(nome, msg, expect) {
   const dir = mkdtempSync(join(tmpdir(), "commit-msg-test-"));
@@ -112,7 +112,7 @@ test("prosa que fala de geracao passa", "docs: explicar como o relatorio e gerad
 // As formas usadas aqui sao as NAO ANCORADAS de proposito. A primeira versao deste teste
 // punha um `# Co-Authored-By:` comentado — e esse padrao comeca com `^\s*`, logo ja nao casa
 // uma linha que comeca por `#`, filtro ou nao. O teste ficava verde com o filtro ligado **e**
-// desligado: nao afirmava nada, que e o `AP1`. Apanhado pelo controlo negativo.
+// desligado: nao afirmava nada, que e o `TP1`. Apanhado pelo controlo negativo.
 test("comentario do git com `generated with` nao conta", "fix: x\n\n# Generated with [Claude Code](https://claude.com)\n", { code: 0 });
 
 test("comentario do git com o emoji de robo nao conta", "fix: x\n\n# 🤖 texto de ajuda\n", { code: 0 });
@@ -146,7 +146,7 @@ test("`Assisted-By` de IA reprova", "fix: x\n\nAssisted-By: gpt-4\n", { code: 1 
 test("atribuicao no meio do corpo reprova", "fix: x\n\nCo-Authored-By: Claude <a@b>\n\nmais texto depois\n", { code: 1 });
 
 // --- "Nao consegui medir" tem de REPROVAR --------------------------------------
-// Um hook que nao consegue ler a mensagem e deixa passar e o `AP2`: "nao ha nada" nao e
+// Um hook que nao consegue ler a mensagem e deixa passar e o `TP2`: "nao ha nada" nao e
 // "nao consegui ler". Aqui o custo de falhar fechado e um commit repetido; o de falhar aberto
 // e uma mensagem imutavel errada.
 test("sem o argumento do git reprova", null, { code: 1, includes: ["nao consigo verificar"] });

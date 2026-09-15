@@ -4,18 +4,19 @@
 > Adicionar uma entrada sempre que um bug revele um padrao evitavel; quando vira regra estavel,
 > migrar para `core-rules.md`.
 >
-> **Os sete anti-padroes do template (`AP1`-`AP7`) vivem em `anti-patterns-template.md`** — NAO
+> **Os sete anti-padroes do template (`TP1`-`TP7`) vivem em `anti-patterns-template.md`** — NAO
 > carregado, lido on-demand. Sao sobre a maquinaria do template (hooks `.mjs`, `git status
 > --porcelain`), e mante-los aqui custava 24% do orcamento sempre-carregado a todos os
 > projetos, incluindo aos que nao sao Node. O Guard 15 varre os dois ficheiros, logo as
 > citacoes continuam a resolver.
 >
-> **O Guard 15 reprova se o mesmo numero estiver definido nos DOIS ficheiros.** Uma citacao a
-> `AP4` resolveria — mas para qual dos dois, que tem significados diferentes? E pior do que uma
-> referencia morta: a morta denuncia-se, esta confirma uma leitura que nao e a do autor.
+> **Comeca no primeiro numero.** O prefixo `AP` e teu e esta todo livre: o template usa `TP`, logo os
+> numeros dele nao consomem os teus e nenhuma citacao trazida por um `/upgrade` precisa de ser
+> reescrita. Antes de os prefixos se separarem, um derivado real ficou com quatro numeros a
+> significar duas coisas cada — e nada no ecra o denunciava.
 >
-> **Comeca no proximo ID livre** — os sete do template estao tomados e sao citados em dezenas
-> de sitios. Confirma com: `git grep -hoE '^#{2,3}[[:space:]]+AP[0-9]+' .agent/rules/ | sort -uV | tail -1`
+> **Cada prefixo no seu ficheiro.** O Guard 15 reprova o mesmo ID definido nos DOIS: uma
+> entrada `TP` escrita aqui, ou uma `AP` escrita no ficheiro do template.
 
 ## Formato de cada entrada
 

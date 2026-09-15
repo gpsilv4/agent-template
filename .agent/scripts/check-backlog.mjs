@@ -268,12 +268,12 @@ for (const { key } of SECTIONS) for (const k of Object.keys(g)) g[k] += counts[k
 // --- Validar tabela Resumo ---
 // O heading `## Resumo` nao tinha rede: renomeado, `section()` devolve "", `tableRows("")`
 // devolve [], o forEach nao corre e o checker anunciava "contadores consistentes" com exit 0
-// — a desligar em silencio a sua propria razao de existir. Mesma forma do AP2 que este
+// — a desligar em silencio a sua propria razao de existir. Mesma forma do TP2 que este
 // ficheiro deu origem, e que ficou de fora quando os cabecalhos `## 1.`..`## 4.` a ganharam.
 const todasResumoRows = tableRows(section(active, /^##\s*Resumo/i));
 // A linha `**Total**` era FILTRADA e nunca comparada — e e o numero mais lido do backlog.
 // Medido: um Resumo com Total a `999/888/777/666/555` saia `OK — contadores consistentes`
-// com exit 0. O gate nao so passava: **afirmava** consistencia que nao verificara (AP1).
+// com exit 0. O gate nao so passava: **afirmava** consistencia que nao verificara (TP1).
 const linhaTotal = todasResumoRows.find((r) => norm(r[0]).includes("total"));
 const resumoRows = todasResumoRows.filter((r) => !norm(r[0]).includes("total"));
 if (resumoRows.length !== SECTIONS.length) {
@@ -295,7 +295,7 @@ resumoRows.forEach((cells) => {
   }
   const c = counts[key];
   // `parseInt(x) || 0` tornava qualquer celula ilegivel (`?`, `n/a`, `—`, ou um numero em
-  // **negrito**) num zero silencioso — o AP2 a nivel de celula, e uma mensagem que acusava o
+  // **negrito**) num zero silencioso — o TP2 a nivel de celula, e uma mensagem que acusava o
   // ficheiro de dizer [0,0,0,0,0] quando dizia outra coisa. `\d+` tolera o negrito e o resto
   // e reportado como ilegivel, nao como zero.
   const nums = cells.slice(1, 6).map((x, i) => {
@@ -349,10 +349,10 @@ if (!progMatch) {
 } else {
   // `[...str]` e nao `.length`: glifos fora do BMP (🟩/⬜, que um projeto derivado pode usar)
   // sao pares surrogate e contavam a DOBRAR — uma barra legitima de 20 blocos media 30, e a
-  // mensagem afirmava "tem 30 blocos" sobre um ficheiro que tem 20. E o `AP1` dentro do
+  // mensagem afirmava "tem 30 blocos" sobre um ficheiro que tem 20. E o `TP1` dentro do
   // verificador escrito para o combater.
   const blocos = [...progMatch[1]];
-  // Allowlist dos dois lados, e nao `!/[_\s]/` (AP6). O teste anterior perguntava "nao e
+  // Allowlist dos dois lados, e nao `!/[_\s]/` (TP6). O teste anterior perguntava "nao e
   // vazio?", logo **qualquer** glifo desconhecido contava como preenchido — e o comentario
   // acima ja admitia que um projeto derivado usa `⬜`, o quadrado BRANCO, que e precisamente
   // um bloco VAZIO: uma barra de 20 `⬜` (0% feito) media 20/20 e passava por 100%.

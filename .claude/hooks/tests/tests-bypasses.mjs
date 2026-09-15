@@ -10,13 +10,13 @@
  * PORQUE VIVE NUMA TABELA: a cobertura de mutacao deste hook deu `2/2 sitios` em tres
  * versoes diferentes — a que tinha 32 defeitos, a que tinha 22, e a atual. O numero nao se
  * move porque mede se cada aviso EXISTENTE e observado. O instrumento que o substitui e esta
- * lista de formas: cresce quando se encontra outra. Ver `AP6` em `anti-patterns.md`.
+ * lista de formas: cresce quando se encontra outra. Ver `TP6` em `anti-patterns.md`.
  */
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 
 // NAO e um entry point: corrido diretamente nao afirmaria nada e sairia 0 — a forma canonica
-// do `AP2`.
+// do `TP2`.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-bypasses.mjs nao e um entry point: nao corre testes por si.\n" +

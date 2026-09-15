@@ -74,7 +74,7 @@ codigo que ele cobre e exigir que fique vermelho **na assercao certa**.
 
 Sem isto, um teste pode nao afirmar nada — uma assercao de visibilidade sem limiar passa com um
 pixel, uma de texto contra o output **inteiro** e satisfeita por outra verificacao que a mesma
-mutacao disparou (`AP1`). Mais padroes reais em `src/docs/ticket-method-why.md`.
+mutacao disparou (`TP1`). Mais padroes reais em `src/docs/ticket-method-why.md`.
 
 Para **verificadores** (guards, linters, scripts de CI), o controlo negativo escala para
 **cobertura de mutacao**: desligar cada sitio de erro, um a um, e exigir que a suite fique
@@ -104,7 +104,7 @@ cuidado com o exit code do pipe: em `zsh` o `PIPESTATUS` nao existe, logo `cmd |
 de `$?` reporta o `tail`, nao o `cmd`.
 
 Um loop cujo objetivo e "ficar verde" tem uma **solucao degenerada: enfraquecer o teste** (ver
-`AP4`). Tres invariantes, e nenhuma e opcional:
+`TP4`). Tres invariantes, e nenhuma e opcional:
 
 - O veredicto assenta no **exit code** do runner, nunca numa regex sobre o output.
 - A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
@@ -137,7 +137,7 @@ Angulos (adaptar ao dominio no bootstrap; os de UI nao servem a uma CLI ou a uma
 > **O angulo mais barato, e o que mais rendeu:** **correr os comandos que a documentacao manda
 > correr.** Nao reler a receita — executa-la. Tres leituras independentes nao viram o que uma
 > corrida das receitas do `BOOTSTRAP.md` apanhou em minutos. Um snippet partido nao se ve a
-> ler: da zero resultados, que e indistinguivel de "esta tudo bem" (`AP2`).
+> ler: da zero resultados, que e indistinguivel de "esta tudo bem" (`TP2`).
 
 **Quantas esperar** (para orcamentar, nao para cumprir):
 

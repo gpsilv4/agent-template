@@ -47,10 +47,10 @@ As tres formas que se mediram, e que a Fase 1 existe para apanhar antes de chega
 |---|---|
 | Assercao de **visibilidade sem limiar** | cumpre-se com **um pixel** visivel; o elemento pode estar praticamente fora do ecra |
 | Assercao de **contagem zero** | cumpre-se no **primeiro instante** em que a contagem e zero — antes de a UI re-renderizar, nao depois |
-| Assercao de **texto contra o output inteiro** | e satisfeita por **outra** verificacao que a mesma mutacao tambem disparou (ver `AP1`) |
+| Assercao de **texto contra o output inteiro** | e satisfeita por **outra** verificacao que a mesma mutacao tambem disparou (ver `TP1`) |
 
 A terceira e a que mais reincide em repos de verificadores: numa sessao apanharam-se **tres**
-testes assim, todos escritos na mesma sessao em que o `AP1` estava a ser documentado. Nenhum
+testes assim, todos escritos na mesma sessao em que o `TP1` estava a ser documentado. Nenhum
 foi encontrado a ler — os tres sairam do **controlo negativo**, que e precisamente a regra que
 a Fase 1 impoe.
 

@@ -15,7 +15,37 @@
 
 ---
 
-## AP1 — Teste cuja assercao e satisfeita por outra verificacao
+## Porque o prefixo do template e `TP` e nao `AP`
+
+As sete entradas nasceram no prefixo `AP` — o mesmo que um projeto derivado usa para as suas.
+(Escrever aqui um ID concreto desse prefixo seria uma citacao morta, e o Guard 15 apanhou-a ao
+escrever este paragrafo.) Enquanto o template estava sozinho isso nao custava nada; ao segundo `/upgrade` custou
+duas vezes.
+
+O que acontecia: o projeto derivado escrevia os seus anti-padroes a partir dos seus proprios
+bugs, comecando no primeiro numero livre — mas "livre" tinha de ser calculado contra os sete
+do template, que ele nao tem razao nenhuma para conhecer. Num consumidor real quatro numeros
+ficaram com dois significados cada; o quarto era "o loop que fica verde enfraquecendo o teste"
+no template e "elemento interativo fora do design system" no projeto. Uma citacao a esse numero
+**resolvia** — para a entrada errada. E pior do que uma referencia morta: a morta denuncia-se,
+esta confirma uma leitura que nao e a do autor e nada no ecra a contradiz. O Guard 15 passou a
+reprovar a colisao, mas reprovar e so o segundo melhor: obrigava a renumerar a mao, e cada
+`/upgrade` trazia ~27 citacoes para reescrever uma a uma.
+
+Prefixos separados eliminam a classe em vez de a detetar. O template usa `TP`, o projeto usa
+`AP` e comeca no primeiro numero com o espaco todo livre; as citacoes `TPn` que um `/upgrade`
+traz copiam-se como estao, porque significam o mesmo em todos os projetos. **Custou 204 sitios
+em 59 ficheiros, uma vez.** O que substituiu era ~27 reescritas de citacoes **por `/upgrade`,
+em cada projeto derivado, para sempre** — e feitas a mao, logo com a taxa de erro de uma tarefa
+mecanica repetida.
+
+O Guard 15 continua a ler os dois prefixos e a reprovar a colisao. Nao por a forma antiga poder
+voltar, mas porque sobra uma forma nova: a entrada escrita no ficheiro do prefixo errado, que e
+o que um `/upgrade` desatento faz ao acrescentar onde devia substituir.
+
+---
+
+## TP1 — Teste cuja assercao e satisfeita por outra verificacao
 
 **Origem**: cinco rondas de review a este template, sempre a mesma classe.
 
@@ -49,7 +79,7 @@ descrevem o presente, e o presente muda.
 
 ---
 
-## AP2 — Zero resultados lido como zero problemas
+## TP2 — Zero resultados lido como zero problemas
 
 **Origem**: o `check-backlog.mjs` deste template.
 
@@ -73,7 +103,7 @@ validar", esta a mentir com exit `0`. Correr tambem cada verificador **de uma su
 
 ---
 
-## AP3 — Teste que depende do estado do repo em vez de o montar
+## TP3 — Teste que depende do estado do repo em vez de o montar
 
 **Origem**: o teste do Guard 13 neste template.
 
@@ -81,7 +111,7 @@ O teste afirmava que o guard **salta**, passando `null` como mutacao — verdade
 onde o ficheiro que dispara o guard nao existe, e **falsa em qualquer projeto derivado**, onde
 o bootstrap o cria. A suite passava aqui e falhava no primeiro dia de cada consumidor.
 
-Voltou a acontecer na correcao do `AP7`: o teste do ramo "ninguem cita" herdava as definicoes
+Voltou a acontecer na correcao do `TP7`: o teste do ramo "ninguem cita" herdava as definicoes
 do `anti-patterns.md` real (a fixture sintetica deriva-as de la), logo num projeto que ainda
 nao escreveu anti-padroes — o que a propria rule autoriza por escrito — `existentes` era 0, o
 guard caia no `SKIP` e o teste ficava vermelho no consumidor estando verde aqui. A correcao foi
@@ -92,7 +122,7 @@ template. Um teste verde num sitio e vermelho no outro nao esta a afirmar o que 
 
 ---
 
-## AP4 — O loop que fica verde enfraquecendo o teste
+## TP4 — O loop que fica verde enfraquecendo o teste
 
 **Origem**: o desenho de um loop de correcao automatica num projeto real.
 
@@ -110,7 +140,7 @@ Os seis invariantes, e o defeito que cada um fecha:
    terceira forma acima).
 3. Nao ha loop sem falha inicial: se a suite ja esta verde, o loop nao arranca.
 4. Perguntar ao **git** o que mudou desde a baseline — e **abortar** se o git falhar, em vez de
-   tratar a resposta vazia como "nada mudou" (e o `AP2` aplicado ao loop).
+   tratar a resposta vazia como "nada mudou" (e o `TP2` aplicado ao loop).
 5. A contagem de testes **nao desce** e os *skipped* **nao sobem** face a baseline.
 6. Procurar marcas de enfraquecimento **so na superficie congelada** — senao um `.skip(offset)`
    de paginacao em codigo de producao da falso positivo.
@@ -156,7 +186,7 @@ era excluido — sabotagem pura escrita como se fosse o gate legitimo.
 
 ---
 
-## AP5 — `.trim()` no output de um comando cujas colunas significam algo
+## TP5 — `.trim()` no output de um comando cujas colunas significam algo
 
 **Origem**: o hook `stop-verify` sub-reportava a divida **em silencio**, com 33 testes verdes.
 
@@ -179,7 +209,7 @@ primeira versao desta linha fazia.
 
 ---
 
-## AP6 — Blocklist de formas perigosas onde era preciso um allowlist
+## TP6 — Blocklist de formas perigosas onde era preciso um allowlist
 
 **Origem**: o hook `guard-protected-branch` deste template. **32 defeitos** medidos na primeira
 leitura: 28 formas de o contornar, 3 formas de force-push que escapavam, 1 falso positivo.
@@ -203,7 +233,7 @@ de distancia.
 
 ---
 
-## AP7 — Ramo inalcancavel, justificado por prosa em vez de medido
+## TP7 — Ramo inalcancavel, justificado por prosa em vez de medido
 
 **Origem**: o ramo "ninguem cita" do Guard 15 (`guards/anti-patterns.mjs`).
 

@@ -4,7 +4,7 @@
  * Espelha `guards/sizes.mjs`. NAO e um entry point: o `test-guards.mjs` descobre-o em disco e
  * chama `registar()`.
  *
- * A fixture MEXE nos ficheiros reais do sandbox (`AP3`): a catraca so tem significado contra
+ * A fixture MEXE nos ficheiros reais do sandbox (`TP3`): a catraca so tem significado contra
  * contagens verdadeiras, e um ficheiro sintetico de 600 linhas provaria apenas que o guard
  * sabe contar — nao que os tetos apontam para os ficheiros certos.
  */

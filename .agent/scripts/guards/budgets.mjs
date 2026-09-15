@@ -80,7 +80,7 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
   //
   // (Uma versao anterior deste comentario dizia 16239 bytes. Uma leitura independente varreu o
   // historico: esse tamanho nunca existiu num ficheiro commitado. Um numero escrito a mao a
-  // justificar um limiar e o `AP1` aplicado a um comentario.)
+  // justificar um limiar e o `TP1` aplicado a um comentario.)
   //
   // O NOTE esta a 12500 e nao a 12000 porque o tamanho de trabalho de uma referencia aqui e
   // ~12 KB (o `ticket-method.md` vive nos 11958): com o NOTE em 12000 a proxima frase que se
@@ -164,7 +164,7 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
     // cabe, cabem todos — e o numero fica a vista, que e o que falta quando so se diz "ok".
     // Zero ficheiros LIDOS nao e o mesmo que zero candidatos: a lista de catalogos e fixa,
     // logo um catalogo que nao exista deixava `outros.length > 0` e o guard nao emitia nem
-    // `OK` nem `SKIP` — silencio, que e o `AP2` dentro do proprio guard. Apanhado pela sua
+    // `OK` nem `SKIP` — silencio, que e o `TP2` dentro do proprio guard. Apanhado pela sua
     // suite, no cenario em que se apagam os workflows todos.
     if (lidos === 0) {
       skip(`Guard 1e — nenhum dos ${outros.length} candidatos (workflows, catalogos) existe no disco`);
@@ -220,7 +220,7 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
       const nota = ausentes.length ? ` (${ausentes.length} import(s) gerado(s) no bootstrap ainda ausente(s))` : "";
       if (vistos === 0) {
         // Zero imports de contexto e legitimo (um projeto pode nao os importar), mas tem de o
-        // DIZER: um orcamento que mede zero nao pode sair como "esta bem" — e o `AP2`.
+        // DIZER: um orcamento que mede zero nao pode sair como "esta bem" — e o `TP2`.
         skip(`Guard 1c — nenhum @import de .agent/context/ em CLAUDE.md${nota}`);
       } else {
         if (contexto > CONTEXTO_MAX) {

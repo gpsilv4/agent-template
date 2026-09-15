@@ -14,7 +14,7 @@ import { test, file, readF, writeF } from "./test-harness.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
-// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// "passa" sem correr nada e a forma canonica do TP2 ("zero resultados lido como zero
 // problemas"). Achado do leitor independente (Fase 4).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -161,7 +161,7 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // --- 12d: contagem de guards numerados ------------------------------------
   // Terceira instancia do padrao: o BOOTSTRAP.md dizia "11 guards numerados" com 14 a
   // existir. Sem rede, um numero a mao envelhece na primeira alteracao.
-  // AP3: a fixture ESCREVE o ficheiro de que a assercao depende, em vez de o ler do repo.
+  // TP3: a fixture ESCREVE o ficheiro de que a assercao depende, em vez de o ler do repo.
   // A versao anterior fazia `readF(dir, ".agent/BOOTSTRAP.md")` — que so existe enquanto o
   // bootstrap nao correu. Num projeto derivado (onde o BOOTSTRAP.md foi apagado e o
   // README.md substituido, como a propria documentacao manda) estes quatro testes davam
@@ -173,7 +173,7 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   test("G12d: guard novo sem atualizar a prosa avisa", (dir) => {
     // A fixture monta a CITACAO de que a assercao depende, alem do guard novo. Sem isto o
     // teste so passava enquanto o `BOOTSTRAP.md` do repo citasse o numero — falso em
-    // qualquer projeto derivado, onde a citacao foi apagada com o ficheiro (AP3).
+    // qualquer projeto derivado, onde a citacao foi apagada com o ficheiro (TP3).
     writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nO checker corre 1 guards numerados.\n");
     writeF(dir, ".agent/scripts/guards/settings.mjs",
       readF(dir, ".agent/scripts/guards/settings.mjs") + "\n// --- Guard 99: inventado ---\n");
@@ -185,7 +185,7 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
     // `guards/` os cabecalhos deles sobreviviam a mutacao: `numerados.size > 0`, o aviso nao
     // disparava, e o teste falhava a apontar para o guard em vez de para a sua propria
     // fixture. Uma lista de ficheiros escrita a mao ao lado de um `listDir` envelhece no
-    // primeiro ficheiro novo — e o `AP1`.
+    // primeiro ficheiro novo — e o `TP1`.
     const fontes = [
       ".agent/scripts/check-doc-versions.mjs",
       ...readdirSync(file(dir, ".agent/scripts/guards"))

@@ -17,10 +17,10 @@
  *     git config core.hooksPath .githooks
  *
  * O `/setup` e o `BOOTSTRAP.md` mandam correr isto. Quem nao o correr fica sem a rede: e a
- * mesma limitacao honesta que o `AP4` descreve para o gate da superficie de teste — a
+ * mesma limitacao honesta que o `TP4` descreve para o gate da superficie de teste — a
  * autoridade que nao depende de configuracao local e o **CI**.
  *
- * BLOCKLIST, E DE PROPOSITO — o `AP6` diz que um allowlist falha fechado e e preferivel, mas
+ * BLOCKLIST, E DE PROPOSITO — o `TP6` diz que um allowlist falha fechado e e preferivel, mas
  * aqui o allowlist nao existe: nao ha forma de enumerar os humanos legitimos, e um
  * `Co-Authored-By` de uma pessoa **tem** de passar. Logo enumera-se o que e IA. A lista falha
  * aberta por construcao: um modelo novo com nome novo passa ate alguem o acrescentar. Esta
@@ -45,7 +45,7 @@ function recusar(titulo, detalhe = []) {
 
 const caminho = process.argv[2];
 // Sem argumento nao ha nada para ler. Reprovar, e nao deixar passar: um hook que "nao
-// conseguiu medir" a dizer OK e o `AP2` aplicado a si proprio.
+// conseguiu medir" a dizer OK e o `TP2` aplicado a si proprio.
 if (!caminho) recusar("commit-msg: o git nao passou o ficheiro da mensagem — nao consigo verificar.");
 
 let msg = "";

@@ -367,7 +367,7 @@ test("RSC: rota DINAMICA (chave com parenteses rectos) resolve na mesma", (dir) 
   manifestoRsc(dir, "/resultados/[id]", [["/_next/static/chunks/din.js"]]);
 }, { code: 0, includes: ["[OK]"], excludes: ["[?]"] });
 
-// "Nao consegui ler" != "esta rota nao tem chunks" (`AP2`). Um manifesto ilegivel tem de
+// "Nao consegui ler" != "esta rota nao tem chunks" (`TP2`). Um manifesto ilegivel tem de
 // deixar a rota por resolver — que ja reprova — e nunca dar zero com `[OK]`.
 test("RSC: manifesto ilegivel deixa a rota por resolver, nao a zero", (dir) => {
   manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
