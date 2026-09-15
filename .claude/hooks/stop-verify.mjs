@@ -38,6 +38,10 @@ const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-doc" },
   { re: /^\.agent\/scripts\/check-backlog\.mjs$/, cmd: "node .agent/scripts/test-backlog.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-backlog" },
+  // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
+  // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
+  // que este ficheiro pode deixar passar.
+  { re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/upgrade-mecanico\.mjs)$/, cmd: "node .agent/scripts/test-simulate-upgrade.mjs && node .agent/scripts/mutation-sweep.mjs --only=upgrade" },
   // O `surface-patterns.mjs` e os dois harnesses nao casavam nenhuma regra: mexer neles nao
   // gerava divida nenhuma no fim do turno, ao contrario de mexer no `check-test-surface.mjs`.
   // E sao eles que DECIDEM — as tabelas de padroes e o veredicto de ~280 testes.
