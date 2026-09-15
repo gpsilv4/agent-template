@@ -37,7 +37,7 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-/** Raiz ancorada ao ficheiro, nunca ao `cwd` (AP2). */
+/** Raiz ancorada ao ficheiro, nunca ao `cwd` (TP2). */
 const RAIZ_HOOK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** O `cwd` da sessao: do payload, senao o do processo (e como os outros hooks deste repo

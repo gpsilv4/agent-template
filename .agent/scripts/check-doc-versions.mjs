@@ -71,7 +71,7 @@ function listTree(path, ext) {
     } catch {
       // So a RAIZ ausente e "nao ha nada a varrer". Uma SUBPASTA que nao se consegue ler
       // desaparecia da varredura sem nada no ecra — "nao consegui ler" a passar por "nao ha
-      // nada", que e o `AP2`. Aqui sobe, e quem chama decide.
+      // nada", que e o `TP2`. Aqui sobe, e quem chama decide.
       if (rel === "") return null;
       throw new Error(`nao consegui ler ${path}/${rel}`);
     }
@@ -160,7 +160,7 @@ guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir });
 // Gemini CLI (o Memory Import Processor define `@./file.md`, `@../file.md` e `@/abs/path`).
 // Consequencia provavel: o Gemini carregava o `GEMINI.md` e ZERO das rules importadas, e
 // quatro guards certificavam a "paridade" sem que nada verificasse que ele carrega alguma
-// coisa — paridade textual lida como paridade funcional, que e o `AP2`. O guard defendia a
+// coisa — paridade textual lida como paridade funcional, que e o `TP2`. O guard defendia a
 // sintaxe errada como invariante.
 //
 // POR VERIFICAR (a unica medicao que fecha isto): abrir o Gemini CLI num clone e correr

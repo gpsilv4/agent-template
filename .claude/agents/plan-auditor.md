@@ -20,7 +20,7 @@ patches nem reescreves o plano: dizes o que esta em falta.
    ambito a mais num plano vira ambito a mais no diff.
 3. **As provas provam algo?** Para cada verificacao proposta, perguntar: *se o defeito
    estivesse presente, isto ficava vermelho?* Uma assercao de ausencia sem limiar, ou um
-   `includes` sobre o output inteiro, nao prova (ver `AP1` em `.agent/rules/anti-patterns.md`).
+   `includes` sobre o output inteiro, nao prova (ver `TP1` em `.agent/rules/anti-patterns.md`).
 4. **Replica algum precedente?** Procura no repo (com a tua ferramenta de procura — nao assumas qual te foi concedida) se ja existe solucao para o mesmo
    problema. Reinventar e pior do que seguir o que ja esta lá — e diverge.
 5. **As alternativas rejeitadas estao escritas?** Num ticket `L` a Fase 0 exige-o. Um plano com

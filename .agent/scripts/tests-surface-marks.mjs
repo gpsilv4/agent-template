@@ -222,7 +222,7 @@ export function registar() {
   }, { code: 1, includes: ["steps de verificacao no CI: 2 -> 1"] });
 
   test("apagar o registo de suites por descoberta e enfraquecimento", (dir) => {
-    // AP4, invariante 2. A descoberta em disco (`lib/registo.mjs`) substituiu as chamadas
+    // TP4, invariante 2. A descoberta em disco (`lib/registo.mjs`) substituiu as chamadas
     // manuais a cada `tests-*.mjs`, mas a propria chamada a descoberta continua a ser uma
     // linha comentavel — e comenta-la faz o entry point correr so os testes inline, com
     // exit 0. `zero: true`: o que se afirma e que a descoberta existe em ALGUM sitio, nao

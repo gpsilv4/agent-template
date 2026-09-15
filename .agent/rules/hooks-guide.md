@@ -12,7 +12,7 @@
 > `src/docs/scripts-guide-why.md`.
 
 - **Hooks** (`.claude/hooks/`, **so-Claude Code**): o agente pode esquecer uma regra do `CLAUDE.md`; um hook nao esquece. Saem `0` em tudo excepto na negacao explicita — um hook avariado nunca bloqueia trabalho legitimo. Testes em `.claude/hooks/tests/test-hooks.mjs`.
-  - `guard-protected-branch` (`PreToolUse`/`Bash`) — num branch protegido **permite so os verbos seguros** do `git` e **nega o resto**, incluindo o que nao consegue identificar; force-push cru (`--force`, `-f`, `+refspec`) e `--mirror` sao negados em **qualquer** branch; `--delete` e `:refspec` sao negados quando o **alvo** e um branch protegido — apagar um `fix/...` mergeado e rotina e tem de passar. E um **allowlist** de proposito: a versao com blocklist tinha 32 defeitos medidos — ver `AP6`. Os detalhes que so aparecem quando se mede (a FORMA conta e nao so o verbo; alguns verbos exigem uma forma; so o verbo falha fechado) estao em `src/docs/scripts-guide-why.md`.
+  - `guard-protected-branch` (`PreToolUse`/`Bash`) — num branch protegido **permite so os verbos seguros** do `git` e **nega o resto**, incluindo o que nao consegue identificar; force-push cru (`--force`, `-f`, `+refspec`) e `--mirror` sao negados em **qualquer** branch; `--delete` e `:refspec` sao negados quando o **alvo** e um branch protegido — apagar um `fix/...` mergeado e rotina e tem de passar. E um **allowlist** de proposito: a versao com blocklist tinha 32 defeitos medidos — ver `TP6`. Os detalhes que so aparecem quando se mede (a FORMA conta e nao so o verbo; alguns verbos exigem uma forma; so o verbo falha fechado) estao em `src/docs/scripts-guide-why.md`.
     O alvo vem do `cwd` do payload **e de todos os `-C`/`--git-dir`/`cd`/`pushd` do comando**; sem pista valida cai no `cwd` do hook (lista vazia **permitia**). A tabela `BYPASSES` na suite e a lista viva de formas conhecidas — acrescentar uma quando aparecer. **Nao se escreve o tamanho dela em prosa**: a primeira tentativa dizia 28 quando a tabela tinha 47, e envelheceu no mesmo dia. O numero esta a um `grep -c` de distancia.
   - `session-context` (`SessionStart`) — afirma o estado real (branch, o que esta por commitar, PRs abertos) em vez de o deixar inferir. Deliberadamente **curto**: entra no contexto a cada sessao.
   - `stop-verify` (`Stop`) — diz que suite ficou **em divida** para os ficheiros tocados. Nao corre nada: um hook de fim de turno que corresse suites seria desligado.
@@ -25,7 +25,7 @@
     sobre `.claude/settings.json`, `.claude/hooks/` ou `.githooks/` reescreviam a fronteira
     sem passar por nenhuma das duas — e o `BOOTSTRAP.md` vendia essa linha como "sem ela, o
     agente alarga as proprias permissoes". O hook fecha-o com uma **allowlist dos verbos de
-    leitura**, nao uma blocklist dos de escrita (`AP6`): as formas de escrever em shell nao
+    leitura**, nao uma blocklist dos de escrita (`TP6`): as formas de escrever em shell nao
     sao enumeraveis, as de ler sao poucas. Julga **por segmento** (`;`, `&&`, `|`, `do`) e nao
     pelo primeiro verbo da linha — a primeira versao negava um `for` que corresse a suite dos
     hooks, medido na sessao em que nasceu. O caminho aberto e o `Edit`, que pede aprovacao.
@@ -33,18 +33,18 @@
 
 - **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do hook.
 
-> **O limite da varredura, e o `AP7`.** Ela mede se cada sitio de aviso **existente** e
+> **O limite da varredura, e o `TP7`.** Ela mede se cada sitio de aviso **existente** e
 > observado; **nao** mede se um ramo nunca dispara, nem ve um falso positivo. Um `note()` nao e
 > sitio de aviso, e um `warn()` inalcancavel por construcao passa igualmente — ela nao tem como
 > distinguir "coberto" de "impossivel". Medido: `26/26` no Guard 15 antes **e** depois de fechar
 > um ramo que era codigo morto. O que apanha isto e o **controlo negativo por ramo** — desligar
 > cada metade da correcao, uma por vez, e exigir vermelho em cada uma. Historia completa e as
-> licoes transferiveis em `src/docs/anti-patterns-why.md` (`AP7`).
+> licoes transferiveis em `src/docs/anti-patterns-why.md` (`TP7`).
 
 > **`test-harness.mjs`, `tests-*.mjs` e `.claude/hooks/tests/` nao sao entry points.** Correm
 > por importacao a partir do `test-guards.mjs` (ou do runner dos hooks) e reprovam se alguem os
 > invocar diretamente — um ficheiro chamado `tests-x.mjs` que "passa" sem correr nada e a forma
-> canonica do `AP2`.
+> canonica do `TP2`.
 
 
 - **Simulador de projeto derivado** (`.agent/scripts/simulate-derived.mjs` + `test-simulate-derived.mjs`): monta um projeto derivado (copia, substitui placeholders, gera as rules do bootstrap, aplica o passo 2.8) e corre la os verificadores. E a unica coisa que testa a promessa do template — todas as outras suites correm sobre o template **nu**. **Nao** se chama `check-*` de proposito: orquestra verificadores que ja tem par, e um alvo sem sitios de aviso proprios reprova na descoberta do sweep com `SINAL ERRADO`. Corre no CI em `pull_request` (~50s). O limite esta no cabecalho: simula o **estado** "bootstrap concluido", nao executa a checklist passo a passo.

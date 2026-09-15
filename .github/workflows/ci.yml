@@ -54,7 +54,7 @@ jobs:
             exit 1
           fi
           # Nem na raiz nem em lado nenhum. Depois do bootstrap isso e "nao consegui medir",
-          # nao "esta tudo bem" (AP2) — mas o template puro e exatamente este caso, e ai e
+          # nao "esta tudo bem" (TP2) — mas o template puro e exatamente este caso, e ai e
           # legitimo. O discriminador e a marca de bootstrap.
           if [ -f .agent/.template-version ]; then
             echo "::warning::Projeto bootstrapado sem package.json em lado nenhum — typecheck, lint, build, testes e audit NAO correm."
@@ -240,7 +240,7 @@ jobs:
         run: node .agent/scripts/test-commit-msg.mjs
       - name: Simulador de projeto derivado — negative tests
         run: node .agent/scripts/test-simulate-derived.mjs
-      # A autoridade que o agente nao alcanca (AP4): se a superficie de teste encolher face a
+      # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
       # Os doc guards e o backlog correm **aqui** e nao no job `quality`: aquele tem
@@ -255,7 +255,7 @@ jobs:
       # O `commit-msg` so corre para quem tenha corrido `git config core.hooksPath .githooks`,
       # e isso e configuracao LOCAL: um clone novo, outra maquina ou outra ferramenta nao a
       # tem. Esta e a camada que nao depende dela — corre o mesmo hook sobre cada mensagem do
-      # PR. E o mesmo raciocinio do `AP4`: a autoridade que o agente nao alcanca e o CI.
+      # PR. E o mesmo raciocinio do `TP4`: a autoridade que o agente nao alcanca e o CI.
       # SEM `if:`, e de propósito. `HEAD^1..HEAD` resolve nos dois eventos e o intervalo
       # certo em cada um:
       #   - `pull_request`: o checkout e o merge ref, cujo pai 1 e a base — logo o intervalo
@@ -273,7 +273,7 @@ jobs:
           # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
           # inicial, que nao tem pai — `git rev-parse HEAD^1` sai 128 e, com `set -e`, mata o
           # step. Resultado: o PRIMEIRO CI de cada projeto derivado nascia vermelho, por um
-          # motivo que nao e culpa de quem clona. Isto nao e o AP2: nao e "nao consegui ler",
+          # motivo que nao e culpa de quem clona. Isto nao e o TP2: nao e "nao consegui ler",
           # e "provei que nao ha intervalo".
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
             echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
@@ -283,7 +283,7 @@ jobs:
           # `-z` separa por NUL: uma mensagem tem linhas em branco, logo nao ha separador de
           # linha que sirva. `--no-merges`: o checkout de um PR e o merge ref, logo sem ele o
           # commit de merge gerado pelo GitHub entrava SEMPRE e a contagem dizia mais uma do
-          # que o PR tem — e o ramo `n -eq 0` ficava inalcancavel (AP7).
+          # que o PR tem — e o ramo `n -eq 0` ficava inalcancavel (TP7).
           n=0
           while IFS= read -r -d '' msg; do
             # `RUNNER_TEMP` e nao `/tmp`: num runner self-hosted (que qualquer derivado pode
@@ -296,7 +296,7 @@ jobs:
             n=$((n + 1))
           done < <(git log --no-merges --format='%B%x00' "$base..HEAD")
           echo "  $n mensagem(ns) verificada(s)."
-          # Zero mensagens com um intervalo valido seria o AP2 ("nao ha nada" != "nao consegui
+          # Zero mensagens com um intervalo valido seria o TP2 ("nao ha nada" != "nao consegui
           # ler"), logo reprova em vez de passar em silencio.
           if [ "$n" -eq 0 ]; then
             echo "  Nenhuma mensagem no intervalo $base..HEAD — nao consegui verificar."
@@ -327,7 +327,7 @@ jobs:
           # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
           # inicial, que nao tem pai — `git rev-parse HEAD^1` sai 128 e, com `set -e`, mata o
           # step. Resultado: o PRIMEIRO CI de cada projeto derivado nascia vermelho, por um
-          # motivo que nao e culpa de quem clona. Isto nao e o AP2: nao e "nao consegui ler",
+          # motivo que nao e culpa de quem clona. Isto nao e o TP2: nao e "nao consegui ler",
           # e "provei que nao ha intervalo".
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
             echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."

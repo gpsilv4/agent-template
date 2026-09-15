@@ -29,7 +29,7 @@ import { TETOS } from "./guards/sizes.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
-// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// "passa" sem correr nada e a forma canonica do TP2 ("zero resultados lido como zero
 // problemas"). Achado do leitor independente (Fase 4).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -306,14 +306,17 @@ function syntheticSandbox() {
     // guard varre os `.agent/scripts/` — incluindo-se a si mesmo. A lista e **derivada** do
     // ficheiro real, para nao envelhecer quando se acrescentar um anti-padrao novo.
     if (r === "anti-patterns") {
-      // Os DOIS ficheiros de definicoes: as entradas do template mudaram-se para o
-      // `anti-patterns-template.md` (nao carregado), e derivar so do primeiro dava todas as
-      // citacoes dos scripts como mortas na fixture "limpa por construcao".
-      const real = [".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"]
-        .map((f) => (existsSync(join(ROOT, f)) ? readFileSync(join(ROOT, f), "utf8") : ""))
-        .join("\n");
-      const entradas = [...real.matchAll(/^#{2,3}\s+(AP\d+\b.*)$/gm)].map((m) => `## ${m[1]}`);
-      w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n\n${entradas.join("\n\n")}\n`);
+      // Os DOIS ficheiros de definicoes, **cada um com o seu prefixo**: `TP` no do template,
+      // `AP` no do projeto. Derivar so do primeiro dava todas as citacoes dos scripts como
+      // mortas na fixture "limpa por construcao"; despeja-las todas no do projeto punha os
+      // `TPn` definidos no ficheiro errado, e a fixture "limpa" passava a ensinar ao contrario
+      // do que o guard reprova.
+      for (const [f, pre] of [["anti-patterns.md", "AP"], ["anti-patterns-template.md", "TP"]]) {
+        const alvo = `.agent/rules/${f}`;
+        const real = existsSync(join(ROOT, alvo)) ? readFileSync(join(ROOT, alvo), "utf8") : "";
+        const entradas = [...real.matchAll(new RegExp(`^#{2,3}\\s+(${pre}\\d+\\b.*)$`, "gm"))].map((m) => `## ${m[1]}`);
+        w(alvo, `# ${f}\n\nConteudo minimo.\n\n${entradas.join("\n\n")}\n`);
+      }
       continue;
     }
     w(`.agent/rules/${r}.md`, `# ${r}\n\nConteudo minimo.\n`);

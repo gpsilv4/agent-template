@@ -109,7 +109,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > `anti-patterns.md` define, para cada entrada, um **`grep` de detecao "para o /review"**.
 > Este e o passo que os corre — sem ele, esse campo nao tem consumidor.
 
-- [ ] Correr os `grep` de detecao de **cada entrada** dos **dois** ficheiros: `.agent/rules/anti-patterns.md` (vazio no template nu) e `.agent/rules/anti-patterns-template.md` (`AP1`-`AP7`). Varrer so o primeiro e correr zero greps e marcar a caixa sobre o diff
+- [ ] Correr os `grep` de detecao de **cada entrada** dos **dois** ficheiros: `.agent/rules/anti-patterns.md` (vazio no template nu) e `.agent/rules/anti-patterns-template.md` (`TP1`-`TP7`). Varrer so o primeiro e correr zero greps e marcar a caixa sobre o diff
 - [ ] Algum achado -> corrigir, ou justificar por escrito porque nao se aplica
 - [ ] Duvida sobre o que uma deteccao apanha, ou porque a entrada existe? -> `src/docs/anti-patterns-why.md`
       (evidencia e receitas por inteiro; **nao** carregado, abrir so quando faz falta)
@@ -144,7 +144,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`, `.claude/hooks/` ou `.githooks/`): as **nove** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte) — sem eles, um guard partido parece um guard a passar
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
-- [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `AP4`)
+- [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `TP4`)
 
 ## 11. Leitor Independente (Fase 4)  — a partir de `L`
 

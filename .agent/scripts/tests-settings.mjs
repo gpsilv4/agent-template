@@ -13,7 +13,7 @@ import { test, file, readF, writeF, patchSettings, GUARD, GUARD_MODULES } from "
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
-// "passa" sem correr nada e a forma canonica do AP2 ("zero resultados lido como zero
+// "passa" sem correr nada e a forma canonica do TP2 ("zero resultados lido como zero
 // problemas"). Achado do leitor independente (Fase 4).
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -43,7 +43,7 @@ test("G11: deny de .env retirado por completo avisa", (dir) => {
 
 // Achado do leitor independente (Fase 4), confirmado pela varredura: este era o UNICO
 // sitio de aviso do guard que podia ser desligado com a suite verde (20/21) — e e o que
-// impoe o "perguntar primeiro" do CLAUDE.md. Causa: AP1. O teste acima esvazia o `deny`
+// impoe o "perguntar primeiro" do CLAUDE.md. Causa: TP1. O teste acima esvazia o `deny`
 // E o `ask` ao mesmo tempo, e o `includes` era satisfeito pelos flags do deny, logo o
 // `askCovers` desligado passava invisivel. Este esvazia SO o `ask`.
 // Achado do leitor independente (Fase 4): a lista de prefixos "fora do projeto" enumerava
@@ -135,7 +135,7 @@ test("G11: `allow` que nao e array nao rebenta nem imprime o OK tranquilizador",
   patchSettings(dir, (c) => (c.permissions.allow = {}));
   // O `excludes` do OK e o que importa: sem ele este teste passava com o guard a dizer
   // "allow sem concessoes largas" logo abaixo do WARN — a unica frase impossivel, porque
-  // o `asList` devolveu [] e o loop que analisa o allow nunca correu (AP1).
+  // o `asList` devolveu [] e o loop que analisa o allow nunca correu (TP1).
 }, { code: 1,
      includes: ["devia ser um array"],
      excludes: ["is not iterable", "allow sem concessoes largas"] });
@@ -219,7 +219,7 @@ for (const rule of [
 }
 
 // Ramos acrescentados na ronda 5 — descobertos pela varredura de mutacao, que revelou
-// que eu os tinha escrito sem teste (o proprio AP1 a acontecer).
+// que eu os tinha escrito sem teste (o proprio TP1 a acontecer).
 test("G11: caminho fora do projeto e apanhado", (dir) => {
   patchSettings(dir, (c) => c.permissions.allow.push("Bash(cat ~/.ssh/id_rsa)"));
 }, { code: 1, synthetic: true, includes: ["fora do projeto"] });

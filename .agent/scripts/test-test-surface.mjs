@@ -103,7 +103,7 @@ test("glob: suite nomeada tests-x.mjs (plural) tambem", (dir) => {
   return ref;
 }, { code: 1, includes: ["tests-settings.mjs", "APAGADO"] });
 
-// --- Esvaziar nao deixa marca de `skip` para tras (invariante 5 do AP4) -------
+// --- Esvaziar nao deixa marca de `skip` para tras (invariante 5 do TP4) -------
 
 test("contagem: casos de teste apagados sem nenhuma marca reprovam", (dir) => {
   writeFileSync(join(dir, "tests/exemplo.test.js"), "// suite esvaziada, sem skip nenhum\n");
@@ -133,7 +133,7 @@ test("arvore: apagar um teste SEM commitar e detetado", (dir) => {
 // --- O dia 1 de um projeto DERIVADO ------------------------------------------
 // Um clone tem o branch de trabalho e `origin/main`, mas nao `main` LOCAL. Sem os candidatos
 // remote-tracking o verificador nao conseguia medir e saia `!= 0` em todo o projeto derivado
-// — verde no template, vermelho no consumidor. E o `AP3`.
+// — verde no template, vermelho no consumidor. E o `TP3`.
 
 test("derivado: sem main LOCAL mas com origin/main, consegue medir", (dir) => {
   // Simular um clone: renomear o branch e criar o ref remoto a apontar para a baseline.
@@ -238,7 +238,7 @@ test("nao consegue medir: detached HEAD diz o que se passa, nao culpa a baseline
 test("as MARCAS nao se aplicam ao ficheiro que as define", (dir) => {
   // A entrada nova vai como CODIGO e nao como comentario. A primeira versao deste teste
   // punha-a num comentario, e o contador tira comentarios antes de medir: ficava verde com a
-  // exclusao ligada **e** desligada — nao afirmava nada, que e o `AP1`. Apanhado pelo
+  // exclusao ligada **e** desligada — nao afirmava nada, que e o `TP1`. Apanhado pelo
   // controlo negativo, nao pela leitura.
   writeFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"),
     readFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"), "utf8") +
@@ -254,7 +254,7 @@ test("esvaziar as tabelas de padroes REPROVA (as CONTAGENS aplicam-se)", (dir) =
 }, { code: 1, includes: ["surface-patterns.mjs"] });
 
 // --- Mover != apagar: o invariante e sobre o TOTAL --------------------------------
-// O `AP4` diz "a contagem de testes nao desce" — a contagem, ou seja o total da superficie. A
+// O `TP4` diz "a contagem de testes nao desce" — a contagem, ou seja o total da superficie. A
 // comparacao era so por ficheiro, e por isso punia uma **extracao**: mover testes para um
 // modulo novo, que e o que o `core-rules.md` manda fazer acima das 500 linhas, lia-se como
 // perda no ficheiro de origem e fechava o gate. Um gate que reprova a limpeza que o projeto
@@ -323,7 +323,7 @@ test("workflow COM steps de teste continua a ser medido por contagem", (dir) => 
 // Movidas para `tests-surface-marks.mjs`: sao as mais numerosas e passavam este ficheiro do
 // flag das 500 linhas. Registadas no fim.
 
-// --- O AP2 aplicado ao proprio verificador -----------------------------------
+// --- O TP2 aplicado ao proprio verificador -----------------------------------
 test("TEST_GLOBS que nao casam nada na baseline REPROVAM, em vez de dizer intacta", (dir) => {
   const p = join(dir, ".agent/scripts/check-test-surface.mjs");
   const s = readFileSync(p, "utf8");
@@ -335,7 +335,7 @@ test("TEST_GLOBS que nao casam nada na baseline REPROVAM, em vez de dizer intact
 test("nao consegue medir: arvore da baseline ausente REPROVA", (dir) => {
   // O commit resolve (`rev-parse --verify` le o objeto commit) mas o `ls-tree` precisa da
   // ARVORE. Apagar o objeto solto da arvore separa "nao ha superficie" de "nao consegui
-  // ler" — a distincao que o `AP2` exige.
+  // ler" — a distincao que o `TP2` exige.
   const tree = git(dir, ["rev-parse", "HEAD^{tree}"]);
   rmSync(join(dir, ".git/objects", tree.slice(0, 2), tree.slice(2)), { force: true });
   return "HEAD";
@@ -414,7 +414,7 @@ test("apostrofo num comentario nao dessincroniza a contagem", (dir) => {
   return ref;
 }, { code: 0 });
 
-// AP4: descoberta em disco, nao chamada a mao. Ver `lib/registo.mjs`.
+// TP4: descoberta em disco, nao chamada a mao. Ver `lib/registo.mjs`.
 const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-test-surface.mjs",

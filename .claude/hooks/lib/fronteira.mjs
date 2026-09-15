@@ -7,7 +7,7 @@
  * passar por nenhuma das duas ferramentas — e o `BOOTSTRAP.md` vendia essa linha como "sem
  * ela, o agente alarga as proprias permissoes". Vendia mais do que entregava.
  *
- * DESENHO: **allowlist dos verbos de leitura**, nao blocklist dos de escrita (`AP6`). As
+ * DESENHO: **allowlist dos verbos de leitura**, nao blocklist dos de escrita (`TP6`). As
  * formas de escrever um ficheiro em shell nao sao enumeraveis — redireccao, `tee`, `sed -i`,
  * `perl -i`, `mv`, `cp`, `dd`, `install`, um interpretador qualquer. As de LER sao poucas.
  *

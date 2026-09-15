@@ -130,8 +130,8 @@ gh pr create --fill     # then merge once CI is green
 │                                 propagation, ticket-method, mcp-policy
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
-│   ├── anti-patterns.md        <- Bug-derived anti-patterns + review greps (loaded)
-│   ├── anti-patterns-template.md <- AP1-AP7: the template's own machinery (NOT loaded)
+│   ├── anti-patterns.md        <- YOUR anti-patterns (prefix AP, starts free) + greps (loaded)
+│   ├── anti-patterns-template.md <- TP1-TP7: the template's own machinery (NOT loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
@@ -174,14 +174,14 @@ gh pr create --fill     # then merge once CI is green
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed (bilingual)
     │   ├── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
-    │   ├── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (AP7)
+    │   ├── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (TP7)
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
     │   └── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
     ├── lib/
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
     │   └── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
-    ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (AP4)
+    ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear
     ├── test-test-surface.mjs   <- Negative tests for it (real git repos as fixtures)
     ├── test-surface-harness.mjs<- Its sandbox (a real git repo) + test() + summary
@@ -232,7 +232,7 @@ gh pr create --fill     # then merge once CI is green
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
 │       └── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
 │                                      the branch guard, plus the legitimate commands
-│                                      it must NOT block (AP6)
+│                                      it must NOT block (TP6)
 └── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
 
 .githooks/                      <- Versioned git hooks (tool-independent)

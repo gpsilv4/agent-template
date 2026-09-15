@@ -21,7 +21,7 @@
 // a DESLIGAR sem quebrar a sintaxe.
 //
 // O que isto mede, exatamente: se **algum teste nota a falta daquele aviso**. Para os pares
-// `warn(`/`flag(` o `neutro` faz a mensagem DESAPARECER — nao e a variante do `AP1` em que a
+// `warn(`/`flag(` o `neutro` faz a mensagem DESAPARECER — nao e a variante do `TP1` em que a
 // mensagem fica e so o gate cai (`warn(` -> `note(`). Nestes verificadores as duas coisas sao
 // o mesmo mecanismo (`hasWarnings`/`warnings`), logo a distincao nao e explorável aqui; mas
 // nao se deve ler a varredura como prova de que o VEREDICTO esta afirmado, so a mensagem.
@@ -87,7 +87,7 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
-    // A seleccao do runner (AP4, invariante 2). Vive em `lib/` e nao em `guards/` porque
+    // A seleccao do runner (TP4, invariante 2). Vive em `lib/` e nao em `guards/` porque
     // nao e um guard de documentacao — mas tem sitios de recusa, logo tem de ter rede.
     alvo: ".agent/scripts/lib/registo.mjs",
     suite: ".agent/scripts/test-registo.mjs",

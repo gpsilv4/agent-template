@@ -11,7 +11,7 @@
  *     secret versionado, e o `.mcp.json` do repo e partilhado com quem clona;
  *   - servidor sem linha na tabela "Servidores aprovados" de `.agent/rules/mcp-policy.md` —
  *     e o que impede um servidor de entrar sem alguem ter respondido as perguntas da politica;
- *   - JSON invalido: "nao consegui ler" != "nao ha nada" (`AP2`).
+ *   - JSON invalido: "nao consegui ler" != "nao ha nada" (`TP2`).
  *
  * NO TEMPLATE NU NAO HA `.mcp.json`, logo isto salta com `SKIP` visivel. E por desenho: a
  * regra so tem trabalho a partir do primeiro servidor que o projeto derivado acrescente. Um
@@ -28,7 +28,7 @@
  *
  *  Cobrir so o `.mcp.json` era um **alvo estreito**: a politica declara-se para todos os
  *  agentes, e bastava o servidor entrar pelo ficheiro do Cursor, do VS Code ou do Gemini para
- *  o guard dizer `SKIP` e nao ver nada. Um allowlist de um item numa familia de quatro (AP6).
+ *  o guard dizer `SKIP` e nao ver nada. Um allowlist de um item numa familia de quatro (TP6).
  *
  *  `chave`: o VS Code chama-lhe `servers`, os restantes `mcpServers`.
  *  `dedicado`: o ficheiro existe SO para MCP. Num ficheiro de definicoes gerais
@@ -117,7 +117,7 @@ export function guardMcp({ read, warn, ok, skip }) {
     try {
       cfg = JSON.parse(bruto);
     } catch (err) {
-      // "Nao consegui ler" != "esta bem" (AP2).
+      // "Nao consegui ler" != "esta bem" (TP2).
       warn(`${m.f}: JSON invalido (${err.message}) — nao consegui validar a politica MCP`);
       problemas++;
       ilegiveis++;
@@ -158,7 +158,7 @@ export function guardMcp({ read, warn, ok, skip }) {
     // seccao `inputs` que existe precisamente para valores sensiveis, e o
     // `.gemini/settings.json` traz definicoes de tudo; um token colado la passava sem uma
     // palavra enquanto a linha de sucesso dizia "sem segredos literais, em <ficheiro>" — a
-    // afirmar sobre o ficheiro tendo lido uma chave (`AP1`). A validacao de APROVACAO
+    // afirmar sobre o ficheiro tendo lido uma chave (`TP1`). A validacao de APROVACAO
     // continua restrita ao bloco de servidores, que e onde os nomes vivem.
     for (const [caminho, valor] of valores(cfg)) {
       if (REFERENCIA_AO_AMBIENTE.test(valor)) continue;

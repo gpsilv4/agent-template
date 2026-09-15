@@ -37,16 +37,60 @@ export function registar() {
   // quer. (Excluir as suites da varredura era a alternativa, e perdia dez citacoes legitimas
   // que vivem nelas — medido.)
   const AP_INEXISTENTE = "AP" + "99";
+  /** O mesmo, no prefixo do TEMPLATE. Os dois prefixos sao lidos pela MESMA alternativa no
+   *  guard, e um teste so por um deixava metade dela por medir: tirar `TP` da alternativa
+   *  apagava de uma vez as definicoes E as citacoes, logo nenhuma citacao ficava "morta" e o
+   *  unico sinal era um SKIP onde devia estar um OK — que nenhuma assercao daqui via. */
+  const TP_INEXISTENTE = "TP" + "99";
+
+  /** Os DOIS ficheiros de definicoes, na ordem do guard: o do projeto (`APn`) e o do template
+   *  (`TPn`). Escritos aqui uma vez porque varias fixtures os precisam, e uma copia
+   *  desatualizada em qualquer uma delas passaria a medir o ficheiro errado em silencio. */
+  const DEF_PROJETO = ".agent/rules/anti-patterns.md";
+  const DEF_TEMPLATE = ".agent/rules/anti-patterns-template.md";
+
+  /** Esvazia o ficheiro de definicoes do TEMPLATE. As fixtures que montam o do projeto a mao
+   *  precisam dele fora do caminho: com os `TPn` ainda definidos, um cabecalho `TPn` escrito
+   *  pela fixture e uma COLISAO legitima, e o teste passava a medir a colisao em vez do ramo
+   *  que diz medir. */
+  const semDefinicoesDoTemplate = (dir) => writeF(dir, DEF_TEMPLATE, "# Anti-Padroes do template\n");
+
+  /** Os dois ficheiros como lista, para as fixtures que tratam os dois por igual. */
+  const DEFINICOES = [DEF_PROJETO, DEF_TEMPLATE];
+
+  /** Os mesmos padroes que o guard usa (`guards/anti-patterns.mjs`), com o prefixo capturado
+   *  a parte para a fixture o poder preservar. Se divergirem, as fixtures deixam de neutralizar
+   *  — ou de preservar — exactamente o que o guard le, e os testes medem outro ficheiro. */
+  const CABECALHO = /^#{2,3}\s+(?:AP|TP)\d+\b/;
+  const CITACAO = /\b(AP|TP)(\d+)\b/g;
+  /** O MESMO padrao sem o `g`, e so para perguntar "ha alguma?". Um `.test()` sobre a versao
+   *  global avanca o `lastIndex` entre chamadas e alterna entre verdadeiro e falso no mesmo
+   *  texto — a fixture saltava um ficheiro sim, um ficheiro nao, e o que ficasse por
+   *  neutralizar nao dava erro nenhum: dava um teste verde a medir menos do que promete. */
+  const TEM_CITACAO = /\b(?:AP|TP)\d+\b/;
   test("G15: citacao de um anti-padrao que nao existe avisa", (dir) => {
     const f = ".agent/rules/core-rules.md";
     writeF(dir, f, readF(dir, f) + `\n> Ver ${AP_INEXISTENTE} para o detalhe.\n`);
   }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
 
+  test("G15: citacao morta no prefixo do TEMPLATE tambem avisa", (dir) => {
+    const f = ".agent/rules/core-rules.md";
+    writeF(dir, f, readF(dir, f) + `\n> Ver ${TP_INEXISTENTE} para o detalhe.\n`);
+  }, { code: 1, includes: [`cita ${TP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
+
   test("G15: entrada escrita com `###` tambem conta como definida", (dir) => {
     // Tolerancia aos dois niveis: as entradas deste repo usam `##`, um derivado pode usar
     // `###`, e o guard nao pode passar a dizer que o anti-padrao desapareceu por isso.
-    const f = ".agent/rules/anti-patterns.md";
-    writeF(dir, f, readF(dir, f).replace(/^## AP/gm, "### AP"));
+    //
+    // O ficheiro e o do TEMPLATE, que e onde as definicoes vivem. Apontado ao do projeto —
+    // que num template por estrear nao tem cabecalho nenhum — o `replace` nao casava nada: a
+    // fixture nao mexia em ficheiro algum e o `code: 0` era satisfeito pelo repo intacto. Um
+    // teste que passa sem alterar nada nao mede nada.
+    const f = DEF_TEMPLATE;
+    const antes = readF(dir, f);
+    const depois = antes.replace(/^## TP/gm, "### TP");
+    if (depois === antes) throw new Error(`${f} sem cabecalhos de definicao — a fixture nao alterou nada`);
+    writeF(dir, f, depois);
   }, { code: 0, excludes: ["nao existe em nenhum dos ficheiros de anti-padroes"] });
 
   test("G15: sem anti-patterns.md da SKIP visivel, nao silencio", (dir) => {
@@ -63,7 +107,7 @@ export function registar() {
   /** Percorre a fixture e aplica `transformar` aos ficheiros que `inclui` aceita. O varrimento
    *  e DERIVADO da fixture e nao uma lista escrita a mao: o Guard 15 varre os proprios
    *  `.agent/scripts/`, logo quem cita anti-padroes nos comentarios e o guard sob teste, e uma
-   *  lista fixa aqui envelhecia no primeiro ficheiro novo da fixture — o `AP1`.
+   *  lista fixa aqui envelhecia no primeiro ficheiro novo da fixture — o `TP1`.
    *
    *  `transformar` a devolver `null` significa "so ler": e assim que se deriva o conjunto de
    *  anti-padroes citados sem escrever nada.
@@ -77,14 +121,13 @@ export function registar() {
    *  Os cabecalhos de DEFINICAO do `anti-patterns.md` ficam intactos: sem eles o guard cai no
    *  SKIP legitimo em vez do ramo que se quer medir. */
   function andarFixture(dir, inclui, transformar) {
-    const AP = ".agent/rules/anti-patterns.md";
     const neutralizar = (c, sub) =>
       c
         .split("\n")
         .map((l) =>
-          sub === AP && /^#{2,3}\s+AP\d+\b/.test(l)
+          DEFINICOES.includes(sub) && CABECALHO.test(l)
             ? l
-            : l.replace(/\bAP(\d+)\b/g, (_, n) => "AP" + "x".repeat(n.length))
+            : l.replace(CITACAO, (_, pre, n) => pre + "x".repeat(n.length))
         )
         .join("\n");
     const anda = (rel) => {
@@ -98,7 +141,7 @@ export function registar() {
         if (!/\.(?:md|mjs|json|toml)$/.test(e.name)) continue;
         if (!inclui(sub)) continue;
         const c = readF(dir, sub);
-        if (!/\bAP\d+\b/.test(c)) continue;
+        if (!TEM_CITACAO.test(c)) continue;
         const novo = transformar ? transformar(c, sub) : neutralizar(c, sub);
         if (novo !== null && novo !== c) writeF(dir, sub, novo);
       }
@@ -122,20 +165,23 @@ export function registar() {
   /** Escreve um `anti-patterns.md` que DEFINE tudo o que o codigo da fixture cita. Derivado da
    *  fixture, nao do repo: herdar as definicoes do `anti-patterns.md` real tornava a assercao
    *  falsa num projeto que ainda nao escreveu anti-padroes (o que o proprio ficheiro autoriza
-   *  por escrito) — verde aqui, vermelho no consumidor. E o `AP3`. */
+   *  por escrito) — verde aqui, vermelho no consumidor. E o `TP3`. */
   const definicoesQueOCodigoCita = (dir) => {
     const citados = new Set();
     andarFixture(dir, (sub) => ehCodigo(sub), (c) => {
-      for (const m of c.matchAll(/\bAP(\d+)\b/g)) citados.add(m[1]);
+      for (const m of c.matchAll(CITACAO)) citados.add(m[0]);
       return null; // so ler
     });
-    const entradas = [...citados].sort((a, b) => Number(a) - Number(b));
-    writeF(
-      dir,
-      ".agent/rules/anti-patterns.md",
-      `# Anti-Padroes\n\n${entradas.map((n) => `## AP${n} — montado pela fixture`).join("\n\n")}\n`
-    );
-    return entradas.length;
+    // Cada ID no ficheiro do SEU prefixo. Escritos todos no mesmo, os `TPn` ficavam definidos
+    // duas vezes (aqui e no ficheiro do template) e o guard reprovava por COLISAO — o teste
+    // media a colisao em vez do ramo que diz medir, e a verde nao se distinguia uma da outra.
+    for (const [pre, ficheiro] of [["AP", DEF_PROJETO], ["TP", DEF_TEMPLATE]]) {
+      const ids = [...citados]
+        .filter((i) => i.startsWith(pre))
+        .sort((a, b) => Number(a.slice(2)) - Number(b.slice(2)));
+      writeF(dir, ficheiro, `# Anti-Padroes\n\n${ids.map((i) => `## ${i} — montado pela fixture`).join("\n\n")}\n`);
+    }
+    return citados.size;
   };
 
   test("G15: catalogo que a documentacao ignora da NOTE (o ramo que era codigo morto)", (dir) => {
@@ -164,16 +210,17 @@ export function registar() {
   //
   // A citacao que importa e a da PROSA dentro do comentario, nao o cabecalho: o cabecalho ja
   // e excluido pela outra correcao, e um teste que so o exercitasse ficava verde com o strip
-  // de comentarios desligado — satisfeito por outra verificacao, que e o `AP1`.
+  // de comentarios desligado — satisfeito por outra verificacao, que e o `TP1`.
   test("G15: exemplo ilustrativo dentro de `<!-- -->` nao e citacao nem definicao", (dir) => {
     semCitacoesAP(dir);
-    writeF(dir, ".agent/rules/anti-patterns.md", [
+    semDefinicoesDoTemplate(dir);
+    writeF(dir, DEF_PROJETO, [
       "# Anti-Padroes",
       "",
-      "<!-- Exemplo (substituir/remover no bootstrap). O AP1 abaixo e ilustrativo e nao uma",
+      "<!-- Exemplo (substituir/remover no bootstrap). O TP1 abaixo e ilustrativo e nao uma",
       "     definicao deste projeto; a prosa deste comentario cita-o, como no template.",
       "",
-      "## AP1 — Um anti-padrao qualquer",
+      "## TP1 — Um anti-padrao qualquer",
       "",
       "- **Origem**: nenhuma, e exemplo",
       "-->",
@@ -211,10 +258,11 @@ export function registar() {
   // o teste caia no SKIP em vez de medir o que diz medir.
   test("G15: `<!--` sem fecho comenta ate ao fim do ficheiro", (dir) => {
     semCitacoesAP(dir);
-    writeF(dir, ".agent/rules/anti-patterns.md", [
+    semDefinicoesDoTemplate(dir);
+    writeF(dir, DEF_PROJETO, [
       "# Anti-Padroes",
       "",
-      "## AP1 — entrada montada pela fixture",
+      "## TP1 — entrada montada pela fixture",
       "",
       "<!-- Exemplo por remover. A linha de fecho foi apagada a mao, logo daqui para baixo",
       "     esta tudo comentado — incluindo a citacao morta da linha seguinte.",
@@ -253,21 +301,29 @@ export function registar() {
   }, { code: 1, includes: [`cita ${AP_INEXISTENTE}`, "nao existe em nenhum dos ficheiros de anti-padroes"] });
 
   // --- COLISAO entre os dois ficheiros de anti-padroes ------------------------
-  // A separacao (template vs projeto) resolveu o orcamento de bytes, mas a leitura unia os
-  // dois sem verificar numeros repetidos — e ai uma citacao "resolve" para a entrada errada.
-  // Pior que uma referencia morta: a morta denuncia-se, esta confirma uma leitura que nao e a
-  // do autor. Medido num derivado real, com QUATRO numeros duplicados.
-  test("G15: o mesmo APn definido nos DOIS ficheiros avisa", (dir) => {
-    const f = ".agent/rules/anti-patterns.md";
-    writeF(dir, f, readF(dir, f) + "\n### AP1 — anti-padrao proprio deste projeto\n\nTexto.\n");
-  }, { code: 1, includes: ["AP1 esta definido em", "resolve, mas para qual?"] });
+  // Os prefixos separados (`TP` do template, `AP` do projeto) tornaram impossivel a forma
+  // original desta colisao — o projeto a gastar um numero que o template ja usava. O que
+  // sobra, e o que estes dois testes guardam, e a entrada escrita no ficheiro do prefixo
+  // ERRADO: e o que um `/upgrade` desatento faz ao acrescentar em vez de substituir.
+  test("G15: uma entrada `TPn` escrita no ficheiro do PROJETO avisa", (dir) => {
+    writeF(dir, DEF_PROJETO, readF(dir, DEF_PROJETO) + "\n### TP1 — copiada para o ficheiro errado\n\nTexto.\n");
+  }, { code: 1, includes: ["TP1 esta definido em", "resolve, mas para qual?"] });
 
-  // O contra-caso: um numero que so existe num dos ficheiros nao e colisao. Sem ele, um guard
-  // que avisasse de TODOS os numeros passaria o teste acima.
-  test("G15: APn so num dos ficheiros NAO e colisao", (dir) => {
-    const f = ".agent/rules/anti-patterns.md";
-    // Construido em pedacos, como o `AP_INEXISTENTE` acima: escrito por extenso, este
-    // ficheiro passaria a CITAR um numero que nao existe e o Guard 15 reprovava-o — e foi
-    // exactamente o que aconteceu ao escrever este teste.
-    writeF(dir, f, readF(dir, f) + `\n### ${AP_INEXISTENTE} — anti-padrao proprio, numero livre\n\nTexto.\n`);
-  }, { code: 0, excludes: ["esta definido em"] });}
+  // O CONTRA-CASO, e o que a separacao de prefixos existe para garantir: o projeto a definir o
+  // SEU primeiro anti-padrao, ao lado dos sete do template, nao e colisao nenhuma. Antes dos
+  // prefixos este mesmo cenario reprovava, e era preciso ir procurar o proximo numero livre.
+  //
+  // Construido em pedacos, como o `AP_INEXISTENTE` acima: escrito por extenso, este ficheiro
+  // passaria a CITAR um ID que o template nu nao define e o Guard 15 reprovava-o — foi
+  // exactamente o que aconteceu ao escrever o teste original.
+  //
+  // A fixture DEFINE **e** CITA: sem a citacao, o teste continuava verde com o guard a nao ler
+  // sequer os cabecalhos do prefixo do projeto (nada por resolver, nada por colidir), e era
+  // precisamente esse o ramo que ele existe para cobrir. Com ela, deixar de ler as definicoes
+  // do projeto torna a citacao morta e o teste vermelho.
+  test("G15: o projeto a definir e citar o seu primeiro `APn` NAO e colisao", (dir) => {
+    const idProprio = "AP" + "1";
+    writeF(dir, DEF_PROJETO, readF(dir, DEF_PROJETO) + `\n### ${idProprio} — o primeiro deste projeto\n\nTexto.\n`);
+    const doc = ".agent/rules/core-rules.md";
+    writeF(dir, doc, readF(dir, doc) + `\n> Ver ${idProprio} para o detalhe.\n`);
+  }, { code: 0, excludes: ["esta definido em", "nao existe em nenhum dos ficheiros de anti-padroes"] });}

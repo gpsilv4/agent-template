@@ -30,7 +30,7 @@ na copia.
 
 Um SKIP nao e um achado, e exigir um teste por cada um seria estreito de mais para o valor.
 Mas a regra que este repo repete em dezenas de comentarios e **"todo o skip e visivel"**: um
-guard que deixa de ANUNCIAR que nao correu e o `AP2` em forma pura, e nada media se isso era
+guard que deixa de ANUNCIAR que nao correu e o `TP2` em forma pura, e nada media se isso era
 possivel. O modo `--skips` mede — fora do CI, corrido a mao ao mexer nos guards.
 
 

@@ -64,7 +64,7 @@ const CONTAGENS = [
   // A forma mais eficaz de enfraquecer TODAS as suites de uma vez nao move nenhuma das
   // contagens acima: trocar `if (failures.length) {` por `if (false) {` no harness desliga o
   // veredicto e todas as suites passam a sair 0 para sempre. Medido: o gate dizia "sem marcas
-  // de enfraquecimento" e saia 0. E o invariante 1 do `AP4` ("o veredicto assenta no exit code
+  // de enfraquecimento" e saia 0. E o invariante 1 do `TP4` ("o veredicto assenta no exit code
   // do runner"), que este verificador nao protegia.
   // `zero: true` — so conta como enfraquecimento se chegar a **zero**, nao se apenas descer.
   // Consolidar tres `console.log` + `process.exit(1)` num helper faz a contagem cair de 3 para
@@ -79,14 +79,14 @@ const CONTAGENS = [
   { re: /\b(?:failures|falhas|problemas)\.length/, msg: "referencias a contagem de falhas" },
   // Os proprios verificadores estao na superficie (ver `CONFIG_CONTAVEIS`): despromover um
   // `warn(` a `note(` num guard desliga o gate sem mudar o exit code de nenhum teste — a
-  // variante do `AP1` que este repo documenta.
+  // variante do `TP1` que este repo documenta.
   { re: /\b(?:warn|fatal)\s*\(/, msg: "sitios de aviso" },
   // A mesma ideia do lado dos HOOKS: o que eles tem nao e um `warn(`, e uma decisao de
   // negacao. Reduzir o numero de negacoes no `guard-protected-branch.mjs` enfraquece a rede
   // sem que nenhum teste tenha de ser tocado. `cru` porque a chave e um literal e o
   // `semStrings` apagava-a.
   { re: /permissionDecision\s*:\s*["']deny["']/, msg: "decisoes de negacao dos hooks", cru: true },
-  // O invariante 2 do `AP4` ("estreitar a seleccao do runner") na forma que ESTE repo tem.
+  // O invariante 2 do `TP4` ("estreitar a seleccao do runner") na forma que ESTE repo tem.
   // Os entry points chamavam cada modulo `tests-*.mjs` a mao; comentar uma dessas linhas
   // levava `test-hooks.mjs` de 156 para 39 testes com exit 0 e "todos passaram" — medido
   // numa auditoria. A seleccao passou a ser DESCOBERTA em disco (`lib/registo.mjs`), o que

@@ -52,7 +52,7 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     ".github/pull_request_template.md",
     // Estes dois entram nos alvos DE PROPOSITO: sem eles na lista, o filtro `DOCUMENTAM`
     // nunca corria (0 execucoes em 146 testes) e o teste que dizia cobri-lo passava porque
-    // os ficheiros nunca eram lidos — AP1. Agora o filtro e que os exclui, e isso e testavel.
+    // os ficheiros nunca eram lidos — TP1. Agora o filtro e que os exclui, e isso e testavel.
     ".agent/BOOTSTRAP.md",
     "README.md",
     // Pontos de entrada que o Copilot e o Cursor carregam. Nao estavam aqui quando foram

@@ -48,7 +48,7 @@
 >
 > **Prioridade nao se escreve aqui nem no sprint.** No sprint, a `Ordem` **e** a prioridade;
 > uma coluna de urgencia ao lado dela seriam dois campos a ter de concordar a mao, sem nada a
-> verifica-los — e ao primeiro reordenar o documento passa a mentir (ver `AP1`). Nesta tabela
+> verifica-los — e ao primeiro reordenar o documento passa a mentir (ver `TP1`). Nesta tabela
 > nao ha ordem porque a decisao ainda nao foi tomada: o que falta e a **razao**, nao um rotulo.
 
 | ID | Descricao | Esforco | Nota |

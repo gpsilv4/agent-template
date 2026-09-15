@@ -17,7 +17,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-// Fonte unica da descoberta de suites (AP4). O caminho atravessa arvores de proposito:
+// Fonte unica da descoberta de suites (TP4). O caminho atravessa arvores de proposito:
 // duplicar a logica aqui era exactamente o que o `sync-docs` proibe.
 import { registaDescobertos, resumoDescoberta } from "../../../.agent/scripts/lib/registo.mjs";
 
@@ -414,7 +414,7 @@ test("stop: a divida sub-reportada era silenciosa — reporta os DOIS ficheiros"
   }
 });
 
-// --- Caminhos que o porcelain CITA (AP5, segunda cara) -------------------------
+// --- Caminhos que o porcelain CITA (TP5, segunda cara) -------------------------
 // Sem `-z`, o git devolve `?? ".agent/scripts/guards/caf\303\251.mjs"` — com aspas e escapes
 // octais. O `slice(3)` entregava essa string ao matcher, nenhuma regra casava, e a divida
 // desaparecia em silencio. Medido: o hook via 1 de 3 ficheiros. Num template escrito em
@@ -481,7 +481,7 @@ function comPrompt(texto) {
 // A versao anterior deste corpus foi escrita a partir das frases de um revisor — logo testava
 // o que a implementacao ja fazia. Uma auditoria independente mediu o espaco de entrada a
 // serio: **14 de 15** frases de conversa normal disparavam, e **6 de 6** ordens reais eram
-// perdidas. E o `AP1` ("assercao satisfeita por outra verificacao") aplicado a um corpus de
+// perdidas. E o `TP1` ("assercao satisfeita por outra verificacao") aplicado a um corpus de
 // teste, no ficheiro escrito para fazer cumprir o metodo.
 //
 // Estas duas listas sao agora o contrato do hook. Acrescentar uma frase quando aparecer outra
@@ -662,7 +662,7 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
   }
 });
 
-// AP4: os modulos `tests-*.mjs` sao DESCOBERTOS em disco, nao chamados a mao — comentar
+// TP4: os modulos `tests-*.mjs` sao DESCOBERTOS em disco, nao chamados a mao — comentar
 // uma linha aqui levava a suite de 156 para 39 testes com exit 0. Ver `lib/registo.mjs`.
 const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),

@@ -68,7 +68,7 @@ export function registar() {
     // `ehDerivado()` tem DOIS sinais: o marcador presente, ou o `BOOTSTRAP.md` ausente. Para
     // montar o estado "ainda nao houve bootstrap" e preciso negar os dois — apagar so o
     // marcador deixava a fixture a depender de o repo ainda ter o `BOOTSTRAP.md`, que e
-    // falso em todo projeto derivado. Montar metade da pre-condicao e o AP3.
+    // falso em todo projeto derivado. Montar metade da pre-condicao e o TP3.
     try {
       rmSync(file(dir, ".agent/.template-version"));
     } catch {

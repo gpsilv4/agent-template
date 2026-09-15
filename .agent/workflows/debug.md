@@ -73,7 +73,7 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 verificacao que nao depende de alguem se lembrar de repetir os passos daqui a seis meses.
 
 - [ ] **Teste de regressao** escrito, e **visto a falhar** com a correcao desligada. Um teste
-      que nunca se viu vermelho pode nao estar a afirmar nada (`AP1` — e a mesma regra da
+      que nunca se viu vermelho pode nao estar a afirmar nada (`TP1` — e a mesma regra da
       Fase 1 do `ticket-method`: cada teste novo nasce com o seu controlo negativo).
       Se o bug nao justificar teste — tipicamente so-visual — **escrever porque**, em vez de
       deixar a ausencia por explicar.

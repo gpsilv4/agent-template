@@ -4,7 +4,7 @@
  * Espelha `guards/mcp.mjs`. NAO e um entry point: o `test-guards.mjs` descobre-o em disco e
  * chama `registar()`.
  *
- * A fixture MONTA o `.mcp.json` de que cada assercao depende (`AP3`) — no template nu esse
+ * A fixture MONTA o `.mcp.json` de que cada assercao depende (`TP3`) — no template nu esse
  * ficheiro nao existe, logo herdar o estado do repo daria uma suite que so afirma "saltou".
  */
 import { rmSync } from "fs";
@@ -52,7 +52,7 @@ export function registar() {
   });
 
   // A mensagem do SKIP tem de NOMEAR onde procurou. Um "nao encontrei nada" que nao diga
-  // onde olhou e indistinguivel de um guard que olha para o sitio errado (AP2).
+  // onde olhou e indistinguivel de um guard que olha para o sitio errado (TP2).
   test("G16: o SKIP diz onde procurou, e sao os quatro agentes", null, {
     code: 0,
     includes: [".mcp.json", ".cursor/mcp.json", ".vscode/mcp.json", ".gemini/settings.json"],
@@ -90,7 +90,7 @@ export function registar() {
     writeF(dir, ".mcp.json", cfg({ x: { command: "npx", args: ["x"] } }));
   }, { code: 1, includes: ["sem a seccao \"Servidores aprovados\""] });
 
-  // --- Nao consegui ler != esta bem (AP2) -------------------------------------
+  // --- Nao consegui ler != esta bem (TP2) -------------------------------------
   test("G16: JSON invalido avisa, em vez de passar", (dir) => {
     writeF(dir, ".mcp.json", "{ isto nao e json }\n");
   }, { code: 1, includes: ["JSON invalido"] });
@@ -102,7 +102,7 @@ export function registar() {
   // --- Os outros tres agentes (o guard via SO o Claude Code) -------------------
   // A politica declara-se para todos os agentes. Enquanto o guard so lia `.mcp.json`,
   // bastava configurar o servidor pelo Cursor, pelo VS Code ou pelo Gemini para ele nao ver
-  // nada e dizer SKIP — a politica valia num dos quatro caminhos (AP6).
+  // nada e dizer SKIP — a politica valia num dos quatro caminhos (TP6).
   test("G16: servidor por aprovar no ficheiro do Cursor avisa", (dir) => {
     writeF(dir, ".cursor/mcp.json", cfg({ naoAprovado: { command: "npx", args: ["x"] } }));
   }, { code: 1, includes: [".cursor/mcp.json", 'nao esta em "Servidores aprovados"'] });
@@ -142,7 +142,7 @@ export function registar() {
   // Um segredo FORA do bloco de servidores. O `.vscode/mcp.json` tem uma seccao `inputs` que
   // existe precisamente para valores sensiveis; enquanto a varredura era so do bloco de
   // servidores, um token colado la passava — e a linha de sucesso dizia "sem segredos
-  // literais, em .vscode/mcp.json", a afirmar sobre o ficheiro tendo lido uma chave (`AP1`).
+  // literais, em .vscode/mcp.json", a afirmar sobre o ficheiro tendo lido uma chave (`TP1`).
   test("G16: segredo fora do bloco de servidores tambem avisa", (dir) => {
     aprova(dir, "exemplo");
     writeF(dir, ".vscode/mcp.json", JSON.stringify({

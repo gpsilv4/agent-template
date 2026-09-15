@@ -63,7 +63,7 @@ reprova em:
 - **segredo literal** num `env`/`args` (token, chave, password, URL com credencial);
 - **servidor sem justificacao** — cada servidor declarado tem de ter uma linha na tabela
   *Servidores aprovados* abaixo, para nao entrar nenhum sem alguem ter respondido as perguntas;
-- **JSON invalido** — nao consegue ler != nao ha nada (`AP2`).
+- **JSON invalido** — nao consegue ler != nao ha nada (`TP2`).
 
 **No template nu nao ha `.mcp.json`, logo o guard salta com `SKIP` visivel.** E por desenho: a
 regra so tem trabalho a partir do momento em que o teu projeto acrescenta o primeiro servidor.

@@ -4,10 +4,10 @@
  *
  * O que se afirma: cada caminho de recusa **recusa mesmo**, com a razao dita. Um registo
  * que falhasse aberto seria pior do que nao existir — daria a impressao de que a seleccao
- * do runner esta fechada quando nao esta, que e exactamente o defeito (`AP4`, invariante 2)
+ * do runner esta fechada quando nao esta, que e exactamente o defeito (`TP4`, invariante 2)
  * que este modulo veio corrigir.
  *
- * Cada caso monta a sua propria pasta com os seus proprios modulos (`AP3`: nada e herdado
+ * Cada caso monta a sua propria pasta com os seus proprios modulos (`TP3`: nada e herdado
  * do estado do repo) e corre um entry point sintetico num processo filho — `registo.mjs`
  * decide por `process.exit(1)`, logo o veredicto tem de ser lido de fora.
  */
@@ -190,7 +190,7 @@ test(
 
 // --- Contrato da propria funcao: recusas ANTES de tocar no disco ----------------
 // Sem estes tres casos, a varredura de mutacao reportava os `fatal(` correspondentes como
-// sitios sem teste — e um deles (`nao consegui ler`) e o AP2 em pessoa.
+// sitios sem teste — e um deles (`nao consegui ler`) e o TP2 em pessoa.
 
 testCru(
   "sem `contagem()` reprova (nao ha como medir o contributo de cada modulo)",
@@ -205,7 +205,7 @@ testCru(
 );
 
 testCru(
-  "pasta ilegivel reprova a dizer que NAO LEU — nao 'nao ha nada' (AP2)",
+  "pasta ilegivel reprova a dizer que NAO LEU — nao 'nao ha nada' (TP2)",
   '{ dir: "/nao/existe/em/lado/nenhum", entryPoint: "x.mjs", contagem: () => 0, conhecidos: ["x.mjs"] }',
   { code: 1, includes: ["nao consegui ler"] }
 );

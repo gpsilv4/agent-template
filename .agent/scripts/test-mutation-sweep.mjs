@@ -66,7 +66,7 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
     // A linha ambigua tem de ser a linha COBERTA (a do "mau"), nao a descoberta. Na primeira
     // versao deste teste ela era a do "zzz": desligar o `falhou` do LINHA AMBIGUA mantinha o
     // exit 1 porque a INCOMPLETA disparava — a assercao era satisfeita por outra verificacao,
-    // que e exatamente o AP1. Assim, a unica razao de reprovar e a linha ambigua.
+    // que e exatamente o TP1. Assim, a unica razao de reprovar e a linha ambigua.
     check = check.replace(
       'if (alvo.includes("mau")) warn("encontrei \'mau\'");',
       'if (alvo.includes("mau")) { warn("encontrei \'mau\'"); warn("extra"); }'
@@ -134,7 +134,7 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
     // `sitiosMedidos === 0`, e a verificacao `NADA MEDIDO` — acrescentada depois destes
     // testes — passava a ligar o `falhou` sozinha. Os tres testes continuavam verdes com o
     // `falhou = true` do sitio em causa DESLIGADO: a assercao satisfeita por outra
-    // verificacao que a mesma mutacao tambem dispara, que e o `AP1`.
+    // verificacao que a mesma mutacao tambem dispara, que e o `TP1`.
     writeFileSync(join(dir, ".agent/scripts/fake-check-2.mjs"),
       'const warn=(m)=>{console.log("  WARN  "+m)};\nif((process.argv[2]??"").includes("mau")){warn("dois");process.exit(1)}\nprocess.exit(0);\n');
     writeFileSync(join(dir, ".agent/scripts/fake-test-2.mjs"),
@@ -151,7 +151,7 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
   // A fixture escreve um `lib/pares.mjs` e confia que o varredor o LE. Se alguem voltar a
   // pôr a tabela dentro do varredor, o ficheiro que escrevemos deixa de ser lido: os 21
   // testes passariam a medir os pares REAIS do repo e continuariam verdes, a afirmar sobre
-  // um alvo que nao e o da fixture. E o `AP3` na forma mais silenciosa que ha.
+  // um alvo que nao e o da fixture. E o `TP3` na forma mais silenciosa que ha.
   const src = readFileSync(SWEEP, "utf8");
   if (!/from\s+["'`]\.\/lib\/pares\.mjs["'`]/.test(src)) {
     throw new Error("o mutation-sweep.mjs ja nao importa ./lib/pares.mjs — a fixture deixaria de ser lida");
@@ -223,11 +223,11 @@ test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }
   excludes: ["INCOMPLETA"],
 });
 
-// --- Uma varredura que nao mediu nada nao e "cobertura completa" (AP2) --------
+// --- Uma varredura que nao mediu nada nao e "cobertura completa" (TP2) --------
 // O `--skips` varre `skip()`/`note()`. Se nenhum alvo tiver desses sitios, todos saiam por
 // `SEM SKIPS`, `falhou` ficava false e a ultima linha anunciava "Cobertura de mutacao
 // completa" com exit 0 — a frase mais citada deste repo, impressa sobre zero medicoes. Ver
-// zero e concluir "nao ha problemas" e o AP2, e estava dentro do script escrito para o
+// zero e concluir "nao ha problemas" e o TP2, e estava dentro do script escrito para o
 // combater.
 test("--skips sem um unico skip() nao anuncia cobertura completa", {}, ["--skips"], {
   code: 1,
@@ -282,7 +282,7 @@ test("alvo que nao existe reprova (nao passa a dizer 'completa')", { semAlvo: tr
 // A fixture tem UM par. Declarado opcional e ausente, ele nao reprova — e essa e a
 // afirmacao deste teste. Mas entao a varredura nao mediu **nada**, e o veredicto que lhe
 // cabe e "NADA MEDIDO", nao "cobertura completa": a versao anterior deste teste exigia a
-// segunda frase, e estava a codificar o AP2 como comportamento esperado. A ausencia
+// segunda frase, e estava a codificar o TP2 como comportamento esperado. A ausencia
 // tolerada e o `excludes: ["ALVO AUSENTE"]`; o resto e o veredicto global, que e outra
 // pergunta.
 test("alvo declarado opcional pode faltar sem ser reportado como ausente", { semAlvo: true, opcional: true }, [], {
@@ -373,7 +373,7 @@ test("--only com correspondencia varre so esse alvo", {}, ["--only=fake-check"],
 // --- Resumo ------------------------------------------------------------------
 // `segundoSitio: false` para o unico sitio descoberto possivel ser o comentario: com o
 // sitio "zzz" da fixture por omissao, a INCOMPLETA disparava por ele e a assercao ficava
-// satisfeita por outra verificacao — o `AP1`.
+// satisfeita por outra verificacao — o `TP1`.
 // O mesmo raciocinio para uma STRING. Sem isto, uma linha com duas mencoes dentro de aspas
 // era `LINHA AMBIGUA` (reprova), e uma com uma mencao era um sitio a mais cuja mutacao nao
 // muda comportamento nenhum — INCOMPLETA a mandar escrever um teste para o que nao existe.

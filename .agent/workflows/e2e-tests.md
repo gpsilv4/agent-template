@@ -68,7 +68,7 @@ baixar.
 - Correr o teste suspeito isolado, 5x seguidas. Se falhar uma, e flaky.
 - Causas por ordem de frequencia: espera por tempo em vez de por estado; dados partilhados
   entre testes; ordem de execucao assumida; animacao nao terminada.
-- **Marcar `skip` e a solucao degenerada** (`AP4`): remove a falha sem remover a causa, e o
+- **Marcar `skip` e a solucao degenerada** (`TP4`): remove a falha sem remover a causa, e o
   `check-test-surface.mjs` conta-o. Ou se corrige, ou vira ticket com o teste ainda vermelho.
 
 ## 6. Regras para specs novos

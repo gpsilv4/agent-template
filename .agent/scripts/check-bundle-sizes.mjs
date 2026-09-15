@@ -165,7 +165,7 @@ function chunksDoManifestoRsc(route) {
   try {
     obj = JSON.parse(m[1]);
   } catch {
-    return null; // manifesto ilegivel != rota sem chunks (`AP2`)
+    return null; // manifesto ilegivel != rota sem chunks (`TP2`)
   }
   const mods = obj?.clientModules;
   if (!mods || typeof mods !== "object") return null;

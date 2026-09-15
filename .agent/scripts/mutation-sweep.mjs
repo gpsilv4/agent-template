@@ -85,7 +85,7 @@ const only = onlyArg ? onlyArg.slice("--only=".length) : null;
 // A varredura normal exclui-os de propósito — um SKIP nao e um achado, e exigir um teste por
 // cada um seria estreito de mais para o valor. Mas a regra que este repo repete em dezenas de
 // comentarios e **"todo o skip e visivel"**: um guard que deixa de ANUNCIAR que nao correu
-// e o `AP2` em forma pura, e nada media se isso era possivel. Este modo mede.
+// e o `TP2` em forma pura, e nada media se isso era possivel. Este modo mede.
 //
 // Fica fora do CI e fora da varredura normal: corre-se a mao, ao mexer nos guards. O que
 // devolve nao e um veredicto de "esta mal" — e a lista dos sitios que ninguem observa.
@@ -96,7 +96,7 @@ let falhou = false;
 // Quantos sitios foram DE FACTO desligados e medidos. Sem esta conta, uma varredura que nao
 // mediu nada — `--skips` quando nenhum alvo tem `skip()`, ou um `--only=` que casa um alvo
 // sem trabalho — imprimia "Cobertura de mutacao completa" e saia 0. Zero resultados lidos
-// como zero problemas e o `AP2`, e ve-lo no proprio script escrito para o combater era o
+// como zero problemas e o `TP2`, e ve-lo no proprio script escrito para o combater era o
 // defeito mais caro possivel: a frase que toda a gente cita como prova.
 let sitiosMedidos = 0;
 

@@ -55,7 +55,7 @@ export function registar() {
   );
 
   // Afirmar contra as linhas WARN, e nao contra o output todo: uma linha `OK` com o mesmo
-  // nome de ficheiro satisfazia o `includes` de um teste que espera reprovacao (`AP1`).
+  // nome de ficheiro satisfazia o `includes` de um teste que espera reprovacao (`TP1`).
   caso(
     "surface-harness: includes nao e satisfeito por uma linha OK",
     { code: 1, out: "  OK    x.mjs alterado, sem marcas\n  WARN  outra coisa\n", expect: { code: 1, includes: ["x.mjs"] } },

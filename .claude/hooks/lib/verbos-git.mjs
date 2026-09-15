@@ -90,7 +90,7 @@ export const SEGUROS = new Set([
 ]);
 
 /** Chaves de `git config` cuja ESCRITA e execucao de codigo ou desliga uma rede de
- *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `AP6`): e uma lista
+ *  seguranca. Nao e uma blocklist de comandos (que falharia aberta, `TP6`): e uma lista
  *  fechada de chaves que o proprio git documenta como executaveis. */
 export const CHAVES_PERIGOSAS = new RegExp(
   "^(?:" +

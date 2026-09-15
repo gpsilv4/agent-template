@@ -174,7 +174,7 @@ test("G4: termo banido e apanhado em TODOS os ficheiros, nao so no primeiro", (d
 }, { code: 1, includes: ["CLAUDE.md:", "GEMINI.md:", "termo de teste"] });
 
 // A fixture ESVAZIA o `BANNED`, em vez de assumir que o repo o tem vazio: um projeto
-// derivado que use a feature (e ela existe para isso) tornava esta pre-condicao falsa — AP3.
+// derivado que use a feature (e ela existe para isso) tornava esta pre-condicao falsa — TP3.
 test("G4: lista BANNED vazia da SKIP visivel", (dir) => {
   const g = readF(dir, GUARD).replace(/const BANNED = \[[\s\S]*?\];/, "const BANNED = [];");
   if (g === readF(dir, GUARD)) throw new Error("nao encontrei o array BANNED no GUARD");
@@ -307,7 +307,7 @@ test("crlf: o guard passa num clone com line endings do Windows", (dir) => {
     // Engolir SO o ficheiro ausente. A versao anterior tinha um `catch {}` mudo e o
     // `readFileSync` nao estava importado: as 10 iteracoes lancavam `ReferenceError`, o
     // catch comia-os, e o teste passava por a fixture ficar IDENTICA ao baseline. A receita
-    // de deteccao que o AP2 prescreve ("correr cada verificador num clone com CRLF") esteve
+    // de deteccao que o TP2 prescreve ("correr cada verificador num clone com CRLF") esteve
     // por verificar desde que foi escrita.
     try {
       paraCrlf(p);
@@ -419,7 +419,7 @@ test("G8: conta so os imports que RESOLVEM", (dir) => {
 // --- Os SKIP que ninguem observava (varredura `--skips`) ----------------------
 // "Todo o skip e visivel" e regra repetida em dezenas de comentarios, e nada media se um
 // skip podia ser apagado em silencio. Um guard que deixa de ANUNCIAR que nao correu e o
-// `AP2`. Cada teste aqui monta a ausencia que faz o guard saltar e exige que ele o diga.
+// `TP2`. Cada teste aqui monta a ausencia que faz o guard saltar e exige que ele o diga.
 //
 // `code: 0` na maioria: **um SKIP nao e um WARN**, e o invariante do harness e que o exit
 // code reflete os avisos. O que se afirma nao e reprovacao — e que a linha SKIP aparece.
@@ -511,7 +511,7 @@ test("G12e: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
   writeF(dir, "README.md", "# Projeto\n\nSem contagens.\n");
 }, { synthetic: true, code: 0, includes: ["SKIP  Guard 12e"] });
 
-// AP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
+// TP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
 const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-guards.mjs",

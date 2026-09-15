@@ -1,7 +1,7 @@
 /**
  * Registo de suites por DESCOBERTA em disco.
  *
- * PORQUE EXISTE (AP4, invariante 2 — "estreitar a seleccao do runner"):
+ * PORQUE EXISTE (TP4, invariante 2 — "estreitar a seleccao do runner"):
  * os entry points chamavam cada modulo a mao (`registarBypasses(...)`, `registarBudgets()`).
  * Essas chamadas ERAM a seleccao do runner deste repo, e nada as contava. Medido numa
  * auditoria: comentar UMA linha em `.claude/hooks/tests/test-hooks.mjs` levava a suite de
@@ -9,12 +9,12 @@
  * o mesmo em `test-guards.mjs` (172 -> 159). O `check-test-surface.mjs` nao via nada: o
  * numero de `test(` dentro dos `tests-*.mjs` nao desce quando ninguem os chama.
  *
- * A resposta certa e a que o proprio `AP4` prescreve — **retirar a capacidade, nao pedir
+ * A resposta certa e a que o proprio `TP4` prescreve — **retirar a capacidade, nao pedir
  * contencao**. Aqui nao ha linha para comentar: os modulos sao lidos do disco. Acrescentar
  * um `tests-*.mjs` passa a ser suficiente para ele correr; apaga-lo e a unica forma de o
  * tirar da suite, e isso o `check-test-surface.mjs` ja ve.
  *
- * Falha SEMPRE fechado (AP2): zero modulos descobertos, um modulo sem `registar()`, ou um
+ * Falha SEMPRE fechado (TP2): zero modulos descobertos, um modulo sem `registar()`, ou um
  * modulo que nao contribui nenhum teste sao todos `exit 1` com a razao dita — nunca um
  * "nao havia nada a correr" silencioso.
  */
@@ -36,7 +36,7 @@ export function descobreModulos(dir) {
   try {
     entradas = readdirSync(dir, { withFileTypes: true });
   } catch (err) {
-    // "Nao consegui ler" != "nao ha nada" — o AP2 em forma pura.
+    // "Nao consegui ler" != "nao ha nada" — o TP2 em forma pura.
     fatal(`nao consegui ler ${dir}: ${err.message}`);
   }
   return entradas
@@ -148,7 +148,7 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
     fatal(
       `nenhum dos ${nomes.length} modulo(s) em ${dir} declara \`entryPoint: "${entryPoint}"\`.\n` +
         `  Um entry point sem modulos proprios estaria a correr so os seus testes inline e a\n` +
-        `  dizer que correu tudo — reprova em vez de passar (AP2).`
+        `  dizer que correu tudo — reprova em vez de passar (TP2).`
     );
   }
   return { registados, deOutros };
