@@ -72,7 +72,30 @@ export const FORMAS_INSEGURAS = {
   // `-c`/`-C` COPIAM um branch (`git branch -c antigo novo`) — nao destroem nada e sao a
   // forma normal de duplicar. Ficam de fora; `-m`/`-M` (mover/renomear) continuam, porque
   // renomear um branch protegido fa-lo desaparecer.
-  branch: /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/,
+  //
+  // Julgado pelo ALVO e nao pela flag — a mesma regra que o `push --delete` ja seguia, e a
+  // incoerencia que faltava fechar: `git push origin --delete fix/x` passava, `git branch -d
+  // fix/x` nao. Um derivado real bateu nisto logo a seguir a mergear um PR, a fazer a limpeza
+  // que as `process-rules` mandam fazer.
+  //
+  // Porque nao a correcao mais obvia (tirar so o `-d`, que "o git ja protege"): ela deixaria
+  // passar `git branch -d develop` — o git apaga-o de facto quando esta mergeado, e `develop`
+  // e um branch PROTEGIDO. Julgar pelo alvo destrava a limpeza legitima **e** fecha esse caso.
+  //
+  // Sem alvo nomeado (`git branch -d` sozinho, ou so com flags) nao ha o que julgar: nega-se,
+  // que e o lado seguro do erro.
+  branch: (args, ctx) => {
+    // Pelas flags NORMALIZADAS: `git branch -Df old` agrupa duas flags num token e nenhuma
+    // casa por igualdade. A versao anterior desta regra era uma regex aplicada ao resultado
+    // de `normalizaFlags`; ao passar a predicado, a normalizacao tinha de vir com ela — e
+    // sem isso o proprio teste do `-Df` ficou vermelho, que e o que ele existe para fazer.
+    const flags = ctx?.normalizaFlags?.(args) ?? args;
+    const destrutiva = flags.some((a) => /^(?:-f|--force|-[dD]|--delete|-[mM]|--move)$/.test(a));
+    if (!destrutiva) return false;
+    const alvos = args.filter((a) => !a.startsWith("-"));
+    if (alvos.length === 0) return true;
+    return alvos.some((a) => ctx?.ehProtegido?.(a) ?? true);
+  },
   tag: /^(?:-d|--delete|-f|--force)$/,
   // `symbolic-ref` LE o HEAD com um argumento e ESCREVE-O com dois. E a forma que permitia
   // `git symbolic-ref HEAD refs/heads/MAIN` seguido de `git commit` — medido a fazer `main`

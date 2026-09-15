@@ -24,8 +24,29 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-guards.mjs";
 
-/** Um dos ficheiros congelados em TETOS, e o que nao e a suite que esta a correr. */
-const CONGELADO = ".claude/hooks/guard-protected-branch.mjs";
+/** Um dos ficheiros congelados em TETOS — **DERIVADO**, nunca escrito a mao.
+ *
+ *  Os `TETOS` sao por natureza do PROJETO: sao contagens de linhas dos ficheiros dele. Qualquer
+ *  derivado os reescreve, e no momento em que o faz sem incluir o nome que estivesse cravado
+ *  aqui, estes testes rebentam no setup com `ENOENT`. Aconteceu num derivado real: os dois
+ *  ficheiros acima de 500 linhas eram outros, e quatro testes ficaram vermelhos a apontar para
+ *  um caminho que os `TETOS` dele nao tinham.
+ *
+ *  O `guardFileSizes` ja trata a pasta ausente (`noAlcance`, `ausentes`) — o cuidado estava no
+ *  guard e faltava no teste dele.
+ *
+ *  **Exclui o proprio verificador e os seus modulos**: estes testes truncam e esvaziam o
+ *  ficheiro escolhido, e faze-lo ao `check-doc-versions.mjs` (ou a um `guards/*.mjs`) rebenta
+ *  quem esta a correr, em vez de produzir o aviso que se quer medir. */
+const CONGELADO = Object.keys(TETOS).find(
+  (f) => !/check-doc-versions\.mjs$|\/guards\/|\/lib\//.test(f)
+);
+if (!CONGELADO) {
+  throw new Error(
+    "tests-sizes: nenhuma entrada de TETOS serve de cobaia (todas sao o verificador ou modulos dele). " +
+      "Acrescentar um teto de um ficheiro que os testes possam truncar, ou ajustar a exclusao."
+  );
+}
 
 export function registar() {
   // --- O estado limpo do repo ------------------------------------------------

@@ -98,7 +98,9 @@ const BYPASSES = [
   ["--delete depois do ref (a flag e global)", "git push origin main --delete fix/x"],
   ["apagar fix/x E empurrar HEAD:main", "git push origin :fix/x HEAD:main"],
   ["--delete com src:dst", "git push origin --delete main:x"],
-  ["branch -Df agrupado", "git branch -Df old"],
+  // Flags AGRUPADAS: `-Df` e um so token e nenhuma das duas casa por igualdade. O alvo e
+  // protegido, que e o que torna o comando destrutivo desde que a regra julga pelo alvo.
+  ["branch -Df agrupado sobre um protegido", "git branch -Df main"],
   ["switch -Cmain aderente", "git switch -Cmain"],
   ["tag -df agrupado", "git tag -df v1"],
   ["checkout -B reposiciona (nao cria)", "git checkout -B main HEAD~1"],
@@ -199,6 +201,15 @@ const BYPASSES = [
   ["atribuicao com espacos", 'GIT_AUTHOR_DATE="2020-01-01 00:00" git commit -m x'],
   ["atribuicao com espacos (push)", 'GIT_SSH_COMMAND="ssh -i k" git push origin main'],
 
+  // O reverso do falso positivo acima: julgar pelo alvo tem de continuar a NEGAR o alvo
+  // protegido. A correcao "obvia" (tirar so o `-d`, porque o git recusa apagar um branch nao
+  // mergeado) deixava passar este caso — o `develop` esta em PROTEGIDOS, e o git apaga-o de
+  // facto quando esta mergeado.
+  ["branch -d de um branch PROTEGIDO", "git branch -d develop"],
+  ["branch -D de um branch PROTEGIDO", "git branch -D master"],
+  ["branch -m a renomear um protegido", "git branch -m main outro"],
+  ["branch -d sem alvo nomeado", "git branch -d"],
+
   // --- A fronteira nao se reescreve a si propria -------------------------------
   // O `deny` do settings so cobre `Edit`/`Write`. Por `Bash` havia seis caminhos abertos, e o
   // `BOOTSTRAP.md` vendia essa linha como "sem ela, o agente alarga as proprias permissoes" —
@@ -251,6 +262,12 @@ const LEGITIMOS = [
   ["echo com separador dentro de aspas", 'echo "a; git push --force"'],
   ["grep cuja STRING cita um comando", 'rg "build && git push --force" docs/'],
   ["branch -c COPIA, nao destroi", "git branch -c antigo novo"],
+  // Limpar o branch depois de mergear o PR — que as `process-rules` mandam fazer. Era negado
+  // enquanto a regra julgava pela FLAG; `git push origin --delete fix/x` ja passava, e a
+  // incoerencia entre as duas apanhou um derivado real a seguir ao merge do PR dele.
+  ["branch -d de um branch nao protegido", "git branch -d fix/ja-mergeado"],
+  ["branch -D de um branch nao protegido", "git branch -D feature/abandonada"],
+  ["branch -d de varios nao protegidos", "git branch -d fix/a fix/b docs/c"],
   ["fetch para refs remote-tracking", "git fetch origin +refs/heads/main:refs/remotes/origin/main"],
   ["symbolic-ref a LER (um argumento)", "git symbolic-ref HEAD"],
   // LER a fronteira tem de continuar trivial. Um guard que nega `cat` ou `git diff` sobre ela

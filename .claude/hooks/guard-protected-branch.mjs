@@ -60,7 +60,6 @@ const PROTEGIDOS = new Set(PROTEGIDOS_LISTA.map((b) => b.toLowerCase()));
 const ehProtegido = (br) =>
   typeof br === "string" && PROTEGIDOS.has(br.replace(/^refs\/heads\//, "").toLowerCase());
 
-
 /** Sub-verbos destrutivos. Comparados **so contra o primeiro argumento**, porque os
  *  sub-verbos do git sao posicionais: comparar contra qualquer argumento negava
  *  `git stash push -m "apply later"` (a palavra `apply` na mensagem),
@@ -440,7 +439,8 @@ function seguro(inv) {
   // Flags: com as agrupadas e aderentes expandidas, para comparar por igualdade.
   const insegura = FORMAS_INSEGURAS[inv.verbo];
   if (!insegura) return true;
-  if (typeof insegura === "function") return !insegura(inv.args);
+  // `ctx`: para as formas julgadas pelo ALVO e nao pela flag (hoje, `branch`).
+  if (typeof insegura === "function") return !insegura(inv.args, { ehProtegido, normalizaFlags });
   return !normalizaFlags(inv.args).some((a) => insegura.test(a));
 }
 
