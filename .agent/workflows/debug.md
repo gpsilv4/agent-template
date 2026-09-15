@@ -25,7 +25,12 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 - Query retorna `null` ou vazio -> verificar politicas de seguranca
 - Dados inconsistentes -> verificar se migracoes foram aplicadas
 
-### Estado (Data Fetching/React)
+> **As duas listas seguintes assumem uma app web com React/Tailwind.** Num projeto de outra
+> stack (CLI, lib, API, Python, mobile), **substituir** pelas classes de bug equivalentes do
+> teu dominio — o valor esta em ter uma lista de sintomas conhecidos, nao nestes sintomas.
+> O `BOOTSTRAP.md` §2.6 manda adaptar os workflows a stack; isto e um dos sitios.
+
+### Estado (Data Fetching/React) — *so para apps com UI reativa*
 
 - **Campos em falta no fetcher**: Verificar se o fetcher inclui TODOS os campos usados
 - **Ghost fetchers**: Procurar chamadas a funcoes de fetch que deviam ser invalidacao de cache
@@ -34,7 +39,7 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 - **Hybrid state**: Estado inicializado do backend mas editavel pelo utilizador -> dependencia especifica
 - **One-time init**: Formularios re-inicializados por revalidation -> usar guard `initialized`
 
-### UI (Layout/Mobile)
+### UI (Layout/Mobile) — *so com UI; os exemplos sao Tailwind*
 
 - **Overflow horizontal**: `grid-cols-*` fixo sem fallback responsivo -> usar `flex flex-col sm:flex-row`
 - **Popovers cortados**: largura fixa -> usar `w-[min(300px,calc(100vw-2rem))]`

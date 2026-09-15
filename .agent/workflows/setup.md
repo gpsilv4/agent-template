@@ -103,7 +103,7 @@ gh pr create --title "feat: descricao" \
 npm run dev
 ```
 
-Abre `http://localhost:3000`.
+Abre o URL de dev do projeto (`http://localhost:3000` no default do Next; ver o `dev` do `package.json`).
 
 ## 7. Build e Verificacao
 

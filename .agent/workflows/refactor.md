@@ -31,7 +31,7 @@ Seguir o padrao estabelecido no projeto:
 
 ### Sub-components
 
-- Seccoes visualmente distintas -> novos ficheiros em `src/components/`
+- Seccoes visualmente distintas -> novos ficheiros na pasta de componentes do projeto (`src/components/` numa app web tipica; noutra stack, o equivalente)
 - **Estado fica no parent**: data fetching, handlers complexos, `useMemo`
 - **JSX move para filhos**: Apenas renderizacao e logica de apresentacao
 - **Props explicitas**: Passar dados computados e handlers como props
@@ -52,7 +52,8 @@ Seguir o checklist estrito:
 6. Verificar que nao ha **ghost fetchers** — chamadas a funcoes de fetch onde devia estar
    invalidacao de cache (`debug.md`). **O `tsc` NAO deteta isto**: e codigo bem tipado.
    Procurar a olho nos handlers de escrita, com apoio de:
-   `grep -rn -A5 -E "handle[A-Z]|onSubmit|onClick" src/ | grep -E "fetch|refetch|load[A-Z]"`
+   `grep -rn -A5 -E "handle[A-Z]|onSubmit|onClick" <pasta de codigo> | grep -E "fetch|refetch|load[A-Z]"`
+   (`src/` numa app web; ajustar a arvore do projeto — o padrao e que e generico, nao o caminho)
    (sem `-n` no segundo grep: numeraria a posicao no *pipe*, nao no ficheiro)
    (o `-A5` e essencial: a chamada de fetch quase nunca esta na MESMA linha do handler —
    um `grep | grep` sem contexto devolve zero mesmo com ghost fetchers a existir)

@@ -83,10 +83,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 5. Mobile  — a partir de `M`
 
-- [ ] Sem `grid-cols-*` fixo sem fallback (`flex flex-col sm:flex-row`)
-- [ ] Popovers com `w-[min(300px,calc(100vw-2rem))]`
-- [ ] Modals/Sheets com `w-full` e `overflow-x-hidden`
-- [ ] Sticky headers com `min-w-0 shrink` no texto
+> Os quatro pontos de layout responsivo passaram para o `/design-review`, que e o workflow de
+> UI. Num projeto sem UI, esta seccao nao se aplica.
 
 ## 6. Arquitetura  — a partir de `M`
 
