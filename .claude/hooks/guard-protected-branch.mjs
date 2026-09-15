@@ -46,7 +46,7 @@ import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
-import { SEGUROS, FORMAS_INSEGURAS } from "./lib/verbos-git.mjs";
+import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA } from "./lib/verbos-git.mjs";
 import { alteraFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
 
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
@@ -102,46 +102,9 @@ function normalizaFlags(args) {
 const CHECKOUT_CRIA = /(?<![\w-])-b(?![\w-])/;
 const CHECKOUT_REPOSICIONA = /(?<![\w-])-B(?![\w-])/;
 
-/** Verbos que exigem uma forma para serem seguros (nao basta faltar-lhes a forma insegura).
- *  Existe porque o `deploy.md`, o `CONTRIBUTING.md` e o `process-rules.md` deste repo mandam
- *  correr `git pull` e `git push origin --tags` em `main`: negar isso punha o guard em
- *  contradicao com o procedimento de release documentado — e um falso positivo que bloqueia
- *  trabalho documentado custa tanto como um bypass. */
-const FORMA_EXIGIDA = {
-  pull: (args) => args.includes("--ff-only"),
-  push: (args) => {
-    // (a) So tags: e o procedimento de release, que corre em `main`.
-    //
-    // `--follow-tags` SAIU daqui: nao e `--tags`. Publica o refspec normal **mais** as tags
-    // anotadas, logo publica o branch atual — medido com `--dry-run --porcelain` contra um
-    // remoto real, a enviar um commit de `main` que ninguem reviu. Tratar os dois como
-    // equivalentes permitia exactamente o que este guarda existe para impedir.
-    const soTags =
-      args.includes("--tags") &&
-      args.filter((a) => !a.startsWith("-")).length <= 1 && // no maximo o nome do remoto
-      !args.some((a) => a.includes(":"));
-    if (soTags) return true;
-    // (b) O comando **so apaga**, e nenhum dos refs apagados e protegido. Um
-    // `git push origin --delete fix/algo` estando em `main` nao toca no `main`.
-    //
-    // **So as remocoes sao julgadas pelo alvo**; para todo o resto continua a valer o branch
-    // onde se esta. `git push origin main` a partir de `fix/x` passa, e as `FORMAS_INSEGURAS`
-    // so se aplicam estando num branch protegido. Uma versao anterior deste comentario dizia
-    // "julga-se o que o comando empurra, nao onde se esta" como afirmacao geral — e falso. Sem isto, limpar um branch mergeado (que as regras deste repo
-    // mandam fazer) era negado, e foi a primeira coisa que este hook bloqueou.
-    //
-    // `todosApagam` e a correcao de uma leitura independente: bastava **uma** remocao nao
-    // protegida para branquear o comando inteiro, logo `git push origin :fix/x main` empurrava
-    // o `main`. E a mesma forma que a tabela ja conhecia para o ramo (a)
-    // (`git push origin main --tags`), reintroduzida no ramo (b).
-    const posicionais = args.filter((a) => !a.startsWith("-"));
-    const refs = posicionais.slice(1); // o primeiro posicional e o remoto
-    const temDelete = args.some((a) => a === "--delete" || /^-[a-zA-Z]*d[a-zA-Z]*$/.test(a));
-    const todosApagam = refs.length > 0 && refs.every((r) => temDelete || r.startsWith(":"));
-    if (!todosApagam) return false;
-    return !refsApagados(args).some((r) => ehProtegido(r));
-  },
-};
+// A tabela `FORMA_EXIGIDA` vive em `lib/verbos-git.mjs`: e politica (que formas de `pull` e
+// `push` sao aceitaveis num branch protegido), nao motor. O hook injecta-lhe o `ehProtegido`
+// e o `refsApagados`, que dependem da lista de branches que cada projeto adapta no bootstrap.
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
  *  regex de posicao de comando: cada entrada em falta era um bypass. */
@@ -412,7 +375,7 @@ function seguro(inv) {
   if (INSPECAO_PURA.test(inv.verbo) && !inv.viaWrapperOpaco) return true;
   if (!SEGUROS.has(inv.verbo)) return false;
   const exigida = FORMA_EXIGIDA[inv.verbo];
-  if (exigida) return exigida(inv.args);
+  if (exigida) return exigida(inv.args, { ehProtegido, refsApagados });
   // Sub-verbo: o primeiro argumento POSICIONAL (nao-flag). Comparar so com `args[0]` fazia
   // QUALQUER flag anular a tabela inteira — `git stash -q drop`, `git reflog --verbose
   // expire`, `git remote -v remove origin` passavam todos. Cinco bypasses medidos.

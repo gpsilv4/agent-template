@@ -8,9 +8,17 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
 ## 1. Ambito & Guards
 
 - **Ambito**: perguntar ao utilizador — auditoria **completa** (todo o repo) ou **scoped** (so o que mudou desde a ultima tag/release: `git diff <ultima-tag>..HEAD --stat` + `git log <ultima-tag>..HEAD` — o `git diff <tag>` sozinho compara com a working tree e ignora untracked). Scoped e mais barato para milestones frequentes.
-- Correr os **guards deterministicos** primeiro e incluir o resultado:
+- Correr os **guards deterministicos** primeiro e incluir o resultado. O workflow que se
+  anuncia como o mais abrangente era o que corria **menos** verificacao automatica — o
+  `/review` §10 e o `/deploy` §1 ja exigiam mais do que isto:
   - `node .agent/scripts/check-doc-versions.mjs`
   - `node .agent/scripts/check-backlog.mjs`
+  - `node .agent/scripts/check-test-surface.mjs` — a superficie de teste nao encolheu (`AP4`)
+  - **as nove suites** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte)
+  - `node .agent/scripts/mutation-sweep.mjs` — **so se a auditoria tocar em verificadores ou
+    hooks**; custa dezenas de minutos, e e o unico instrumento que mede se um aviso NOVO fica
+    vermelho quando desligado
+  - `node .agent/scripts/simulate-derived.mjs` — o template ainda funciona depois do bootstrap
   - `npm run build`, `npx tsc --noEmit`, `npm run lint`, `npm audit --audit-level=high` (se aplicavel)
 
 ## 2. Lentes (uma por especialista)

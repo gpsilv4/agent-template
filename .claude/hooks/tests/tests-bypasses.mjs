@@ -209,6 +209,10 @@ const BYPASSES = [
   ["branch -D de um branch PROTEGIDO", "git branch -D master"],
   ["branch -m a renomear um protegido", "git branch -m main outro"],
   ["branch -d sem alvo nomeado", "git branch -d"],
+  // O reverso: a forma de tag nao pode virar porta para publicar um branch.
+  ["push de uma tag JUNTO com o main", "git push origin v1.0.0 main"],
+  ["push de um branch com nome de versao protegido", "git push origin main"],
+  ["force-push de uma tag continua negado", "git push --force origin v1.0.0"],
 
   // --- A fronteira nao se reescreve a si propria -------------------------------
   // O `deny` do settings so cobre `Edit`/`Write`. Por `Bash` havia seis caminhos abertos, e o
@@ -268,6 +272,12 @@ const LEGITIMOS = [
   ["branch -d de um branch nao protegido", "git branch -d fix/ja-mergeado"],
   ["branch -D de um branch nao protegido", "git branch -D feature/abandonada"],
   ["branch -d de varios nao protegidos", "git branch -d fix/a fix/b docs/c"],
+  // Publicar uma tag de versao depois do merge — o que o `process-rules.md` manda fazer. Era
+  // negado porque a regra so reconhecia a forma `--tags`, e medi-lo ao marcar a v0.4.0 deste
+  // repo. Julgado pela FORMA do ref e pela exclusao dos nomes protegidos: perguntar ao git
+  // aqui correria no cwd do HOOK e responderia sobre o repo errado.
+  ["push de uma tag de versao", "git push origin v0.4.0"],
+  ["push de duas tags nomeadas", "git push origin v1.0.0 v1.0.1"],
   ["fetch para refs remote-tracking", "git fetch origin +refs/heads/main:refs/remotes/origin/main"],
   ["symbolic-ref a LER (um argumento)", "git symbolic-ref HEAD"],
   // LER a fronteira tem de continuar trivial. Um guard que nega `cat` ou `git diff` sobre ela
