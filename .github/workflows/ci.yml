@@ -190,13 +190,28 @@ jobs:
   guard-tests:
     name: Guard Tests
     runs-on: ubuntu-latest
-    # 40, e o numero vem de uma MEDICAO e nao de um palpite: a primeira corrida com a
-    # varredura de mutacao ligada levou **20m29s** (PR #36, que tocou nos verificadores).
-    # Um tecto de 25 deixava ~18% de folga, e cada verificador novo empurra isto para cima.
-    # O modo de falha de um timeout apertado e feio — o job morre por tempo e parece um
-    # defeito, em vez de dizer que faltou tempo. Sobe-se antes de doer, nao depois.
+    # 75, e o numero vem de MEDICOES sucessivas e nao de um palpite. O historico e o que
+    # interessa aqui, porque mostra uma TENDENCIA e nao um valor:
+    #
+    #   PR #36   20m29s   primeira corrida com a varredura ligada
+    #   PR #47   39m09s   depois de o template ganhar guards e suites
+    #   PR #56   >40m     **morreu no tecto de 40** — 163 sitios, e a medir ainda
+    #
+    # O comentario anterior dizia "cada verificador novo empurra isto para cima" e
+    # "sobe-se antes de doer, nao depois". Doeu: o job foi cancelado a meio da varredura e o
+    # PR ficou bloqueado por **falta de tempo**, nao por defeito. E o pior modo de falha
+    # possivel — parece um erro e nao e.
+    #
+    # 75 nao e generosidade: e ~85% de folga sobre a ultima medicao completa, porque a
+    # varredura cresce com o produto (sitios x tamanho das suites) e cada teste novo no
+    # `test-guards` multiplica por ~90.
+    #
+    # A alternativa estrutural — derivar um `--only` do diff, para varrer so os alvos
+    # tocados — esta na issue do repo com a analise feita. Enquanto nao existir, o tecto e
+    # que segura isto, e um tecto apertado transforma crescimento legitimo em CI vermelho.
+    #
     # Quando o PR NAO toca nos verificadores a varredura salta e o job leva ~1m10s.
-    timeout-minutes: 40
+    timeout-minutes: 75
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
