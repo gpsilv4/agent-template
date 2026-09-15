@@ -311,6 +311,21 @@ jobs:
       - name: Projeto derivado — o template funciona depois do bootstrap
         if: github.event_name == 'pull_request'
         run: node .agent/scripts/simulate-derived.mjs
+      # A OUTRA metade da promessa: o template tambem serve para ATUALIZAR projetos que ja
+      # existem, e essa metade nao tinha rede nenhuma ate agora. Monta um derivado da ultima
+      # tag, aplica o upgrade e mede — a FASE 1 dele imprime o que este PR faz reprovar num
+      # consumidor, que e informacao que ninguem mais produz.
+      #
+      # Sem filtro por caminho, e de proposito: o que isto apanha e "o template partiu os
+      # consumidores", e quase qualquer alteracao pode causa-lo — uma rule, um limiar, um
+      # workflow. Restringir o gatilho obrigava a adivinhar quais, que e o mesmo filtro
+      # fragil que ja foi recusado para a varredura.
+      #
+      # Precisa das tags, que o `fetch-depth: 0` acima ja traz. Num clone raso ele REPROVA a
+      # dizer que nao mediu, em vez de passar em silencio.
+      - name: Projeto ja existente — o /upgrade nao parte um consumidor
+        if: github.event_name == 'pull_request'
+        run: node .agent/scripts/simulate-upgrade.mjs
       - name: Test surface — nao enfraquecida desde a base do PR
         if: github.event_name == 'pull_request'
         # `HEAD^1` e nao `base.sha`: o checkout de um PR e o **merge ref**, cujo pai 1 e a
@@ -390,6 +405,11 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # NOTA para quem vir o aviso do editor: a extensao GitHub Actions do VS Code marca
+          # estas duas linhas com "Context access might be invalid: GITLEAKS_LICENSE". E
+          # ESPERADO — ela avisa sempre que nao consegue confirmar que um secret existe, e este
+          # e opcional por desenho. Nao e erro de CI: o job passa sem o secret definido.
+          #
           # Organizacoes (nao repos pessoais) precisam de GITLEAKS_LICENSE, gratis. Fica
           # DESCOMENTADO: sem secret definido o valor e vazio e a acao comporta-se como antes;
           # com secret, funciona. Comentado, nem definir o secret resolvia — e o aviso acima
