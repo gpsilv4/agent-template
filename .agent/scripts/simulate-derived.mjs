@@ -106,7 +106,11 @@ function comandosDoCI() {
   //    por sua vez faria outra copia — recursao infinita. Medido: o processo nao terminava e
   //    deixou dezenas de copias em `/tmp`. E a armadilha obvia de derivar a lista do CI, e
   //    por isso esta escrita aqui em vez de ser descoberta outra vez.
-  const EXCLUIR = ["check-test-surface", "simulate-derived"];
+  //  - `simulate-upgrade`: precisa de TAGS, e a copia nao tem `.git` nenhum. Mesma classe
+  //    que o `check-test-surface` acima. Sem esta linha, acrescentar o simulador de
+  //    upgrade ao `ci.yml` punha esta simulacao vermelha — e a falha nao dizia respeito
+  //    ao derivado, dizia respeito a copia nao ser um repo. Medido ao ligar os dois.
+  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade"];
   return [...new Set(encontrados)].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
 }
 
