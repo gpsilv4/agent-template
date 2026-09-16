@@ -23,7 +23,7 @@ import { dirname, resolve, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "./lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, BASE, cenario, limpa } from "./test-upgrade-harness.mjs";
+import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico } from "./test-upgrade-harness.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
@@ -47,8 +47,6 @@ function test(nome, fn) {
     console.log(`  FAIL  ${nome}\n          rebentou: ${err.message}`);
   }
 }
-
-/** Verifica exit code e texto de uma corrida, e devolve os problemas. */
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 
@@ -114,12 +112,6 @@ test("sem BOOTSTRAP.md (o outro sinal de derivado), tambem da SKIP", () => {
 
 // --- O motor mecanico: e aqui que um erro custa DADOS -----------------------------
 
-/** Monta um par (template de ontem -> template de hoje) + o consumidor que saiu do primeiro.
- *  `ontem` e o conteudo na tag; `hoje` o que o template tem agora; `consumidor` o que o
- *  projeto tem (por omissao, igual ao de ontem — ou seja, intacto). */
-/** O minimo que o motor exige de qualquer template: as pastas que ele copia por inteiro e os
- *  dois ficheiros de anti-padroes (o cabecalho de um deles e trazido, e a divisao e pelo `---`).
- *  Sem esta base, cada caso rebentava num `fatal` que nada tinha a ver com o que media. */
 // A regra geral do `/upgrade`, na sua forma mais simples: intacto -> traz-se o novo.
 test("documento NAO customizado fica com a versao nova", () => {
   let c;
@@ -146,11 +138,16 @@ test("documento NAO customizado fica com a versao nova", () => {
 // constante a lista das preservadas prova que alguem a escreveu la, nao que ela sobrevive.
 // O INVARIANTE MUDOU, e a mudanca e o ponto: antes afirmava-se que o `ALVOS_REPROVAM` estava
 // na lista das constantes preservadas. Agora ele vive em `config/bundles.mjs`, e o que tem de
-// ser verdade e mais forte — **o upgrade nao toca na pasta de configuracao de todo**.
+// ser verdade e mais forte — **o upgrade nunca SUBSTITUI a pasta de configuracao**.
 //
 // Uma lista de nomes a preservar envelhece a cada decisao nova que alguem acrescente e se
-// esqueca de inscrever. Uma pasta que o upgrade nao toca nao envelhece.
-test("o upgrade NAO toca na configuracao do projeto", () => {
+// esqueca de inscrever. Uma pasta que o upgrade nao substitui nao envelhece.
+//
+// "Nunca substitui" e nao "nunca toca": a primeira versao desta regra excluia a pasta por
+// inteiro, e a simulacao contra a tag real reprovou — um consumidor anterior a `config/` existir
+// recebia o `check-bundle-sizes.mjs` novo, que a IMPORTA, sem o ficheiro importado. O par de
+// testes abaixo mede as duas direccoes, porque uma sozinha deixa passar a outra.
+test("o upgrade NAO substitui a configuracao do projeto", () => {
   let c;
   try {
     const cfg = ".agent/scripts/config/bundles.mjs";
@@ -164,6 +161,51 @@ test("o upgrade NAO toca na configuracao do projeto", () => {
     const p = [];
     if (!/ALVOS_REPROVAM = false/.test(v ?? "")) p.push("a decisao do projeto foi atropelada pelo upgrade");
     if ((v ?? "").includes("NOVIDADE")) p.push("o upgrade escreveu por cima da config — devia nao lhe tocar");
+    return p;
+  } finally {
+    limpa(c);
+  }
+});
+
+// A OUTRA METADE, e a que o CI apanhou quando este par ainda era so a de cima. Um consumidor
+// tirado de uma tag anterior a `config/` existir NAO a tem — e todos os projetos derivados
+// estao nesse caso na ronda em que ela nasce.
+//
+// Se o upgrade a saltasse por "e do projeto", trazia o `check-bundle-sizes.mjs` novo (que faz
+// `import ... from "./config/bundles.mjs"`) SEM o ficheiro importado, e o verificador rebentava
+// no arranque. Proteger a configuracao partindo o consumidor nao e proteger nada.
+test("consumidor SEM config/ recebe-a (senao fica com logica que importa o que nao existe)", () => {
+  let c;
+  try {
+    const cfg = ".agent/scripts/config/bundles.mjs";
+    c = cenario({
+      ontem: { [cfg]: null }, // a tag de onde o projeto saiu ainda nao tinha a pasta
+      hoje: { [cfg]: "export const ALVOS_REPROVAM = true;\n" },
+      consumidor: { [cfg]: null },
+    });
+    const v = c.ler(cfg);
+    return v === null ? ["o upgrade nao trouxe a config — o verificador novo fica sem o que importa"] : [];
+  } finally {
+    limpa(c);
+  }
+});
+
+// E o caso que a exclusao-da-pasta-inteira tambem partia, e que nenhuma das duas de cima apanha:
+// o consumidor JA tem a pasta, e o template acrescenta-lhe um ficheiro NOVO. Saltar a pasta por
+// ela existir deixava o ficheiro novo de fora para sempre.
+test("ficheiro NOVO dentro de config/ chega a um consumidor que ja tem a pasta", () => {
+  let c;
+  try {
+    const cfg = ".agent/scripts/config/bundles.mjs";
+    const novo = ".agent/scripts/config/rotas.mjs";
+    c = cenario({
+      ontem: { [cfg]: "export const ALVOS_REPROVAM = true;\n", [novo]: null },
+      hoje: { [cfg]: "export const ALVOS_REPROVAM = true;\n", [novo]: "export const ROTAS = [];\n" },
+      consumidor: { [cfg]: "export const ALVOS_REPROVAM = false;\n", [novo]: null },
+    });
+    const p = [];
+    if (c.ler(novo) === null) p.push("o ficheiro novo de config/ nao chegou");
+    if (!/ALVOS_REPROVAM = false/.test(c.ler(cfg) ?? "")) p.push("e a decisao existente foi atropelada");
     return p;
   } finally {
     limpa(c);
@@ -321,36 +363,6 @@ test("um cenario que REBENTA nao deixa diretorios temporarios para tras", () => 
 // customizacao da fixture, a derivacao dos comandos, a adaptacao do Guard 17) ficam medidos.
 // A varredura de mutacao apontou-os um a um como nao cobertos; nenhum apareceu numa leitura.
 
-/** Um template minimo mas COMPLETO: tem tudo o que o simulador toca. As constantes adaptaveis
- *  estao ca todas porque o motor as procura pelo nome e para se faltar uma — de proposito. */
-function templateSintetico(extra = {}) {
-  const constantes = {
-    // `ALVOS_REPROVAM` entra aqui porque entrou na lista das constantes preservadas: o motor
-    // procura-a pelo nome e REPROVA se nao a encontrar — e reprova bem, porque a tabela do
-    // `/upgrade` estaria a mandar preservar algo que nao existe. Quem fica incompleta e a
-    // fixture, nao o motor.
-    ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\n',
-    // A DECISAO vive a parte, e e ela que o simulador suspende. Estava dentro do ficheiro da
-    // logica e o upgrade atropelava-a — foi essa a mudanca que a separacao veio fechar.
-    ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = true;\n",
-    ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
-    ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
-    ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
-    ".agent/scripts/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
-    ".agent/scripts/guards/sizes.mjs": "export const TETOS = {\n};\n",
-  };
-  return {
-    ".agent/BOOTSTRAP.md": "# Bootstrap\n\n### 2.2 Ficheiros a GERAR\n\n| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra\n",
-    ".github/workflows/ci.yml": "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n",
-    ".agent/scripts/stub.mjs": 'console.log("  1 passaram, 0 falharam.");\n',
-    ".claude/hooks/h.mjs": "// hook\n",
-    ".agent/context/session.md": "# estado\n",
-    ".agent/rules/anti-patterns-template.md": "# Template\n\n## TP1 — um\n",
-    ".agent/rules/anti-patterns.md": `# Projeto\n\n> cabecalho\n\n---\n\n## ${"AP" + "1"} — meu\n`,
-    ...constantes,
-    ...extra,
-  };
-}
 
 /** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. */
 function pontaAPonta(extra = {}) {
@@ -416,7 +428,10 @@ for (const [nome, extra, marca] of [
   // deixa de exercitar a travessia que interessa — e passava a verde a afirmar menos. A
   // varredura apontou este `fatal()` como nao coberto.
   ["com o gate dos bundles noutra forma", { ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = 1;\n" }, "nao consegui suspender o gate"],
-  ["sem a config dos bundles", { ".agent/scripts/config/bundles.mjs": null }, "nao representa um consumidor"],
+  // A AUSENCIA da config NAO entra nesta lista, e saiu dela de proposito: um consumidor tirado
+  // de uma tag anterior a `config/` existir nao a tem, e esse e o caso real mais importante, nao
+  // uma fixture partida. A fixture passa a escreve-la; o que ela mede esta nos dois testes
+  // dedicados mais abaixo.
   ["sem a seccao 2.2 no BOOTSTRAP.md", { ".agent/BOOTSTRAP.md": "# Bootstrap\n\nsem a seccao\n" }, "nao derivei nenhuma rule gerada"],
   ["sem `anti-patterns.md` na tag", { ".agent/rules/anti-patterns.md": null }, "nao representa um consumidor"],
 ]) {

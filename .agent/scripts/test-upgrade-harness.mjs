@@ -154,3 +154,34 @@ export const limpa = (c) => {
   for (const d of [c?.dir, c?.root]) if (d) rmSync(d, { recursive: true, force: true });
 };
 
+
+/** Um template minimo mas COMPLETO: tem tudo o que o simulador toca. As constantes adaptaveis
+ *  estao ca todas porque o motor as procura pelo nome e para se faltar uma — de proposito. */
+export function templateSintetico(extra = {}) {
+  const constantes = {
+    // `ALVOS_REPROVAM` entra aqui porque entrou na lista das constantes preservadas: o motor
+    // procura-a pelo nome e REPROVA se nao a encontrar — e reprova bem, porque a tabela do
+    // `/upgrade` estaria a mandar preservar algo que nao existe. Quem fica incompleta e a
+    // fixture, nao o motor.
+    ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\n',
+    // A DECISAO vive a parte, e e ela que o simulador suspende. Estava dentro do ficheiro da
+    // logica e o upgrade atropelava-a — foi essa a mudanca que a separacao veio fechar.
+    ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = true;\n",
+    ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
+    ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
+    ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
+    ".agent/scripts/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
+    ".agent/scripts/guards/sizes.mjs": "export const TETOS = {\n};\n",
+  };
+  return {
+    ".agent/BOOTSTRAP.md": "# Bootstrap\n\n### 2.2 Ficheiros a GERAR\n\n| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra\n",
+    ".github/workflows/ci.yml": "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n",
+    ".agent/scripts/stub.mjs": 'console.log("  1 passaram, 0 falharam.");\n',
+    ".claude/hooks/h.mjs": "// hook\n",
+    ".agent/context/session.md": "# estado\n",
+    ".agent/rules/anti-patterns-template.md": "# Template\n\n## TP1 — um\n",
+    ".agent/rules/anti-patterns.md": `# Projeto\n\n> cabecalho\n\n---\n\n## ${"AP" + "1"} — meu\n`,
+    ...constantes,
+    ...extra,
+  };
+}

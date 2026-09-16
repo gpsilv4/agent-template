@@ -268,11 +268,21 @@ ok(`bootstrapado: ${tocados} ficheiro(s) com placeholders, ${geradas.length} rul
   //     A decisao vive na `config/`, que o upgrade NAO toca. E essa a mudanca que fecha a
   //     classe: preservar por nome era mitigacao, e uma lista de nomes envelhece a cada decisao
   //     nova que alguem acrescente e se esqueca de inscrever.
+  //     A fixture pode legitimamente NAO ter a `config/`: ela nasceu depois de algumas tags, e
+  //     um consumidor tirado de uma dessas e exactamente o caso real que mais interessa. Por
+  //     isso isto **garante** o ficheiro em vez de o exigir — escreve-o quando falta, e edita-o
+  //     quando ja veio da tag. As duas metades sao medidas: o teste do consumidor SEM `config/`
+  //     vive em `test-simulate-upgrade.mjs`, e prova que o upgrade lha traz.
   const relCfg = ".agent/scripts/config/bundles.mjs";
   const cCfg = leOuNull(join(dir, relCfg));
-  if (cCfg === null) fatal(`${relCfg} nao existe no ${tag} — a fixture nao representa um consumidor`);
-  const comGateSuspenso = cCfg.replace(/export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
-  if (comGateSuspenso === cCfg) fatal(`nao consegui suspender o gate em ${relCfg} — o literal mudou de forma`);
+  const comGateSuspenso =
+    cCfg === null
+      ? "export const TARGETS = {};\nexport const ALVOS_REPROVAM = false;\n"
+      : cCfg.replace(/export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
+  if (cCfg !== null && comGateSuspenso === cCfg) {
+    fatal(`nao consegui suspender o gate em ${relCfg} — o literal mudou de forma`);
+  }
+  mkdirSync(dirname(join(dir, relCfg)), { recursive: true });
   writeFileSync(join(dir, relCfg), comGateSuspenso);
 }
 ok("conteudo proprio do projeto acrescentado (anti-padrao, verificador grande e uma constante customizada)");

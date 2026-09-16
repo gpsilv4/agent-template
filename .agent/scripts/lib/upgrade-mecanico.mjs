@@ -14,9 +14,9 @@
  * ficheiros customizados. Isso e leitura, nao mecanica.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync, statSync } from "fs";
 import { execFileSync } from "child_process";
-import { join, dirname, sep } from "path";
+import { join, dirname, sep, relative } from "path";
 
 /** `null` em vez de excepcao: "nao existe" e "nao consegui ler" pedem accoes diferentes a
  *  quem chama, e colapsar as duas e o `TP2`. */
@@ -63,7 +63,8 @@ export function andaFicheiros(base, fn, rel = "") {
  *  `check-test-surface.mjs`, e ela vive em `surface-patterns.mjs`. Um consumidor a seguir a
  *  instrucao copiava o ficheiro por inteiro e perdia as suas contagens em silencio. */
 // As duas dos BUNDLES sairam desta lista: `TARGETS` e `ALVOS_REPROVAM` mudaram-se para
-// `.agent/scripts/config/bundles.mjs`, que o `/upgrade` NUNCA toca. Preservar por nome era a
+// `.agent/scripts/config/bundles.mjs`, que o `/upgrade` nunca SUBSTITUI (mas copia se o
+// consumidor ainda nao a tiver — ver o filtro em `trazerDoHead`). Preservar por nome era a
 // mitigacao; separar a configuracao da logica **fecha a classe** — a lista deixa de ter de
 // crescer a cada decisao nova, e era por ela envelhecer que a suspensao do gate se perdeu numa
 // ronda real, em silencio.
@@ -153,11 +154,29 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     if (!existsSync(origem)) fatal(`${rel} nao existe no HEAD — nada a trazer`);
     cpSync(origem, join(dir, rel), {
       recursive: true,
-      // `config/` NUNCA se toca: e a configuracao do PROJETO, ao lado do `.agent/context/`.
-      // Sem este filtro, mover as constantes para la nao resolvia nada — a copia de
-      // `.agent/scripts/**` passava-lhes por cima na mesma, e a decisao do projeto voltava ao
-      // default do template. Era esse o defeito, um directorio abaixo.
-      filter: (src) => !src.split(sep).join("/").includes("/.agent/scripts/config/"),
+      // `config/` e a configuracao do PROJETO, ao lado do `.agent/context/`. Sem tratamento
+      // proprio, a copia de `.agent/scripts/**` passava-lhe por cima e a decisao do projeto
+      // voltava ao default do template — era esse o defeito, um directorio abaixo.
+      //
+      // Mas a regra NAO e "nunca tocar": e **nunca SUBSTITUIR, copiar se AUSENTE**, que e a
+      // mesma que os hooks ja usam. A diferenca nao e academica — a primeira versao desta linha
+      // excluia a pasta por inteiro, e o simulador reprovou: um consumidor anterior a existencia
+      // da `config/` recebia o `check-bundle-sizes.mjs` novo, que faz
+      // `import ... from "./config/bundles.mjs"`, e **sem o ficheiro que ele importa**. O
+      // verificador rebentava no arranque, em TODOS os projetos derivados ja existentes.
+      //
+      // Trazer a logica sem a configuracao que ela importa nao e proteger a configuracao — e
+      // partir o consumidor para a proteger.
+      filter: (src) => {
+        const p = src.split(sep).join("/");
+        if (!p.includes("/.agent/scripts/config/")) return true;
+        // Descer sempre nas pastas: recusar a pasta `config/` porque ela ja existe saltava
+        // tambem os ficheiros NOVOS que o template tivesse acrescentado la dentro.
+        if (statSync(src).isDirectory()) return true;
+        // O destino deriva-se do caminho relativo a origem da copia — nunca de aritmetica sobre
+        // a string, que e onde este tipo de codigo costuma mentir em silencio.
+        return !existsSync(join(dir, rel, relative(origem, src)));
+      },
     });
   }
   

@@ -1,7 +1,7 @@
 /**
  * Configuracao do PROJETO para o verificador de bundles — {{PROJECT_NAME}}
  *
- * **Este ficheiro e teu. O `/upgrade` nunca lhe toca.**
+ * **Este ficheiro e teu. O `/upgrade` nunca o SUBSTITUI** — so o cria se ainda nao existir.
  *
  * PORQUE EXISTE: a configuracao vivia dentro do `check-bundle-sizes.mjs`, que e logica e que o
  * upgrade **substitui**. A mitigacao era uma lista de nomes a preservar, mantida a mao — e uma

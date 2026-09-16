@@ -331,7 +331,7 @@ export const TARGETS = {
 };
 ```
 
-**Porque e noutro ficheiro:** `config/` e do projeto e o `/upgrade` **nunca lhe toca**; o
+**Porque e noutro ficheiro:** `config/` e do projeto e o `/upgrade` **nunca a substitui** (so a cria se faltar); o
 `check-bundle-sizes.mjs` e logica e o upgrade substitui-o. Enquanto a configuracao viveu dentro
 da logica, a unica proteccao era uma lista de nomes a preservar, mantida a mao — e foi assim que
 o interruptor `ALVOS_REPROVAM` (que esta no mesmo ficheiro) ficou de fora dela e a decisao de um
