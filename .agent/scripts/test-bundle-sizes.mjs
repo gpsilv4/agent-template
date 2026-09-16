@@ -21,113 +21,29 @@
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, cpSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
+// Os construtores de fixture vivem no harness: a catraca do Guard 17 exigiu a divisao antes
+// de deixar a suite crescer mais. Ver `test-bundle-harness.mjs`.
+import {
+  ROOT,
+  CHECKER,
+  sandbox,
+  chunk,
+  TARGETS_FIXTURE,
+  porConfig,
+  withTargets,
+  suspenderAlvos,
+  ligarAlvos,
+  manifestoRsc,
+  manifest,
+} from "./test-bundle-harness.mjs";
+
+// Os contadores sao da SUITE, nao do harness: quem monta fixtures nao conta veredictos.
+let passed = 0;
+const failures = [];
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
 import { gzipSync } from "zlib";
 import { randomBytes } from "crypto";
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const CHECKER = ".agent/scripts/check-bundle-sizes.mjs";
-
-let passed = 0;
-const failures = [];
-
-/** Cria uma sandbox com o checker e uma arvore .next/ vazia. */
-function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "bundle-test-"));
-  mkdirSync(join(dir, ".agent", "scripts"), { recursive: true });
-  cpSync(join(ROOT, CHECKER), join(dir, CHECKER));
-  // Normalizar a configuracao ANTES de qualquer teste correr: nenhum deles pode depender das
-  // rotas deste projeto. Rebenta se o literal mudar de forma, em vez de herdar em silencio.
-  withTargets(dir, TARGETS_FIXTURE);
-  mkdirSync(join(dir, ".next", "static", "chunks", "app"), { recursive: true });
-  return dir;
-}
-
-/** Escreve um chunk com `bytes` de conteudo compressivel e devolve o tamanho gzipped. */
-function chunk(dir, relPath, bytes, filler = "x") {
-  const full = join(dir, ".next", relPath);
-  mkdirSync(dirname(full), { recursive: true });
-  const body = filler.repeat(bytes);
-  writeFileSync(full, body);
-  return gzipSync(Buffer.from(body)).length;
-}
-
-/** O `TARGETS` da FIXTURE, escrito aqui e **nao herdado do repo**.
- *
- *  A `sandbox()` copia o checker deste projeto, e com ele a configuracao DELE. Num consumidor
- *  essa configuracao e outra: acrescentar **uma** rota — a primeira coisa que o `BOOTSTRAP.md`
- *  §2.4 manda fazer — punha **7 destes 27 testes** vermelhos, todos com
- *  "nao foi possivel resolver os chunks proprios destas rotas". Verde no template, vermelho em
- *  todos os consumidores com UI, no dia 1: e o `TP3` na sua forma mais cara.
- *
- *  O mecanismo para evitar isto ja existia (`withTargets`) e **nunca era chamado** — codigo
- *  morto ao lado do defeito que ele resolvia. Medido pelo `simulate-upgrade.mjs`, que hoje e o
- *  controlo desta correccao: ele customiza o `TARGETS` do consumidor e exige verde. */
-const TARGETS_FIXTURE = { "/": { name: "Home", target: 160, alarm: 180 } };
-
-/** Reescreve o literal TARGETS na copia do checker (para exercitar varias rotas). */
-const LITERAL_TARGETS = /const TARGETS = \{[\s\S]*?\n\};/;
-
-function withTargets(dir, targets) {
-  const p = join(dir, CHECKER);
-  const src = readFileSync(p, "utf8");
-  const body = Object.entries(targets)
-    .map(([r, c]) => `  ${JSON.stringify(r)}: { name: ${JSON.stringify(c.name)}, target: ${c.target}, alarm: ${c.alarm} },`)
-    .join("\n");
-  // Testa o PADRAO, nao a diferenca. `out === src` como guarda de "nao aplicou" tem um falso
-  // positivo: escrever o valor que ja la esta produz texto identico, e a guarda le isso como
-  // "o literal mudou de forma". Acontece a quem generalize um destes patches para fixar uma
-  // posicao em vez de a inverter — e aconteceu.
-  if (!LITERAL_TARGETS.test(src)) throw new Error("o literal TARGETS mudou de forma — o patch mediria a versao errada");
-  writeFileSync(p, src.replace(LITERAL_TARGETS, `const TARGETS = {\n${body}\n};`));
-}
-
-/** Escreve o manifesto RSC de uma rota, na forma que o Next escreve.
- *  A chave leva o caminho da rota — e numa rota dinamica leva parenteses rectos, que e a
- *  armadilha que a regex tem de sobreviver. */
-function manifestoRsc(dir, route, chunksPorModulo, { chaveLiteral = null, corpo = null } = {}) {
-  const rel = route === "/" ? "" : route.slice(1);
-  const f = join(dir, ".next", "server", "app", rel, "page_client-reference-manifest.js");
-  mkdirSync(dirname(f), { recursive: true });
-  const chave = chaveLiteral ?? `${route === "/" ? "" : route}/page`;
-  const obj = corpo ?? {
-    moduleLoading: { prefix: "/_next/" },
-    clientModules: Object.fromEntries(
-      chunksPorModulo.map((chunks, i) => [`mod${i}`, { id: i, name: "*", chunks }])
-    ),
-  };
-  writeFileSync(
-    f,
-    `globalThis.__RSC_MANIFEST=(globalThis.__RSC_MANIFEST||{});\n` +
-      `globalThis.__RSC_MANIFEST[${JSON.stringify(chave)}]=${typeof obj === "string" ? obj : JSON.stringify(obj)}\n`
-  );
-  return f;
-}
-
-/** FIXA o interruptor do gate na posicao pedida, em vez de o inverter.
- *
- *  A versao anterior so sabia ir de `true` para `false`, e casava o literal `= true;`. Num
- *  derivado com o gate JA suspenso — que e precisamente para isso que o interruptor existe —
- *  o patch nao aplicava, rebentava no setup, e tres outros testes que esperam `exit 1` do
- *  alarme passavam a receber `0`. Sete vermelhos de uma vez, e nenhum a dizer a causa.
- *
- *  Cada teste passa a DECLARAR a posicao que mede, em vez de a herdar do repo (`TP3`).
- *  Falha ALTO se o literal mudar de forma — mas pelo PADRAO, e nao por `out === src`: fixar
- *  o valor que ja la esta produz texto identico, e a guarda antiga lia isso como "nao aplicou". */
-const LITERAL_ALVOS = /const ALVOS_REPROVAM = (?:true|false);/;
-function porAlvos(dir, valor) {
-  const f = join(dir, CHECKER);
-  const src = readFileSync(f, "utf8");
-  if (!LITERAL_ALVOS.test(src)) throw new Error("o literal ALVOS_REPROVAM mudou de forma — o patch mediria a versao errada");
-  writeFileSync(f, src.replace(LITERAL_ALVOS, `const ALVOS_REPROVAM = ${valor};`));
-}
-const suspenderAlvos = (dir) => porAlvos(dir, false);
-const ligarAlvos = (dir) => porAlvos(dir, true);
-
-function manifest(dir, obj) {
-  writeFileSync(join(dir, ".next", "build-manifest.json"), JSON.stringify(obj));
-}
 
 function run(dir, cwd) {
   try {

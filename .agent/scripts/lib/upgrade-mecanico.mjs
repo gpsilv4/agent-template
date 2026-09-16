@@ -16,7 +16,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
-import { join, dirname } from "path";
+import { join, dirname, sep } from "path";
 
 /** `null` em vez de excepcao: "nao existe" e "nao consegui ler" pedem accoes diferentes a
  *  quem chama, e colapsar as duas e o `TP2`. */
@@ -62,22 +62,20 @@ export function andaFicheiros(base, fn, rel = "") {
  *  Escrever esta lista ja rendeu: a tabela do workflow dizia `CONTAGENS` em
  *  `check-test-surface.mjs`, e ela vive em `surface-patterns.mjs`. Um consumidor a seguir a
  *  instrucao copiava o ficheiro por inteiro e perdia as suas contagens em silencio. */
+// As duas dos BUNDLES sairam desta lista: `TARGETS` e `ALVOS_REPROVAM` mudaram-se para
+// `.agent/scripts/config/bundles.mjs`, que o `/upgrade` NUNCA toca. Preservar por nome era a
+// mitigacao; separar a configuracao da logica **fecha a classe** — a lista deixa de ter de
+// crescer a cada decisao nova, e era por ela envelhecer que a suspensao do gate se perdeu numa
+// ronda real, em silencio.
+//
+// As que ficam sao as que ainda vivem dentro de ficheiros de logica. A lista encolhe a cada
+// uma que se mude, e o objectivo e **desaparecer**.
 export const CONSTANTES_DO_PROJETO = [
-  [".agent/scripts/check-bundle-sizes.mjs", "TARGETS"],
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
   [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
   [".agent/scripts/surface-patterns.mjs", "CONTAGENS"],
-  // `ALVOS_REPROVAM` e uma DECISAO do projeto, nao um valor tecnico: um derivado que ligue a
-  // medicao de bundles a serio encontra os alvos acima e SUSPENDE o juizo, com ticket aberto.
-  // Nao estava nesta lista — e por isso o upgrade repunha o default `true` e o gate voltava a
-  // reprovar **sem ninguem decidir nada**. Medido num derivado real, ronda 4.
-  //
-  // Escapou a verificacao que ja existia porque essa e por DIFERENCA de output: nenhuma linha
-  // desapareceu, o verificador correu e mediu bem — so mudou de veredicto. Diferenca de output
-  // apanha o que some; nao apanha um default que regressa.
-  [".agent/scripts/check-bundle-sizes.mjs", "ALVOS_REPROVAM"],
 ];
 
 /**
@@ -153,7 +151,14 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   function trazerDoHead(rel) {
     const origem = join(root, rel);
     if (!existsSync(origem)) fatal(`${rel} nao existe no HEAD — nada a trazer`);
-    cpSync(origem, join(dir, rel), { recursive: true });
+    cpSync(origem, join(dir, rel), {
+      recursive: true,
+      // `config/` NUNCA se toca: e a configuracao do PROJETO, ao lado do `.agent/context/`.
+      // Sem este filtro, mover as constantes para la nao resolvia nada — a copia de
+      // `.agent/scripts/**` passava-lhes por cima na mesma, e a decisao do projeto voltava ao
+      // default do template. Era esse o defeito, um directorio abaixo.
+      filter: (src) => !src.split(sep).join("/").includes("/.agent/scripts/config/"),
+    });
   }
   
   // (i) `.agent/scripts/**` — copia limpa. (ii) O catalogo de anti-padroes do TEMPLATE, por

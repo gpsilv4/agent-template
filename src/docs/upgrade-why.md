@@ -62,6 +62,32 @@ julgamento a fazer sobre ele.
 
 ---
 
+## Porque a configuracao do projeto saiu dos ficheiros da logica
+
+O template misturava, no mesmo ficheiro, a **logica** (que o upgrade traz) e a **configuracao**
+(que nao deve trazer). A mitigacao era uma lista de nomes a preservar (`CONSTANTES_DO_PROJETO`),
+mantida **a mao** — e uma lista a mao envelhece.
+
+Foi assim que se perdeu uma decisao real. Um consumidor tinha o gate dos bundles **suspenso**,
+com ticket aberto e razao escrita; a ronda trouxe o ficheiro, a constante voltou ao default, e o
+gate passou a reprovar **sem ninguem decidir nada**.
+
+**O modo de falha e o pior que ha**: nada desapareceu do ecra. O verificador correu, mediu bem, e
+so o veredicto mudou. A verificacao que o consumidor tinha era por DIFERENCA de output e nao o
+apanhou — diferenca de output apanha o que some, **nao apanha um default que regressa**.
+
+A separacao fecha a classe em vez de a mitigar: o upgrade copia `.agent/scripts/**` por inteiro
+e a configuracao ja nao esta la dentro. A lista de nomes a preservar passa a poder **encolher**
+a cada constante que se mude, em vez de ter de crescer a cada decisao nova.
+
+**Uma expectativa que estava errada, registada porque a proxima pessoa vai te-la:** esperava-se
+que mover as constantes encolhesse a suite de testes (que fatiava literais de dentro do ficheiro
+da logica). **Nao encolheu** — o ajudante que ESCREVE a config, com a semantica parcial que o
+torna correcto, custa tanto como o fatiamento que substituiu. O ganho e o upgrade deixar de
+atropelar decisoes; nao e o tamanho.
+
+---
+
 ## Os tres defeitos que a simulacao encontrou na primeira corrida
 
 Escritos porque sao a prova de que o caminho do `/upgrade` nao estava medido — os tres viviam

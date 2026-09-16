@@ -13,7 +13,7 @@
  */
 import { SUITES, regraDe, comandoDe, verificadoresDe } from "./lib/mapa-suites.mjs";
 import { PARES } from "./lib/pares.mjs";
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync, readdirSync, existsSync } from "fs";
 
 let passed = 0;
 const falhas = [];
@@ -150,6 +150,22 @@ test("todo o harness casa uma regra no mapa", () => {
   const harnesses = readdirSync(".agent/scripts").filter((n) => /harness\.mjs$/.test(n));
   if (harnesses.length === 0) return ["nenhum harness encontrado — o teste mediria o vazio"];
   return harnesses.flatMap((f) => (regraDe(`.agent/scripts/${f}`) === null ? [`${f}: nenhuma regra no mapa`] : []));
+});
+
+// Os guards de documentacao varrem pastas INTEIRAS (`listDir("src/docs", ".md")`), nao uma lista
+// de nomes. Um `.md` novo nessas pastas entra no alcance deles no momento em que existe — mas nao
+// gerava obrigacao nenhuma de os correr. Estavam de fora o `src/docs/` completo e o
+// `.agent/BOOTSTRAP.md`, que TRES guards leem (12, 13 e 15).
+//
+// Apanhado pelo `--diff`, que disse `sem regra no mapa` ao ver o `upgrade-why.md` tocado. Escrito
+// aqui por descoberta em disco e nao por lista, para que o proximo ficheiro seja apanhado sozinho.
+test("todo o .md que os guards varrem casa uma regra no mapa", () => {
+  const alvos = [
+    ...(existsSync("src/docs") ? readdirSync("src/docs").filter((n) => n.endsWith(".md")).map((n) => `src/docs/${n}`) : []),
+    ...readdirSync(".agent").filter((n) => n.endsWith(".md")).map((n) => `.agent/${n}`),
+  ];
+  if (alvos.length === 0) return ["nenhum .md encontrado — o teste mediria o vazio"];
+  return alvos.flatMap((f) => (regraDe(f) === null ? [`${f}: nenhuma regra no mapa`] : []));
 });
 
 console.log("");

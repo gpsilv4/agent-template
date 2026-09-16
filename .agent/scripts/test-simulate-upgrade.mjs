@@ -16,7 +16,7 @@
  *   node .agent/scripts/test-simulate-upgrade.mjs
  */
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -144,15 +144,30 @@ test("documento NAO customizado fica com a versao nova", () => {
 // linha desapareceu, o veredicto e que mudou. Diferenca de output apanha o que some; nao apanha
 // um default que regressa. Por isso isto e um teste e nao uma linha numa tabela: acrescentar a
 // constante a lista das preservadas prova que alguem a escreveu la, nao que ela sobrevive.
-// A OUTRA METADE, e sem ela a de baixo nao vale nada: o teste do motor INJECTA a lista de
-// constantes, logo continua verde com o `ALVOS_REPROVAM` fora do catalogo real. Mede o
-// mecanismo, nao a inscricao — assertiva satisfeita por outra coisa, que e o `TP1`.
+// O INVARIANTE MUDOU, e a mudanca e o ponto: antes afirmava-se que o `ALVOS_REPROVAM` estava
+// na lista das constantes preservadas. Agora ele vive em `config/bundles.mjs`, e o que tem de
+// ser verdade e mais forte — **o upgrade nao toca na pasta de configuracao de todo**.
 //
-// Esta afirma a inscricao. As duas juntas dizem "esta na lista E a lista funciona"; qualquer
-// uma sozinha deixa passar metade.
-test("o gate dos bundles esta no catalogo das decisoes preservadas", () => {
-  const tem = CONSTANTES_DO_PROJETO.some(([f, n]) => f.endsWith("check-bundle-sizes.mjs") && n === "ALVOS_REPROVAM");
-  return tem ? [] : ["ALVOS_REPROVAM fora de CONSTANTES_DO_PROJETO — a decisao do projeto perde-se em cada upgrade"];
+// Uma lista de nomes a preservar envelhece a cada decisao nova que alguem acrescente e se
+// esqueca de inscrever. Uma pasta que o upgrade nao toca nao envelhece.
+test("o upgrade NAO toca na configuracao do projeto", () => {
+  let c;
+  try {
+    const cfg = ".agent/scripts/config/bundles.mjs";
+    c = cenario({
+      ontem: { [cfg]: "export const ALVOS_REPROVAM = true;\n" },
+      // O template mudou a sua config — e mesmo assim a do consumidor fica.
+      hoje: { [cfg]: "export const ALVOS_REPROVAM = true;\nexport const NOVIDADE = 1;\n" },
+      consumidor: { [cfg]: "export const ALVOS_REPROVAM = false;\n" },
+    });
+    const v = c.ler(cfg);
+    const p = [];
+    if (!/ALVOS_REPROVAM = false/.test(v ?? "")) p.push("a decisao do projeto foi atropelada pelo upgrade");
+    if ((v ?? "").includes("NOVIDADE")) p.push("o upgrade escreveu por cima da config — devia nao lhe tocar");
+    return p;
+  } finally {
+    limpa(c);
+  }
 });
 
 test("a DECISAO do projeto (gate suspenso) sobrevive ao upgrade", () => {
@@ -268,6 +283,38 @@ test("constante que desapareceu do template REPROVA, em vez de ignorar", () => {
   }
 });
 
+// Os casos de recusa aqui em cima passavam TODOS — e deixavam oito diretorios temporarios por
+// corrida para tras, cada um com um repo `git init` dentro. O chamador escreve
+// `let c; try { c = cenario(...) } finally { limpa(c) }`, e quando o `cenario` lanca, o `c`
+// ainda e `undefined`: o `finally` corre e nao limpa nada. Um teste verde a sujar a maquina.
+//
+// Chegou a 1621 diretorios (4,1 GB) antes de alguem reparar, e o efeito nao era so disco: o
+// indexador do macOS percorria-os e as medicoes de tempo DESTA suite saiam 3x infladas — uma
+// fuga de recursos que falsificava as proprias medicoes que iam decidir se valia a pena
+// optimizar. Nenhuma leitura do teste a denunciava, porque o sintoma esta fora do processo.
+test("um cenario que REBENTA nao deixa diretorios temporarios para tras", () => {
+  // A pasta e SO deste teste. Contar `sim-up-*` no `tmpdir()` do sistema media o estado da
+  // maquina (`TP3`) e ficava vermelho por causa de qualquer outra corrida em paralelo.
+  const base = mkdtempSync(join(tmpdir(), "sim-up-fuga-"));
+  try {
+    try {
+      cenario({
+        ontem: { ".agent/scripts/s.mjs": "const A = {\n  x: 1,\n};\n" },
+        hoje: { ".agent/scripts/s.mjs": "// a constante saiu daqui\n" },
+        constantes: [[".agent/scripts/s.mjs", "A"]],
+        base,
+      });
+      return ["o cenario devia ter rebentado — sem isso este teste nao mede nada"];
+    } catch (err) {
+      if (!err.message.startsWith("__fatal__")) return [`rebentou por outra razao: ${err.message}`];
+    }
+    const restos = readdirSync(base);
+    return restos.length === 0 ? [] : [`ficaram ${restos.length} diretorio(s) para tras: ${restos.join(", ")}`];
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 // --- O simulador de ponta a ponta, sobre um template SINTETICO --------------------
 // Os casos de cima saem cedo, nos guardas. Estes montam um template completo o bastante para
 // o simulador correr ate ao fim — e e so assim que os seus proprios caminhos de recusa (a
@@ -282,8 +329,10 @@ function templateSintetico(extra = {}) {
     // procura-a pelo nome e REPROVA se nao a encontrar — e reprova bem, porque a tabela do
     // `/upgrade` estaria a mandar preservar algo que nao existe. Quem fica incompleta e a
     // fixture, nao o motor.
-    ".agent/scripts/check-bundle-sizes.mjs":
-      'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\nconst ALVOS_REPROVAM = true;\n',
+    ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\n',
+    // A DECISAO vive a parte, e e ela que o simulador suspende. Estava dentro do ficheiro da
+    // logica e o upgrade atropelava-a — foi essa a mudanca que a separacao veio fechar.
+    ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = true;\n",
     ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
     ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
     ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
@@ -366,7 +415,8 @@ for (const [nome, extra, marca] of [
   // O gate suspenso e a DECISAO do projeto: se a fixture nao a conseguir montar, a simulacao
   // deixa de exercitar a travessia que interessa — e passava a verde a afirmar menos. A
   // varredura apontou este `fatal()` como nao coberto.
-  ["com o gate dos bundles noutra forma", { ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\nconst ALVOS_REPROVAM = 1;\n' }, "nao consegui suspender o gate"],
+  ["com o gate dos bundles noutra forma", { ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = 1;\n" }, "nao consegui suspender o gate"],
+  ["sem a config dos bundles", { ".agent/scripts/config/bundles.mjs": null }, "nao representa um consumidor"],
   ["sem a seccao 2.2 no BOOTSTRAP.md", { ".agent/BOOTSTRAP.md": "# Bootstrap\n\nsem a seccao\n" }, "nao derivei nenhuma rule gerada"],
   ["sem `anti-patterns.md` na tag", { ".agent/rules/anti-patterns.md": null }, "nao representa um consumidor"],
 ]) {

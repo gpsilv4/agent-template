@@ -263,9 +263,17 @@ ok(`bootstrapado: ${tocados} ficheiro(s) com placeholders, ${geradas.length} rul
   //     A verificacao que o consumidor tinha era por DIFERENCA de output, e nao apanhou: nenhuma
   //     linha desapareceu — o veredicto e que mudou. Diferenca de output apanha o que some; nao
   //     apanha um default que regressa. Por isso e que isto se mede aqui, e nao se confia.
-  const comGateSuspenso = cAlvosNovo.replace(/const ALVOS_REPROVAM = (?:true|false);/, "const ALVOS_REPROVAM = false;");
-  if (comGateSuspenso === cAlvosNovo) fatal(`nao consegui suspender o gate em ${relAlvos} — o literal mudou de forma`);
-  writeFileSync(join(dir, relAlvos), comGateSuspenso);
+  writeFileSync(join(dir, relAlvos), cAlvosNovo);
+
+  //     A decisao vive na `config/`, que o upgrade NAO toca. E essa a mudanca que fecha a
+  //     classe: preservar por nome era mitigacao, e uma lista de nomes envelhece a cada decisao
+  //     nova que alguem acrescente e se esqueca de inscrever.
+  const relCfg = ".agent/scripts/config/bundles.mjs";
+  const cCfg = leOuNull(join(dir, relCfg));
+  if (cCfg === null) fatal(`${relCfg} nao existe no ${tag} — a fixture nao representa um consumidor`);
+  const comGateSuspenso = cCfg.replace(/export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
+  if (comGateSuspenso === cCfg) fatal(`nao consegui suspender o gate em ${relCfg} — o literal mudou de forma`);
+  writeFileSync(join(dir, relCfg), comGateSuspenso);
 }
 ok("conteudo proprio do projeto acrescentado (anti-padrao, verificador grande e uma constante customizada)");
 
@@ -283,8 +291,8 @@ ok(
 // com um facto e nao com uma lista: acrescentar a constante a tabela das preservadas nao prova
 // que ela sobrevive — prova que alguem a escreveu la. Isto mede.
 {
-  const depois = leOuNull(join(dir, ".agent/scripts/check-bundle-sizes.mjs"));
-  if (depois === null || !/const ALVOS_REPROVAM = false;/.test(depois)) {
+  const depois = leOuNull(join(dir, ".agent/scripts/config/bundles.mjs"));
+  if (depois === null || !/export const ALVOS_REPROVAM = false;/.test(depois)) {
     warn(
       "a suspensao do gate dos bundles NAO sobreviveu ao upgrade — a decisao do projeto foi " +
         "reposta no default, e e isso que faz um consumidor levar um gate vermelho sem ter decidido nada"

@@ -44,8 +44,11 @@ export const SUITES = [
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
   { re: /^\.agent\/scripts\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
+  // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do
+  // projeto: mexer na configuracao obriga a correr quem a le.
+  { re: /^\.agent\/scripts\/(test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
-  { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|test-sweep-harness\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
   { re: /^\.agent\/scripts\/(lib\/mapa-suites|test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
@@ -63,19 +66,45 @@ export const SUITES = [
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
   { re: /^\.agent\/scripts\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   { re: /^\.agent\/scripts\/tests-[\w-]+\.mjs$/, verifica: [S("test-guards.mjs")] },
+
+  // Uma suite de entry point verifica-se A SI PROPRIA. Oito das dez nao casavam regra nenhuma:
+  // mexer no `test-guards.mjs` — 245 testes — nao gerava obrigacao de o correr. Escapou porque
+  // as regras foram escritas a pensar em "o que verifica ESTE ficheiro de producao", e uma suite
+  // e produto de si mesma.
+  //
+  // Vem DEPOIS das especificas de proposito: o `test-mutation-sweep` e o `test-mapa-suites` ja
+  // tem regra propria acima, e a ordem da tabela e a semantica.
+  //
+  // Apanhado pelo aviso dos ficheiros sem regra, um minuto depois de esse aviso deixar de ser
+  // engolido — que e o argumento inteiro a favor de o tornar visivel.
+  { re: /^\.agent\/scripts\/(test-[\w-]+)\.mjs$/, verifica: [], suiteDeSi: true },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
+  // Qualquer `.md` na RAIZ de `.agent/` — hoje so o `BOOTSTRAP.md`, e ele e lido por tres
+  // guards (12, 13 e 15). A regra e por pasta e nao pelo nome do ficheiro de proposito: escrita
+  // a nome, um `.agent/QUALQUER.md` novo voltava a nao gerar obrigacao nenhuma, que e o mesmo
+  // buraco outra vez.
+  { re: /^\.agent\/[^/]+\.md$/, verifica: [S("check-doc-versions.mjs")] },
   { re: /^(CLAUDE|GEMINI|AGENTS|README)\.md$/, verifica: [S("check-doc-versions.mjs")] },
+  // `src/docs/` e a casa da evidencia, e DOIS guards a varrem por inteiro, nao ficheiro a
+  // ficheiro: o Guard 12 (`listDir("src/docs", ".md")`, numeros citados na prosa) e o Guard 15
+  // (citacoes de anti-padroes que tem de resolver). Mexer aqui podia partir qualquer um deles e
+  // nao gerava obrigacao nenhuma — o `--diff` apontou-o com `sem regra no mapa` ao ver o
+  // `upgrade-why.md` a ser tocado.
+  { re: /^src\/docs\/.+\.md$/, verifica: [S("check-doc-versions.mjs")] },
   { re: /^\.agent\/context\/backlog/, verifica: [S("check-backlog.mjs")] },
   { re: /^\.claude\/settings\.json$/, verifica: [S("test-guards.mjs")] },
 ];
 
 /** A linha de comando de uma regra, montada a partir do que ela declara. */
-export function comandoDe(regra) {
-  const partes = regra.verifica.map((v) => `node ${v}`);
+export function comandoDe(regra, ficheiro) {
+  // `suiteDeSi`: a regra nao sabe QUAL suite e, so que e ela propria. O ficheiro tocado e que
+  // o diz — e por isso o comando so se pode montar com ele a mao.
+  const alvos = regra.suiteDeSi ? [ficheiro] : regra.verifica;
+  const partes = alvos.map((v) => `node ${v}`);
   if (regra.only) partes.push(`node ${S("mutation-sweep.mjs")} --only=${regra.only}`);
   return partes.join(" && ");
 }
@@ -97,7 +126,7 @@ export function verificadoresDe(ficheiros) {
       semRegra.push(f);
       continue;
     }
-    for (const v of regra.verifica) {
+    for (const v of (regra.suiteDeSi ? [f] : regra.verifica)) {
       if (!porVerificador.has(v)) porVerificador.set(v, []);
       porVerificador.get(v).push(f);
     }

@@ -403,10 +403,12 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
   // (c) O gate dos bundles SUSPENSO. E a posicao que um derivado toma quando liga a medicao a
   //     serio e encontra os alvos acima — e o interruptor existe para isso. Um teste que so
   //     saiba ir de `true` para `false` rebenta aqui, que foi exactamente o que aconteceu.
+  // Na `config/`, que e onde a DECISAO agora vive — e nao no ficheiro da logica, que o upgrade
+  // substitui. Foi esta mudanca de casa que fechou a classe: preservar por nome era mitigacao.
   configura(
-    ".agent/scripts/check-bundle-sizes.mjs",
-    /const ALVOS_REPROVAM = (?:true|false);/,
-    "const ALVOS_REPROVAM = false;",
+    ".agent/scripts/config/bundles.mjs",
+    /export const ALVOS_REPROVAM = (?:true|false);/,
+    "export const ALVOS_REPROVAM = false;",
     "o gate dos bundles suspenso"
   );
 
