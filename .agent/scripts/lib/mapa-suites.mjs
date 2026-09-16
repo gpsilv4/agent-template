@@ -1,0 +1,88 @@
+/**
+ * Caminho tocado -> o que o verifica — {{PROJECT_NAME}}
+ *
+ * PORQUE VIVE AQUI: esta tabela nasceu dentro do `.claude/hooks/stop-verify.mjs`, que e
+ * **so-Claude-Code**. Mas o conhecimento nao e dele: "mexer em X obriga a correr Y" vale para
+ * qualquer agente, e o `mutation-sweep.mjs` — que so precisa de `node` — precisa do mesmo mapa
+ * para derivar o que varrer a partir de um diff.
+ *
+ * Escrever um segundo mapa la dentro eram **dois campos a ter de concordar a mao, sem nada a
+ * verifica-los** — o `TP1` que este repo documenta. Um mapa, dois consumidores.
+ *
+ * O COMANDO E DERIVADO e nao escrito: cada regra diz **o que verifica** (`verifica`) e, se for
+ * caso disso, que fatia da varredura lhe corresponde (`only`). A string que o `stop-verify`
+ * mostra sai daqui montada. Guardar as duas coisas lado a lado era a mesma duplicacao a entrar
+ * outra vez, um nivel abaixo.
+ *
+ * CONFIGURAR AO PROJETO: e esta a tabela que um projeto derivado adapta. A **ordem importa** —
+ * a primeira regra que casa e a que vale.
+ */
+
+const S = (n) => `.agent/scripts/${n}`;
+
+export const SUITES = [
+  { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
+  { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
+  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs")], only: "check-backlog" },
+  // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
+  // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
+  // que este mapa pode deixar passar.
+  {
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/upgrade-mecanico\.mjs)$/,
+    verifica: [S("test-simulate-upgrade.mjs")],
+    only: "upgrade",
+  },
+  // O `surface-patterns.mjs` e os dois harnesses nao casavam nenhuma regra: mexer neles nao
+  // gerava divida nenhuma, ao contrario de mexer no `check-test-surface.mjs`. E sao eles que
+  // DECIDEM — as tabelas de padroes e o veredicto de ~280 testes.
+  //
+  // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
+  // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
+  { re: /^\.agent\/scripts\/(?:check-test-surface|surface-patterns|test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/test-harness\.mjs$/, verifica: [S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
+  { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
+  // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
+  { re: /^\.agent\/scripts\/(lib\/mapa-suites|test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
+  { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
+  { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
+  { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
+  { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
+  { re: /^(CLAUDE|GEMINI|AGENTS|README)\.md$/, verifica: [S("check-doc-versions.mjs")] },
+  { re: /^\.agent\/context\/backlog/, verifica: [S("check-backlog.mjs")] },
+  { re: /^\.claude\/settings\.json$/, verifica: [S("test-guards.mjs")] },
+];
+
+/** A linha de comando de uma regra, montada a partir do que ela declara. */
+export function comandoDe(regra) {
+  const partes = regra.verifica.map((v) => `node ${v}`);
+  if (regra.only) partes.push(`node ${S("mutation-sweep.mjs")} --only=${regra.only}`);
+  return partes.join(" && ");
+}
+
+/** A primeira regra que casa `ficheiro`, ou `null`. A ORDEM da tabela e a semantica. */
+export const regraDe = (ficheiro) => SUITES.find((s) => s.re.test(ficheiro)) ?? null;
+
+/** Os caminhos que verificam `ficheiros`, sem repetidos, com os ficheiros que motivam cada um.
+ *
+ *  Devolve tambem os que **nao casaram nenhuma regra**: quem chama precisa deles para os poder
+ *  mostrar. Engoli-los era transformar uma lacuna do mapa em silencio — e uma lacuna silenciosa
+ *  num mapa de cobertura e pior do que nao ter mapa, porque parece cobertura. */
+export function verificadoresDe(ficheiros) {
+  const porVerificador = new Map(); // caminho -> ficheiros que o motivam
+  const semRegra = [];
+  for (const f of ficheiros) {
+    const regra = regraDe(f);
+    if (regra === null) {
+      semRegra.push(f);
+      continue;
+    }
+    for (const v of regra.verifica) {
+      if (!porVerificador.has(v)) porVerificador.set(v, []);
+      porVerificador.get(v).push(f);
+    }
+  }
+  return { porVerificador, semRegra };
+}

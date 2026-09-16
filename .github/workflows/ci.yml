@@ -234,6 +234,8 @@ jobs:
         run: node .agent/scripts/test-test-surface.mjs
       - name: Registo de suites por descoberta — negative tests
         run: node .agent/scripts/test-registo.mjs
+      - name: Mapa "caminho tocado -> o que o verifica" — negative tests
+        run: node .agent/scripts/test-mapa-suites.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests
