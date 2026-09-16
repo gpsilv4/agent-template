@@ -226,3 +226,58 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
   }
   return 1;
 }
+
+// --- Guard 18: cada anti-padrao do TEMPLATE tem a sua evidencia -------------------
+/**
+ * O `anti-patterns-template.md` (instrucoes) e o `src/docs/anti-patterns-why.md` (evidencia)
+ * sao um PAR. Uma das duas direccoes ja estava fechada por medicao, a outra nao:
+ *
+ *   - seccao no `-why` sem entrada na rule -> o Guard 15 ja a apanha (varre `src/docs/*.md`,
+ *     logo um cabecalho orfao la e uma citacao morta);
+ *   - entrada na rule sem seccao no `-why` -> estava garantida **so por prosa**, no `/review`.
+ *
+ * E este repo tem uma licao escrita sobre prosa: a regra de nao atribuir commits a uma IA
+ * estava em maiusculas no `process-rules.md` e foi violada na mesma. Foi preciso um hook.
+ *
+ * SO OS `TPn`, e a assimetria e deliberada. Os do TEMPLATE sao do template: ele controla-os,
+ * e uma entrada sua sem evidencia e sempre um esquecimento. Os `APn` do PROJETO nao entram —
+ * um derivado tem toda a legitimidade para nunca escrever um `-why` (o proprio ficheiro
+ * autoriza apaga-lo), e exigir-lho era impor-lhe uma pratica que o template nao justifica em
+ * casa alheia. Ha um teste que afirma esse silencio.
+ *
+ * `SKIP` quando o `-why` nao existe: apaga-lo e uma escolha legitima de quem deriva, nao um
+ * defeito. Visivel, e nao em silencio — "nao se aplica aqui" != "correu e passou".
+ *
+ * @returns {number} guards executados
+ */
+export function guardAntiPatternEvidence({ read, warn, ok, skip }) {
+  const WHY = "src/docs/anti-patterns-why.md";
+  const rule = read(".agent/rules/anti-patterns-template.md");
+  const why = read(WHY);
+  if (rule === null || why === null) {
+    skip(`Guard 18 (evidencia dos anti-padroes do template) — sem ${rule === null ? "o catalogo" : WHY}`);
+    return 0;
+  }
+
+  // O MESMO padrao de cabecalho do Guard 15, e nao uma copia: se divergirem, um guard conta
+  // entradas que o outro nao ve, e a assimetria entre eles passa a ser invisivel.
+  const naRule = [...semHtml(rule).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]);
+  const noWhy = new Set([...why.matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]));
+
+  // So o prefixo do TEMPLATE. Um `APn` que alguem escreva neste ficheiro ja e reprovado pela
+  // deteccao de colisao la em cima — nao e aqui que se diz isso outra vez.
+  const doTemplate = naRule.filter((id) => id.startsWith("TP"));
+  if (doTemplate.length === 0) {
+    skip("Guard 18 — o catalogo do template nao tem entradas");
+    return 0;
+  }
+
+  const semEvidencia = doTemplate.filter((id) => !noWhy.has(id));
+  for (const id of semEvidencia) {
+    warn(`${id} esta definido no catalogo do template mas nao tem seccao em ${WHY} — a instrucao existe, a evidencia nao`);
+  }
+  if (semEvidencia.length === 0) {
+    ok(`${doTemplate.length} anti-padrao(oes) do template com a sua evidencia em ${WHY}`);
+  }
+  return 1;
+}

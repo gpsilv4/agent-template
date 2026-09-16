@@ -79,6 +79,10 @@ const FIXTURE_PATHS = [
   ".nvmrc",
   "src/docs/CHANGELOG.md",
   "src/docs/agent-guide.md",
+  // O par do catalogo de anti-padroes: as instrucoes vivem na rule, a evidencia aqui. Sem ele
+  // na fixture, o Guard 18 dava SKIP em TODOS os testes — e um guard que salta sempre passa
+  // por verde sem nunca ter sido medido.
+  "src/docs/anti-patterns-why.md",
 ];
 
 let passed = 0;

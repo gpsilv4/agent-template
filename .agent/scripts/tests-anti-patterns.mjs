@@ -321,6 +321,44 @@ export function registar() {
   // sequer os cabecalhos do prefixo do projeto (nada por resolver, nada por colidir), e era
   // precisamente esse o ramo que ele existe para cobrir. Com ela, deixar de ler as definicoes
   // do projeto torna a citacao morta e o teste vermelho.
+  // --- Guard 18: cada anti-padrao do TEMPLATE tem a sua evidencia ---------------
+  // O par instrucoes<->evidencia tinha uma direccao fechada (o Guard 15 apanha a seccao orfa)
+  // e a outra garantida SO POR PROSA. Este guard fecha-a; estes testes provam que a fecha.
+
+  const WHY = "src/docs/anti-patterns-why.md";
+
+  test("G18: entrada do template sem seccao no `-why` avisa", (dir) => {
+    // Apaga-se a seccao da PRIMEIRA entrada, seja ela qual for — derivado e nao escrito a mao,
+    // que e o que impede o teste de envelhecer quando as entradas mudarem de numero.
+    const c = readF(dir, WHY);
+    const m = c.match(/^#{2,3}\s+(TP\d+)\b.*$/m);
+    if (m === null) throw new Error(`${WHY} sem cabecalhos de entrada — o teste mediria outra coisa`);
+    const semUma = c.split("\n").filter((l) => !l.startsWith(m[0])).join("\n");
+    if (semUma === c) throw new Error("a fixture nao apagou nada");
+    writeF(dir, WHY, semUma);
+    return { includes: [`${m[1]} esta definido no catalogo do template mas nao tem seccao`] };
+  }, { code: 1 });
+
+  // O CONTRA-CASO do ambito: os `APn` do PROJETO nao entram. Um derivado tem legitimidade para
+  // nunca escrever um `-why`, e exigir-lho era impor-lhe uma pratica que o template nao
+  // justifica em casa alheia. Sem este teste, alargar o guard a todos os prefixos passava
+  // despercebido — e so se veria no CI de um consumidor.
+  test("G18: um `APn` do projeto sem evidencia NAO e problema deste guard", (dir) => {
+    const f = ".agent/rules/anti-patterns.md";
+    const idProprio = "AP" + "1";
+    writeF(dir, f, readF(dir, f) + `\n### ${idProprio} — o primeiro deste projeto\n\nTexto.\n`);
+    const doc = ".agent/rules/core-rules.md";
+    writeF(dir, doc, readF(dir, doc) + `\n> Ver ${idProprio} para o detalhe.\n`);
+  }, { code: 0, excludes: ["nao tem seccao em"] });
+
+  // Exit **0**: apagar o `-why` e uma escolha legitima de quem deriva, nao um defeito. O que
+  // nao pode e ser silencio — "nao se aplica aqui" tem de aparecer no ecra. (O teste
+  // equivalente do Guard 15 espera exit 1 porque la a ausencia dos DOIS catalogos faz outros
+  // guards reprovar; aqui nao ha nada a reprovar, e copiar aquele numero era medir o ruido.)
+  test("G18: sem o ficheiro de evidencia da SKIP visivel, nao silencio", (dir) => {
+    rmSync(file(dir, WHY));
+  }, { code: 0, anyOut: ["SKIP  Guard 18"] });
+
   test("G15: o projeto a definir e citar o seu primeiro `APn` NAO e colisao", (dir) => {
     const idProprio = "AP" + "1";
     writeF(dir, DEF_PROJETO, readF(dir, DEF_PROJETO) + `\n### ${idProprio} — o primeiro deste projeto\n\nTexto.\n`);
