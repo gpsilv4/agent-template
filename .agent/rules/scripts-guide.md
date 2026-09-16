@@ -41,6 +41,11 @@ nao casou regra nenhuma, para uma lacuna no mapa ficar visivel em vez de absorvi
 > checklist — e o habito passa por decisao. Aconteceu no proprio PR que introduziu o `--diff`,
 > e so se viu porque alguem perguntou "porque estas a correr a completa?".
 
+> **Guard 18** (no mesmo modulo do 15): cada `TPn` do catalogo do template tem de ter a sua
+> seccao em `src/docs/anti-patterns-why.md`. A outra direccao ja estava fechada — uma seccao
+> orfa la e uma citacao morta para o Guard 15. **So os `TPn`**: um projeto derivado pode
+> legitimamente nunca escrever um `-why`, e exigir-lho era impor-lhe uma pratica do template.
+
 ## A regra que os liga
 
 Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua

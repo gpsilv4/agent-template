@@ -37,7 +37,7 @@ import { guardChangelogVersion, guardDependencyVersions } from "./guards/version
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
-import { guardAntiPatternRefs } from "./guards/anti-patterns.mjs";
+import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
 
@@ -417,6 +417,7 @@ guardsRun += guardMcp({ read, warn, ok, skip });
 // ficheiro, que passou o flag das 500 linhas); a entrada em `PARES` do `mutation-sweep.mjs` e
 // obrigatoria, senao a varredura mede este ficheiro e reporta 100% a mentir.
 guardsRun += guardAntiPatternRefs({ read, warn, ok, skip, note, listDir });
+guardsRun += guardAntiPatternEvidence({ read, warn, ok, skip });
 
 
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---

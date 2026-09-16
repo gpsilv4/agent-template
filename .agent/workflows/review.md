@@ -114,7 +114,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] Duvida sobre o que uma deteccao apanha, ou porque a entrada existe? -> `src/docs/anti-patterns-why.md`
       (evidencia e receitas por inteiro; **nao** carregado, abrir so quando faz falta)
 - [ ] O trabalho revelou um padrao evitavel novo? -> propor entrada nova em `anti-patterns.md`
-      **e** a seccao correspondente no `anti-patterns-why.md` (as duas andam em par)
+      (as tuas; o prefixo `AP` esta livre). Para os `TPn` do template, o **Guard 18** ja exige
+      a seccao no `anti-patterns-why.md` — nos teus fica a teu criterio
 
 ## 9. Testes  — a partir de `S`
 
