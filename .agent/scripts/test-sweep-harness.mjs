@@ -305,7 +305,12 @@ export function test(name, opts, args, expect) {
   }
 }
 /** O veredicto da suite. Vive aqui porque os contadores vivem aqui: exporta-los em bruto punha
- *  duas copias do mesmo numero a ter de concordar a mao (`TP1`). Devolve o codigo de saida. */
+ *  duas copias do mesmo numero a ter de concordar a mao (`TP1`).
+ *
+ *  SAI daqui em vez de devolver um codigo, como o `resumo()` do `test-harness.mjs`. Devolve-lo
+ *  parecia mais testavel e custava duas coisas: divergia da convencao dos outros harnesses, e
+ *  tirava o `process.exit(1)` de dentro da suite — que e a marca por onde o
+ *  `check-test-surface.mjs` reconhece que um runner ainda tem veredicto. O gate apanhou-o. */
 export function resumo() {
   console.log("");
   console.log(`  ${passed} passaram, ${failures.length} falharam.`);
@@ -316,8 +321,8 @@ export function resumo() {
       console.log(out);
     }
     console.log("  Ha testes do mutation sweep a falhar.\n");
-    return 1;
+    process.exit(1);
   }
   console.log("  Todos os testes do mutation sweep passaram.\n");
-  return 0;
+  process.exit(0);
 }

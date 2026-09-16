@@ -406,6 +406,39 @@ test("gate SUSPENSO: ficheiro ausente do disco continua a reprovar", (dir) => {
   suspenderAlvos(dir);
 }, { code: 1, includes: ["AUSENTES do disco"] });
 
+// --- A ligacao entre a fixture e o que o checker LE --------------------------
+// Estes dois substituem os `throw` que o #67 tornou obsoletos. Antes, a fixture FATIAVA o
+// literal dentro do ficheiro da logica, e cada patch trazia a sua guarda de "o literal mudou de
+// forma — o patch mediria a versao errada". Com a config escrita num ficheiro proprio esse modo
+// de falha desapareceu... e foi substituido por outro, da mesma familia e igualmente silencioso:
+//
+//   o `porConfig()` escreve `.agent/scripts/config/bundles.mjs` na sandbox. Se o checker deixar
+//   de a importar — alguem volta a por a configuracao inline — ou renomear o que importa, a
+//   fixture passa a escrever um ficheiro que NINGUEM LE. Os 27 testes continuam verdes, a medir
+//   a configuracao errada.
+//
+// O `check-test-surface` apontou a descida das assercoes e obrigou a esta pergunta. A resposta
+// nao foi baixar o numero: foi traduzir o invariante velho para o desenho novo.
+test("o checker IMPORTA a config — senao a fixture nao e lida por ninguem", () => {
+  const src = readFileSync(join(ROOT, CHECKER), "utf8");
+  if (!/from\s+["']\.\/config\/bundles\.mjs["']/.test(src)) {
+    throw new Error("o check-bundle-sizes.mjs ja nao importa ./config/bundles.mjs — a fixture deixaria de ser lida");
+  }
+// A assercao deste teste esta no SETUP, nao no output: a sandbox fica vazia e o checker sai 1 a
+// pedir o build, como em qualquer outro teste sem manifest. O que se mede e o `throw` acima.
+}, { code: 1, includes: ["nao encontrado", "npm run build"] });
+
+test("o checker importa os NOMES que a fixture escreve", () => {
+  const src = readFileSync(join(ROOT, CHECKER), "utf8");
+  const importa = src.match(/import\s*\{([^}]+)\}\s*from\s+["']\.\/config\/bundles\.mjs["']/)?.[1] ?? "";
+  const faltam = ["TARGETS", "ALVOS_REPROVAM"].filter((n) => !new RegExp(`\\b${n}\\b`).test(importa));
+  if (faltam.length) {
+    throw new Error(`o checker ja nao importa ${faltam.join(", ")} — o porConfig() escreveria nomes que ninguem le`);
+  }
+// A assercao deste teste esta no SETUP, nao no output: a sandbox fica vazia e o checker sai 1 a
+// pedir o build, como em qualquer outro teste sem manifest. O que se mede e o `throw` acima.
+}, { code: 1, includes: ["nao encontrado", "npm run build"] });
+
 // --- Resumo -----------------------------------------------------------------
 
 console.log("");

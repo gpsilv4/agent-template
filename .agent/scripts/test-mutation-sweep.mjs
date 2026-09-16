@@ -301,4 +301,4 @@ registarResultado(
   )
 );
 
-process.exit(resumo());
+resumo();
