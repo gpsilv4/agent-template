@@ -7,9 +7,8 @@
  * A fixture MONTA o `.mcp.json` de que cada assercao depende (`TP3`) — no template nu esse
  * ficheiro nao existe, logo herdar o estado do repo daria uma suite que so afirma "saltou".
  */
-import { rmSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF } from "./test-harness.mjs";
+import { test, readF, writeF } from "./test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(

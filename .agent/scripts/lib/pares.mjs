@@ -40,6 +40,20 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas e a
+    // catraca do Guard 17 exigiu a divisao. Entrou na descoberta no momento em que ganhou o
+    // prefixo `test-` da convencao — e a descoberta reclamou logo, com razao: um harness DECIDE
+    // o veredicto de toda a suite que o usa.
+    //
+    // O `sinal` e o `throw`, e nao um `warn(`/`problemas.push(`: este harness nao reporta, ele
+    // PARA. A unica recusa que tem e a do `fatal` injectado no motor — desliga-la faz um `cenario`
+    // que devia reprovar seguir em frente e a suite passar a medir outra coisa.
+    alvo: ".agent/scripts/test-upgrade-harness.mjs",
+    suite: ".agent/scripts/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])throw new Error\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/test-surface-harness.mjs",
     suite: ".agent/scripts/test-test-surface.mjs",
     sinal: /(?<![\w.$])problemas\.push\(/,

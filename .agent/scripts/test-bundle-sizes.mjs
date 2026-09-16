@@ -67,15 +67,20 @@ function chunk(dir, relPath, bytes, filler = "x") {
 const TARGETS_FIXTURE = { "/": { name: "Home", target: 160, alarm: 180 } };
 
 /** Reescreve o literal TARGETS na copia do checker (para exercitar varias rotas). */
+const LITERAL_TARGETS = /const TARGETS = \{[\s\S]*?\n\};/;
+
 function withTargets(dir, targets) {
   const p = join(dir, CHECKER);
   const src = readFileSync(p, "utf8");
   const body = Object.entries(targets)
     .map(([r, c]) => `  ${JSON.stringify(r)}: { name: ${JSON.stringify(c.name)}, target: ${c.target}, alarm: ${c.alarm} },`)
     .join("\n");
-  const out = src.replace(/const TARGETS = \{[\s\S]*?\n\};/, `const TARGETS = {\n${body}\n};`);
-  if (out === src) throw new Error("o patch de TARGETS nao aplicou — o literal mudou de forma");
-  writeFileSync(p, out);
+  // Testa o PADRAO, nao a diferenca. `out === src` como guarda de "nao aplicou" tem um falso
+  // positivo: escrever o valor que ja la esta produz texto identico, e a guarda le isso como
+  // "o literal mudou de forma". Acontece a quem generalize um destes patches para fixar uma
+  // posicao em vez de a inverter — e aconteceu.
+  if (!LITERAL_TARGETS.test(src)) throw new Error("o literal TARGETS mudou de forma — o patch mediria a versao errada");
+  writeFileSync(p, src.replace(LITERAL_TARGETS, `const TARGETS = {\n${body}\n};`));
 }
 
 /** Escreve o manifesto RSC de uma rota, na forma que o Next escreve.
@@ -100,15 +105,25 @@ function manifestoRsc(dir, route, chunksPorModulo, { chaveLiteral = null, corpo 
   return f;
 }
 
-/** Poe o interruptor do gate em `false` na copia do checker. O patch falha ALTO se o literal
- *  mudar de forma: um patch que nao aplica e um teste que mede a versao errada em silencio. */
-function suspenderAlvos(dir) {
+/** FIXA o interruptor do gate na posicao pedida, em vez de o inverter.
+ *
+ *  A versao anterior so sabia ir de `true` para `false`, e casava o literal `= true;`. Num
+ *  derivado com o gate JA suspenso — que e precisamente para isso que o interruptor existe —
+ *  o patch nao aplicava, rebentava no setup, e tres outros testes que esperam `exit 1` do
+ *  alarme passavam a receber `0`. Sete vermelhos de uma vez, e nenhum a dizer a causa.
+ *
+ *  Cada teste passa a DECLARAR a posicao que mede, em vez de a herdar do repo (`TP3`).
+ *  Falha ALTO se o literal mudar de forma — mas pelo PADRAO, e nao por `out === src`: fixar
+ *  o valor que ja la esta produz texto identico, e a guarda antiga lia isso como "nao aplicou". */
+const LITERAL_ALVOS = /const ALVOS_REPROVAM = (?:true|false);/;
+function porAlvos(dir, valor) {
   const f = join(dir, CHECKER);
   const src = readFileSync(f, "utf8");
-  const out = src.replace(/const ALVOS_REPROVAM = true;/, "const ALVOS_REPROVAM = false;");
-  if (out === src) throw new Error("o patch de ALVOS_REPROVAM nao aplicou — o literal mudou de forma");
-  writeFileSync(f, out);
+  if (!LITERAL_ALVOS.test(src)) throw new Error("o literal ALVOS_REPROVAM mudou de forma — o patch mediria a versao errada");
+  writeFileSync(f, src.replace(LITERAL_ALVOS, `const ALVOS_REPROVAM = ${valor};`));
 }
+const suspenderAlvos = (dir) => porAlvos(dir, false);
+const ligarAlvos = (dir) => porAlvos(dir, true);
 
 function manifest(dir, obj) {
   writeFileSync(join(dir, ".next", "build-manifest.json"), JSON.stringify(obj));
@@ -345,6 +360,9 @@ test("`./x.js` e `x.js` sao o mesmo ficheiro, nao dois", (dir) => {
 // --- Targets ----------------------------------------------------------------
 
 test("bundle acima do alarme FALHA", (dir) => {
+  // DECLARA a posicao do gate em vez de a herdar do repo: num derivado que o tenha
+  // suspenso — o interruptor existe para isso — este teste media outra coisa (`TP3`).
+  ligarAlvos(dir);
   // Bytes CRIPTOGRAFICAMENTE aleatorios. Uma primeira versao usava
   // `(i * 2654435761) % 256`, que e um ciclo perfeito de 256 bytes — o gzip
   // esmagava-o para 1.8 kB e o teste media compressao, nao o alarme.
@@ -365,6 +383,7 @@ test("bundle acima do alarme FALHA", (dir) => {
 // (fica abaixo e da `[OK]`) e falha se a rota nem sequer resolver (da `[?]`). Sem o resolvedor
 // RSC, esta rota nao tem chunks proprios em lado nenhum — era exactamente o caso do Next 16.
 test("RSC: os chunks da rota sao contados a partir do manifesto", (dir) => {
+  ligarAlvos(dir);
   chunk(dir, "static/chunks/base.js", 1000);
   const n = chunk(dir, "static/chunks/rota-abc.js", 80_000);
   manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });
@@ -424,6 +443,7 @@ test("RSC: chunk que SAI do .next/ e reportado, nao contado", (dir) => {
 // E UM ficheiro, carregado em TODAS as paginas, e media 38,7 kB num derivado real — 20% do
 // First Load. Nao tem nada a ver com a versao do Next: era uma omissao pura.
 test("polyfillFiles entram na baseline", (dir) => {
+  ligarAlvos(dir);
   chunk(dir, "static/chunks/base.js", 1000);
   const n = chunk(dir, "static/chunks/poly.js", 80_000);
   chunk(dir, "static/chunks/app/page-x.js", 100);
@@ -439,6 +459,7 @@ test("polyfillFiles entram na baseline", (dir) => {
 // persegue em todo o lado.
 
 test("gate LIGADO: exceder o alarme reprova", (dir) => {
+  ligarAlvos(dir);
   chunk(dir, "static/chunks/base.js", 1000);
   const n = chunk(dir, "static/chunks/app/page-x.js", 80_000);
   manifest(dir, { rootMainFiles: ["static/chunks/base.js"] });

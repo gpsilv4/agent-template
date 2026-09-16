@@ -42,7 +42,7 @@
  *   node .agent/scripts/simulate-upgrade.mjs --keep     # nao apaga a copia
  */
 
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync, cpSync } from "fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -253,7 +253,19 @@ ok(`bootstrapado: ${tocados} ficheiro(s) com placeholders, ${geradas.length} rul
   // simulacao passava a testar a preservacao de zero constantes — verde a afirmar nada. Foi
   // exactamente o que aconteceu, e so se viu por o contador dizer `0 preservada(s)`.
   if (cAlvosNovo === cAlvos) fatal(`nao consegui customizar TARGETS em ${relAlvos} — a forma da constante mudou`);
-  writeFileSync(join(dir, relAlvos), cAlvosNovo);
+
+  // (d) A DECISAO do projeto: o gate dos bundles SUSPENSO. Nao e um valor tecnico — e a posicao
+  //     que um consumidor toma quando liga a medicao a serio, encontra os alvos acima e abre um
+  //     ticket. Foi exactamente esta decisao que se perdeu numa ronda de `/upgrade` real: o
+  //     ficheiro veio, a constante voltou ao default, e o gate passou a reprovar **sem ninguem
+  //     decidir nada**. Em silencio, com o verificador a correr e a medir bem.
+  //
+  //     A verificacao que o consumidor tinha era por DIFERENCA de output, e nao apanhou: nenhuma
+  //     linha desapareceu — o veredicto e que mudou. Diferenca de output apanha o que some; nao
+  //     apanha um default que regressa. Por isso e que isto se mede aqui, e nao se confia.
+  const comGateSuspenso = cAlvosNovo.replace(/const ALVOS_REPROVAM = (?:true|false);/, "const ALVOS_REPROVAM = false;");
+  if (comGateSuspenso === cAlvosNovo) fatal(`nao consegui suspender o gate em ${relAlvos} — o literal mudou de forma`);
+  writeFileSync(join(dir, relAlvos), comGateSuspenso);
 }
 ok("conteudo proprio do projeto acrescentado (anti-padrao, verificador grande e uma constante customizada)");
 
@@ -266,6 +278,19 @@ ok(
   `upgrade mecanico aplicado: ${medido.repostas} constante(s) customizada(s) preservada(s), ` +
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`
 );
+
+// A DECISAO do projeto sobrevive a travessia? E a pergunta que o `/upgrade` tem de responder
+// com um facto e nao com uma lista: acrescentar a constante a tabela das preservadas nao prova
+// que ela sobrevive — prova que alguem a escreveu la. Isto mede.
+{
+  const depois = leOuNull(join(dir, ".agent/scripts/check-bundle-sizes.mjs"));
+  if (depois === null || !/const ALVOS_REPROVAM = false;/.test(depois)) {
+    warn(
+      "a suspensao do gate dos bundles NAO sobreviveu ao upgrade — a decisao do projeto foi " +
+        "reposta no default, e e isso que faz um consumidor levar um gate vermelho sem ter decidido nada"
+    );
+  }
+}
 
 // O que o `/upgrade` manda NUNCA tocar, medido ANTES e depois. Um `cp -R` mal apontado aqui
 // apaga trabalho que nao existe em mais sitio nenhum — e a primeira frase da Fase 0 de la.

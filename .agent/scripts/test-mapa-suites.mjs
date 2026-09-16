@@ -13,6 +13,7 @@
  */
 import { SUITES, regraDe, comandoDe, verificadoresDe } from "./lib/mapa-suites.mjs";
 import { PARES } from "./lib/pares.mjs";
+import { readFileSync, readdirSync } from "fs";
 
 let passed = 0;
 const falhas = [];
@@ -91,6 +92,64 @@ test("as suites do mapa que o PARES conhece resolvem para alvos reais", () => {
   // mexer no ficheiro que ela verifica nunca seleccionaria o alvo.
   const orfas = [...doPares].filter((s) => !doMapa.has(s));
   return orfas.length === 0 ? [] : [`suites do PARES sem regra no mapa: ${orfas.join(", ")}`];
+});
+
+// O `pares.mjs` decide o que a varredura mede de todo: uma entrada perdida ali nao da vermelho
+// nenhum — a varredura mede menos e reporta 100% sobre isso. Ele caia na regra generica de
+// `lib/` e ia para a suite do registo, que nao lhe toca. A licao estava escrita tres linhas
+// acima, aplicada a UM ficheiro.
+//
+// Derivado e nao escrito a mao: a suite certa e a que MENCIONA o ficheiro. Uma suite que nao
+// fala do que verifica nao o verifica.
+test("cada modulo de `lib/` vai para uma suite que fala dele", () => {
+  const problemas = [];
+  for (const rel of ["lib/pares.mjs", "lib/mapa-suites.mjs", "lib/registo.mjs"]) {
+    const r = regraDe(`.agent/scripts/${rel}`);
+    if (r === null) {
+      problemas.push(`${rel}: nenhuma regra`);
+      continue;
+    }
+    const nome = rel.split("/").pop().replace(".mjs", "");
+    const fala = r.verifica.some((v) => {
+      try {
+        return readFileSync(v, "utf8").toLowerCase().includes(nome.toLowerCase());
+      } catch {
+        return false;
+      }
+    });
+    if (!fala) problemas.push(`${rel} -> ${r.verifica.join(", ")}, que nao o menciona`);
+  }
+  return problemas;
+});
+
+// Editar um modulo `tests-*.mjs` nao gerava obrigacao de verificacao nenhuma — nenhum casava
+// regra. Baixa gravidade (o CI descobre-os), mas o aviso local existia para todos menos para
+// eles. E a regra tem de mandar ao entry point que o PROPRIO modulo declara, nao a um qualquer.
+test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
+  const problemas = [];
+  for (const f of readdirSync(".agent/scripts").filter((n) => /^tests-[\w-]+\.mjs$/.test(n))) {
+    const declarado = readFileSync(`.agent/scripts/${f}`, "utf8").match(/entryPoint = "([^"]+)"/)?.[1];
+    if (!declarado) {
+      problemas.push(`${f}: nao declara entryPoint`);
+      continue;
+    }
+    const r = regraDe(`.agent/scripts/${f}`);
+    if (r === null) problemas.push(`${f}: nenhuma regra no mapa`);
+    else if (!r.verifica.some((v) => v.endsWith(declarado))) {
+      problemas.push(`${f} declara ${declarado} mas o mapa manda ${r.verifica.join(", ")}`);
+    }
+  }
+  return problemas;
+});
+
+// Um HARNESS decide o veredicto de toda a suite que o usa — e por isso um sem regra e o mesmo
+// buraco que o `pares.mjs` tinha: mexer nele nao gera obrigacao de verificacao nenhuma. Ja
+// aconteceu duas vezes (o `pares.mjs`, e o harness do simulador de `/upgrade` no dia em que
+// nasceu). Esta e a terceira vez que a mesma classe aparece, logo passa a ter teste.
+test("todo o harness casa uma regra no mapa", () => {
+  const harnesses = readdirSync(".agent/scripts").filter((n) => /harness\.mjs$/.test(n));
+  if (harnesses.length === 0) return ["nenhum harness encontrado — o teste mediria o vazio"];
+  return harnesses.flatMap((f) => (regraDe(`.agent/scripts/${f}`) === null ? [`${f}: nenhuma regra no mapa`] : []));
 });
 
 console.log("");

@@ -7,7 +7,7 @@
  * NAO e um entry point: o `test-guards.mjs` importa e chama `registar()`, para a ordem dos
  * testes ser explicita em vez de depender da ordem de avaliacao dos imports.
  */
-import { readdirSync, rmSync } from "fs";
+import { readdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./test-harness.mjs";
@@ -77,9 +77,37 @@ test("G12b: '(N pontos' de OUTRA contagem nao e falso positivo", (dir) => {
 return { includes: [`citacao(oes) de "(N pontos" coerentes com ${nPontos(dir)}`] };
   }, { code: 0 });
 
+/** As MESMAS pastas que o `ficheirosComProsa` do guard varre, enumeradas do disco da fixture.
+ *
+ *  As duas fixtures de "zero citacoes" limpavam quatro ficheiros ESCRITOS A MAO. Bastava o
+ *  projeto ter uma citacao num quinto que o guard varre para o teste afirmar "zero citacoes"
+ *  com uma citacao viva ao lado — e o teste ficava vermelho sem nada estar partido.
+ *
+ *  O guard aprendeu esta licao e escreveu-a (`derived-counts.mjs`: "`src/docs` INTEIRO e nao um
+ *  ficheiro a mao"). **A licao nao chegou ao teste do guard.** Aconteceu num derivado real, ao
+ *  corrigir uma citacao num ficheiro que a lista nao tinha. */
+function comProsa(dir) {
+  const naPasta = (rel) => {
+    try {
+      return readdirSync(file(dir, rel)).filter((n) => n.endsWith(".md")).map((n) => `${rel}/${n}`);
+    } catch {
+      return []; // a pasta pode nao existir na fixture; e quem chama que decide o que isso vale
+    }
+  };
+  return [
+    ...naPasta(".agent/rules"),
+    ...naPasta(".agent/workflows"),
+    ...naPasta("src/docs"),
+    "CLAUDE.md",
+    "GEMINI.md",
+    "AGENTS.md",
+    "README.md",
+    "CONTRIBUTING.md",
+  ].filter((f) => existsSync(file(dir, f)));
+}
+
 test("G12b: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => {
-  for (const f of [".agent/rules/process-rules.md", ".agent/workflows/review.md",
-                   ".agent/workflows/deploy.md", "src/docs/agent-guide.md"]) {
+  for (const f of comProsa(dir)) {
     writeF(dir, f, readF(dir, f).replace(/\(\d+ pontos/g, "(a checklist"));
   }
 }, { code: 1, includes: ["nenhum ficheiro cita o tamanho da checklist"] });
@@ -94,9 +122,16 @@ test("G12: sync-docs.md ausente da SKIP visivel, nao silencio", (dir) => {
 // "nenhuma se salta", faltar uma nos resumos e um erro de conteudo, nao uma gralha.
 const METODO = ".agent/rules/ticket-method.md";
 
+// A fixture ESCREVE a citacao que vai tornar obsoleta, em vez de mutar prosa que pode nao
+// existir. A versao anterior ancorava na REDACCAO do template ("passa por 6 fases"): num
+// derivado que a reescreva a sua maneira — e reescreve, e o texto dele — o `replace` nao casa,
+// a fixture nao muta nada, e o teste fica vermelho a dizer "devia acrescentar pelo menos um
+// aviso". Falha silenciosa sobre a causa: quem a le nao sabe que foi a ancora que nao casou.
+//
+// Uma fixture que nao muta nada e um teste que nao mediu nada — e a mesma forma do `TP3`.
 test("G12c: citacao em digito desatualizada avisa (o defeito original)", (dir) => {
-  writeF(dir, ".agent/rules/process-rules.md",
-    readF(dir, ".agent/rules/process-rules.md").replace("passa por 6 fases", "passa por 5 fases"));
+  const f = ".agent/rules/process-rules.md";
+  writeF(dir, f, readF(dir, f) + "\n> O metodo por ticket passa por 5 fases.\n");
 }, { code: 1, includes: ['diz "5 fases" mas .agent/rules/ticket-method.md tem 6'] });
 
 test("G12c: citacao por palavra desatualizada avisa", (dir) => {
@@ -119,7 +154,7 @@ test("G12c: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => 
   // Tambem o `README.md` e tambem a forma INGLESA: o guard passou a bilingue porque o
   // `.agent/` esta em portugues e o README em ingles, e uma citacao inglesa errada
   // ("5-phase" com o metodo a ter 6) passava por todos os guards.
-  for (const f of [".agent/rules/process-rules.md", METODO, "src/docs/agent-guide.md", "README.md"]) {
+  for (const f of comProsa(dir)) {
     writeF(dir, f, readF(dir, f)
       .replace(/(\d+|Seis|seis)\s+fases/g, "as etapas")
       .replace(/(\d+)[- ]\s*phases?\b/gi, "as etapas"));

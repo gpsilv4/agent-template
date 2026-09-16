@@ -356,6 +356,96 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
   }
 }
 
+// --- 3d. o derivado que CONFIGUROU -----------------------------------------------
+// PORQUE EXISTE: o bloco 3c acima nomeia tres dimensoes de maturidade e implementa UMA. A
+// quarta — **a configuracao preenchida** — nem sequer era nomeada, e e a mais barata e a que
+// mais rende: os quatro defeitos que a quarta ronda de revisao abriu vivem TODOS nela.
+//
+// A relacao e causal e foi verificada num derivado real: no momento em que a configuracao foi
+// preenchida, quatro testes que estavam verdes ficaram vermelhos. Nao escaparam por serem
+// subtis — escaparam porque **o instrumento construido para os apanhar constroi um derivado
+// que nao os pode manifestar**. Um template por estrear tem `CHECKS` vazia, `BANNED` vazia,
+// `TARGETS` com uma rota de exemplo e o gate dos bundles no default: nenhum teste que leia
+// essas listas em vez de as MONTAR pode falhar aqui, e todos falham no consumidor.
+//
+// E o `TP3` — "teste que depende do estado do repo em vez de o montar" — do lado do simulador:
+// ele proprio dependia de o repo estar por configurar.
+{
+  /** Substitui um literal na copia, e REPROVA se nao casar. Um patch que nao aplica deixa a
+   *  simulacao a medir o template por estrear outra vez, em silencio — que e o defeito que
+   *  este bloco existe para fechar. Falhar alto e a unica alternativa honesta. */
+  const configura = (rel, padrao, novo, o_que) => {
+    const p = join(dir, rel);
+    const c = leOuNull(p);
+    if (c === null) fatal(`${rel} nao existe na copia — nao consigo simular ${o_que}`);
+    const depois = c.replace(padrao, novo);
+    if (depois === c) fatal(`nao consegui configurar ${o_que} em ${rel} — o literal mudou de forma`);
+    writeFileSync(p, depois);
+  };
+
+  // (a) `CHECKS` — o opt-in dos guards de versoes. Vazia, o guard SALTA; preenchida, corre. Um
+  //     teste que assuma a lista vazia fica vermelho em qualquer projeto que a preencha.
+  configura(
+    ".agent/scripts/guards/versions.mjs",
+    /const CHECKS = \[[\s\S]*?\n\];/,
+    'const CHECKS = [\n  { name: "Framework", pkg: "framework-do-projeto", pattern: /Framework\\s+(\\d+)/g, files: ["README.md"] },\n];',
+    "os guards de versoes de dependencias"
+  );
+
+  // (b) `BANNED` — os termos obsoletos deste projeto. O template deixa-a vazia.
+  configura(
+    ".agent/scripts/check-doc-versions.mjs",
+    /const BANNED = \[/,
+    'const BANNED = [\n  { re: /NomeAntigoDoProjeto/g, msg: "nome anterior ao rebrand" },',
+    "os termos obsoletos"
+  );
+
+  // (c) O gate dos bundles SUSPENSO. E a posicao que um derivado toma quando liga a medicao a
+  //     serio e encontra os alvos acima — e o interruptor existe para isso. Um teste que so
+  //     saiba ir de `true` para `false` rebenta aqui, que foi exactamente o que aconteceu.
+  configura(
+    ".agent/scripts/check-bundle-sizes.mjs",
+    /const ALVOS_REPROVAM = (?:true|false);/,
+    "const ALVOS_REPROVAM = false;",
+    "o gate dos bundles suspenso"
+  );
+
+  // (d) A PROSA reescrita. Um derivado nao mantem a redaccao do template: reescreve-a a sua
+  //     maneira. Uma fixture que ancore na redaccao do template nao casa nada aqui — e uma
+  //     fixture que nao muta nada da um teste verde que nao mediu coisa nenhuma.
+  configura(
+    ".agent/rules/process-rules.md",
+    /passa por 6 fases/,
+    "atravessa seis fases (0 a 5)",
+    "a prosa reescrita pelo projeto"
+  );
+
+  ok("derivado que CONFIGUROU: CHECKS, BANNED, gate dos bundles suspenso e prosa reescrita");
+}
+
+// --- 3e. o derivado com ficheiros GRANDES seus -----------------------------------
+// A terceira dimensao que o comentario do 3c nomeia e nao implementa. Os `TETOS` do Guard 17
+// sao por natureza do PROJETO — contagens de linhas dos ficheiros dele — e qualquer derivado
+// os reescreve. Um teste que crave o nome de um ficheiro congelado pelo TEMPLATE rebenta no
+// setup do consumidor com `ENOENT`, e foi assim que quatro testes ficaram vermelhos numa ronda.
+{
+  const rel = ".agent/scripts/check-dominio.mjs";
+  writeFileSync(join(dir, rel), "#!/usr/bin/env node\n// Verificador proprio deste projeto.\n" + "// linha\n".repeat(540));
+  const relGuard = ".agent/scripts/guards/sizes.mjs";
+  const p = join(dir, relGuard);
+  const c = leOuNull(p);
+  if (c === null) fatal(`${relGuard} nao existe na copia`);
+  const n = readFileSync(join(dir, rel), "utf8").split("\n").length;
+  // ACRESCENTA, nao substitui. Um derivado fica com os ficheiros grandes do template (que
+  // copiou) **e** os seus — os dois conjuntos, nao um deles. Substituir simulava um projeto que
+  // apagou os ficheiros do template, que nao e um derivado: e outra coisa. Medido — a versao
+  // que substituia punha o Guard 17 a reclamar de tres ficheiros do proprio template.
+  const depois = c.replace(/export const TETOS = \{/, `export const TETOS = {\n  ${JSON.stringify(rel)}: ${n},`);
+  if (depois === c) fatal(`nao consegui reescrever os TETOS em ${relGuard} — o literal mudou de forma`);
+  writeFileSync(p, depois);
+  ok(`derivado com ficheiros grandes seus: ${rel} (${n} linhas) congelado, TETOS do projeto`);
+}
+
 // --- 4. correr -------------------------------------------------------------------
 console.log("");
 let corridos = 0;
