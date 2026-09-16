@@ -40,11 +40,29 @@ export const SUITES = [
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
   { re: /^\.agent\/scripts\/(?:check-test-surface|surface-patterns|test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   { re: /^\.agent\/scripts\/test-harness\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
+  // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
+  // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
+  { re: /^\.agent\/scripts\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
   { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
   { re: /^\.agent\/scripts\/(lib\/mapa-suites|test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
+  // O `pares.mjs` decide **o que a varredura mede de todo**, e caia na generica de `lib/` — ia
+  // para o `test-registo.mjs`, que nao lhe toca (menciona `PARES` zero vezes; o
+  // `test-mutation-sweep.mjs` menciona-o vinte). Exactamente a armadilha que a regra de cima
+  // evita, escrita ali, e nao aplicada aqui.
+  //
+  // E mais grave do que parecer: uma entrada perdida no `PARES` nao produz vermelho nenhum —
+  // a varredura passa a medir um conjunto mais pequeno e **reporta 100% sobre ele**.
+  { re: /^\.agent\/scripts\/(lib\/pares|test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
+  // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
+  // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
+  // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
+  { re: /^\.agent\/scripts\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/tests-[\w-]+\.mjs$/, verifica: [S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },

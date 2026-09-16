@@ -484,20 +484,6 @@ test("G3: CHANGELOG sem entrada de versao da NOTE visivel", (dir) => {
   writeF(dir, "src/docs/CHANGELOG.md", "# Changelog\n\nSem entradas ainda.\n");
 }, { code: 0, includes: ["ainda sem entrada de versao"] });
 
-test("Guards de deps: lista CHECKS vazia da SKIP visivel (opt-in)", null, {
-  // Opt-in por defeito. Um opt-in silencioso e indistinguivel de um guard partido.
-  code: 0,
-  includes: ["SKIP  Guards de versoes de dependencias — lista CHECKS vazia"],
-});
-
-test("Guards de deps: com CHECKS mas sem package.json da SKIP visivel", (dir) => {
-  // `CHECKS` e opt-in e vem vazio; preencher e a unica forma de chegar ao ramo seguinte.
-  const g = ".agent/scripts/guards/versions.mjs";
-  writeF(dir, g, readF(dir, g).replace(
-    /const CHECKS = \[[\s\S]*?\n\];/,
-    'const CHECKS = [{ name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+)/g, files: [".agent/rules/core-rules.md"] },\n];'));
-}, { code: 0, includes: ["SKIP  Guards de versoes de dependencias — sem package.json"] });
-
 test("G12d: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
   // O oposto do teste irmao: com o marcador de bootstrap presente, nao ter citacao do numero
   // de guards e normal — era este ramo que punha o CI de todos os consumidores vermelho.

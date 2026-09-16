@@ -39,6 +39,12 @@ export const TETOS = {
   // deixava a folga recuperada por recuperar.
   ".claude/hooks/guard-protected-branch.mjs": 517,
   ".agent/scripts/test-guards.mjs": 525,
+  // ADIAMENTO com razao, e nao solucao: este ficheiro estava em 497 e passou os 500 ao corrigir
+  // as fixtures que liam a configuracao do repo (ronda 4). Dividi-lo exige ligar a descoberta
+  // de modulos a este entry point, que nao a tem — um refactor que nao pertence a um PR de
+  // correccao de defeitos. Fica congelado: a catraca so desce, logo o proximo que lhe mexer
+  // paga a divida. **A divisao e o passo seguinte, nao esta feita.**
+  ".agent/scripts/test-bundle-sizes.mjs": 508,
 };
 
 // O `mutation-sweep.mjs` esteve nesta lista (505 linhas) e SAIU: a tabela `PARES` — 186

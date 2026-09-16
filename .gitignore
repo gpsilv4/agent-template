@@ -24,10 +24,16 @@ coverage/
 # Estado local dos hooks — memoria desta maquina, nao do repo
 .claude/state/
 
-# Relatorios externos de revisao (TEMPLATE-FIXES*.md e afins): sao entregues a sessao, nao
-# fazem parte do template, e nenhum chegou a ser commitado. Sem esta linha ficavam so a
-# depender de quem faz `git add` os escolher um a um — e um `git add -A` distraido leva-os.
+# Relatorios externos de revisao: sao entregues a sessao, nao fazem parte do template, e
+# nenhum chegou a ser commitado. Sem estas linhas ficavam so a depender de quem faz `git add`
+# os escolher um a um — e um `git add -A` distraido leva-os para dentro de um template que tem
+# de ficar virgem.
+#
+# A lista tem DUAS formas porque o padrao antigo dizia "e afins" e nao os cobria: a ronda 4
+# chegou como `RELATORIO-TEMPLATE-RONDA4.md` e ficou por ignorar. Um comentario que promete
+# mais do que o padrao cumpre e pior do que nenhum — foi apanhado a um `git add -A` de distancia.
 TEMPLATE-FIXES*.md
+RELATORIO-*.md
 
 # OS / logs
 .DS_Store

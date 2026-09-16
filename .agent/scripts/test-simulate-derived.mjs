@@ -55,7 +55,7 @@ const falhas = [];
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 const ap = (n) => "AP" + n;
 
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -80,6 +80,25 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   // substituicao **nao** cobre. O `.txt` nao esta em nenhuma das listas — e e essa a forma do
   // defeito que isto apanhou de verdade: o `.githooks/commit-msg`, que nao tem extensao.
   if (sobraPlaceholder) w("NOTAS.txt", `Projeto: ${ph}\n`);
+
+  // Os ficheiros que os blocos 3d/3e CONFIGURAM. Sem eles o simulador reprova a dizer que nao
+  // consegue simular um derivado configurado — e reprova bem: um patch que nao aplica deixava-o
+  // a medir o template por estrear outra vez. A fixture tem de os ter, como um template os tem.
+  //
+  // Sao SINTETICOS e nao copiados: copiar os reais fazia estes testes depender do conteudo
+  // deste repo (`TP3`). O que se mede aqui e o simulador, nao os verificadores.
+  // `semConfig` / `configOutraForma`: as duas formas de o bloco 3d nao conseguir configurar o
+  // derivado. Reprovar e obrigatorio — um patch que nao aplica deixa a simulacao a medir o
+  // template por estrear outra vez, que e o defeito que o 3d existe para fechar.
+  if (!semConfig) {
+    w(".agent/scripts/guards/versions.mjs", configOutraForma ? 'const CHECKS = "outra forma";\n' : "const CHECKS = [\n];\n");
+  }
+  w(".agent/scripts/check-doc-versions.mjs", "const BANNED = [\n];\n");
+  w(".agent/scripts/check-bundle-sizes.mjs", "const ALVOS_REPROVAM = true;\n");
+  w(".agent/rules/process-rules.md", "# Processo\n\nO metodo passa por 6 fases.\n");
+  if (!semGuardTamanhos) {
+    w(".agent/scripts/guards/sizes.mjs", tetosOutraForma ? "export const TETOS = [];\n" : "export const TETOS = {\n};\n");
+  }
 
   w(".agent/rules/anti-patterns.md",
     `# Anti-Padroes\n\n<!-- Exemplo a remover no bootstrap.\n\n## ${ap(1)} — exemplo\n\n-->\n\n## ${ap(1)} — real\n`);
@@ -282,6 +301,31 @@ test("derivado maduro: os `TPn` do template NAO consomem a numeracao do projeto"
 test("derivado maduro: sem o ficheiro do template, o proximo e o MESMO", {}, {
   code: 0,
   includes: [`anti-padrao proprio ${ap(2)} acrescentado`],
+});
+
+// --- O derivado que CONFIGUROU: cada recusa recusa mesmo ----------------------
+// A varredura de mutacao apontou os quatro `fatal()` dos blocos 3d/3e como NAO COBERTOS: eu
+// tinha escrito as defesas e nenhum teste notava se deixassem de disparar. Um patch que nao
+// aplica em silencio deixa a simulacao a medir o template por estrear — exactamente o que
+// estes blocos existem para impedir.
+test("sem o ficheiro que o 3d configura, REPROVA", { semConfig: true }, {
+  code: 1,
+  includes: ["nao existe na copia", "nao consigo simular"],
+});
+
+test("com a constante do 3d noutra forma, REPROVA", { configOutraForma: true }, {
+  code: 1,
+  includes: ["nao consegui configurar", "o literal mudou de forma"],
+});
+
+test("sem o guard dos tamanhos, o 3e REPROVA", { semGuardTamanhos: true }, {
+  code: 1,
+  includes: ["guards/sizes.mjs nao existe na copia"],
+});
+
+test("com os TETOS noutra forma, o 3e REPROVA", { tetosOutraForma: true }, {
+  code: 1,
+  includes: ["nao consegui reescrever os TETOS"],
 });
 
 // --- A lista de exclusao tem de valer em profundidade ------------------------

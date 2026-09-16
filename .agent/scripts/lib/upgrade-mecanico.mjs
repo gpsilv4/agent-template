@@ -62,13 +62,22 @@ export function andaFicheiros(base, fn, rel = "") {
  *  Escrever esta lista ja rendeu: a tabela do workflow dizia `CONTAGENS` em
  *  `check-test-surface.mjs`, e ela vive em `surface-patterns.mjs`. Um consumidor a seguir a
  *  instrucao copiava o ficheiro por inteiro e perdia as suas contagens em silencio. */
-const CONSTANTES_DO_PROJETO = [
+export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-bundle-sizes.mjs", "TARGETS"],
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
   [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
   [".agent/scripts/surface-patterns.mjs", "CONTAGENS"],
+  // `ALVOS_REPROVAM` e uma DECISAO do projeto, nao um valor tecnico: um derivado que ligue a
+  // medicao de bundles a serio encontra os alvos acima e SUSPENDE o juizo, com ticket aberto.
+  // Nao estava nesta lista — e por isso o upgrade repunha o default `true` e o gate voltava a
+  // reprovar **sem ninguem decidir nada**. Medido num derivado real, ronda 4.
+  //
+  // Escapou a verificacao que ja existia porque essa e por DIFERENCA de output: nenhuma linha
+  // desapareceu, o verificador correu e mediu bem — so mudou de veredicto. Diferenca de output
+  // apanha o que some; nao apanha um default que regressa.
+  [".agent/scripts/check-bundle-sizes.mjs", "ALVOS_REPROVAM"],
 ];
 
 /**

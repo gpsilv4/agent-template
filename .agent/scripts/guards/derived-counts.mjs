@@ -142,6 +142,20 @@ if (metodo) {
         // afirmacao sobre o total, e exigir-lhe o intervalo abria um falso negativo real —
         // reescrever o README para `6-phase method` sem `0-5` saia da cobertura em silencio,
         // que e o defeito que este guard foi criado para apanhar.
+        //
+        // O FALSO NEGATIVO que a ancora custa, medido e aceite: uma linha por palavra que
+        // ENUMERA sem trazer o intervalo — `"Cinco fases: explicar · desenvolver · ..."` — fica
+        // de fora, e pode estar errada. Aconteceu num derivado, no ficheiro que explica o metodo.
+        //
+        // Nao se corrige dispensando a ancora quando a linha enumera, e a razao e concreta:
+        // `"tres fases escalam por tamanho: S · M · L"` tambem enumera, tambem tem a contagem
+        // de itens a bater com a palavra, e e prosa CORRECTA. Nenhum discriminador textual as
+        // separa — a diferenca e semantica (o sujeito de uma sao ALGUMAS fases, o da outra e o
+        // total). Dispensar a ancora poe a segunda a reprovar, e um falso positivo num guard
+        // custa mais do que este falso negativo: ensina a ignorar guards.
+        //
+        // Fica escrito em vez de tapado. Quem escrever um resumo por palavra que seja o total
+        // poe-lhe o intervalo ao lado — e e o que o resto do repo ja faz.
         if (!digito && !/\b0\s*(?:a|to|ate|-|–)\s*\d\b|\(0\)/i.test(linha)) continue;
         citacoes++;
         const escrito = digito ? Number(digito[1]) : null;

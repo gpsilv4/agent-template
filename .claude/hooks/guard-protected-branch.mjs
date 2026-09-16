@@ -96,12 +96,6 @@ function normalizaFlags(args) {
   return out;
 }
 
-/** `checkout` so e seguro na forma que cria um branch NOVO (`-b`). O `-B` **reposiciona** um
- *  branch existente — entrava por engano na versao anterior. Sem `-b` pode descartar trabalho
- *  (`git checkout -- .`), e o verbo nao distingue branch de caminho. */
-const CHECKOUT_CRIA = /(?<![\w-])-b(?![\w-])/;
-const CHECKOUT_REPOSICIONA = /(?<![\w-])-B(?![\w-])/;
-
 // A tabela `FORMA_EXIGIDA` vive em `lib/verbos-git.mjs`: e politica (que formas de `pull` e
 // `push` sao aceitaveis num branch protegido), nao motor. O hook injecta-lhe o `ehProtegido`
 // e o `refsApagados`, que dependem da lista de branches que cada projeto adapta no bootstrap.
@@ -363,8 +357,14 @@ function semVerboEInofensivo(inv) {
 function seguro(inv) {
   if (inv.verbo === null) return semVerboEInofensivo(inv);
   if (inv.verbo === "checkout") {
+    // So e seguro na forma que CRIA um branch novo (`-b`). O `-B` **reposiciona** um branch
+    // existente — entrava por engano numa versao anterior. E sem `-b` nenhum, o verbo pode
+    // descartar trabalho (`git checkout -- .`), porque nao distingue branch de caminho.
+    //
     // Pelas flags normalizadas e nao por regex sobre o texto: `git checkout -bfeature` (forma
     // aderente, que o git aceita) era lido como "sem -b" e negado — falso positivo medido.
+    // (Esteve presa a duas constantes `CHECKOUT_*` mortas: uma razao longe da decisao que
+    // explica nao e documentacao, e ruido que envelhece sem ninguem notar.)
     const flags = normalizaFlags(inv.args);
     return flags.includes("-b") && !flags.includes("-B");
   }

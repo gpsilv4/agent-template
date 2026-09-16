@@ -20,53 +20,16 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-import { aplicaUpgradeMecanico } from "./lib/upgrade-mecanico.mjs";
+import { CONSTANTES_DO_PROJETO } from "./lib/upgrade-mecanico.mjs";
+// Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
+// Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
+import { git, repo, corre, exige, BASE, cenario, limpa } from "./test-upgrade-harness.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
 
 let passed = 0;
 const falhas = [];
-
-const git = (dir, args) =>
-  execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-
-/** Um repo git minimo que passa o guarda "sou o template?": tem `BOOTSTRAP.md` e nao tem
- *  marca. O conteudo e o minimo para o simulador chegar ao passo que se quer medir. */
-function repo({ comTag = null, comMarca = false, semBootstrap = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-"));
-  mkdirSync(join(dir, ".agent", "scripts"), { recursive: true });
-  if (!semBootstrap) writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), "# Bootstrap\n");
-  if (comMarca) writeFileSync(join(dir, ".agent/.template-version"), "sha: abc1234\n");
-  writeFileSync(join(dir, "README.md"), "# repo\n");
-  git(dir, ["init", "-q", "-b", "main"]);
-  git(dir, ["config", "user.email", "t@t"]);
-  git(dir, ["config", "user.name", "t"]);
-  git(dir, ["add", "-A"]);
-  git(dir, ["commit", "-qm", "inicial"]);
-  if (comTag) {
-    git(dir, ["tag", comTag]);
-    // Sem um commit A SEGUIR a tag, a tag E o HEAD — que e o caso do "delta vazio".
-  }
-  return dir;
-}
-
-/** Corre o simulador DENTRO de `dir`. O simulador resolve a raiz a partir do seu proprio
- *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo. */
-function corre(dir) {
-  mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
-  for (const [de, para] of [
-    [SIMULADOR, ".agent/scripts/simulate-upgrade.mjs"],
-    [resolve(AQUI, "lib", "upgrade-mecanico.mjs"), ".agent/scripts/lib/upgrade-mecanico.mjs"],
-  ]) {
-    writeFileSync(join(dir, para), readFileSync(de, "utf8"));
-  }
-  try {
-    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs")], { cwd: dir, encoding: "utf8" }) };
-  } catch (err) {
-    return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
-  }
-}
 
 function test(nome, fn) {
   try {
@@ -86,16 +49,6 @@ function test(nome, fn) {
 }
 
 /** Verifica exit code e texto de uma corrida, e devolve os problemas. */
-const exige = ({ code, out }, { codigo, inclui = [], exclui = [] }) => {
-  const p = [];
-  if (code !== codigo) p.push(`exit ${code}, esperado ${codigo}`);
-  for (const t of inclui) if (!out.includes(t)) p.push(`output devia conter ${JSON.stringify(t)}`);
-  for (const t of exclui) if (out.includes(t)) p.push(`output NAO devia conter ${JSON.stringify(t)}`);
-  if (p.length) p.push(`--- output ---\n${out.slice(0, 700)}`);
-  return p;
-};
-
-console.log("\n=== Testes do simulador de /upgrade ===\n");
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 
@@ -167,68 +120,6 @@ test("sem BOOTSTRAP.md (o outro sinal de derivado), tambem da SKIP", () => {
 /** O minimo que o motor exige de qualquer template: as pastas que ele copia por inteiro e os
  *  dois ficheiros de anti-padroes (o cabecalho de um deles e trazido, e a divisao e pelo `---`).
  *  Sem esta base, cada caso rebentava num `fatal` que nada tinha a ver com o que media. */
-const BASE = {
-  ".agent/scripts/x.mjs": "// script\n",
-  ".claude/hooks/h.mjs": "// hook\n",
-  ".agent/rules/anti-patterns-template.md": "# Template\n\n## TP1 — um\n",
-  // O ID e MONTADO: escrito por extenso, este ficheiro passava a CITAR um anti-padrao que o
-  // template nu nao define, e o Guard 15 reprovava o repo. E a convencao do
-  // `tests-anti-patterns.mjs`, e foi o guard que a exigiu aqui tambem.
-  ".agent/rules/anti-patterns.md": `# Projeto\n\n> cabecalho\n\n---\n\n## ${"AP" + "1"} — meu\n`,
-};
-
-function cenario({ ontem, hoje, consumidor = null, constantes = [] }) {
-  ontem = { ...BASE, ...ontem };
-  hoje = { ...BASE, ...hoje };
-  if (consumidor) consumidor = { ...BASE, ...consumidor };
-  const root = mkdtempSync(join(tmpdir(), "sim-up-root-"));
-  for (const [rel, c] of Object.entries(ontem)) {
-    if (c === null) continue; // `null` = este ficheiro NAO existe, e e isso que se mede
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), c);
-  }
-  git(root, ["init", "-q", "-b", "main"]);
-  git(root, ["config", "user.email", "t@t"]);
-  git(root, ["config", "user.name", "t"]);
-  git(root, ["add", "-A"]);
-  git(root, ["commit", "-qm", "ontem"]);
-  git(root, ["tag", "v1.0.0"]);
-  for (const [rel, c] of Object.entries(hoje)) {
-    if (c === null) continue;
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), c);
-  }
-
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-cons-"));
-  for (const [rel, c] of Object.entries(consumidor ?? ontem)) {
-    if (c === null) continue;
-    mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    writeFileSync(join(dir, rel), c);
-  }
-  mkdirSync(join(dir, ".agent", "context"), { recursive: true });
-  writeFileSync(join(dir, ".agent/context/session.md"), "# estado do projeto\n");
-
-  const razoes = [];
-  const medido = aplicaUpgradeMecanico({
-    dir,
-    root,
-    tag: "v1.0.0",
-    fatal: (m) => {
-      // A razao VAI na excepcao. Sem isto, um caso que rebentasse dizia so "__fatal__" e
-      // obrigava a instrumentar o motor para se perceber porque — foi o que aconteceu.
-      razoes.push(m);
-      throw new Error(`__fatal__: ${m}`);
-    },
-    substituto: "Consumidor",
-    constantes,
-  });
-  return { dir, root, medido, razoes, ler: (rel) => (existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), "utf8") : null) };
-}
-
-const limpa = (c) => {
-  for (const d of [c?.dir, c?.root]) if (d) rmSync(d, { recursive: true, force: true });
-};
-
 // A regra geral do `/upgrade`, na sua forma mais simples: intacto -> traz-se o novo.
 test("documento NAO customizado fica com a versao nova", () => {
   let c;
@@ -239,6 +130,47 @@ test("documento NAO customizado fica com a versao nova", () => {
     });
     const v = c.ler(".agent/rules/guia.md");
     return v === "# guia novo\n" ? [] : [`ficou ${JSON.stringify(v)}, esperado o novo`];
+  } finally {
+    limpa(c);
+  }
+});
+
+// A DECISAO do projeto sobrevive a travessia. Nao e um caso qualquer de constante preservada:
+// e O caso, porque foi este valor que se perdeu numa ronda de `/upgrade` real — o ficheiro veio,
+// a constante voltou ao default, e o gate dos bundles passou a reprovar **sem ninguem decidir
+// nada**, com o verificador a correr e a medir bem.
+//
+// A verificacao que o consumidor tinha era por DIFERENCA de output e nao o apanhou: nenhuma
+// linha desapareceu, o veredicto e que mudou. Diferenca de output apanha o que some; nao apanha
+// um default que regressa. Por isso isto e um teste e nao uma linha numa tabela: acrescentar a
+// constante a lista das preservadas prova que alguem a escreveu la, nao que ela sobrevive.
+// A OUTRA METADE, e sem ela a de baixo nao vale nada: o teste do motor INJECTA a lista de
+// constantes, logo continua verde com o `ALVOS_REPROVAM` fora do catalogo real. Mede o
+// mecanismo, nao a inscricao — assertiva satisfeita por outra coisa, que e o `TP1`.
+//
+// Esta afirma a inscricao. As duas juntas dizem "esta na lista E a lista funciona"; qualquer
+// uma sozinha deixa passar metade.
+test("o gate dos bundles esta no catalogo das decisoes preservadas", () => {
+  const tem = CONSTANTES_DO_PROJETO.some(([f, n]) => f.endsWith("check-bundle-sizes.mjs") && n === "ALVOS_REPROVAM");
+  return tem ? [] : ["ALVOS_REPROVAM fora de CONSTANTES_DO_PROJETO — a decisao do projeto perde-se em cada upgrade"];
+});
+
+test("a DECISAO do projeto (gate suspenso) sobrevive ao upgrade", () => {
+  let c;
+  try {
+    const rel = ".agent/scripts/check-bundle-sizes.mjs";
+    c = cenario({
+      ontem: { [rel]: "const ALVOS_REPROVAM = true;\n// motor velho\n" },
+      hoje: { [rel]: "const ALVOS_REPROVAM = true;\n// motor NOVO\n" },
+      // O consumidor SUSPENDEU o gate. E a posicao que ele toma ao ligar a medicao a serio.
+      consumidor: { [rel]: "const ALVOS_REPROVAM = false;\n// motor velho\n" },
+      constantes: [[rel, "ALVOS_REPROVAM"]],
+    });
+    const v = c.ler(rel);
+    const p = [];
+    if (!/const ALVOS_REPROVAM = false;/.test(v ?? "")) p.push("a suspensao perdeu-se: o upgrade repos o default");
+    if (!(v ?? "").includes("motor NOVO")) p.push("nao trouxe o motor novo — a logica tem de vir");
+    return p;
   } finally {
     limpa(c);
   }
@@ -346,7 +278,12 @@ test("constante que desapareceu do template REPROVA, em vez de ignorar", () => {
  *  estao ca todas porque o motor as procura pelo nome e para se faltar uma — de proposito. */
 function templateSintetico(extra = {}) {
   const constantes = {
-    ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\n',
+    // `ALVOS_REPROVAM` entra aqui porque entrou na lista das constantes preservadas: o motor
+    // procura-a pelo nome e REPROVA se nao a encontrar — e reprova bem, porque a tabela do
+    // `/upgrade` estaria a mandar preservar algo que nao existe. Quem fica incompleta e a
+    // fixture, nao o motor.
+    ".agent/scripts/check-bundle-sizes.mjs":
+      'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\nconst ALVOS_REPROVAM = true;\n',
     ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
     ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
     ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
@@ -426,6 +363,10 @@ for (const [nome, extra, marca] of [
   ["sem job `guard-tests` no ci.yml", { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" }, "nao derivei nenhum comando"],
   ["sem o guard dos tamanhos", { ".agent/scripts/guards/sizes.mjs": null }, "nao consigo aplicar a adaptacao"],
   ["sem `.agent/context/`", { ".agent/context/session.md": null }, "nao existe na copia"],
+  // O gate suspenso e a DECISAO do projeto: se a fixture nao a conseguir montar, a simulacao
+  // deixa de exercitar a travessia que interessa — e passava a verde a afirmar menos. A
+  // varredura apontou este `fatal()` como nao coberto.
+  ["com o gate dos bundles noutra forma", { ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\nconst ALVOS_REPROVAM = 1;\n' }, "nao consegui suspender o gate"],
   ["sem a seccao 2.2 no BOOTSTRAP.md", { ".agent/BOOTSTRAP.md": "# Bootstrap\n\nsem a seccao\n" }, "nao derivei nenhuma rule gerada"],
   ["sem `anti-patterns.md` na tag", { ".agent/rules/anti-patterns.md": null }, "nao representa um consumidor"],
 ]) {
