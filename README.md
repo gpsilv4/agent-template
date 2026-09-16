@@ -203,6 +203,8 @@ gh pr create --fill     # then merge once CI is green
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │                              (lib/upgrade-mecanico.mjs holds the mechanical engine)
     ├── test-simulate-upgrade.mjs<- Negative tests for it (each refusal path refuses)
+    ├── lib/mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
+    ├── test-mapa-suites.mjs    <- Negative tests for the map
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     └── test-mutation-sweep.mjs <- Negative tests for the sweep itself (fake checker + fake suite)
 

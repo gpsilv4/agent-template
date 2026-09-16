@@ -19,7 +19,7 @@
  *   node .agent/scripts/test-mutation-sweep.mjs
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
@@ -53,7 +53,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU");
 console.log("ok");
 `;
 
-function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, parSao = false } = {}) {
+function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -156,6 +156,12 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
   if (!/from\s+["'`]\.\/lib\/pares\.mjs["'`]/.test(src)) {
     throw new Error("o mutation-sweep.mjs ja nao importa ./lib/pares.mjs — a fixture deixaria de ser lida");
   }
+  // O mesmo para o mapa de suites, pela mesma razao: a fixture escreve o seu, e se o varredor
+  // deixar de o importar (ou mudar o nome do que importa) os testes passavam a medir o mapa
+  // REAL do repo. E a mesma armadilha do `pares.mjs`, uma linha abaixo.
+  if (!/from\s+["'`]\.\/lib\/mapa-suites\.mjs["'`]/.test(src)) {
+    throw new Error("o mutation-sweep.mjs ja nao importa ./lib/mapa-suites.mjs — a fixture deixaria de ser lida");
+  }
   copyFileSync(SWEEP, join(dir, ".agent/scripts/mutation-sweep.mjs"));
   mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
   writeFileSync(
@@ -169,6 +175,46 @@ function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$]
         : "") +
       "];\n"
   );
+  // O mapa de suites da fixture. Minimo e SINTETICO, nao copiado: copiar o do repo fazia estes
+  // testes depender das regras reais (`TP3`), e o que eles medem e o varredor, nao o mapa — que
+  // tem suite propria. As regras cobrem os ficheiros falsos que a fixture escreve.
+  writeFileSync(
+    join(dir, ".agent/scripts/lib/mapa-suites.mjs"),
+    'export const SUITES = [\n' +
+      '  { re: /^\\.agent\\/scripts\\/fake-check\\.mjs$/, verifica: [".agent/scripts/fake-test.mjs"] },\n' +
+      '  { re: /^\\.agent\\/scripts\\/fake-check-2\\.mjs$/, verifica: [".agent/scripts/fake-test-2.mjs"] },\n' +
+      "];\n" +
+      "export const regraDe = (f) => SUITES.find((s) => s.re.test(f)) ?? null;\n" +
+      "export function comandoDe(r) { return r.verifica.map((v) => `node ${v}`).join(\" && \"); }\n" +
+      "export function verificadoresDe(ficheiros) {\n" +
+      "  const porVerificador = new Map();\n  const semRegra = [];\n" +
+      "  for (const f of ficheiros) {\n" +
+      "    const r = regraDe(f);\n" +
+      "    if (r === null) { semRegra.push(f); continue; }\n" +
+      "    for (const v of r.verifica) {\n" +
+      "      if (!porVerificador.has(v)) porVerificador.set(v, []);\n" +
+      "      porVerificador.get(v).push(f);\n" +
+      "    }\n  }\n  return { porVerificador, semRegra };\n}\n"
+  );
+  if (comGit) {
+    // Um repo REAL, porque e isso que o `--diff` le. Sem ele, o caminho "sem baseline" e o
+    // unico alcancavel — e seria facil dar-se o filtro por testado medindo so a recusa.
+    const g = (args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    g(["init", "-q", "-b", "main"]);
+    g(["config", "user.email", "t@t"]);
+    g(["config", "user.name", "t"]);
+    g(["add", "-A"]);
+    g(["commit", "-qm", "base"]);
+    // `alterado` e escrito DEPOIS do commit: e o que o diff contra a base vai ver.
+    // Acrescenta se existir, cria se nao — os dois casos interessam: um ficheiro EXISTENTE
+    // tocado (alvo a seleccionar) e um ficheiro NOVO que nao mapeia para nada (a lista do
+    // "nada a varrer"). Um `readFileSync` cego rebentava no segundo.
+    if (alterado) {
+      const alvo = join(dir, alterado);
+      const antes = existsSync(alvo) ? readFileSync(alvo, "utf8") : "";
+      writeFileSync(alvo, antes + "\n// tocado\n");
+    }
+  }
   return dir;
 }
 
@@ -387,6 +433,39 @@ test("sinal mencionado num COMENTARIO nao conta como sitio", { sinalEmComentario
   code: 0,
   includes: ["Cobertura de mutacao completa"],
   excludes: ["INCOMPLETA"],
+});
+
+
+// --- `--diff`: varrer so o que este branch tocou -----------------------------------
+// E o ESPELHO, nao o portao. Cada caso aqui mede um dos quatro comportamentos que a decisao
+// do `/grill` fixou, e o quarto e o contra-caso sem o qual os outros nao valem nada.
+
+// Sem repo nao ha base, e sem base nao ha medicao. Cair para "varrer tudo" ou para "varrer
+// nada" seria escolher por conta propria o que medir — e uma medicao ausente nao e um OK.
+test("--diff sem baseline resoluvel REPROVA, em vez de escolher por si", {}, ["--diff"], {
+  code: 1,
+  includes: ["SEM BASELINE", "uma medicao ausente nao e um OK"],
+});
+
+// Nada a varrer e resposta LEGITIMA — mas nunca silenciosa. O que nao casou vai para o ecra:
+// se um deles DEVIA levar a um alvo, a lacuna do mapa fica visivel em vez de absorvida.
+test("--diff sem alvos LISTA o que nao casou e sai 0", { comGit: true, alterado: "README-x.md" }, ["--diff"], {
+  code: 0,
+  includes: ["Nada a varrer", "sem regra no mapa: README-x.md", "falta-lhe regra em lib/mapa-suites.mjs"],
+});
+
+// O caso util: um alvo tocado -> varre-se esse.
+test("--diff com um alvo tocado varre esse alvo", { comGit: true, alterado: ".agent/scripts/fake-check.mjs" }, ["--diff", "--list"], {
+  code: 0,
+  includes: ["fake-check.mjs"],
+});
+
+// O CONTRA-CASO, e e ele que faz os outros valerem: **sem flags varre tudo**. O `ci.yml`
+// invoca sem flags, e se o diff passasse a ser o default o portao virava parcial sem ninguem
+// ter decidido isso. Este teste e o que impede essa alteracao de passar despercebida.
+test("SEM flags varre tudo, mesmo num repo com diff", { comGit: true, parSao: true, alterado: ".agent/scripts/fake-check.mjs" }, ["--list"], {
+  code: 0,
+  includes: ["fake-check.mjs", "fake-check-2.mjs"],
 });
 
 console.log("");

@@ -31,33 +31,16 @@ import { execFileSync } from "child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
+import { regraDe, comandoDe } from "../../.agent/scripts/lib/mapa-suites.mjs";
 
-/** CONFIGURAR AO PROJETO: caminho tocado -> comando que o verifica.
- *  A ordem importa: a primeira regra que casa e a que se reporta. */
-const SUITES = [
-  { re: /^\.agent\/scripts\/guards\//, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=guards" },
-  { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, cmd: "node .agent/scripts/test-guards.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-doc" },
-  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, cmd: "node .agent/scripts/test-backlog.mjs && node .agent/scripts/mutation-sweep.mjs --only=check-backlog" },
-  // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
-  // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
-  // que este ficheiro pode deixar passar.
-  { re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/upgrade-mecanico\.mjs)$/, cmd: "node .agent/scripts/test-simulate-upgrade.mjs && node .agent/scripts/mutation-sweep.mjs --only=upgrade" },
-  // O `surface-patterns.mjs` e os dois harnesses nao casavam nenhuma regra: mexer neles nao
-  // gerava divida nenhuma no fim do turno, ao contrario de mexer no `check-test-surface.mjs`.
-  // E sao eles que DECIDEM — as tabelas de padroes e o veredicto de ~280 testes.
-  { re: /^\.agent\/scripts\/(?:check-test-surface|surface-patterns|test-surface-harness)\.mjs$/, cmd: "node .agent/scripts/test-test-surface.mjs" },
-  { re: /^\.agent\/scripts\/test-harness\.mjs$/, cmd: "node .agent/scripts/test-guards.mjs" },
-  { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, cmd: "node .agent/scripts/test-bundle-sizes.mjs" },
-  { re: /^\.agent\/scripts\/mutation-sweep\.mjs$/, cmd: "node .agent/scripts/test-mutation-sweep.mjs" },
-  { re: /^\.agent\/scripts\/lib\//, cmd: "node .agent/scripts/test-registo.mjs" },
-  { re: /^\.githooks\//, cmd: "node .agent/scripts/test-commit-msg.mjs" },
-  { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, cmd: "node .agent/scripts/test-simulate-derived.mjs" },
-  { re: /^\.claude\/hooks\//, cmd: "node .claude/hooks/tests/test-hooks.mjs" },
-  { re: /^\.agent\/(rules|workflows)\//, cmd: "node .agent/scripts/check-doc-versions.mjs" },
-  { re: /^(CLAUDE|GEMINI|AGENTS|README)\.md$/, cmd: "node .agent/scripts/check-doc-versions.mjs" },
-  { re: /^\.agent\/context\/backlog/, cmd: "node .agent/scripts/check-backlog.mjs" },
-  { re: /^\.claude\/settings\.json$/, cmd: "node .agent/scripts/test-guards.mjs" },
-];
+/** O mapa "caminho tocado -> o que o verifica" vive em `.agent/scripts/lib/mapa-suites.mjs`.
+ *
+ *  Nasceu aqui, mas o conhecimento nao e deste hook: vale para qualquer agente, e o
+ *  `mutation-sweep.mjs` precisa do mesmo mapa para derivar o que varrer a partir de um diff.
+ *  Duas copias eram dois campos a ter de concordar a mao, sem nada a verifica-los (`TP1`).
+ *
+ *  Este hook e so-Claude-Code; o mapa nao. Por isso o mapa esta la e este importa-o, e nao ao
+ *  contrario — um script que qualquer agente corre nao pode depender de `.claude/`. */
 
 /** Caminhos de um `git status --porcelain -z`.
  *
@@ -100,10 +83,11 @@ try {
   const tocados = caminhosPorcelain(porcelain);
   const devidos = new Map(); // cmd -> ficheiros que o motivam
   for (const f of tocados) {
-    const regra = SUITES.find((s) => s.re.test(f));
+    const regra = regraDe(f);
     if (!regra) continue;
-    if (!devidos.has(regra.cmd)) devidos.set(regra.cmd, []);
-    devidos.get(regra.cmd).push(f);
+    const cmd = comandoDe(regra);
+    if (!devidos.has(cmd)) devidos.set(cmd, []);
+    devidos.get(cmd).push(f);
   }
   if (devidos.size === 0) process.exit(0);
 

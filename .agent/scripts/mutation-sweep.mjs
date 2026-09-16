@@ -72,6 +72,7 @@ function listarDir(rel) {
 }
 
 import { PARES } from "./lib/pares.mjs";
+import { verificadoresDe } from "./lib/mapa-suites.mjs";
 
 
 const listarSo = process.argv.includes("--list");
@@ -79,6 +80,20 @@ const listarSo = process.argv.includes("--list");
 // razao para recorrer as suites dos outros — e a varredura custa minutos por alvo.
 const onlyArg = process.argv.find((a) => a.startsWith("--only="));
 const only = onlyArg ? onlyArg.slice("--only=".length) : null;
+
+// `--diff`: varrer so os alvos que o trabalho deste branch tocou. E o ESPELHO, nao o portao —
+// existe para quem esta no terminal nao esperar ~45 min por uma medicao que devia caber num.
+// Com ~1 min corre-se a cada passo, e apanha problemas enquanto ainda sao pequenos: o ganho
+// nao e poupar tempo, e **mais medicoes, nao menos**.
+//
+// **NAO e o comportamento por omissao, e isso e deliberado.** O `ci.yml` invoca este script
+// sem flags, e o CI e o portao: se o diff passasse a ser o default, a varredura completa do
+// portao virava parcial sem ninguem ter decidido isso, e sem aparecer em lado nenhum.
+//
+// A baseline e a **base do branch** e nao o `HEAD`: olhar so ao nao-commitado deixava por medir
+// o que foi commitado ha dez minutos — o mesmo trabalho, o mesmo risco. `git diff <base>` sem
+// `--cached` ja compara a ARVORE DE TRABALHO contra a base, logo cobre os dois num comando.
+const modoDiff = process.argv.includes("--diff");
 
 // `--skips`: varrer os sitios `skip()`/`note()` em vez dos `warn()`/`fatal()`.
 //
@@ -166,7 +181,85 @@ if (!only) {
   }
 }
 
-const selecionados = only ? PARES.filter((p) => p.alvo.includes(only)) : PARES;
+/** Os alvos que o trabalho deste branch toca, pelas DUAS vias que o mapa conhece.
+ *
+ *  1. O ficheiro alterado E um alvo -> varre-se.
+ *  2. O ficheiro alterado e (ou leva a) uma SUITE -> varrem-se todos os alvos que a usam. E a
+ *     via que apanha o indirecto: mexer no `test-harness.mjs` nao toca em alvo nenhum, mas
+ *     muda o veredicto de ~260 testes. Sem esta via o filtro media menos do que diz medir, que
+ *     seria o `TP2` dentro da ferramenta escrita para o apanhar.
+ *
+ *  A baseline vem de `git`: sem ela **reprova**, nunca cai para "varrer tudo" nem para "varrer
+ *  nada". Uma medicao ausente nao e um OK — a mesma regra do `check-test-surface.mjs`. */
+function alvosDoDiff() {
+  const git = (args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  let base;
+  try {
+    // O ramo principal deste repo, e nao um nome assumido: um projeto derivado pode usar outro.
+    const principal = ["origin/HEAD", "origin/main", "main", "origin/master", "master"].find((r) => {
+      try {
+        git(["rev-parse", "--verify", "--quiet", r]);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+    if (!principal) return { erro: "nao encontrei o branch principal (origin/HEAD, main, master)" };
+    base = git(["merge-base", "HEAD", principal]);
+  } catch (err) {
+    return { erro: `nao consegui resolver a base do branch: ${err.message.split("\n")[0]}` };
+  }
+  // Sem `--cached`: compara a ARVORE DE TRABALHO contra a base, logo inclui o que ainda nao
+  // foi commitado. `-z` porque o git CITA caminhos com espacos ou bytes nao-ASCII, e um
+  // caminho citado nao casa regra nenhuma — a lacuna seria silenciosa (`TP5`).
+  let ficheiros;
+  try {
+    ficheiros = git(["diff", "--name-only", "-z", base]).split("\0").filter(Boolean);
+  } catch (err) {
+    return { erro: `nao consegui ler o diff contra ${base.slice(0, 7)}: ${err.message.split("\n")[0]}` };
+  }
+  // Os nao rastreados tambem contam: um verificador NOVO ainda por commitar e exactamente o
+  // caso em que ninguem quer descobrir a falta de cobertura so no CI.
+  try {
+    const novos = git(["ls-files", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean);
+    ficheiros = [...new Set([...ficheiros, ...novos])];
+  } catch {
+    /* melhor esforco: o diff acima ja e a medicao */
+  }
+
+  const { porVerificador, semRegra } = verificadoresDe(ficheiros);
+  const suites = new Set(porVerificador.keys());
+  const alvos = PARES.filter((p) => ficheiros.includes(p.alvo) || suites.has(p.suite));
+  return { ficheiros, alvos, semRegra };
+}
+
+let selecionados = only ? PARES.filter((p) => p.alvo.includes(only)) : PARES;
+let diffSemAlvos = null;
+if (modoDiff) {
+  const r = alvosDoDiff();
+  if (r.erro) {
+    console.log(`  SEM BASELINE  ${r.erro}`);
+    console.log("                sem baseline nao ha medicao, e uma medicao ausente nao e um OK.");
+    console.log("");
+    process.exit(1);
+  }
+  selecionados = only ? r.alvos.filter((p) => p.alvo.includes(only)) : r.alvos;
+  // Nada a varrer e uma resposta LEGITIMA (mexer so em documentacao, por exemplo) — mas nunca
+  // silenciosa. Quem le tem de poder ver os ficheiros que nao casaram nenhuma regra: se um
+  // deles DEVIA mapear para um alvo, a lacuna do mapa fica no ecra em vez de ser absorvida
+  // para sempre. Um mapa de cobertura com buracos calados e pior do que nao ter mapa nenhum,
+  // porque tem o aspecto de cobertura.
+  if (selecionados.length === 0) diffSemAlvos = r;
+}
+if (diffSemAlvos) {
+  const { ficheiros, semRegra } = diffSemAlvos;
+  console.log(`  Nada a varrer: nenhum dos ${ficheiros.length} ficheiro(s) alterado(s) leva a um alvo.`);
+  for (const f of semRegra) console.log(`    sem regra no mapa: ${f}`);
+  console.log("");
+  console.log("  Se algum destes DEVIA levar a um alvo, falta-lhe regra em lib/mapa-suites.mjs.");
+  console.log("");
+  process.exit(0);
+}
 if (only && selecionados.length === 0) {
   console.log(`  --only=${only} nao casa nenhum alvo. Conhecidos:`);
   for (const p of PARES) console.log(`    ${p.alvo}`);
