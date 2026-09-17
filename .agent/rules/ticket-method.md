@@ -112,6 +112,12 @@ Um loop cujo objetivo e "ficar verde" tem uma **solucao degenerada: enfraquecer 
   `node .agent/scripts/check-test-surface.mjs`, a correr como passo — nao ha hook que a
   impeca.
 
+**Corrigido um defeito, varrer pelo PADRAO e nao pelo ficheiro.** Tres rondas de revisao
+seguidas encontraram a mesma forma: a licao e aprendida, escrita com clareza, e aplicada **num
+sitio** — enquanto o irmao com a mesma forma fica, e volta a custar uma ronda. Um `grep` pelo
+padrao que se acabou de corrigir custa cinco segundos. Medido: a correccao de `out === src` num
+ficheiro deixou a mesma linha noutro, **no mesmo commit**.
+
 Ao chegar as 5, **parar e apresentar** o que falha e o que ja se tentou — e e o mesmo
 ponto de decisao da Fase 3: o agente nao decide sozinho abandonar nem insistir. O
 utilizador escolhe entre mais tentativas, mudar de abordagem, ou aceitar o estado atual
