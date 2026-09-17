@@ -9,7 +9,7 @@
  */
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF, patchSettings, GUARD, GUARD_MODULES } from "./harness/test-harness.mjs";
+import { test, file, readF, writeF, patchSettings, GUARD_MODULES } from "./harness/test-harness.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que

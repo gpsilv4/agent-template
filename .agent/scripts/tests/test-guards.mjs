@@ -15,7 +15,7 @@
 
 import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
+import { test, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";

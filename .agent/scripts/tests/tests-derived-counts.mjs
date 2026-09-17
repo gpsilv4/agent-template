@@ -8,7 +8,7 @@
  * testes ser explicita em vez de depender da ordem de avaliacao dos imports.
  */
 import { readdirSync, rmSync, existsSync } from "fs";
-import { join } from "path";
+import { join, sep } from "path";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./harness/test-harness.mjs";
 
@@ -22,6 +22,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       "Correr `node .agent/scripts/tests/test-guards.mjs`, que importa este modulo e chama registar()."
   );
   process.exit(1);
+}
+
+/** Apaga de toda a fixture as linhas que casam com `padrao`, para um controlo negativo
+ *  provar a ausencia SEM saber em que ficheiros a frase estava escrita. */
+function apagaCitacoes(dir, padrao) {
+  for (const rel of readdirSync(dir, { recursive: true })) {
+    const p = String(rel).split(sep).join("/");
+    if (!p.endsWith(".md")) continue;
+    const antes = readF(dir, p);
+    const depois = antes.replace(padrao, "");
+    if (depois !== antes) writeF(dir, p, depois);
+  }
 }
 
 /** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
@@ -237,10 +249,22 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // apagar a citacao fazia-o passar em silencio — sem OK e sem WARN — enquanto `guardsRun`
   // continuava a conta-lo. Achado da Fase 4.
   test("G12d: citacao do numero de guards apagada avisa (no TEMPLATE)", (dir) => {
-    // O BOOTSTRAP.md fica SEM a frase — e continua a existir, logo isto e o template e nao
-    // um derivado. A distincao importa: num derivado a ausencia de citacao e normal e o
-    // guard tem de saltar, nao avisar. O teste irmao abaixo fixa esse outro lado.
+    // O BOOTSTRAP.md continua a existir (sem a frase), logo isto e o template e nao um
+    // derivado. A distincao importa: num derivado a ausencia de citacao e normal e o guard
+    // tem de saltar, nao avisar. O teste irmao abaixo fixa esse outro lado.
+    //
+    // A frase e apagada de TODO o `.md` da fixture, e nao no `BOOTSTRAP.md` a mao. A versao
+    // a mao assumia que o template so citava o numero num sitio; quando o `scripts-guide.md`
+    // passou a cita-lo tambem, este controlo negativo ficou vermelho sem haver defeito nenhum
+    // — a fixture e que tinha por dentro uma segunda copia da lista de ficheiros do guard
+    // (`TP8`). Varrer nao esquece o ficheiro seguinte.
+    // O `writeF` do BOOTSTRAP.md NAO e cosmetico e nao sai daqui: e ele que faz da fixture um
+    // TEMPLATE. Num derivado o ficheiro foi apagado no bootstrap, `ehDerivado()` da true e o
+    // guard faz SKIP em vez de WARN — sem esta linha o teste passava no template nu e
+    // reprovava em todos os consumidores. Apanhado pelo `simulate-upgrade.mjs`, que mede
+    // contra a ultima tag; a bateria inteira estava verde.
     writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem citacoes de contagens.\n");
+    apagaCitacoes(dir, /^.*\d+\s+(?:guards\s+numerados|numbered\s+guards).*$/gim);
   }, { code: 1, includes: ["nenhum ficheiro cita o numero de guards numerados"] });
 
   // --- 12e: contagem de workflows/comandos ----------------------------------

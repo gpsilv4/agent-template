@@ -18,9 +18,8 @@
  * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml.
  */
 
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, cpSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { execFileSync } from "child_process";
-import { fileURLToPath } from "url";
 // Os construtores de fixture vivem no harness: a catraca do Guard 17 exigiu a divisao antes
 // de deixar a suite crescer mais. Ver `test-bundle-harness.mjs`.
 import {
@@ -28,8 +27,6 @@ import {
   CHECKER,
   sandbox,
   chunk,
-  TARGETS_FIXTURE,
-  porConfig,
   withTargets,
   suspenderAlvos,
   ligarAlvos,
@@ -40,8 +37,7 @@ import {
 // Os contadores sao da SUITE, nao do harness: quem monta fixtures nao conta veredictos.
 let passed = 0;
 const failures = [];
-import { dirname, resolve, join } from "path";
-import { tmpdir } from "os";
+import { join } from "path";
 import { gzipSync } from "zlib";
 import { randomBytes } from "crypto";
 

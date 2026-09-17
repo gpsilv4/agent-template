@@ -14,7 +14,7 @@
  * pasta, acusava 13 citacoes correctas.
  */
 import { pathToFileURL } from "url";
-import { test, writeF, file } from "./harness/test-harness.mjs";
+import { test, writeF } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(

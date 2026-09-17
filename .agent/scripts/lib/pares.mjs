@@ -109,10 +109,6 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
-    // Guard 19 (isolamento das suites). E o guard que torna a varredura PARALELA segura: se
-    // ele deixar de avisar, o paralelismo continua a parecer funcionar e passa a dar vermelhos
-    // que nao sao reais. Um verificador cuja falha e invisivel precisa desta rede mais do que
-    // qualquer outro.
     // Guard 20 (citacoes de ficheiro nas instrucoes). Le PROSA, e uma citacao morta nao da erro
     // nenhum — fica a mentir ate alguem a seguir. Se este guard deixar de avisar, volta-se ao
     // estado em que nada verificava isso.
@@ -122,6 +118,10 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // Guard 19 (isolamento das suites). E o guard que torna a varredura PARALELA segura: se
+    // ele deixar de avisar, o paralelismo continua a parecer funcionar e passa a dar vermelhos
+    // que nao sao reais. Um verificador cuja falha e invisivel precisa desta rede mais do que
+    // qualquer outro.
     alvo: ".agent/scripts/guards/isolamento.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
@@ -266,6 +266,16 @@ export const PARES = [
     // Este nao usa `warn()`: imprime ERROR/FAILED e reprova com `process.exit(1)`.
     sinal: /process\.exit\(1\)/,
     neutro: "process.exit(0)",
+  },
+  {
+    // O detector de codigo morto. Teve TRES defeitos antes de estar certo, e nenhum apareceu
+    // numa leitura: o regex de string a comer 92% do ficheiro, as interpolacoes de template
+    // string tratadas como texto, e a limpeza automatica que juntou nomes. Um verificador com
+    // este historico e o ultimo que devia entrar sem rede.
+    alvo: ".agent/scripts/check-codigo-morto.mjs",
+    suite: ".agent/scripts/tests/test-codigo-morto.mjs",
+    sinal: /(?<![\w.$])morto\(/,
+    neutro: "(() => {})(",
   },
   {
     alvo: ".agent/scripts/check-backlog.mjs",

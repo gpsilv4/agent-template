@@ -32,6 +32,7 @@ Producao (main branch + {{BACKEND}} PROD)
 - [ ] **Testes dos guards** passam (`test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs`)?
 - [ ] Se algum `check-*.mjs` mudou neste ciclo: `node .agent/scripts/mutation-sweep.mjs` exit 0?
 - [ ] **Superficie de teste**: `node .agent/scripts/check-test-surface.mjs` exit 0 (nenhum teste apagado nem desativado desde a base)?
+- [ ] **Codigo morto**: `node .agent/scripts/check-codigo-morto.mjs` exit 0 (nenhum import por usar)?
 - [ ] **`.agent/context/backlog.md`** + **`backlog-archive.md`** — items concluidos movidos para o Historico, contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - Se a documentacao nao foi atualizada, fazer **ANTES** de continuar o deploy.
 

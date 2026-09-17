@@ -26,6 +26,7 @@
 - [ ] `/review` §10 ran: the 28-point checklist in `.agent/rules/sync-docs.md`
 - [ ] If a `check-*.mjs` changed: `node .agent/scripts/mutation-sweep.mjs` exits 0 (every warning site goes red; no checker without a suite)
 - [ ] Test surface not weakened (`node .agent/scripts/check-test-surface.mjs`) — no deleted/skipped tests, no dropped counts
+- [ ] No dead imports (`node .agent/scripts/check-codigo-morto.mjs`)
 - [ ] Backlog counters valid (`node .agent/scripts/check-backlog.mjs`) — 0 divergences
 - [ ] CI is green on the branch — never merge on red, and **check that checks exist**: `gh pr checks --watch` exits 0 when none have been reported yet
 - [ ] `src/docs/CHANGELOG.md` updated
