@@ -20,12 +20,12 @@
  *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *
- *   node .agent/scripts/test-mutation-sweep.mjs
+ *   node .agent/scripts/tests/test-mutation-sweep.mjs
  */
 
 import { readFileSync } from "fs";
 import { join } from "path";
-import { test, avaliar, registarResultado, resumo } from "./test-sweep-harness.mjs";
+import { test, avaliar, registarResultado, resumo } from "./harness/test-sweep-harness.mjs";
 // O verificador falso, a suite falsa, o `sandbox()` e os contadores vivem no harness: a suite
 // passou as 500 linhas e a catraca do Guard 17 exige dividir antes de acrescentar. O que fica
 // aqui sao as ASSERCOES — que e o que se le quando se quer saber o que esta garantido.

@@ -8,11 +8,11 @@
  * A fixture e um **repo git real** em `os.tmpdir()` — o verificador pergunta ao git o que
  * mudou desde a baseline, logo simular com ficheiros nao afirmaria nada.
  *
- *   node .agent/scripts/test-test-surface.mjs
+ *   node .agent/scripts/tests/test-test-surface.mjs
  */
 
-import { test, commit, git, resumo, contagem } from "./test-surface-harness.mjs";
-import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "./lib/registo.mjs";
+import { test, commit, git, resumo, contagem } from "./harness/test-surface-harness.mjs";
+import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
@@ -88,18 +88,18 @@ test("baseline que nao resolve REPROVA (nao pode dar OK)", () => "ref-que-nao-ex
 // — foi escrita errada tres vezes; conta-se com `git ls-files`.)
 
 test("glob: suite nomeada pelo prefixo (test-x.mjs) esta na superficie", (dir) => {
-  writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  writeFileSync(join(dir, ".agent/scripts/tests/test-guards.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
   commit(dir, "add suite com nome de prefixo");
   const ref = git(dir, ["rev-parse", "HEAD"]);
-  rmSync(join(dir, ".agent/scripts/test-guards.mjs"));
+  rmSync(join(dir, ".agent/scripts/tests/test-guards.mjs"));
   return ref;
 }, { code: 1, includes: ["test-guards.mjs", "APAGADO"] });
 
 test("glob: suite nomeada tests-x.mjs (plural) tambem", (dir) => {
-  writeFileSync(join(dir, ".agent/scripts/tests-settings.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
+  writeFileSync(join(dir, ".agent/scripts/tests/tests-settings.mjs"), 'test("a", () => { expect(1).toBe(1); });\n');
   commit(dir, "add suite plural");
   const ref = git(dir, ["rev-parse", "HEAD"]);
-  rmSync(join(dir, ".agent/scripts/tests-settings.mjs"));
+  rmSync(join(dir, ".agent/scripts/tests/tests-settings.mjs"));
   return ref;
 }, { code: 1, includes: ["tests-settings.mjs", "APAGADO"] });
 
@@ -240,15 +240,15 @@ test("as MARCAS nao se aplicam ao ficheiro que as define", (dir) => {
   // punha-a num comentario, e o contador tira comentarios antes de medir: ficava verde com a
   // exclusao ligada **e** desligada — nao afirmava nada, que e o `TP1`. Apanhado pelo
   // controlo negativo, nao pela leitura.
-  writeFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"),
-    readFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"), "utf8") +
+  writeFileSync(join(dir, ".agent/scripts/lib/surface-patterns.mjs"),
+    readFileSync(join(dir, ".agent/scripts/lib/surface-patterns.mjs"), "utf8") +
       "\nconst EXTRA = [{ re: /\\b(?:xit|xdescribe|xtest)\\b/, msg: \"x\" }];\nexport { EXTRA };\n");
   commit(dir, "acrescentar uma marca ao detetor");
 }, { code: 0, excludes: ["  WARN  "] });
 
 test("esvaziar as tabelas de padroes REPROVA (as CONTAGENS aplicam-se)", (dir) => {
   // Desligar o detetor sem tocar em nenhum teste: as tabelas viram um par de arrays vazios.
-  writeFileSync(join(dir, ".agent/scripts/surface-patterns.mjs"),
+  writeFileSync(join(dir, ".agent/scripts/lib/surface-patterns.mjs"),
     "const CONTAGENS = [];\nconst MARCAS = [];\nexport { CONTAGENS, MARCAS };\n");
   commit(dir, "esvaziar as tabelas");
 }, { code: 1, includes: ["surface-patterns.mjs"] });

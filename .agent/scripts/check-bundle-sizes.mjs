@@ -9,7 +9,7 @@
  *   npm run build && node .agent/scripts/check-bundle-sizes.mjs
  *
  * Requisito: .next/ deve existir (correr npm run build antes).
- * Testes: node .agent/scripts/test-bundle-sizes.mjs
+ * Testes: node .agent/scripts/tests/test-bundle-sizes.mjs
  *
  * PRINCIPIO: um numero errado e pior do que numero nenhum. Este script prefere
  * FALHAR a reportar um valor que nao conseguiu medir. A versao anterior tratava

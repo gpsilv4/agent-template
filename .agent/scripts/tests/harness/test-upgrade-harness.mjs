@@ -19,9 +19,12 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-import { aplicaUpgradeMecanico } from "./lib/upgrade-mecanico.mjs";
+import { aplicaUpgradeMecanico } from "../../lib/upgrade-mecanico.mjs";
 
-const AQUI = dirname(fileURLToPath(import.meta.url));
+// `AQUI` e agora `tests/harness/`; os ficheiros que este harness copia vivem na raiz de
+// `.agent/scripts/`. Resolver a partir da RAIZ e nao da pasta do ficheiro evita que a proxima
+// mudanca de sitio parta isto outra vez em silencio.
+const AQUI = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
 
 export const git = (dir, args) =>
@@ -184,7 +187,7 @@ export function templateSintetico(extra = {}) {
     ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
     ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
     ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
-    ".agent/scripts/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
+    ".agent/scripts/lib/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
     // O guard dos tamanhos exporta TRES coisas que a adaptacao 2b usa: a tabela que reescreve, e
     // a contagem/limite que importa dele para nao existir uma segunda copia da mesma regra. Uma
     // fixture so com a tabela fazia o import trazer `undefined` e a simulacao rebentava — a

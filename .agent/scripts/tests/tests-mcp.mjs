@@ -8,12 +8,12 @@
  * ficheiro nao existe, logo herdar o estado do repo daria uma suite que so afirma "saltou".
  */
 import { pathToFileURL } from "url";
-import { test, readF, writeF } from "./test-harness.mjs";
+import { test, readF, writeF } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-mcp.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-guards.mjs`."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`."
   );
   process.exit(1);
 }

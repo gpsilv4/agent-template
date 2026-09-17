@@ -19,7 +19,7 @@ import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const SWEEP = join(ROOT, ".agent/scripts/mutation-sweep.mjs");
 
 // --- O verificador falso -----------------------------------------------------
@@ -109,7 +109,8 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
     // Um harness que so MONTA fixtures: nenhuma recusa, nada que se desligue. E o caso real do
     // `test-bundle-harness.mjs`, que ficou sem guardas quando a configuracao passou a
     // escrever-se em vez de se fatiar dentro do ficheiro da logica.
-    writeFileSync(join(dir, ".agent/scripts/test-novo-harness.mjs"),
+    mkdirSync(join(dir, ".agent/scripts/tests/harness"), { recursive: true });
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-novo-harness.mjs"),
       'export const fixture = () => ({ rotas: ["/"], teto: 160 });\n');
   }
   if (harnessComThrow) {
@@ -117,7 +118,8 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
     // `throw`. A verificacao de conteudo nao conhecia `throw new Error(` — dizia "nao tem
     // recusas" de um ficheiro que tem uma, e teria isentado este. Nao se via nos harnesses
     // reais porque a isencao so se aplica a quem AINDA nao esta em PARES.
-    writeFileSync(join(dir, ".agent/scripts/test-outro-harness.mjs"),
+    mkdirSync(join(dir, ".agent/scripts/tests/harness"), { recursive: true });
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-outro-harness.mjs"),
       'export const fixture = (x) => { if (!x) throw new Error("fixture vazia"); return x; };\n');
   }
   if (dadosComRecusa) {

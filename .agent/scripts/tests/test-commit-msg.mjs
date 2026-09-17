@@ -9,7 +9,7 @@
  *
  * Sem dependencias e sem `package.json`: corre com `node`, como os restantes.
  *
- *   node .agent/scripts/test-commit-msg.mjs
+ *   node .agent/scripts/tests/test-commit-msg.mjs
  *
  * Sai `!= 0` se algum teste falhar. Corre no job `guard-tests` do `ci.yml`.
  */
@@ -20,7 +20,7 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".githooks/commit-msg");
 
 let passed = 0;

@@ -10,12 +10,12 @@
 import { readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, readF, writeF, file } from "./test-harness.mjs";
+import { test, readF, writeF, file } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-placeholders.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-guards.mjs`."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`."
   );
   process.exit(1);
 }

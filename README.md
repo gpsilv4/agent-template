@@ -164,61 +164,54 @@ gh pr create --fill     # then merge once CI is green
 │   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/
-    ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
-    ├── config/                  <- THIS project's configuration. /upgrade never touches it
-    │   └── bundles.mjs          <- Routes, budgets, and the ALVOS_REPROVAM switch
-    ├── test-commit-msg.mjs     <- Negative tests for the .githooks/commit-msg hook
+└── scripts/                    <- 7 pontos de entrada na raiz: o que se INVOCA
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
-    ├── guards/                 <- Guard modules split out of the entry point
+    ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
+    ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
+    ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
+    ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
+    ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
+    ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
+    │
+    ├── config/                 <- THIS project's configuration. /upgrade never replaces it
+    │   └── bundles.mjs         <- Routes, budgets, and the ALVOS_REPROVAM switch
+    │
+    ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
-    │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed (bilingual)
-    │   ├── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
-    │   ├── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (TP7)
+    │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed
+    │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap
+    │   ├── anti-patterns.mjs   <- Guards 15/18: citations resolve; each TPn has its evidence
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
     │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
     │   └── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
-    ├── lib/
+    │
+    ├── lib/                    <- Shared modules. No entry point, no discovery: imported
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
+    │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
+    │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
+    │   ├── surface-patterns.mjs   <- Pattern tables: what can't drop, what can't appear
     │   ├── patch.mjs           <- Text patching with THREE outcomes: applied / already-set / no-target
     │   ├── derivado.mjs        <- "Is this repo the template, or a project derived from it?"
     │   └── ficheiros.mjs       <- Reads that tell "missing" apart from "unreadable"
-    ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
-    ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
-    ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear
-    ├── test-test-surface.mjs   <- Negative tests for it (real git repos as fixtures)
-    ├── test-surface-harness.mjs<- Its sandbox (a real git repo) + test() + summary
-    ├── tests-surface-marks.mjs <- The weakening marks: `|| true`, `if:`, unreachable verdict
-    ├── test-guards.mjs         <- Entry point for the doc-guard suites (no deps, no package.json)
-    ├── test-harness.mjs        <- Shared sandbox + test() + summary
-    ├── tests-settings.mjs      <- Guard 11 tests (mirrors guards/settings.mjs)
-    ├── tests-derived-counts.mjs<- Guards 12/12c/12d/12e tests
-    ├── tests-placeholders.mjs  <- Guard 13 tests (simulates a completed bootstrap)
-    ├── tests-anti-patterns.mjs <- Guard 15 tests (fixture derives its own definitions)
-    ├── tests-budgets.mjs       <- Series-1 guard tests (mirrors guards/budgets.mjs)
-    ├── tests-mcp.mjs           <- Guard 16 tests (mirrors guards/mcp.mjs)
-    ├── tests-sizes.mjs         <- Guard 17 tests (mirrors guards/sizes.mjs)
-    ├── tests-isolamento.mjs    <- Guard 19 tests (each rule with its counter-case)
-    ├── tests-upgrade-motor.mjs <- The /upgrade engine tests (imported by test-simulate-upgrade)
-    ├── test-registo.mjs        <- Negative tests for the suite discovery in lib/registo.mjs
-    ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
-    ├── test-bundle-harness.mjs <- Its fixtures: sandbox + the config each test needs
-    ├── test-sweep-harness.mjs  <- The mutation sweep suite's fake checker, sandbox and summary
-    ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
-    ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
-    ├── test-simulate-derived.mjs<- Negative tests for it (minimal fixture repo, stubbed checkers)
-    ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
-    │                              (lib/upgrade-mecanico.mjs holds the mechanical engine)
-    ├── test-simulate-upgrade.mjs<- Negative tests for it (each refusal path refuses)
-    ├── test-upgrade-harness.mjs<- Fixture builders for that suite (imported, not discovered)
-    ├── lib/mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
-    ├── test-mapa-suites.mjs    <- Negative tests for the map
-    ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
-    └── test-mutation-sweep.mjs <- Negative tests for the sweep itself (fake checker + fake suite)
+    │
+    └── tests/                  <- Everything that TESTS the machinery above
+        ├── test-*.mjs          <- 10 entry points, one per verifier (run them directly)
+        ├── tests-*.mjs         <- 13 modules discovered on disk by an entry point
+        └── harness/            <- Fixture builders: imported, never invoked
+            ├── test-harness.mjs          <- Sandbox + test() + summary, for the doc guards
+            ├── test-bundle-harness.mjs   <- Fake .next/ trees and the config each test needs
+            ├── test-surface-harness.mjs  <- A real git repo as a fixture
+            ├── test-sweep-harness.mjs    <- Fake checker + fake suite of known behaviour
+            └── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
+
+> **Porque os testes estao numa pasta e os 7 verificadores nao.** A raiz responde a "o que posso
+> correr aqui?". E a distincao entre `test-*` (ponto de entrada) e `tests-*` (modulo descoberto)
+> era de **um carater** — e a maquinaria aplica-a: um modulo que declare o entry point errado e
+> recusado pelo `lib/registo.mjs`. A pasta torna visivel o que o sufixo escondia.
 
 .github/                        <- DevOps & governance
 ├── workflows/
@@ -297,11 +290,11 @@ src/docs/
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every push/PR** in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every push/PR** in the `guard-tests` job |
-| Guard Tests | `node .agent/scripts/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
-| Bundle Tests | `node .agent/scripts/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
-| Backlog Tests | `node .agent/scripts/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
+| Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
+| Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
+| Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
 | Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — run locally after touching a `check-*.mjs` (opt-in in ci.yml) |
-| Sweep Tests | `node .agent/scripts/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
+| Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
 

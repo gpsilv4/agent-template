@@ -24,7 +24,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { CONTAGENS, MARCAS } from "./surface-patterns.mjs";
+import { CONTAGENS, MARCAS } from "./lib/surface-patterns.mjs";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";

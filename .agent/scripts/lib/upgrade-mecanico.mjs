@@ -79,7 +79,7 @@ export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
   [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
-  [".agent/scripts/surface-patterns.mjs", "CONTAGENS"],
+  [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
 ];
 
 /**
@@ -92,8 +92,10 @@ export const CONSTANTES_DO_PROJETO = [
  * pior do que nao fazer upgrade nenhum.
  *
  * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: string[]}} o que
- *          mediu. `removidos` sao os ficheiros que sairam do template e o consumidor ainda tem —
- *          uma LISTA a propor, nunca uma accao ja feita.
+ *          mediu. `removidos` sao `{caminho, migrado}`: os ficheiros que sairam do template e o
+ *          consumidor ainda tem. `migrado: true` quando o mesmo NOME existe noutro caminho — ou
+ *          seja, o ficheiro mudou de sitio e a remocao **faz parte da migracao**, nao e uma
+ *          limpeza opcional. Continua a ser uma LISTA, nunca uma accao ja feita.
  */
 export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, constantes = CONSTANTES_DO_PROJETO }) {
   
@@ -175,9 +177,22 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     fatal(`nao consegui listar a arvore do ${tag} — sem ela nao sei o que saiu do template`);
   }
   const agora = arvoreNoDisco();
-  const removidos = [...naTag]
-    .filter((p) => !agora.has(p) && existsSync(join(dir, p)))
-    .sort();
+  const saiu = [...naTag].filter((p) => !agora.has(p) && existsSync(join(dir, p))).sort();
+
+  // MIGRACAO vs LIMPEZA, e a distincao decide se a remocao e opcional.
+  //
+  // Um ficheiro que saiu e **nao voltou a aparecer** e uma limpeza: o consumidor pode adiar a
+  // remocao e fica so com um orfao inofensivo. Um ficheiro que saiu e cujo **mesmo nome existe
+  // noutro caminho** foi MOVIDO — e ai adiar parte o projeto: os contadores duplicam, a
+  // descoberta exige par ao orfao, o `check-test-surface` ve a superficie inflada.
+  //
+  // Nao e teorico: foi medido a mover 28 ficheiros para `tests/`. O consumidor ficava com as
+  // DUAS estruturas e o gate vermelho, com uma mensagem que falava de "entry point que declara"
+  // — a quilometros da causa. A tabela do `/upgrade` dizia "propor apagar, com aprovacao", o que
+  // esta certo para um ficheiro solto e errado para uma migracao.
+  const nomeDe = (p) => p.split("/").pop();
+  const nomesAgora = new Set([...agora].map(nomeDe));
+  const removidos = saiu.map((p) => ({ caminho: p, migrado: nomesAgora.has(nomeDe(p)) }));
 
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];

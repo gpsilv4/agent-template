@@ -14,7 +14,7 @@
  * que ele valide a sandbox — e por isso que os testes conseguem mutar os inputs.
  *
  * Uso:
- *   node .agent/scripts/test-guards.mjs
+ *   node .agent/scripts/tests/test-guards.mjs
  *
  * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml
  * (sem `package.json` e sem gate do `detect` — o template puro e exatamente o caso coberto).
@@ -25,7 +25,7 @@ import { execFileSync } from "child_process";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
-import { TETOS } from "./guards/sizes.mjs";
+import { TETOS } from "../../guards/sizes.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -34,13 +34,13 @@ import { TETOS } from "./guards/sizes.mjs";
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     `test-harness.mjs nao e um entry point: nao corre testes por si.\n` +
-      "Correr `node .agent/scripts/test-guards.mjs`, que importa este modulo e chama registar()."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`, que importa este modulo e chama registar()."
   );
   process.exit(1);
 }
 
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const GUARD = ".agent/scripts/check-doc-versions.mjs";
 // Modulos que o GUARD importa. Copiar a pasta INTEIRA, e nao ficheiro a ficheiro: ao
 // extrair o Guard 11 para `guards/settings.mjs`, o sandbox sintetico deixou de resolver o

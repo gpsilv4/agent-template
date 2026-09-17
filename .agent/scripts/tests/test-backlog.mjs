@@ -17,7 +17,7 @@
  *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *
- *   node .agent/scripts/test-backlog.mjs
+ *   node .agent/scripts/tests/test-backlog.mjs
  */
 
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "fs";
@@ -26,7 +26,7 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
 
 // --- A fixture valida -------------------------------------------------------

@@ -320,12 +320,31 @@ ok(
 // Guard 17 conta-o e o `check-test-surface` ve a superficie duplicada. Uma arrumacao de pastas
 // no template punha VERMELHOS todos os projetos derivados, sem ninguem perceber porque.
 //
-// Isto LISTA, nao apaga. Apagar e decisao do passo de aprovacao do workflow — a Fase 0 do
-// `/upgrade` diz que nada acontece antes dela, e apagar e a coisa menos reversivel que ha aqui.
+// O MOTOR lista e nao apaga — apagar e decisao do passo de aprovacao, e e a coisa menos
+// reversivel deste workflow. Mas ESTE simulador tem de responder a outra pergunta: *um
+// consumidor que faca este upgrade **bem feito** fica verde?* E um upgrade bem feito inclui
+// apagar o que saiu.
+//
+// Medir o meio da migracao media um estado que ninguem deve FICAR a ter: com as duas estruturas
+// no disco, os contadores duplicam, a descoberta exige par aos orfaos e o `check-test-surface`
+// ve a superficie inflada. Foi exactamente o que aconteceu ao mover 28 ficheiros para `tests/`,
+// e a mensagem que o consumidor recebia falava de "entry point que declara" — a quilometros da
+// causa.
+//
+// Por isso a simulacao **aplica** as remocoes e **diz que as aplicou**. A linha existe para
+// ninguem ler isto como "o /upgrade apaga sozinho": num projeto real sao propostas, uma a uma.
 if (medido.removidos.length) {
+  const migrados = medido.removidos.filter((r) => r.migrado);
   ok(`${medido.removidos.length} ficheiro(s) sairam do template desde ${tag} e continuam no projeto:`);
-  for (const rel of medido.removidos) console.log(`        ${rel}`);
-  console.log("        (o /upgrade PROPOE apaga-los; nao os apaga)");
+  for (const { caminho, migrado } of medido.removidos) {
+    console.log(`        ${caminho}${migrado ? "   (MIGRADO: o mesmo nome existe noutra pasta)" : ""}`);
+  }
+  if (migrados.length) {
+    console.log(`        ${migrados.length} sao MIGRACAO, nao limpeza — adiar a remocao deixa o projeto`);
+    console.log("        com as duas estruturas, e e isso que poe o gate vermelho.");
+  }
+  for (const { caminho } of medido.removidos) rmSync(join(dir, caminho), { force: true });
+  ok(`aplicadas ${medido.removidos.length} remocao(oes) propostas — num projeto real aprovam-se uma a uma`);
 } else {
   ok(`nenhum ficheiro saiu do template desde ${tag} — nada a propor remover`);
 }

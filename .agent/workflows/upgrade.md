@@ -80,7 +80,7 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** (mesma regra dos hooks) | E a configuracao deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes do projeto que ainda vivem na logica: `BANNED` (`check-doc-versions.mjs`), `CHECKS` (**`guards/versions.mjs`** — mudou de ficheiro, e um glob `*.mjs` sem `**` nao o apanha), `TEST_GLOBS`/`CONFIG_GLOBS` (`check-test-surface.mjs`) e `CONTAGENS` (`surface-patterns.mjs`). Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero**, e ele diz "superficie intacta" sobre uma suite apagada |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes do projeto que ainda vivem na logica: `BANNED` (`check-doc-versions.mjs`), `CHECKS` (**`guards/versions.mjs`** — mudou de ficheiro, e um glob `*.mjs` sem `**` nao o apanha), `TEST_GLOBS`/`CONFIG_GLOBS` (`check-test-surface.mjs`) e `CONTAGENS` (`lib/surface-patterns.mjs`). Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero**, e ele diz "superficie intacta" sobre uma suite apagada |
 | **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova) — e do template, e os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto), mas o **cabecalho** e prosa do template e traz-se: o antigo cita IDs que ja nao existem, e o Guard 15 lista-os. As citacoes `TPn` nos scripts e workflows **copiam-se como estao** | Os prefixos tornam isto copia em vez de reescrita a mao (eram mais de vinte citacoes por ronda) |
@@ -127,7 +127,7 @@ Depois de aplicar, correr **nesta ordem**:
 ```bash
 node .agent/scripts/check-doc-versions.mjs     # paridade, orcamentos, placeholders
 node .agent/scripts/check-backlog.mjs          # contadores do backlog
-node .agent/scripts/test-guards.mjs            # e as outras suites test-*
+node .agent/scripts/tests/test-guards.mjs            # e as outras suites test-*
 node .agent/scripts/mutation-sweep.mjs         # custa minutos; e o que interessa
 ```
 

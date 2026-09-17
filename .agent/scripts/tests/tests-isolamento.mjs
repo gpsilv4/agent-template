@@ -14,12 +14,12 @@
  * Sem o segundo, um guard que avisasse sempre passava metade destes testes.
  */
 import { pathToFileURL } from "url";
-import { test, writeF } from "./test-harness.mjs";
+import { test, writeF } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-isolamento.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-guards.mjs`."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`."
   );
   process.exit(1);
 }

@@ -14,14 +14,14 @@
  * para isso que existe. Um teste que assuma a lista vazia esta a afirmar sobre o estado do
  * repo e nao sobre o guard, e fica vermelho no consumidor sem nada estar partido (`TP3`).
  */
-import { test, readF, writeF } from "./test-harness.mjs";
-import { aplica } from "./lib/patch.mjs";
+import { test, readF, writeF } from "./harness/test-harness.mjs";
+import { aplica } from "../lib/patch.mjs";
 import { pathToFileURL } from "url";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-versions.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-guards.mjs`."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`."
   );
   process.exit(1);
 }

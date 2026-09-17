@@ -11,12 +11,12 @@
  * isolado como funcao pura, e aqui chama-se com entradas fabricadas, uma por assercao.
  */
 import { pathToFileURL } from "url";
-import { avaliar, registarResultado } from "./test-surface-harness.mjs";
+import { avaliar, registarResultado } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-surface-self.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-test-surface.mjs`."
+      "Correr `node .agent/scripts/tests/test-test-surface.mjs`."
   );
   process.exit(1);
 }

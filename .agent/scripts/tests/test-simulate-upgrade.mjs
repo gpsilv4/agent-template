@@ -13,18 +13,18 @@
  * O motor mecanico tem os seus casos proprios aqui em baixo: foi extraido para `lib/` por ser
  * a parte que escreve por cima dos ficheiros de um consumidor, e e ai que um erro custa dados.
  *
- *   node .agent/scripts/test-simulate-upgrade.mjs
+ *   node .agent/scripts/tests/test-simulate-upgrade.mjs
  */
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { CONSTANTES_DO_PROJETO } from "./lib/upgrade-mecanico.mjs";
+import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./test-upgrade-harness.mjs";
+import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
-import { contaLinhas, LIMITE } from "./guards/sizes.mjs";
+import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -221,7 +221,7 @@ test('ficheiro que saiu do template e listado como removido', () => {
       ontem: { '.agent/scripts/velho.mjs': '// existia na tag\n' },
       hoje: { '.agent/scripts/velho.mjs': null }, // saiu do template
     });
-    return c.medido.removidos.includes('.agent/scripts/velho.mjs')
+    return c.medido.removidos.some((r) => r.caminho === '.agent/scripts/velho.mjs')
       ? []
       : [`removidos = ${JSON.stringify(c.medido.removidos)}, devia conter o ficheiro que saiu`];
   } finally {
@@ -240,7 +240,7 @@ test('ficheiro PROPRIO do projeto nunca e proposto para remocao', () => {
       hoje: {},
       consumidor: { '.agent/scripts/meu-verificador.mjs': '// e meu, nunca esteve no template\n' },
     });
-    return c.medido.removidos.some((p) => p.includes('meu-verificador'))
+    return c.medido.removidos.some((r) => r.caminho.includes('meu-verificador'))
       ? ['propos apagar um ficheiro do PROJETO — nunca esteve na tag']
       : [];
   } finally {
@@ -259,7 +259,7 @@ test('ficheiro que saiu do template mas o projeto ja apagou nao e listado', () =
       hoje: { '.agent/scripts/velho.mjs': null },
       consumidor: { '.agent/scripts/velho.mjs': null }, // o projeto ja o tinha apagado
     });
-    return c.medido.removidos.includes('.agent/scripts/velho.mjs')
+    return c.medido.removidos.some((r) => r.caminho === '.agent/scripts/velho.mjs')
       ? ['listou um ficheiro que o consumidor ja nao tem']
       : [];
   } finally {
@@ -285,4 +285,45 @@ test('a contagem da adaptacao 2b concorda com o Guard 17 na FRONTEIRA', () => {
   return p;
 });
 
+
+  // --- Migracao ou limpeza: a distincao decide se a remocao e opcional --------
+  // Um ficheiro que saiu e nao voltou a aparecer e uma LIMPEZA: adiar a remocao deixa um orfao
+  // inofensivo. Um que saiu e cujo mesmo NOME existe noutro caminho foi MOVIDO — e ai adiar
+  // parte o projeto: os contadores duplicam, a descoberta exige par ao orfao, o
+  // `check-test-surface` ve a superficie inflada.
+  //
+  // Medido a mover 28 ficheiros para `tests/`: o consumidor ficava com as DUAS estruturas e o
+  // gate vermelho, com uma mensagem que falava de "entry point que declara" — a quilometros da
+  // causa.
+  test('ficheiro MOVIDO (mesmo nome noutra pasta) e marcado como migracao', () => {
+    let c;
+    try {
+      c = cenario({
+        ontem: { '.agent/scripts/x.mjs': '// na raiz\n' },
+        hoje: { '.agent/scripts/x.mjs': null, '.agent/scripts/tests/x.mjs': '// mudou de pasta\n' },
+      });
+      const r = c.medido.removidos.find((r) => r.caminho === '.agent/scripts/x.mjs');
+      if (!r) return ['nao listou o ficheiro que saiu da raiz'];
+      return r.migrado ? [] : ['devia estar marcado como migrado — o mesmo nome existe em tests/'];
+    } finally {
+      limpa(c);
+    }
+  });
+
+  // O CONTRA-CASO, e sem ele o de cima era satisfeito por marcar TUDO como migracao: um ficheiro
+  // que desapareceu de vez e uma limpeza, e a remocao dele pode esperar sem partir nada.
+  test('ficheiro que desapareceu de vez NAO e marcado como migracao', () => {
+    let c;
+    try {
+      c = cenario({
+        ontem: { '.agent/scripts/obsoleto.mjs': '// ja nao serve\n' },
+        hoje: { '.agent/scripts/obsoleto.mjs': null },
+      });
+      const r = c.medido.removidos.find((r) => r.caminho === '.agent/scripts/obsoleto.mjs');
+      if (!r) return ['nao listou o ficheiro que saiu'];
+      return r.migrado ? ['marcou como migracao um ficheiro que nao existe em lado nenhum'] : [];
+    } finally {
+      limpa(c);
+    }
+  });
 resumo();

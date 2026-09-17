@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const REGISTO = resolve(AQUI, "lib", "registo.mjs");
+const REGISTO = resolve(AQUI, "..", "lib", "registo.mjs");
 
 let passed = 0;
 const falhas = [];

@@ -10,7 +10,7 @@
 import { readdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF } from "./test-harness.mjs";
+import { test, file, readF, writeF } from "./harness/test-harness.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -19,7 +19,7 @@ import { test, file, readF, writeF } from "./test-harness.mjs";
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     `tests-derived-counts.mjs nao e um entry point: nao corre testes por si.\n` +
-      "Correr `node .agent/scripts/test-guards.mjs`, que importa este modulo e chama registar()."
+      "Correr `node .agent/scripts/tests/test-guards.mjs`, que importa este modulo e chama registar()."
   );
   process.exit(1);
 }

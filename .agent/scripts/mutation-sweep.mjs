@@ -134,7 +134,7 @@ if (!only) {
     // por descoberta). Sem esta linha um modulo novo ali entrava sem par e sem suite.
     ...listarDir(".agent/scripts/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/lib/${f}`),
     // Os harnesses: decidem o veredicto de todas as suites e estavam fora da descoberta.
-    ...listarDir(".agent/scripts").filter((f) => /^test-.*harness\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
+    ...listarDir(".agent/scripts/tests/harness").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/tests/harness/${f}`),
     // O `simulate-derived.mjs` nao e um `check-*` nem um harness, mas TEM sitios de recusa
     // (8 `fatal()`) — e escapava a descoberta pelo NOME. A convencao e util mas nao e a
     // verdade: o que faz de um ficheiro um verificador e ter sitios de recusa, nao o prefixo.
@@ -176,7 +176,7 @@ if (!only) {
   // `test-bundle-harness.mjs` ficou assim de proposito: o #67 tirou-lhe as guardas do "o patch
   // nao aplicou" ao trocar fatiar-o-literal por escrever-a-config. Exigir-lhe um par produzia
   // um `SINAL ERRADO` permanente, e um aviso que esta sempre aceso ensina a ignorar o painel.
-  const PODE_SER_ISENTO = [/^\.agent\/scripts\/lib\//, /^\.agent\/scripts\/test-[\w-]+-harness\.mjs$/];
+  const PODE_SER_ISENTO = [/^\.agent\/scripts\/lib\//, /^\.agent\/scripts\/tests\/harness\//];
   const semRecusas = (f) => {
     if (!PODE_SER_ISENTO.some((re) => re.test(f))) return false;
     try {

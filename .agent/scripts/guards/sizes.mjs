@@ -51,13 +51,26 @@ export const TETOS = {
   // FORMA_EXIGIDA, que e politica e nao motor). RE-CONGELA a cada descida, senao a catraca
   // deixava a folga recuperada por recuperar.
   ".claude/hooks/guard-protected-branch.mjs": 517,
-  ".agent/scripts/test-guards.mjs": 525,
+  ".agent/scripts/tests/test-guards.mjs": 525,
 };
 
 // O `mutation-sweep.mjs` esteve nesta lista (505 linhas) e SAIU: a tabela `PARES` — 186
 // linhas de dados dentro de um ficheiro de logica — passou para `lib/pares.mjs` e o motor
 // ficou em 330. E o desfecho que a catraca existe para provocar; fica aqui escrito para a
 // proxima pessoa ver que sair da lista e possivel, e como.
+//
+// QUANDO ESTE GUARD DISPARAR, e a licao mais util deste ficheiro: a saida barata e encolher
+// prosa — cortar comentarios ate caber, tres linhas de cada vez. A saida certa e quase sempre
+// **procurar o que esta escrito duas vezes**. Medido cinco vezes numa so sessao; a diferenca
+// entre as duas reaccoes:
+//
+//   - cortar prosa: 3 linhas por corte, e a informacao que se perde e a que explica PORQUE;
+//   - remover uma copia: 14 linhas de uma vez (o `leOuNull`, que vivia em dois ficheiros), e o
+//     que se perde e um defeito a espera de acontecer — as duas copias divergem sempre.
+//
+// O mesmo vale para os orcamentos de bytes das rules, e aconteceu la duas vezes: o racional do
+// paralelismo estava escrito no `scripts-guide.md` **e** no cabecalho do modulo que o
+// implementa. Tirar um deu 170 bytes; cortar frases dava 20.
 
 /**
  * @returns {number} guards executados
