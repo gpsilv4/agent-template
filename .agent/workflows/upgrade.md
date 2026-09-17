@@ -80,26 +80,26 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** (mesma regra dos hooks) | E a configuracao deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes deste projeto que ainda vivem dentro da logica: `BANNED` em `check-doc-versions.mjs`, `CHECKS` em **`guards/versions.mjs`** (mudou de ficheiro quando os guards foram divididos, e um glob `*.mjs` sem `**` nao o apanha), `TEST_GLOBS` e `CONFIG_GLOBS` em `check-test-surface.mjs`, e `CONTAGENS` em `surface-patterns.mjs`. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero**, e ele passa a dizer "superficie intacta" sobre uma suite apagada. `TARGETS` e `ALVOS_REPROVAM` **sairam desta lista** — vivem em `config/`, que a linha de cima ja cobre |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes do projeto que ainda vivem na logica: `BANNED` (`check-doc-versions.mjs`), `CHECKS` (**`guards/versions.mjs`** — mudou de ficheiro, e um glob `*.mjs` sem `**` nao o apanha), `TEST_GLOBS`/`CONFIG_GLOBS` (`check-test-surface.mjs`) e `CONTAGENS` (`surface-patterns.mjs`). Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Sao as que o `BOOTSTRAP.md` §2.4 manda adaptar a stack: uma copia cega devolve o gate a **medir zero**, e ele diz "superficie intacta" sobre uma suite apagada |
+| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova) — e do template, e os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto), mas o **cabecalho** e prosa do template e traz-se: o antigo cita IDs que ja nao existem, e o Guard 15 lista-os. As citacoes `TPn` nos scripts e workflows **copiam-se como estao** | Os prefixos tornam isto copia em vez de reescrita a mao (eram mais de vinte citacoes por ronda) |
-| `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Se o projeto nao as customizou, copia; se customizou, integrar a mao | Misturam regra generica com decisoes do projeto |
+| `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
-| Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao do projeto; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
+| Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
 | `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`). Nao substituir o CI do projeto | O CI do projeto pode ter passos proprios |
 | `.claude/settings.json` | Trazer regras de `deny`/`ask` novas; **acrescentar** ao `allow` os scripts novos | O `allow` do projeto reflete o que ele corre |
-| `.claude/agents/*` | Copia se ausentes. **Sao load-bearing**: a Fase 4 exige o `code-reviewer`, e a Fase 0 de um `L` o `plan-auditor` | Sem eles essas fases nao correm no Claude Code |
+| `.claude/agents/*` | Copia se ausentes. **Load-bearing**: a Fase 4 exige o `code-reviewer` e a Fase 0 de um `L` o `plan-auditor` | Sem eles essas fases nao correm no Claude Code |
 | `.claude/hooks/*` + a chave `hooks` do `settings.json` | Copia se ausentes, **e adaptar** `PROTEGIDOS` (branches deste projeto) e os verbos que o projeto tenha acrescentado a `SEGUROS` no `guard-protected-branch`. O mapa caminho -> quem-o-verifica ja nao vive aqui: e `lib/mapa-suites.mjs`, e passa pela linha dos scripts. Trazer `.claude/hooks/tests/` **inteiro** — um hook sem testes bloqueia trabalho legitimo em silencio | **So-Claude Code.** A verificacao equivalente vive em `.agent/scripts/check-*.mjs`, que qualquer agente corre |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
-| `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template deve espelhar o `/review` deste projeto | Governance: metade e do projeto |
+| `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` deste projeto | Governance: metade e do projeto |
 | **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
 
 ## 2b. Mudancas que REPROVAM um projeto que estava verde
 
-Nem toda a melhoria e aditiva. Quando o template **aperta** um criterio, um projeto que passava
-deixa de passar — e a leitura natural ("o upgrade partiu o meu CI") leva a desfaze-lo, que e o
-contrario do que se quer. Estas nao se trazem em silencio: **dizem-se na Fase 0, com o numero
-que cada uma custa neste projeto, medido ANTES de aplicar.**
+Nem toda a melhoria e aditiva: quando o template **aperta** um criterio, um projeto que passava
+deixa de passar. Nao se trazem em silencio — **dizem-se na Fase 0, com o numero que cada uma custa
+neste projeto, medido ANTES de aplicar** (porque, em `upgrade-why.md`).
 
 | Classe | Como reconhecer | O que perguntar ao utilizador |
 |--------|-----------------|-------------------------------|
@@ -114,9 +114,8 @@ que cada uma custa neste projeto, medido ANTES de aplicar.**
 node .agent/scripts/simulate-upgrade.mjs   # FASE 1 = o que passa a reprovar, nomeado
 ```
 
-Ele monta um derivado da ultima release, aplica o upgrade mecanico e imprime o que reprova.
-Uma lista escrita a mao aqui envelhecia a cada release e ninguem a recalculava; esta e medida
-contra a versao de onde SAIS. O historico das rondas anteriores vive em `src/docs/upgrade-why.md`.
+Monta um derivado da ultima release, aplica o upgrade mecanico e imprime o que reprova. Uma lista
+escrita a mao aqui envelhecia a cada release; esta e medida contra a versao de onde SAIS.
 
 > Um upgrade que deixa o projeto vermelho sem que ninguem tenha decidido isso e pior do que
 > nao ter feito upgrade nenhum.

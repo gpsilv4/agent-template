@@ -126,3 +126,58 @@ num template com as suites verdes e a cobertura de mutacao completa.
 3. **O cabecalho do `anti-patterns.md` ficava a citar IDs mortos.** A instrucao dizia "nunca
    tocar" nesse ficheiro — certo para as entradas do projeto, errado para o cabecalho, que e
    prosa do template. Depois da separacao de prefixos as citacoes antigas deixaram de resolver.
+
+## Porque o upgrade passou a dizer o que SAIU do template
+
+O upgrade copia com `cpSync`: acrescenta e substitui, **nunca apaga**. Enquanto o template so
+ganhou ficheiros, isso nao custou nada. Assim que um for renomeado ou movido, o consumidor fica
+com os **dois** — o velho e o novo.
+
+E nao e desarrumacao. A maquinaria reage ao orfao, e reage mal:
+
+- a **descoberta em disco** da varredura encontra-o e exige-lhe par: `SEM PAR`, gate vermelho;
+- o **Guard 17** conta-o, e um ficheiro grande que ja nao devia existir volta a pesar;
+- o **`check-test-surface`** ve a superficie duplicada, e a contagem que ele compara deixa de
+  significar o que significava.
+
+Ou seja: **uma arrumacao de pastas no template punha vermelhos todos os projetos derivados**, por
+uma razao que ninguem ia associar a arrumacao. Foi isso que bloqueou a reorganizacao de
+`.agent/scripts/` e obrigou a fazer isto primeiro.
+
+### A regra e estreita de proposito
+
+So entra um ficheiro que cumpra as tres: **estava na tag** de onde o projeto saiu, **ja nao esta
+no template**, e **ainda existe no consumidor**.
+
+A primeira condicao e a que torna isto seguro. Um ficheiro que o projeto criou nunca esteve na
+tag, logo nunca pode ser proposto — e essa e a diferenca entre propor apagar codigo do template
+e propor apagar trabalho de alguem. A terceira evita listar o que o projeto ja tratou: uma lista
+com entradas inexistentes perde a confianca de quem a le, e ai deixa de ser lida.
+
+**E uma LISTA, nao uma accao.** Apagar e a coisa menos reversivel deste workflow; fica no passo de
+aprovacao, onde a Fase 0 manda.
+
+### Dois defeitos que a implementacao revelou
+
+A primeira versao comparava `git ls-tree HEAD` contra `git ls-tree <tag>`. Mas o motor **copia do
+disco**, nao do commit — as duas metades respondiam a perguntas diferentes, e um ficheiro ainda
+por commitar aparecia como removido. O lado "agora" passou a vir do disco, que e de onde a copia
+vem. Duas leituras do mesmo conceito com normalizacoes diferentes: `TP1`, na forma mais barata.
+
+E a fixture nao sabia exprimir uma remocao. O `null` em `hoje` dizia no comentario "este ficheiro
+nao existe" e fazia no codigo "nao sobrescrever" — o ficheiro escrito no passo do `ontem` ficava
+no disco. A diferenca entre as duas so aparece quando alguem tenta medir uma **remocao**, e foi
+exactamente ai que apareceu.
+
+## Porque as mudancas que REPROVAM se anunciam antes de aplicar
+
+A leitura natural de um gate que fica vermelho a seguir a um upgrade e "o upgrade partiu o meu
+CI" — e a accao natural a seguir a essa leitura e desfazer o upgrade, ou afrouxar o guard. As
+duas sao o contrario do que se queria.
+
+Por isso a Fase 0 anuncia cada uma com o **numero que custa neste projeto**, medido antes de
+aplicar. Um limiar que aperta deixa de ser uma surpresa e passa a ser uma decisao: aceitar agora,
+adiar, ou nao trazer. O que nao pode acontecer e o projeto ficar vermelho sem ninguem ter
+decidido isso — ai o que se perde nao e o gate, e a confianca em todos os outros.
+
+O historico das rondas anteriores esta neste ficheiro, mais acima.

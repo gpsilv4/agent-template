@@ -200,6 +200,7 @@ gh pr create --fill     # then merge once CI is green
     ├── tests-mcp.mjs           <- Guard 16 tests (mirrors guards/mcp.mjs)
     ├── tests-sizes.mjs         <- Guard 17 tests (mirrors guards/sizes.mjs)
     ├── tests-isolamento.mjs    <- Guard 19 tests (each rule with its counter-case)
+    ├── tests-upgrade-motor.mjs <- The /upgrade engine tests (imported by test-simulate-upgrade)
     ├── test-registo.mjs        <- Negative tests for the suite discovery in lib/registo.mjs
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-bundle-harness.mjs <- Its fixtures: sandbox + the config each test needs

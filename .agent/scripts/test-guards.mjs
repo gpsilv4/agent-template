@@ -16,7 +16,7 @@
 import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./test-harness.mjs";
-import { registaDescobertos, resumoDescoberta } from "./lib/registo.mjs";
+import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "./lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
@@ -502,9 +502,8 @@ const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-guards.mjs",
   contagem,
-  // Os entry points DESTE repo. Um modulo que declare outro qualquer nao e corrido por
-  // ninguem, e sem esta lista esse erro de escrita era silencioso.
-  conhecidos: ["test-guards.mjs", "test-test-surface.mjs", "test-hooks.mjs"],
+  // A lista vive em `lib/registo.mjs`: tinha tres copias a concordar a mao (`TP8`).
+  conhecidos: ENTRY_POINTS,
 });
 console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 

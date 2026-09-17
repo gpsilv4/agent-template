@@ -312,6 +312,24 @@ ok(
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`
 );
 
+// O que SAIU do template e o consumidor ainda tem. O upgrade copia com `cpSync`, que acrescenta
+// e substitui mas NUNCA apaga — logo uma renomeacao no template deixava o ficheiro velho no
+// consumidor, ao lado do novo, para sempre.
+//
+// Nao e desarrumacao: a descoberta em disco encontra o orfao e exige-lhe par (`SEM PAR`), o
+// Guard 17 conta-o e o `check-test-surface` ve a superficie duplicada. Uma arrumacao de pastas
+// no template punha VERMELHOS todos os projetos derivados, sem ninguem perceber porque.
+//
+// Isto LISTA, nao apaga. Apagar e decisao do passo de aprovacao do workflow — a Fase 0 do
+// `/upgrade` diz que nada acontece antes dela, e apagar e a coisa menos reversivel que ha aqui.
+if (medido.removidos.length) {
+  ok(`${medido.removidos.length} ficheiro(s) sairam do template desde ${tag} e continuam no projeto:`);
+  for (const rel of medido.removidos) console.log(`        ${rel}`);
+  console.log("        (o /upgrade PROPOE apaga-los; nao os apaga)");
+} else {
+  ok(`nenhum ficheiro saiu do template desde ${tag} — nada a propor remover`);
+}
+
 // A DECISAO do projeto sobrevive a travessia? E a pergunta que o `/upgrade` tem de responder
 // com um facto e nao com uma lista: acrescentar a constante a tabela das preservadas nao prova
 // que ela sobrevive — prova que alguem a escreveu la. Isto mede.

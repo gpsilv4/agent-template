@@ -19,7 +19,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 // Fonte unica da descoberta de suites (TP4). O caminho atravessa arvores de proposito:
 // duplicar a logica aqui era exactamente o que o `sync-docs` proibe.
-import { registaDescobertos, resumoDescoberta } from "../../../.agent/scripts/lib/registo.mjs";
+import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".claude/hooks/guard-protected-branch.mjs");
@@ -669,7 +669,7 @@ const descoberta = await registaDescobertos({
   entryPoint: "test-hooks.mjs",
   ctx: { test, corre, repo, eq, contem },
   contagem: () => passed + falhas.length,
-  conhecidos: ["test-guards.mjs", "test-test-surface.mjs", "test-hooks.mjs"],
+  conhecidos: ENTRY_POINTS,
 });
 console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
