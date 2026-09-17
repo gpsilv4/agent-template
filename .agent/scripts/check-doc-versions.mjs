@@ -39,6 +39,7 @@ import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
 import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
+import { ehDerivado as ehDerivadoDe } from "./lib/derivado.mjs";
 import { guardIsolamento } from "./guards/isolamento.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
 
@@ -148,8 +149,9 @@ console.log(`  raiz: ${ROOT}\n`);
  * depende de nenhuma escolha de dominio. A ausencia do `BOOTSTRAP.md` conta como segundo
  * sinal: o bootstrap manda apaga-lo no fim, e um projeto que o fez ja nao e o template.
  */
-const ehDerivado = () =>
-  read(".agent/.template-version") !== null || read(".agent/BOOTSTRAP.md") === null;
+// A deteccao vive em `lib/derivado.mjs`: estava escrita aqui e no simulador de /upgrade,
+// a mao, e o `simulate-derived.mjs` ia levar a terceira copia (`TP8`).
+const ehDerivado = () => ehDerivadoDe(read);
 
 guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir });
 

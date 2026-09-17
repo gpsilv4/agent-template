@@ -289,6 +289,10 @@ function syntheticSandbox() {
   cpSync(join(ROOT, GUARD), join(dir, GUARD));
   if (existsSync(join(ROOT, GUARD_MODULES))) {
     cpSync(join(ROOT, GUARD_MODULES), join(dir, GUARD_MODULES), { recursive: true });
+    // O verificador importa modulos de `lib/` (hoje, a deteccao de repo derivado e a leitura que
+    // devolve `null`). Sem eles o import rebenta ANTES de qualquer guard correr, e a suite inteira
+    // morre por uma razao que nada tem a ver com o que ela mede.
+    cpSync(join(ROOT, ".agent/scripts/lib"), join(dir, ".agent/scripts/lib"), { recursive: true });
   }
 
   // Os ficheiros que o Guard 17 congelou em `TETOS`. A fixture copia o verificador e os seus

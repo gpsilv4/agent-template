@@ -83,9 +83,11 @@ export const SUITES = [
   // Apanhado pelo aviso dos ficheiros sem regra, um minuto depois de esse aviso deixar de ser
   // engolido — que e o argumento inteiro a favor de o tornar visivel.
   { re: /^\.agent\/scripts\/(test-[\w-]+)\.mjs$/, verifica: [], suiteDeSi: true },
+  // ANTES da regra generica de `lib/`: a ordem da tabela e a semantica, e o `lib/` generico
+  // manda tudo para a suite do registo — que nao toca nestes dois.
+  { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado|lib\/ficheiros)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
-  { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
   // Qualquer `.md` na RAIZ de `.agent/` — hoje so o `BOOTSTRAP.md`, e ele e lido por tres
