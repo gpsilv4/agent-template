@@ -85,7 +85,9 @@ try {
   for (const f of tocados) {
     const regra = regraDe(f);
     if (!regra) continue;
-    const cmd = comandoDe(regra);
+    // O ficheiro vai junto: uma suite de entry point verifica-se a si propria, e a regra sabe
+    // que e assim sem saber QUAL suite e. So o caminho tocado o diz.
+    const cmd = comandoDe(regra, f);
     if (!devidos.has(cmd)) devidos.set(cmd, []);
     devidos.get(cmd).push(f);
   }

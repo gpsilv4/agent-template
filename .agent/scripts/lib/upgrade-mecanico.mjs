@@ -14,9 +14,9 @@
  * ficheiros customizados. Isso e leitura, nao mecanica.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync, statSync } from "fs";
 import { execFileSync } from "child_process";
-import { join, dirname } from "path";
+import { join, dirname, sep, relative } from "path";
 
 /** `null` em vez de excepcao: "nao existe" e "nao consegui ler" pedem accoes diferentes a
  *  quem chama, e colapsar as duas e o `TP2`. */
@@ -62,22 +62,21 @@ export function andaFicheiros(base, fn, rel = "") {
  *  Escrever esta lista ja rendeu: a tabela do workflow dizia `CONTAGENS` em
  *  `check-test-surface.mjs`, e ela vive em `surface-patterns.mjs`. Um consumidor a seguir a
  *  instrucao copiava o ficheiro por inteiro e perdia as suas contagens em silencio. */
+// As duas dos BUNDLES sairam desta lista: `TARGETS` e `ALVOS_REPROVAM` mudaram-se para
+// `.agent/scripts/config/bundles.mjs`, que o `/upgrade` nunca SUBSTITUI (mas copia se o
+// consumidor ainda nao a tiver — ver o filtro em `trazerDoHead`). Preservar por nome era a
+// mitigacao; separar a configuracao da logica **fecha a classe** — a lista deixa de ter de
+// crescer a cada decisao nova, e era por ela envelhecer que a suspensao do gate se perdeu numa
+// ronda real, em silencio.
+//
+// As que ficam sao as que ainda vivem dentro de ficheiros de logica. A lista encolhe a cada
+// uma que se mude, e o objectivo e **desaparecer**.
 export const CONSTANTES_DO_PROJETO = [
-  [".agent/scripts/check-bundle-sizes.mjs", "TARGETS"],
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
   [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
   [".agent/scripts/surface-patterns.mjs", "CONTAGENS"],
-  // `ALVOS_REPROVAM` e uma DECISAO do projeto, nao um valor tecnico: um derivado que ligue a
-  // medicao de bundles a serio encontra os alvos acima e SUSPENDE o juizo, com ticket aberto.
-  // Nao estava nesta lista — e por isso o upgrade repunha o default `true` e o gate voltava a
-  // reprovar **sem ninguem decidir nada**. Medido num derivado real, ronda 4.
-  //
-  // Escapou a verificacao que ja existia porque essa e por DIFERENCA de output: nenhuma linha
-  // desapareceu, o verificador correu e mediu bem — so mudou de veredicto. Diferenca de output
-  // apanha o que some; nao apanha um default que regressa.
-  [".agent/scripts/check-bundle-sizes.mjs", "ALVOS_REPROVAM"],
 ];
 
 /**
@@ -153,7 +152,32 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   function trazerDoHead(rel) {
     const origem = join(root, rel);
     if (!existsSync(origem)) fatal(`${rel} nao existe no HEAD — nada a trazer`);
-    cpSync(origem, join(dir, rel), { recursive: true });
+    cpSync(origem, join(dir, rel), {
+      recursive: true,
+      // `config/` e a configuracao do PROJETO, ao lado do `.agent/context/`. Sem tratamento
+      // proprio, a copia de `.agent/scripts/**` passava-lhe por cima e a decisao do projeto
+      // voltava ao default do template — era esse o defeito, um directorio abaixo.
+      //
+      // Mas a regra NAO e "nunca tocar": e **nunca SUBSTITUIR, copiar se AUSENTE**, que e a
+      // mesma que os hooks ja usam. A diferenca nao e academica — a primeira versao desta linha
+      // excluia a pasta por inteiro, e o simulador reprovou: um consumidor anterior a existencia
+      // da `config/` recebia o `check-bundle-sizes.mjs` novo, que faz
+      // `import ... from "./config/bundles.mjs"`, e **sem o ficheiro que ele importa**. O
+      // verificador rebentava no arranque, em TODOS os projetos derivados ja existentes.
+      //
+      // Trazer a logica sem a configuracao que ela importa nao e proteger a configuracao — e
+      // partir o consumidor para a proteger.
+      filter: (src) => {
+        const p = src.split(sep).join("/");
+        if (!p.includes("/.agent/scripts/config/")) return true;
+        // Descer sempre nas pastas: recusar a pasta `config/` porque ela ja existe saltava
+        // tambem os ficheiros NOVOS que o template tivesse acrescentado la dentro.
+        if (statSync(src).isDirectory()) return true;
+        // O destino deriva-se do caminho relativo a origem da copia — nunca de aritmetica sobre
+        // a string, que e onde este tipo de codigo costuma mentir em silencio.
+        return !existsSync(join(dir, rel, relative(origem, src)));
+      },
+    });
   }
   
   // (i) `.agent/scripts/**` — copia limpa. (ii) O catalogo de anti-padroes do TEMPLATE, por

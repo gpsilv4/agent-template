@@ -49,6 +49,8 @@
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join, relative, sep, dirname, resolve } from "path";
 import { fileURLToPath } from "url";
+// A configuracao do PROJETO vive a parte, e o `/upgrade` nunca lhe toca. Ver `config/bundles.mjs`.
+import { TARGETS, ALVOS_REPROVAM } from "./config/bundles.mjs";
 import { gzipSync } from "zlib";
 
 // Ancorado a raiz do repo, como o check-doc-versions.mjs: correr de um subdiretorio
@@ -56,35 +58,6 @@ import { gzipSync } from "zlib";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const NEXT_DIR = join(ROOT, ".next");
 const MANIFEST_PATH = join(NEXT_DIR, "build-manifest.json");
-
-// Adaptar ao projeto: definir paginas e targets
-const TARGETS = {
-  "/":        { name: "Home",     target: 160, alarm: 180 },
-  // "/about":   { name: "About",    target: 155, alarm: 175 },
-  // "/dashboard": { name: "Dashboard", target: 160, alarm: 180 },
-};
-
-/** Os alvos de tamanho reprovam, ou so avisam?
- *
- *  **`true` por omissao** — um orcamento que nao reprova nao e um orcamento.
- *
- *  Porque existe o interruptor: quando um projeto liga a medicao a serio pela primeira vez (o
- *  manifesto RSC acima), os alvos que ja la estavam foram escritos contra um numero que **nao
- *  era medicao**. Medido num derivado real: as dez rotas ficaram **1,4x a 2,0x** acima. Nessa
- *  altura ha tres saidas, e duas sao mas:
- *    - subir os alvos -> transforma um diagnostico em norma, e o orcamento passa a descrever
- *      o que ha em vez de o que se quer;
- *    - deixar o gate vermelho -> bloqueia todos os PRs por um problema que nao e deles;
- *    - **suspender o JUIZO sobre o tamanho**, com um ticket aberto e a razao escrita — e o
- *      que esta linha permite.
- *
- *  O que NAO se suspende: **nao conseguir medir continua a reprovar** (rota por resolver,
- *  ficheiro ausente, caminho fora do `.next/`). So o juizo sobre o numero e que fica de fora.
- *
- *  A alternativa que se tentou primeiro e que NAO se deve usar: `|| true` no `ci.yml`. O
- *  `check-test-surface` apanhou-a, e com razao — e a neutralizacao silenciosa que ele existe
- *  para detetar. A decisao vive aqui, visivel e com data, ou nao vive. */
-const ALVOS_REPROVAM = true;
 
 const missing = [];
 const outside = []; // caminhos do manifest que saem de .next/

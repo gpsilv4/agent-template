@@ -165,7 +165,9 @@ gh pr create --fill     # then merge once CI is green
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
 └── scripts/
-    ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js)
+    ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
+    ├── config/                  <- THIS project's configuration. /upgrade never touches it
+    │   └── bundles.mjs          <- Routes, budgets, and the ALVOS_REPROVAM switch
     ├── test-commit-msg.mjs     <- Negative tests for the .githooks/commit-msg hook
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── guards/                 <- Guard modules split out of the entry point
@@ -197,6 +199,8 @@ gh pr create --fill     # then merge once CI is green
     ├── tests-sizes.mjs         <- Guard 17 tests (mirrors guards/sizes.mjs)
     ├── test-registo.mjs        <- Negative tests for the suite discovery in lib/registo.mjs
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
+    ├── test-bundle-harness.mjs <- Its fixtures: sandbox + the config each test needs
+    ├── test-sweep-harness.mjs  <- The mutation sweep suite's fake checker, sandbox and summary
     ├── test-backlog.mjs        <- Negative tests for the backlog checker (synthetic fixture)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── test-simulate-derived.mjs<- Negative tests for it (minimal fixture repo, stubbed checkers)

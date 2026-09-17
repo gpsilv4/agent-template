@@ -62,6 +62,56 @@ julgamento a fazer sobre ele.
 
 ---
 
+## Porque a configuracao do projeto saiu dos ficheiros da logica
+
+O template misturava, no mesmo ficheiro, a **logica** (que o upgrade traz) e a **configuracao**
+(que nao deve trazer). A mitigacao era uma lista de nomes a preservar (`CONSTANTES_DO_PROJETO`),
+mantida **a mao** — e uma lista a mao envelhece.
+
+Foi assim que se perdeu uma decisao real. Um consumidor tinha o gate dos bundles **suspenso**,
+com ticket aberto e razao escrita; a ronda trouxe o ficheiro, a constante voltou ao default, e o
+gate passou a reprovar **sem ninguem decidir nada**.
+
+**O modo de falha e o pior que ha**: nada desapareceu do ecra. O verificador correu, mediu bem, e
+so o veredicto mudou. A verificacao que o consumidor tinha era por DIFERENCA de output e nao o
+apanhou — diferenca de output apanha o que some, **nao apanha um default que regressa**.
+
+A separacao fecha a classe em vez de a mitigar: o upgrade copia `.agent/scripts/**` por inteiro
+e a configuracao ja nao esta la dentro.
+
+### "Nunca tocar" estava errado. A regra e "nunca SUBSTITUIR, copiar se AUSENTE"
+
+A primeira versao desta regra excluia `config/` da copia **por inteiro**. Parecia a leitura
+conservadora — na duvida, nao mexer — e estava errada de uma forma que so aparece no consumidor.
+
+O `check-bundle-sizes.mjs` faz `import { TARGETS, ALVOS_REPROVAM } from "./config/bundles.mjs"`.
+Um projeto derivado de uma versao **anterior** a esta pasta nao a tem — e na ronda em que ela
+nasce, **nenhum tem**. Com a exclusao total, o upgrade trazia a logica nova e nao trazia o
+ficheiro que ela importa: o verificador rebentava no arranque, em todos eles ao mesmo tempo.
+
+**Proteger a configuracao partindo o consumidor nao e proteger nada.** "Ausente" nao e o mesmo
+que "teu": nao ha decisao do projeto a preservar num ficheiro que o projeto nao tem.
+
+Havia ainda um segundo caso que a exclusao por pasta partia, e que nao se ve pensando so no
+primeiro: um consumidor que **ja tem** a pasta e um template que lhe acrescenta um ficheiro
+**novo** la dentro. Recusar a pasta por ela existir deixava esse ficheiro de fora para sempre.
+Por isso o filtro desce sempre nas pastas e decide **ficheiro a ficheiro**.
+
+**Como apareceu, e o que isso diz.** Nenhuma das 819 assercoes o apanhou. Apanhou-o o
+`simulate-upgrade.mjs` no CI, que constroi um consumidor a partir da **ultima tag real** e
+actualiza-o. Suites medem o que alguem se lembrou de afirmar; o simulador mede o que acontece a
+um projeto verdadeiro. E a segunda vez que a metade do produto que ninguem media foi a que tinha
+o defeito. A lista de nomes a preservar passa a poder **encolher**
+a cada constante que se mude, em vez de ter de crescer a cada decisao nova.
+
+**Uma expectativa que estava errada, registada porque a proxima pessoa vai te-la:** esperava-se
+que mover as constantes encolhesse a suite de testes (que fatiava literais de dentro do ficheiro
+da logica). **Nao encolheu** — o ajudante que ESCREVE a config, com a semantica parcial que o
+torna correcto, custa tanto como o fatiamento que substituiu. O ganho e o upgrade deixar de
+atropelar decisoes; nao e o tamanho.
+
+---
+
 ## Os tres defeitos que a simulacao encontrou na primeira corrida
 
 Escritos porque sao a prova de que o caminho do `/upgrade` nao estava medido — os tres viviam

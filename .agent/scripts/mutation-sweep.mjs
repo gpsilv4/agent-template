@@ -155,16 +155,27 @@ if (!only) {
   // `lib/pares.mjs` fazia a descoberta reprova-la, e o unico remedio era registar uma tabela
   // como se fosse um verificador.
   //
-  // A isencao vale SO para `.agent/scripts/lib/`. Inferi-la do conteudo em todo o lado era
-  // muito pior do que o problema que resolvia: os hooks nao usam `warn(`/`fatal(` nenhum (sao
-  // falha-aberta por desenho, e o sitio que decide e um `console.log`), logo os CINCO de
-  // `.claude/hooks/` e o `.githooks/commit-msg` passavam todos por "so dados". Hoje escapam
-  // por ja estarem em `PARES`, mas um hook NOVO entrava sem par e sem suite — exatamente o
-  // buraco que o bloco acima diz existir para fechar, e um hook errado e pior que um guard
-  // errado porque corre ANTES de cada ferramenta.
-  const RECUSAS = /(?<![\w.$])(?:warn|fatal|flag|deny|problems?\.push|problemas\.push)\(/;
+  // A isencao NAO se infere do conteudo em todo o lado — e uma lista de sitios onde se
+  // permite, nao uma lista de sitios onde se proibe (`TP6`). Os hooks nao usam `warn(`/`fatal(`
+  // nenhum (sao falha-aberta por desenho, e o sitio que decide e um `console.log`), logo os
+  // CINCO de `.claude/hooks/` e o `.githooks/commit-msg` passariam todos por "so dados". Hoje
+  // escapam por ja estarem em `PARES`, mas um hook NOVO entrava sem par e sem suite —
+  // exatamente o buraco que o bloco acima diz existir para fechar, e um hook errado e pior que
+  // um guard errado porque corre ANTES de cada ferramenta.
+  //
+  // `throw new Error(` faz parte das recusas, e a sua falta era um buraco a serio: DOIS
+  // harnesses ja em `PARES` usam-no como `sinal`, logo esta funcao dizia "nao tem recusas" de
+  // ficheiros cujo unico sitio de recusa e precisamente esse. Nao se via porque a isencao so
+  // se aplica a quem AINDA nao esta registado — o buraco estava a espera do proximo harness.
+  const RECUSAS = /(?<![\w.$])(?:warn|fatal|flag|deny|problems?\.push|problemas\.push|throw new Error)\(/;
+  // Onde a isencao por conteudo e permitida. Os harnesses entram porque um harness que nao
+  // recusa nada e um construtor de fixtures — tem tanto que se desligue como uma tabela. O
+  // `test-bundle-harness.mjs` ficou assim de proposito: o #67 tirou-lhe as guardas do "o patch
+  // nao aplicou" ao trocar fatiar-o-literal por escrever-a-config. Exigir-lhe um par produzia
+  // um `SINAL ERRADO` permanente, e um aviso que esta sempre aceso ensina a ignorar o painel.
+  const PODE_SER_ISENTO = [/^\.agent\/scripts\/lib\//, /^\.agent\/scripts\/test-[\w-]+-harness\.mjs$/];
   const semRecusas = (f) => {
-    if (!f.startsWith(".agent/scripts/lib/")) return false;
+    if (!PODE_SER_ISENTO.some((re) => re.test(f))) return false;
     try {
       const src = readFileSync(join(ROOT, f), "utf8");
       return !src.split("\n").some((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l) && RECUSAS.test(l));
@@ -249,6 +260,15 @@ if (modoDiff) {
   // deles DEVIA mapear para um alvo, a lacuna do mapa fica no ecra em vez de ser absorvida
   // para sempre. Um mapa de cobertura com buracos calados e pior do que nao ter mapa nenhum,
   // porque tem o aspecto de cobertura.
+  // Os ficheiros SEM REGRA dizem-se SEMPRE, e nao so quando nada foi seleccionado. A primeira
+  // versao so os imprimia no caso "zero alvos": bastava UM alvo casar para os outros ficheiros
+  // nao mapeados serem descartados **em silencio** — que e exactamente o modo de falha que esta
+  // lista existe para fechar, e o desenho dizia-o por escrito enquanto o codigo fazia o contrario.
+  if (r.semRegra.length > 0 && selecionados.length > 0) {
+    console.log(`  ${r.semRegra.length} ficheiro(s) alterado(s) nao levam a alvo nenhum:`);
+    for (const f of r.semRegra) console.log(`    sem regra no mapa: ${f}`);
+    console.log("  Se algum DEVIA levar a um alvo, falta-lhe regra em lib/mapa-suites.mjs.\n");
+  }
   if (selecionados.length === 0) diffSemAlvos = r;
 }
 if (diffSemAlvos) {

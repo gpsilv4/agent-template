@@ -84,55 +84,104 @@ export const BASE = {
   ".agent/rules/anti-patterns.md": `# Projeto\n\n> cabecalho\n\n---\n\n## ${"AP" + "1"} — meu\n`,
 };
 
-export function cenario({ ontem, hoje, consumidor = null, constantes = [] }) {
+/** `base` e a pasta onde os dois tmpdirs nascem. Existe **so** para o teste da fuga poder medir
+ *  "nao ficou nada para tras" numa pasta que e SO dele: contar `sim-up-*` no `tmpdir()` do
+ *  sistema seria um teste a depender do estado da maquina (`TP3`) — qualquer outra corrida a
+ *  acontecer ao mesmo tempo pintava-o de vermelho sem haver defeito nenhum. */
+export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir() }) {
   ontem = { ...BASE, ...ontem };
   hoje = { ...BASE, ...hoje };
   if (consumidor) consumidor = { ...BASE, ...consumidor };
-  const root = mkdtempSync(join(tmpdir(), "sim-up-root-"));
-  for (const [rel, c] of Object.entries(ontem)) {
-    if (c === null) continue; // `null` = este ficheiro NAO existe, e e isso que se mede
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), c);
-  }
-  git(root, ["init", "-q", "-b", "main"]);
-  git(root, ["config", "user.email", "t@t"]);
-  git(root, ["config", "user.name", "t"]);
-  git(root, ["add", "-A"]);
-  git(root, ["commit", "-qm", "ontem"]);
-  git(root, ["tag", "v1.0.0"]);
-  for (const [rel, c] of Object.entries(hoje)) {
-    if (c === null) continue;
-    mkdirSync(dirname(join(root, rel)), { recursive: true });
-    writeFileSync(join(root, rel), c);
-  }
+  const root = mkdtempSync(join(base, "sim-up-root-"));
+  const dir = mkdtempSync(join(base, "sim-up-cons-"));
+  try {
+    for (const [rel, c] of Object.entries(ontem)) {
+      if (c === null) continue; // `null` = este ficheiro NAO existe, e e isso que se mede
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), c);
+    }
+    git(root, ["init", "-q", "-b", "main"]);
+    git(root, ["config", "user.email", "t@t"]);
+    git(root, ["config", "user.name", "t"]);
+    git(root, ["add", "-A"]);
+    git(root, ["commit", "-qm", "ontem"]);
+    git(root, ["tag", "v1.0.0"]);
+    for (const [rel, c] of Object.entries(hoje)) {
+      if (c === null) continue;
+      mkdirSync(dirname(join(root, rel)), { recursive: true });
+      writeFileSync(join(root, rel), c);
+    }
 
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-cons-"));
-  for (const [rel, c] of Object.entries(consumidor ?? ontem)) {
-    if (c === null) continue;
-    mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    writeFileSync(join(dir, rel), c);
-  }
-  mkdirSync(join(dir, ".agent", "context"), { recursive: true });
-  writeFileSync(join(dir, ".agent/context/session.md"), "# estado do projeto\n");
+    for (const [rel, c] of Object.entries(consumidor ?? ontem)) {
+      if (c === null) continue;
+      mkdirSync(dirname(join(dir, rel)), { recursive: true });
+      writeFileSync(join(dir, rel), c);
+    }
+    mkdirSync(join(dir, ".agent", "context"), { recursive: true });
+    writeFileSync(join(dir, ".agent/context/session.md"), "# estado do projeto\n");
 
-  const razoes = [];
-  const medido = aplicaUpgradeMecanico({
-    dir,
-    root,
-    tag: "v1.0.0",
-    fatal: (m) => {
-      // A razao VAI na excepcao. Sem isto, um caso que rebentasse dizia so "__fatal__" e
-      // obrigava a instrumentar o motor para se perceber porque — foi o que aconteceu.
-      razoes.push(m);
-      throw new Error(`__fatal__: ${m}`);
-    },
-    substituto: "Consumidor",
-    constantes,
-  });
-  return { dir, root, medido, razoes, ler: (rel) => (existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), "utf8") : null) };
+    const razoes = [];
+    const medido = aplicaUpgradeMecanico({
+      dir,
+      root,
+      tag: "v1.0.0",
+      fatal: (m) => {
+        // A razao VAI na excepcao. Sem isto, um caso que rebentasse dizia so "__fatal__" e
+        // obrigava a instrumentar o motor para se perceber porque — foi o que aconteceu.
+        razoes.push(m);
+        throw new Error(`__fatal__: ${m}`);
+      },
+      substituto: "Consumidor",
+      constantes,
+    });
+    return { dir, root, medido, razoes, ler: (rel) => (existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), "utf8") : null) };
+  } catch (err) {
+    // Os casos que medem uma RECUSA fazem o `fatal` lancar daqui de dentro. O chamador escreve
+    // `let c; try { c = cenario(...) } finally { limpa(c) }` — e no throw o `c` ainda e
+    // `undefined`, logo o `limpa` nao limpava nada. Quem criou os dois tmpdirs foi esta funcao,
+    // logo e ela que os desfaz quando nao chega a entrega-los.
+    //
+    // Medido: 8 diretorios por corrida, 1621 acumulados (4,1 GB), cada um com um repo `git init`
+    // dentro. Nao era so disco: o indexador do macOS percorria-os e as medicoes de tempo desta
+    // propria suite sairam 3x inflacionadas — uma fuga de recursos que falsifica benchmarks e
+    // que nenhuma leitura do teste denunciava, porque o teste PASSA.
+    limpa({ dir, root });
+    throw err;
+  }
 }
 
 export const limpa = (c) => {
   for (const d of [c?.dir, c?.root]) if (d) rmSync(d, { recursive: true, force: true });
 };
 
+
+/** Um template minimo mas COMPLETO: tem tudo o que o simulador toca. As constantes adaptaveis
+ *  estao ca todas porque o motor as procura pelo nome e para se faltar uma — de proposito. */
+export function templateSintetico(extra = {}) {
+  const constantes = {
+    // `ALVOS_REPROVAM` entra aqui porque entrou na lista das constantes preservadas: o motor
+    // procura-a pelo nome e REPROVA se nao a encontrar — e reprova bem, porque a tabela do
+    // `/upgrade` estaria a mandar preservar algo que nao existe. Quem fica incompleta e a
+    // fixture, nao o motor.
+    ".agent/scripts/check-bundle-sizes.mjs": 'const TARGETS = {\n  "/": { name: "Home", target: 160, alarm: 180 },\n};\n',
+    // A DECISAO vive a parte, e e ela que o simulador suspende. Estava dentro do ficheiro da
+    // logica e o upgrade atropelava-a — foi essa a mudanca que a separacao veio fechar.
+    ".agent/scripts/config/bundles.mjs": "export const ALVOS_REPROVAM = true;\n",
+    ".agent/scripts/check-doc-versions.mjs": "const BANNED = [\n];\n",
+    ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
+    ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
+    ".agent/scripts/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
+    ".agent/scripts/guards/sizes.mjs": "export const TETOS = {\n};\n",
+  };
+  return {
+    ".agent/BOOTSTRAP.md": "# Bootstrap\n\n### 2.2 Ficheiros a GERAR\n\n| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra\n",
+    ".github/workflows/ci.yml": "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n",
+    ".agent/scripts/stub.mjs": 'console.log("  1 passaram, 0 falharam.");\n',
+    ".claude/hooks/h.mjs": "// hook\n",
+    ".agent/context/session.md": "# estado\n",
+    ".agent/rules/anti-patterns-template.md": "# Template\n\n## TP1 — um\n",
+    ".agent/rules/anti-patterns.md": `# Projeto\n\n> cabecalho\n\n---\n\n## ${"AP" + "1"} — meu\n`,
+    ...constantes,
+    ...extra,
+  };
+}

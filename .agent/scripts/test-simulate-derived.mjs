@@ -94,7 +94,10 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
     w(".agent/scripts/guards/versions.mjs", configOutraForma ? 'const CHECKS = "outra forma";\n' : "const CHECKS = [\n];\n");
   }
   w(".agent/scripts/check-doc-versions.mjs", "const BANNED = [\n];\n");
-  w(".agent/scripts/check-bundle-sizes.mjs", "const ALVOS_REPROVAM = true;\n");
+  // A configuracao do projeto vive a parte, e e ela que o bloco 3d suspende. O ficheiro da
+  // logica fica sem a constante — foi essa a mudanca que tirou a decisao do caminho do upgrade.
+  w(".agent/scripts/check-bundle-sizes.mjs", "// logica do verificador\n");
+  w(".agent/scripts/config/bundles.mjs", "export const ALVOS_REPROVAM = true;\n");
   w(".agent/rules/process-rules.md", "# Processo\n\nO metodo passa por 6 fases.\n");
   if (!semGuardTamanhos) {
     w(".agent/scripts/guards/sizes.mjs", tetosOutraForma ? "export const TETOS = [];\n" : "export const TETOS = {\n};\n");

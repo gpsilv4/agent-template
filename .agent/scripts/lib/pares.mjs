@@ -40,6 +40,16 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O harness dos testes do varredor. Extraido pela catraca do Guard 17, e TEM sitios de
+    // recusa (e ele que compara output e exit code), logo nao cabe na isencao dos harnesses
+    // que so montam fixtures. Desligar um deles faz a suite do medidor aceitar tudo — e o
+    // medidor e a unica coisa que afirma que as outras suites afirmam alguma coisa.
+    alvo: ".agent/scripts/test-sweep-harness.mjs",
+    suite: ".agent/scripts/test-mutation-sweep.mjs",
+    sinal: /(?<![\w.$])problems\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas e a
     // catraca do Guard 17 exigiu a divisao. Entrou na descoberta no momento em que ganhou o
     // prefixo `test-` da convencao — e a descoberta reclamou logo, com razao: um harness DECIDE

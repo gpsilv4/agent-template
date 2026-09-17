@@ -181,7 +181,7 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
    → Substitui `{{TYPES_FILE}}`
 
 9. **Paginas principais** (lista das rotas/paginas da app, ex: "Dashboard (/), Products (/products), Settings (/settings)")
-   → Base para gerar `pages-architecture.md` e `TARGETS` no bundle checker
+   → Base para gerar `pages-architecture.md` e `TARGETS` em `.agent/scripts/config/bundles.mjs`
 
 10. **Sistema de subscricao/paywall?** (Free vs PRO, roles, permissoes)
     → Se sim: adaptar review.md, plan.md e pages-architecture.md com seccoes de gating
@@ -320,15 +320,22 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 
 ### 2.3 Adaptar o Bundle Checker
 
-No ficheiro `.agent/scripts/check-bundle-sizes.mjs`, descomentar e adaptar o objeto `TARGETS` com as paginas reais do projeto (pergunta 9):
+No ficheiro **`.agent/scripts/config/bundles.mjs`** — nao no verificador — descomentar e adaptar
+o objeto `TARGETS` com as paginas reais do projeto (pergunta 9):
 
 ```javascript
-const TARGETS = {
+export const TARGETS = {
   "/":          { name: "Home",       target: 160, alarm: 180 },
   "/products":  { name: "Products",   target: 160, alarm: 180 },
   "/settings":  { name: "Settings",   target: 155, alarm: 175 },
 };
 ```
+
+**Porque e noutro ficheiro:** `config/` e do projeto e o `/upgrade` **nunca a substitui** (so a cria se faltar); o
+`check-bundle-sizes.mjs` e logica e o upgrade substitui-o. Enquanto a configuracao viveu dentro
+da logica, a unica proteccao era uma lista de nomes a preservar, mantida a mao — e foi assim que
+o interruptor `ALVOS_REPROVAM` (que esta no mesmo ficheiro) ficou de fora dela e a decisao de um
+projeto se perdeu em silencio, com o verificador a correr e a medir bem.
 
 **Nota:** Este script so funciona com Next.js App Router. Para outros frameworks, indicar ao utilizador que deve ser adaptado ou removido.
 
@@ -531,7 +538,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
 - [ ] `anti-patterns.md`: exemplo comentado removido, entradas do template **mantidas** (apagar uma exige apagar as citacoes dela — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
-- [ ] `TARGETS` no bundle checker atualizados?
+- [ ] `TARGETS` em `.agent/scripts/config/bundles.mjs` atualizados (nao no verificador)?
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
