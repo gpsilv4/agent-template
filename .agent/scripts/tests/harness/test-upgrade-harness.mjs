@@ -15,7 +15,7 @@
  * exercitados sem montar a simulacao inteira.
  */
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -52,23 +52,89 @@ export function repo({ comTag = null, comMarca = false, semBootstrap = false } =
 
 /** Corre o simulador DENTRO de `dir`. O simulador resolve a raiz a partir do seu proprio
  *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo. */
-export function corre(dir) {
+export function corre(dir, args = []) {
   mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, ".agent", "scripts", "guards"), { recursive: true });
+  // A `lib/` INTEIRA, e nao os modulos nomeados um a um. A lista a mao era uma segunda copia
+  // das dependencias do simulador, a ter de concordar com os `import` dele sem nada a
+  // verifica-lo (`TP8`): bastou extrair um modulo para as 14 suites sinteticas rebentarem com
+  // `ERR_MODULE_NOT_FOUND`, que nao diz "falta uma linha no harness". Copiar de mais e barato;
+  // um modulo que ninguem importa nao chega a ser lido.
   for (const [de, para] of [
     [SIMULADOR, ".agent/scripts/simulate-upgrade.mjs"],
-    [resolve(AQUI, "lib", "upgrade-mecanico.mjs"), ".agent/scripts/lib/upgrade-mecanico.mjs"],
-    // O motor re-exporta o `leOuNull` de `lib/ficheiros.mjs` (a definicao vive la, uma vez).
-    [resolve(AQUI, "lib", "ficheiros.mjs"), ".agent/scripts/lib/ficheiros.mjs"],
-    [resolve(AQUI, "lib", "derivado.mjs"), ".agent/scripts/lib/derivado.mjs"],
+    ...readdirSync(resolve(AQUI, "lib"))
+      .filter((f) => f.endsWith(".mjs"))
+      .map((f) => [resolve(AQUI, "lib", f), `.agent/scripts/lib/${f}`]),
   ]) {
     writeFileSync(join(dir, para), readFileSync(de, "utf8"));
   }
   try {
-    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs")], { cwd: dir, encoding: "utf8" }) };
+    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], { cwd: dir, encoding: "utf8" }) };
   } catch (err) {
     return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
+}
+
+/**
+ * Monta um TEMPLATE sintetico (tagado, com um commit a seguir) e, a partir da tag, um PROJETO
+ * derivado com marca — e corre o modo `--projeto` do simulador, que mede a seccao 2b.
+ *
+ * O simulador corre do lado do TEMPLATE, apontado ao projeto: a copia que um derivado tem e
+ * sempre a antiga, e um flag do lado dele so serviria a partir do upgrade seguinte.
+ *
+ * @param {object} o
+ * @param {object} o.hoje    ficheiros do template DEPOIS da tag (o upgrade a medir)
+ * @param {object} o.projeto ficheiros a sobrepor no projeto (o estado proprio dele)
+ * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
+ */
+export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined } = {}) {
+  const tpl = mkdtempSync(join(tmpdir(), "sim-up-tpl-"));
+  const proj = mkdtempSync(join(tmpdir(), "sim-up-proj-"));
+  const escreve = (base, ficheiros) => {
+    for (const [rel, c] of Object.entries(ficheiros)) {
+      if (c === null) {
+        rmSync(join(base, rel), { force: true });
+        continue;
+      }
+      mkdirSync(dirname(join(base, rel)), { recursive: true });
+      writeFileSync(join(base, rel), c);
+    }
+  };
+
+  escreve(tpl, templateSintetico());
+  git(tpl, ["init", "-q", "-b", "main"]);
+  git(tpl, ["config", "user.email", "t@t"]);
+  git(tpl, ["config", "user.name", "t"]);
+  git(tpl, ["add", "-A"]);
+  git(tpl, ["commit", "-qm", "ontem"]);
+  git(tpl, ["tag", "v1.0.0"]);
+  const sha = git(tpl, ["rev-parse", "v1.0.0^{commit}"]).trim();
+
+  // O projeto sai da TAG — e nao do template de hoje. Um projeto montado do HEAD ja teria tudo,
+  // e a medicao do que o upgrade acrescenta daria sempre vazio: verde por construcao.
+  escreve(proj, templateSintetico());
+  escreve(proj, projeto);
+  rmSync(join(proj, ".agent/BOOTSTRAP.md"), { force: true });
+  if (marca !== null) {
+    writeFileSync(join(proj, ".agent/.template-version"), marca ?? `template: ${tpl}\ncommit: ${sha}\ndata: 2026-01-01\n`);
+  }
+  git(proj, ["init", "-q", "-b", "main"]);
+  git(proj, ["config", "user.email", "t@t"]);
+  git(proj, ["config", "user.name", "t"]);
+  git(proj, ["add", "-A"]);
+  git(proj, ["commit", "-qm", "projeto"]);
+
+  // Só AGORA o template avanca para "hoje": e este delta que o modo tem de medir.
+  //
+  // `--allow-empty` porque os testes de RECUSA nao precisam de delta nenhum — recusam antes de
+  // chegar a medir. Sem ele o `git` abortava o commit vazio, o harness rebentava com "Command
+  // failed" e quatro controlos negativos ficavam vermelhos por uma razao que nada tem a ver com
+  // o que afirmam. Um erro de fixture lido como um defeito e pior do que nenhum teste.
+  escreve(tpl, hoje);
+  git(tpl, ["add", "-A"]);
+  git(tpl, ["commit", "-q", "--allow-empty", "-m", "hoje"]);
+
+  return { tpl, proj, ...corre(tpl, [`--projeto=${proj}`]) };
 }
 
 export const exige = ({ code, out }, { codigo, inclui = [], exclui = [] }) => {

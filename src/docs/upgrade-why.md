@@ -181,3 +181,49 @@ adiar, ou nao trazer. O que nao pode acontecer e o projeto ficar vermelho sem ni
 decidido isso — ai o que se perde nao e o gate, e a confianca em todos os outros.
 
 O historico das rondas anteriores esta neste ficheiro, mais acima.
+
+## Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto
+
+A secao 2b promete uma lista — *"o que e que este upgrade faz reprovar neste projeto?"* — e
+durante varias releases nomeou um comando que **saltava** no unico sitio onde a secao e lida. Os
+dois simuladores recusam-se a correr num derivado (as tags de la sao as releases desse projeto), e
+o `/upgrade` so corre num derivado. Quem seguia a secao a letra via um `SKIP`, lia-o como "nada a
+medir" e avancava. Foi assim que o #75 — uma mudanca que punha um consumidor a `exit 1` — chegou a
+um projeto real: a rede escrita para apanhar aquela classe estava desligada onde a classe ocorre.
+
+**A primeira tentativa foi pelo lado errado, e mediu-se.** O flag comecou por ser
+`--template=<clone>`, corrido de dentro do projeto. Montado um derivado real da `v0.14.0` e
+corrido o comando, o que apareceu foi o `SKIP` de sempre: um projeto derivado corre a **sua** copia
+do simulador, que e a antiga e nao conhece flag nenhum. Um flag do lado do consumidor so serve a
+partir do upgrade **seguinte** aquele que o trouxe — e o upgrade que precisa de ser medido e sempre
+o que esta a acontecer. Invertida a direccao (`--projeto=<caminho>`, corrido do clone), funciona
+no primeiro upgrade de qualquer projeto, incluindo os que sairam de versoes anteriores a esta.
+
+**O antes e o depois sao ambos medidos, e a lista e a diferenca.** Um projeto real pode ja estar
+vermelho por razoes suas. Listar tudo o que esta vermelho depois do upgrade era imputar-lhe o que
+ele nao fez — e quem lesse a lista uma vez aprendia a desconfiar dela. As duas listas de comandos
+tambem sao diferentes de proposito: o ANTES corre os verificadores que o projeto tem hoje, o
+DEPOIS os que o template novo traz. Um verificador novo nao pode ter estado verde antes, porque
+nao existia; logo tudo o que ele acuse e efeito deste upgrade.
+
+**Nao aplica nada.** A medicao corre sobre uma copia em `tmpdir`, e por isso sai `0` mesmo com a
+lista cheia: uma lista cheia e o *output* da secao, nao uma reprovacao. So a impossibilidade de
+medir sai `!= 0`. Um instrumento que altera o que mede nao e um instrumento — e ha um teste que
+afirma exactamente isso, comparando o `git status` do projeto antes e depois.
+
+**A mecanica e uma so, partilhada pelos dois modos** (`lib/medida-upgrade.mjs`). A pergunta e a
+mesma dos dois lados; duas implementacoes a concordar a mao eram o `TP8`, e a do lado menos
+corrido envelhecia sem ninguem reparar — que foi, no fundo, a forma original deste defeito.
+
+## Porque a lista das constantes preservadas saiu da tabela do `/upgrade`
+
+A linha dos `.mjs` enumerava-as por extenso — `BANNED`, `CHECKS`, `TEST_GLOBS`, `CONFIG_GLOBS`,
+`CONTAGENS` — ao lado do ficheiro de cada uma. Era uma segunda copia de `CONSTANTES_DO_PROJETO`
+(`lib/upgrade-mecanico.mjs`), que e a lista que o motor usa de facto, e as duas so podiam
+concordar a mao. **Ja tinham divergido**: quando o `CHECKS` mudou para `guards/versions.mjs`, a
+prosa ficou a apontar para o sitio antigo e teve de ganhar um aviso entre parentesis a explicar a
+mudanca — o sintoma classico de um campo que envelhece (`TP8`). A tabela passa a apontar para a
+lista; quem a quiser ler abre o modulo, onde cada entrada tem o comentario que explica porque esta
+la. Saiu numa altura em que o ficheiro estava 400 bytes acima do tecto: encolher prosa teria
+custado varias passagens, e remover a copia resolveu-o de uma vez, que e o que a nota dos `TETOS`
+prescreve.

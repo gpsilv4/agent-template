@@ -22,7 +22,7 @@ import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./harness/test-upgrade-harness.mjs";
+import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, contraProjeto, test, resumo } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
@@ -326,4 +326,109 @@ test('a contagem da adaptacao 2b concorda com o Guard 17 na FRONTEIRA', () => {
       limpa(c);
     }
   });
+// --- O modo `--projeto`: a medicao da seccao 2b DE DENTRO de um derivado ----------
+//
+// O que se exercita aqui vive em `lib/medida-upgrade.mjs` (o instrumento) e, do outro lado,
+// em `lib/projeto-de-ontem.mjs` (a fixture do modo template). Sao os dois modulos que o
+// `lib/mapa-suites.mjs` manda verificar com esta suite.
+//
+// PORQUE ISTO EXISTE: a seccao 2b nomeia um comando, e o comando nomeado SALTAVA num projeto
+// derivado — que e o unico sitio onde o `/upgrade` corre. Quem seguisse a seccao a letra via
+// um `SKIP`, lia-o como "nada a medir" e avancava. Foi assim que o #75 chegou a um consumidor.
+
+test("aponta para algo que nao e um projeto derivado -> REPROVA", () => {
+  const r = contraProjeto({ projeto: { ".agent/rules/anti-patterns.md": null } });
+  // Um caminho sem `.agent/` de todo: o guarda tem de o dizer, e nao seguir a medir o vazio.
+  const fora = corre(r.tpl, ["--projeto=/caminho/que/nao/existe"]);
+  return exige(fora, { codigo: 1, inclui: ["nao parece um projeto derivado"] });
+});
+
+test("projeto sem marca utilizavel (Modo B) -> REPROVA a dizer que nao mede", () =>
+  exige(contraProjeto({ marca: null }), { codigo: 1, inclui: ["Modo B", "nao se mede"] }));
+
+test("marca a apontar para um commit que o template nao tem -> REPROVA", () =>
+  exige(contraProjeto({ marca: "template: x\ncommit: 0000000000000000000000000000000000000000\n" }), {
+    codigo: 1,
+    inclui: ["nao existe no template"],
+  }));
+
+// A marca que o BOOTSTRAP.md manda escrever quando nao apurou o SHA. Sem este ramo,
+// `desconhecido` era tratado como uma referencia e o motor lia TODOS os ficheiros como novos —
+// uma lista enorme e errada, sem um erro no ecra (`TP2`).
+test("marca com `commit: desconhecido` nao conta como versao -> REPROVA", () =>
+  exige(contraProjeto({ marca: "template: x\ncommit: desconhecido\n" }), { codigo: 1, inclui: ["Modo B"] }));
+
+// --- o que a 2b promete: o que PASSA a reprovar ----------------------------------
+const CI_COM_NOVO =
+  "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n" +
+  "      - run: node .agent/scripts/apertado.mjs\n";
+
+test("verificador NOVO que reprova aparece na lista da 2b", () =>
+  exige(
+    contraProjeto({
+      hoje: {
+        ".agent/scripts/apertado.mjs": 'console.log("  WARN  limiar apertado");\nprocess.exit(1);\n',
+        ".github/workflows/ci.yml": CI_COM_NOVO,
+      },
+    }),
+    { codigo: 0, inclui: ["PASSA A REPROVAR", "apertado.mjs"] }
+  ));
+
+// O CONTRA-CASO, e sem ele o de cima era satisfeito por listar tudo o que esta vermelho: um
+// projeto real ja pode estar vermelho por razoes suas, e imputar isso ao upgrade e culpa-lo do
+// que ele nao fez. Quem lesse a lista aprendia a desconfiar dela.
+test("o que JA reprovava antes do upgrade NAO e imputado ao upgrade", () =>
+  exige(
+    contraProjeto({
+      projeto: { ".agent/scripts/stub.mjs": 'console.log("  WARN  ja estava vermelho");\nprocess.exit(1);\n' },
+      hoje: { ".agent/scripts/stub.mjs": 'console.log("  WARN  ja estava vermelho");\nprocess.exit(1);\n' },
+    }),
+    { codigo: 0, inclui: ["ja reprovam antes do upgrade"], exclui: ["PASSA A REPROVAR  .agent/scripts/stub.mjs"] }
+  ));
+
+test("upgrade puramente aditivo diz-o em vez de nao dizer nada", () =>
+  exige(contraProjeto({ hoje: { "NOVO.md": "# so um doc\n" } }), {
+    codigo: 0,
+    inclui: ["puramente aditivo"],
+  }));
+
+// A promessa mais importante do modo: mede-se ANTES de aplicar, e quem decide e o utilizador.
+// Um instrumento de medicao que altera o que mede nao e um instrumento.
+test("o projeto NAO e tocado pela medicao", () => {
+  const r = contraProjeto({ hoje: { ".agent/scripts/novo-doc.mjs": "// novo\n" } });
+  const sujo = git(r.proj, ["status", "--porcelain"]).trim();
+  return sujo === "" ? [] : [`a medicao mexeu no projeto: ${sujo}`];
+});
+
+// Um caminho com `.agent/` mas SEM `.git`: passa o guarda da forma e falha a copia. Sem esta
+// recusa, o archive saia vazio e a medicao corria sobre uma pasta sem nada — 0 verificacoes a
+// reprovar, que se le como "este upgrade nao parte nada" (`TP2`).
+test("projeto sem `.git` -> REPROVA em vez de medir uma copia vazia", () => {
+  const r = contraProjeto();
+  const semGit = mkdtempSync(join(tmpdir(), "sim-up-sem-git-"));
+  mkdirSync(join(semGit, ".agent"), { recursive: true });
+  // O SHA e REAL, tirado do template: a recusa da marca vem ANTES desta, logo um sha inventado
+  // fazia o teste passar pelo ramo errado — verde a medir outra coisa (`TP1`).
+  writeFileSync(join(semGit, ".agent/.template-version"), `commit: ${git(r.tpl, ["rev-parse", "HEAD"]).trim()}\n`);
+  return exige(corre(r.tpl, [`--projeto=${semGit}`]), {
+    codigo: 1,
+    inclui: ["nao consegui copiar a arvore deste projeto"],
+  });
+});
+
+// As DUAS listas de comandos tem a sua recusa, e as duas sao precisas: derivar zero comandos e
+// indistinguivel de "tudo passou" se ninguem o disser. Um projeto que tenha renomeado o job fica
+// com a medicao a dizer sempre "puramente aditivo".
+test("projeto sem job `guard-tests` no ci.yml -> REPROVA", () =>
+  exige(contraProjeto({ projeto: { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" } }), {
+    codigo: 1,
+    inclui: ["ci.yml DESTE projeto"],
+  }));
+
+test("template sem job `guard-tests` no ci.yml -> REPROVA", () =>
+  exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" } }), {
+    codigo: 1,
+    inclui: ["guard-tests"],
+  }));
+
 resumo();
