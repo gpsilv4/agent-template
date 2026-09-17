@@ -113,6 +113,15 @@ export const PARES = [
     // ele deixar de avisar, o paralelismo continua a parecer funcionar e passa a dar vermelhos
     // que nao sao reais. Um verificador cuja falha e invisivel precisa desta rede mais do que
     // qualquer outro.
+    // Guard 20 (citacoes de ficheiro nas instrucoes). Le PROSA, e uma citacao morta nao da erro
+    // nenhum — fica a mentir ate alguem a seguir. Se este guard deixar de avisar, volta-se ao
+    // estado em que nada verificava isso.
+    alvo: ".agent/scripts/guards/citacoes.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/isolamento.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,

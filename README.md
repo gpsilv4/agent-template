@@ -185,7 +185,8 @@ gh pr create --fill     # then merge once CI is green
     │   ├── anti-patterns.mjs   <- Guards 15/18: citations resolve; each TPn has its evidence
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
     │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
-    │   └── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
+    │   ├── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
+    │   └── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
     │
     ├── lib/                    <- Shared modules. No entry point, no discovery: imported
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
