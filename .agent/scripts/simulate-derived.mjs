@@ -60,7 +60,7 @@ const NAO_COPIAR_PREFIXO = ["TEMPLATE-FIXES"];
 const SUBSTITUIVEIS = /\.(md|mdc|mjs|json|yml|yaml|toml)$/;
 const SUBSTITUIVEIS_SEM_EXT = new Set(["LICENSE", "CODEOWNERS"]);
 /** Os hooks do git nao tem extensao (o git exige o nome exacto do evento), logo precisam de
- *  regra propria — e foi por nao a terem que um `{{PROJECT_NAME}}` la sobrevivia ao bootstrap. */
+ *  regra propria — e foi por nao a terem que um `{{ PROJECT_NAME }}` la sobrevivia ao bootstrap. */
 const substituivel = (rel, nome) =>
   rel.startsWith(".githooks/") || SUBSTITUIVEIS.test(nome) || SUBSTITUIVEIS_SEM_EXT.has(nome);
 

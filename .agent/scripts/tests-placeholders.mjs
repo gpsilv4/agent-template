@@ -93,7 +93,7 @@ export function registar() {
        includes: [`.agent/rules/core-rules.md: placeholder(s) nao substituido(s) apos o bootstrap — ${ph("HOSTING")}`],
        excludes: ["SKIP  Guard 13"] });
 
-  // Sete ficheiros com `{{PROJECT_NAME}}` estavam FORA da lista de alvos: os hooks, os
+  // Sete ficheiros com `{{ PROJECT_NAME }}` estavam FORA da lista de alvos: os hooks, os
   // modulos de `lib/` (um nivel abaixo, que o `listDir` de `.agent/scripts/` nao alcanca) e
   // os subagentes. O sweep do bootstrap substitui-os por EXTENSAO, logo na pratica saiam bem
   // — o que faltava era a rede que apanha um sweep FALHADO. Um guard que so cobre o caminho
