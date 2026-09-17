@@ -183,7 +183,10 @@ gh pr create --fill     # then merge once CI is green
     ├── lib/
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
-    │   └── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
+    │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
+    │   ├── patch.mjs           <- Text patching with THREE outcomes: applied / already-set / no-target
+    │   ├── derivado.mjs        <- "Is this repo the template, or a project derived from it?"
+    │   └── ficheiros.mjs       <- Reads that tell "missing" apart from "unreadable"
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear

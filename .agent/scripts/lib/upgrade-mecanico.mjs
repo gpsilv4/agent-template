@@ -18,15 +18,10 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, cpSync, existsSync
 import { execFileSync } from "child_process";
 import { join, dirname, sep, relative } from "path";
 
-/** `null` em vez de excepcao: "nao existe" e "nao consegui ler" pedem accoes diferentes a
- *  quem chama, e colapsar as duas e o `TP2`. */
-export const leOuNull = (p) => {
-  try {
-    return readFileSync(p, "utf8");
-  } catch {
-    return null;
-  }
-};
+// Re-exportado para nao partir quem ja o importava daqui. A definicao vive em
+// `lib/ficheiros.mjs` — estava escrita duas vezes, identica (`TP8`).
+export { leOuNull } from "./ficheiros.mjs";
+import { leOuNull } from "./ficheiros.mjs";
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Curta de mais, sobram placeholders — e o
  *  Guard 13 denuncia-o no fim, por desenho. */

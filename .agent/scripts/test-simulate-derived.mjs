@@ -21,6 +21,7 @@
 import { execFileSync } from "child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
+import { aplica } from "./lib/patch.mjs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
@@ -138,7 +139,37 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
     w("apps/web/.env.local", "SUPABASE_SERVICE_KEY=nao-copiar\n");
   }
   copyFileSync(SIMULADOR, join(dir, ".agent/scripts/simulate-derived.mjs"));
+  // O simulador importa `lib/patch.mjs` — a distincao entre "o patch nao aplicou" e "o valor ja
+  // era o desejado", que vive num sitio so de proposito. Sem o copiar, o import rebenta e TODOS
+  // estes casos falham por uma razao que nada tem a ver com eles.
+  mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
+  for (const m of ["patch.mjs", "derivado.mjs", "ficheiros.mjs"]) {
+    copyFileSync(join(ROOT, `.agent/scripts/lib/${m}`), join(dir, `.agent/scripts/lib/${m}`));
+  }
   return dir;
+}
+
+/** Um caso que NAO monta fixture nem corre o simulador: afirma sobre uma funcao pura.
+ *
+ *  Existe porque o `test()` abaixo monta sempre um repo e lanca um processo — o que e certo para
+ *  o que ele mede, e impossivel de usar para uma funcao como o `aplica()` do `lib/patch.mjs`.
+ *  Partilha os contadores de proposito: dois conjuntos de numeros a somar a mao no fim eram duas
+ *  copias do mesmo total (`TP1`). */
+function caso(nome, fn) {
+  let problemas;
+  try {
+    problemas = fn() ?? [];
+  } catch (err) {
+    problemas = [`rebentou: ${err.message}`];
+  }
+  if (problemas.length) {
+    falhas.push({ nome, problemas, out: "" });
+    console.log(`  FAIL  ${nome}`);
+    for (const p of problemas) console.log(`          ${p}`);
+  } else {
+    passed++;
+    console.log(`  PASS  ${nome}`);
+  }
 }
 
 function test(nome, opcoes, expect) {
@@ -351,8 +382,51 @@ test("segredos e estado local em subpastas NAO entram na copia", { segredosAninh
   },
 });
 
+// --- `lib/patch.mjs`: os TRES estados de um patch de texto ---------------------
+// `texto.replace()` devolve o texto igual em dois casos que nao tem nada a ver um com o outro:
+// o padrao nao casou, ou casou e o valor ja era o desejado. Colapsa-los num
+// `if (depois === texto) fatal(...)` produz um falso alarme no caso MAIS PROVAVEL — fixar um
+// valor que ja esta fixado.
+//
+// Ja custou duas vezes: o `test-bundle-sizes.mjs` (corrigido no PR #68) e o `configura()` daqui,
+// que reescreveu o mesmo defeito NO MESMO COMMIT que corrigiu o primeiro. Punha o simulador a
+// `exit 1` em qualquer derivado que tivesse suspendido o gate — que e exactamente o estado que
+// este bloco existe para simular. So apareceu numa ronda de `/upgrade` num projeto real.
+caso('patch: padrao que casa e muda devolve `aplicado`', () => {
+  const r = aplica('const X = true;', /const X = (?:true|false);/, 'const X = false;');
+  const p = [];
+  if (r.estado !== 'aplicado') p.push(`estado ${r.estado}, esperado aplicado`);
+  if (r.texto !== 'const X = false;') p.push(`texto ${JSON.stringify(r.texto)}`);
+  return p;
+});
+
+// O caso que motivou tudo: o valor JA e o desejado. Nao e erro, e nao ha nada a escrever.
+caso('patch: valor que JA era o desejado devolve `ja-estava`, nao erro', () => {
+  const r = aplica('const X = false;', /const X = (?:true|false);/, 'const X = false;');
+  return r.estado === 'ja-estava' ? [] : [`estado ${r.estado}, esperado ja-estava`];
+});
+
+// E o CONTRA-CASO, sem o qual os outros dois nao valem nada: o padrao que nao casa continua a ser
+// um erro. Um `aplica()` que dissesse sempre `ja-estava` passava o teste de cima e deixava a
+// simulacao a medir o template por estrear, em silencio — que e o defeito oposto e pior.
+caso('patch: padrao que NAO casa devolve `sem-alvo`', () => {
+  const r = aplica('const OUTRO = 1;', /const X = (?:true|false);/, 'const X = false;');
+  return r.estado === 'sem-alvo' ? [] : [`estado ${r.estado}, esperado sem-alvo`];
+});
+
+// Um `RegExp` com a flag `g` guarda `lastIndex` entre chamadas, e o `test()` alterna entre `true`
+// e `false` sobre o mesmo input. Ja aconteceu num guard deste repo. O `aplica()` usa `match`, e
+// este caso e o que o prende la.
+caso('patch: padrao com flag `g` nao alterna resultados entre chamadas', () => {
+  const g = /const X = (?:true|false);/g;
+  const a = aplica('const X = false;', g, 'const X = false;');
+  const b = aplica('const X = false;', g, 'const X = false;');
+  return a.estado === b.estado ? [] : [`duas chamadas iguais deram ${a.estado} e depois ${b.estado}`];
+});
+
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
+
 console.log("");
 if (falhas.length) {
   for (const { nome, out } of falhas) {

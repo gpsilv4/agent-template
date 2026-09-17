@@ -56,6 +56,7 @@ import {
   CONSTANTES_DO_PROJETO,
 } from "./lib/upgrade-mecanico.mjs";
 import { pathToFileURL } from "url";
+import { ehDerivado } from "./lib/derivado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -115,8 +116,7 @@ console.log("\n=== Simulacao de /upgrade (template de ontem -> hoje) ===\n");
 // `.agent/.template-version` no primeiro passo da Fase 2, e manda apagar o `BOOTSTRAP.md`.
 // Qualquer um dos dois sinais basta — um projeto que tenha apagado o BOOTSTRAP mas nao tenha a
 // marca (ou o contrario) e na mesma um derivado.
-const bootstrapCorreu =
-  leOuNull(join(ROOT, ".agent/.template-version")) !== null || leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) === null;
+const bootstrapCorreu = ehDerivado((rel) => leOuNull(join(ROOT, rel)));
 if (bootstrapCorreu) {
   console.log("  SKIP  simulacao de /upgrade — este repo e um projeto derivado, nao o template.");
   console.log("        As tags daqui sao as releases DESTE projeto; a simulacao mediria outra coisa.\n");

@@ -15,6 +15,7 @@
  * repo e nao sobre o guard, e fica vermelho no consumidor sem nada estar partido (`TP3`).
  */
 import { test, readF, writeF } from "./test-harness.mjs";
+import { aplica } from "./lib/patch.mjs";
 import { pathToFileURL } from "url";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -43,9 +44,12 @@ export function registar() {
   // derivado real, e depois pelo `simulate-derived.mjs` no bloco 3d.
   test("Guards de deps: lista CHECKS vazia da SKIP visivel (opt-in)", (dir) => {
     const antes = readF(dir, GUARD_VERSOES);
-    const depois = antes.replace(LISTA, "const CHECKS = [];");
-    if (depois === antes) throw new Error(`nao encontrei o array CHECKS em ${GUARD_VERSOES}`);
-    writeF(dir, GUARD_VERSOES, depois);
+    // `ja-estava` nao e falha: um projeto que ja tenha `const CHECKS = [];` numa linha esta no
+    // estado que esta fixture quer montar. A versao anterior colapsava-o com "nao encontrei o
+    // array", e a mensagem mandava procurar um literal que esta la. Ver `lib/patch.mjs`.
+    const r = aplica(antes, LISTA, "const CHECKS = [];");
+    if (r.estado === "sem-alvo") throw new Error(`nao encontrei o array CHECKS em ${GUARD_VERSOES}`);
+    writeF(dir, GUARD_VERSOES, r.texto);
   }, {
     // Opt-in por defeito. Um opt-in silencioso e indistinguivel de um guard partido.
     code: 0,

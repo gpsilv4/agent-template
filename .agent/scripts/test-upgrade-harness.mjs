@@ -55,6 +55,9 @@ export function corre(dir) {
   for (const [de, para] of [
     [SIMULADOR, ".agent/scripts/simulate-upgrade.mjs"],
     [resolve(AQUI, "lib", "upgrade-mecanico.mjs"), ".agent/scripts/lib/upgrade-mecanico.mjs"],
+    // O motor re-exporta o `leOuNull` de `lib/ficheiros.mjs` (a definicao vive la, uma vez).
+    [resolve(AQUI, "lib", "ficheiros.mjs"), ".agent/scripts/lib/ficheiros.mjs"],
+    [resolve(AQUI, "lib", "derivado.mjs"), ".agent/scripts/lib/derivado.mjs"],
   ]) {
     writeFileSync(join(dir, para), readFileSync(de, "utf8"));
   }

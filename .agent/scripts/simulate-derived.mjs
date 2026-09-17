@@ -6,18 +6,13 @@
  * derivado". Todas as outras suites correm sobre o template **nu** — placeholders por
  * substituir, rules do bootstrap por gerar. Nenhuma testava a promessa.
  *
- * Nao e teorico. A primeira corrida desta simulacao encontrou a checklist do `BOOTSTRAP.md` a
- * mandar deixar o `anti-patterns.md` "sem entradas" — estado em que os ficheiros do template
- * deixam dezenas de citacoes penduradas e o consumidor leva exit 1 **no dia 1**. Tres leituras
- * independentes nao viram; uma corrida viu em minutos. E a licao do `TP2` e do `ticket-method`
- * ("correr os comandos que a documentacao manda correr") com instrumento.
+ * Nao e teorico: a primeira corrida encontrou a checklist do `BOOTSTRAP.md` a mandar deixar o
+ * `anti-patterns.md` "sem entradas" — estado em que o consumidor leva exit 1 **no dia 1**. Tres
+ * leituras independentes nao viram; uma corrida viu em minutos.
  *
- * NAO E UM `check-*.mjs`, e o nome e deliberado: a descoberta do `mutation-sweep.mjs` varre
- * `check-*.mjs` e `guards/*.mjs` e exige par em `PARES`; um alvo sem sitios de aviso proprios
- * reprova la com `SINAL ERRADO`. Este ficheiro **orquestra** verificadores que ja tem par e
- * suite — o veredicto dele e o exit code deles, nao uma decisao sua. A sua propria logica (o
- * que copia, o que substitui, o que gera, e recusar-se a dar OK sem ter medido) tem suite
- * propria em `test-simulate-derived.mjs`.
+ * NAO E UM `check-*.mjs`, e o nome e deliberado: a descoberta do `mutation-sweep.mjs` exigiria
+ * par a um alvo sem sitios de aviso proprios. Este ficheiro **orquestra** verificadores que ja
+ * tem par e suite; a logica dele tem suite propria em `test-simulate-derived.mjs`.
  *
  * O QUE FAZ, a espelhar a Fase 2 do `BOOTSTRAP.md`:
  *   1. copia o repo sem `.git` nem o que nao pertence a um clone novo;
@@ -29,13 +24,10 @@
  * confianca: se faltar alguma, sobram placeholders e o **Guard 13 dispara** no passo 4. A
  * simulacao denuncia-se a si mesma em vez de passar a medir menos.
  *
- * O LIMITE, dito por inteiro porque e o mesmo erro que o `TP7` documenta: isto simula o
- * **estado** "bootstrap concluido", e nao **executa a checklist** do `BOOTSTRAP.md` passo a
- * passo. Aplica os que sao mecanicos (2.1 substituir, 2.2 gerar, e o unico passo destrutivo do
- * 2.8 — apagar o exemplo comentado do `anti-patterns.md`). Uma instrucao errada noutro passo —
- * que foi exactamente o defeito que motivou este script — so e apanhada se alguem a seguir a
- * mao. Isto reduz a janela; nao a fecha. Quem acrescentar um passo mecanico a Fase 2 devia
- * acrescenta-lo aqui.
+ * O LIMITE, dito por inteiro (e o mesmo erro que o `TP7` documenta): isto simula o **estado**
+ * "bootstrap concluido", nao **executa a checklist** passo a passo. Aplica os mecanicos (2.1, 2.2
+ * e o destrutivo do 2.8). Uma instrucao errada noutro passo so e apanhada a mao: reduz a janela,
+ * nao a fecha. Quem acrescentar um passo mecanico a Fase 2 devia acrescenta-lo aqui.
  *
  * Uso:
  *   node .agent/scripts/simulate-derived.mjs             # corre tudo
@@ -48,8 +40,12 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
 import { tmpdir } from "os";
+import { aplica } from "./lib/patch.mjs";
+import { ehDerivado } from "./lib/derivado.mjs";
+import { leOuNull } from "./lib/ficheiros.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
 
 /** Nao pertencem a um clone novo. `TEMPLATE-FIXES*` sao relatorios de revisao entregues de
  *  fora (ver `.gitignore`); `node_modules` e `.git` sao obvios. */
@@ -80,13 +76,15 @@ function rulesGeradas() {
   return [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
 }
 
-const leOuNull = (p) => {
-  try {
-    return readFileSync(p, "utf8");
-  } catch {
-    return null;
-  }
-};
+
+// Num derivado esta promessa nao se pode verificar: o que o script configura ja esta configurado.
+// Corria e falhava a queixar-se de literais, mandando procurar um defeito no template em vez de
+// dizer que o script esta no sitio errado. SKIP visivel, como o irmao. Deteccao: `lib/derivado.mjs`.
+if (ehDerivado((rel) => leOuNull(join(ROOT, rel)))) {
+  console.log("  SKIP  simulacao de projeto derivado — este repo JA e um derivado, nao o template.");
+  console.log("        O que este script configura ja esta configurado; mediria outra coisa.\n");
+  process.exit(0);
+}
 
 /** Os comandos que um projeto derivado corre — DERIVADOS do job `guard-tests` do `ci.yml`.
  *
@@ -378,9 +376,10 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
     const p = join(dir, rel);
     const c = leOuNull(p);
     if (c === null) fatal(`${rel} nao existe na copia — nao consigo simular ${o_que}`);
-    const depois = c.replace(padrao, novo);
-    if (depois === c) fatal(`nao consegui configurar ${o_que} em ${rel} — o literal mudou de forma`);
-    writeFileSync(p, depois);
+    // `ja-estava` NAO e falha — porque, em `lib/patch.mjs`.
+    const r = aplica(c, padrao, novo);
+    if (r.estado === "sem-alvo") fatal(`nao consegui configurar ${o_que} em ${rel} — o literal mudou de forma`);
+    if (r.estado === "aplicado") writeFileSync(p, r.texto);
   };
 
   // (a) `CHECKS` — o opt-in dos guards de versoes. Vazia, o guard SALTA; preenchida, corre. Um
