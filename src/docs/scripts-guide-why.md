@@ -48,3 +48,11 @@ isto e mais util do que deixar o consumidor supor que o guard o protege de tudo.
 
 Salta com `SKIP` no template nu de propósito: a regra so tem trabalho a partir do primeiro
 servidor que o projeto derivado acrescente. E o mesmo desenho do Guard 13.
+
+## O que cada Doc Guard mede, por extenso
+
+Esta lista vivia no `scripts-guide.md` e ocupava **1314 caracteres numa linha** — mais de 10% do
+orcamento de uma rule de referencia, para um inventario que o cabecalho de cada modulo ja da com
+mais detalhe. Saiu de la quando o ficheiro passou o tecto pela terceira vez no mesmo dia.
+
+Guards que correm sem config — orcamento de bytes com **um tecto unico de 12 000 para tudo o que se le** (NOTE a 11 500): rules carregadas, rules de referencia, **workflows** e catalogos de definicoes. Orcamenta tambem o **contexto** carregado (`.agent/context/`: NOTE 36 000 / gate 48 000, derivado das regras de arquivamento do `process-rules.md`; as rules ficam fora desta soma porque tem dono proprio no primeiro orcamento). Mais: paridade `CLAUDE.md`≡`GEMINI.md`, workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` resolvem, sanidade do `.claude/settings.json` (deny de secrets, allow sem wildcards abertos), **placeholders esquecidos apos o bootstrap** (salta enquanto o bootstrap nao correu), **as Fronteiras copiadas nos ponteiros do Cursor e do Copilot** (copia forcada — ver *why*), versao `package.json`≡`CHANGELOG`, `.nvmrc`, termos obsoletos e versoes de deps (configuravel). Caminhos ancorados a raiz do repo e **todo o skip e visivel**: um guard que nao corre imprime `SKIP`. Sai `!= 0` em warning (serve de gate). **Corre no CI** no job `guard-tests`, nao no `quality` (ver *why*). Correr antes de commit e apos Dependabot PRs.

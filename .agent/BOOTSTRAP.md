@@ -370,6 +370,8 @@ const BANNED = [
 
 Correr antes de commit e apos merge de PRs do Dependabot. **Corre no CI** no job `guard-tests` (que nao depende de `package.json`).
 
+> O `.agent/scripts/check-codigo-morto.mjs` (imports que ninguem usa) tambem **nao precisa de configuracao**: le os `import` de cada `.mjs` da maquinaria e conta os usos sobre codigo, ignorando comentarios e strings. Correr antes de commit; **corre no CI** no job `guard-tests`.
+>
 > O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; **corre no CI** no job `guard-tests`.
 
 #### Adaptar o `check-test-surface.mjs` a stack

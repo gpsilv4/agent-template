@@ -56,7 +56,7 @@
  * primeiro, senao ela passa a reprovar de origem.
  */
 
-import { readFileSync, writeFileSync, mkdtempSync, cpSync, rmSync, readdirSync } from "fs";
+import { readFileSync, mkdtempSync, cpSync, rmSync, readdirSync } from "fs";
 import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";

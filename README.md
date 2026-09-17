@@ -169,6 +169,7 @@ gh pr create --fill     # then merge once CI is green
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
+    ├── check-codigo-morto.mjs  <- Imports nobody uses: dead code travels to derived projects
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
@@ -290,6 +291,7 @@ src/docs/
 | Security Audit | `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every push/PR** in the `guard-tests` job |
+| Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every push/PR** in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every push/PR** in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |

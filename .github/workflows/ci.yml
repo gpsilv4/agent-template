@@ -236,6 +236,8 @@ jobs:
         run: node .agent/scripts/tests/test-registo.mjs
       - name: Mapa "caminho tocado -> o que o verifica" — negative tests
         run: node .agent/scripts/tests/test-mapa-suites.mjs
+      - name: Detector de codigo morto — negative tests
+        run: node .agent/scripts/tests/test-codigo-morto.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests
@@ -256,6 +258,8 @@ jobs:
         run: node .agent/scripts/check-doc-versions.mjs
       - name: Backlog — contadores, barra de progresso e IDs duplicados
         run: node .agent/scripts/check-backlog.mjs
+      - name: Codigo morto — imports que ninguem usa
+        run: node .agent/scripts/check-codigo-morto.mjs
       # O `commit-msg` so corre para quem tenha corrido `git config core.hooksPath .githooks`,
       # e isso e configuracao LOCAL: um clone novo, outra maquina ou outra ferramenta nao a
       # tem. Esta e a camada que nao depende dela — corre o mesmo hook sobre cada mensagem do

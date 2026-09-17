@@ -119,13 +119,12 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 9. Testes  — a partir de `S`
 
-> **Os testes da camada de agente correm sempre**, com ou sem app, e sao estes — sem eles um
-> agente que siga esta seccao num template nu nao corre nada e marca a checkbox:
+> **Os testes da camada de agente correm sempre**, com ou sem app, e a lista deles **nao se
+> escreve aqui**: sai do `ci.yml`, que e a fonte. A copia que aqui estava tinha ficado em 6
+> das 12 — um agente que a seguisse corria metade e marcava a checkbox na mesma.
 >
 > ```
-> node .agent/scripts/tests/test-guards.mjs          node .agent/scripts/tests/test-backlog.mjs
-> node .agent/scripts/tests/test-bundle-sizes.mjs    node .agent/scripts/tests/test-mutation-sweep.mjs
-> node .agent/scripts/tests/test-test-surface.mjs    node .claude/hooks/tests/test-hooks.mjs
+> grep -oE 'node [^ ]+tests/[a-z-]+\.mjs' .github/workflows/ci.yml | sh -e
 > ```
 >
 > Os `npm run` abaixo sao os da **app** e so existem depois de haver `package.json`.
@@ -142,8 +141,9 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 10. Sincronizacao de Conhecimento (Docs Sync)  — a partir de `S`
 
 - [ ] **Correr a checklist completa de `.agent/rules/sync-docs.md`** (28 pontos — CHANGELOG, rules, workflows, scripts, manuais, README, `.github/`, etc.)
-- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`, `.claude/hooks/` ou `.githooks/`): as **nove** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte) — sem eles, um guard partido parece um guard a passar
+- [ ] **Testes dos guards** (se mexeste em `.agent/scripts/`, `.claude/hooks/` ou `.githooks/`): as que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte) — sem eles, um guard partido parece um guard a passar
 - [ ] **Se mexeste num `check-*.mjs`**: `node .agent/scripts/mutation-sweep.mjs` — as suites acima ficarem verdes nao prova que afirmam algo; a varredura desliga cada aviso e exige vermelho. Sai `!= 0` tambem se um verificador novo vier sem suite
+- [ ] **Imports por usar**: `node .agent/scripts/check-codigo-morto.mjs` — um import morto viaja para todos os derivados no proximo `/upgrade`
 - [ ] **Guards de documentacao**: `node .agent/scripts/check-doc-versions.mjs` (bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + tabelas, versao CHANGELOG, termos banidos) — sem WARN
 - [ ] **Superficie de teste nao encolheu**: `node .agent/scripts/check-test-surface.mjs` — testes apagados, `skip`/`only` novos, contagens a descer, ou a selecao do runner estreitada. Mede a **arvore de trabalho**, logo corre antes do commit e ve o que esta a ser commitado (ver `TP4`)
 

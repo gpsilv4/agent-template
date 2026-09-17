@@ -78,6 +78,7 @@
       "Read(./.agent/**)",
       "Bash(node .agent/scripts/check-doc-versions.mjs)",
       "Bash(node .agent/scripts/check-backlog.mjs)",
+      "Bash(node .agent/scripts/check-codigo-morto.mjs)",
       "Bash(node .agent/scripts/check-bundle-sizes.mjs)",
       "Bash(node .agent/scripts/tests/test-guards.mjs)",
       "Bash(node .agent/scripts/tests/test-bundle-sizes.mjs)",

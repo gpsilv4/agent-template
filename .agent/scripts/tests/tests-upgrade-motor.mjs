@@ -15,8 +15,7 @@
  */
 import { cenario, limpa, test } from "./harness/test-upgrade-harness.mjs";
 import { CONSTANTES_DO_PROJETO, PLACEHOLDER } from "../lib/upgrade-mecanico.mjs";
-import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";

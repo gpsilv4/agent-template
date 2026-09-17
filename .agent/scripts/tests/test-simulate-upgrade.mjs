@@ -15,14 +15,14 @@
  *
  *   node .agent/scripts/tests/test-simulate-upgrade.mjs
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./harness/test-upgrade-harness.mjs";
+import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 

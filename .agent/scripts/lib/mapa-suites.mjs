@@ -50,6 +50,7 @@ export const SUITES = [
   // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do
   // projeto: mexer na configuracao obriga a correr quem a le.
   { re: /^\.agent\/scripts\/(test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
+  { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
   { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|test-sweep-harness\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
