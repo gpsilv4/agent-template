@@ -27,9 +27,11 @@
  *   node .agent/scripts/mutation-sweep.mjs                    # todos os alvos
  *   node .agent/scripts/mutation-sweep.mjs --only=backlog     # so um (ao mexer nele)
  *   node .agent/scripts/mutation-sweep.mjs --list             # so contar, sem correr
+ *   node .agent/scripts/mutation-sweep.mjs --workers=1        # sequencial (para comparar)
  *
- * CUSTO: recorre a suite inteira por sitio. dezenas de sitios = minutos. Correr apos mexer num
- * verificador, nao a cada commit. Opt-in no CI (ver `.github/workflows/ci.yml`).
+ * CUSTO: recorre a suite inteira por sitio. Corre em 8 processos, cada um com a SUA copia do
+ * repo — medido neste repo: 58 min em serie, 14m04s em paralelo, com o mesmo veredicto. Correr
+ * apos mexer num verificador, nao a cada commit. Opt-in no CI (ver `.github/workflows/ci.yml`).
  *
  * O QUE ESTA VARREDURA **NAO** COBRE, e vale saber antes de confiar nela: ela muta **sitios
  * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** —
@@ -73,6 +75,7 @@ function listarDir(rel) {
 
 import { PARES } from "./lib/pares.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
+import { medeCobertura, quantosWorkers } from "./lib/varredura-paralela.mjs";
 
 
 const listarSo = process.argv.includes("--list");
@@ -303,10 +306,55 @@ function criarCopia() {
   return dir;
 }
 
-let copia = null;
+/** Uma copia POR WORKER. Ver o cabecalho de `mede()`: a copia unica dava 12% de veredictos
+ *  errados sob paralelismo, e custava 0,06s por worker corrigi-lo. */
+let copias = [];
+
+/** A baseline e por SUITE, nao por alvo — e e a mesma medicao para todos os alvos que a
+ *  partilham. Corria uma vez por ALVO: 28 alvos para 10 suites distintas, ou seja **18
+ *  corridas a medir o que ja tinha sido medido**. So o `test-guards.mjs` (~28s) corria 11
+ *  vezes — perto de cinco minutos por varredura, sempre com o mesmo resultado.
+ *
+ *  Nada se enfraquece: a pergunta "esta suite passa sem mutacao?" tem uma resposta so, e a
+ *  copia esta intacta em qualquer dos momentos em que se podia perguntar (cada alvo repoe o
+ *  seu ficheiro antes de sair). Mede-se uma vez e guarda-se.
+ *
+ *  Preguicoso e nao adiantado: assim so se pagam as baselines das suites que a seleccao
+ *  (`--only`, `--diff`) chega a usar. */
+/** Os alvos que sobreviveram a tudo o que se decide SEM correr nada. O que entra aqui e para
+ *  medir; o resto ja foi reportado acima. */
+const medir = [];
+
+/** O grau de paralelismo. `--workers=1` devolve o comportamento sequencial por inteiro, para
+ *  quem precise de comparar um resultado sem mudar mais nada. */
+const argWorkers = process.argv.find((a) => a.startsWith("--workers="));
+const WORKERS = quantosWorkers(argWorkers?.slice("--workers=".length));
+
+/** Mede o que ficou em `medir` e IMPRIME o veredicto. A medicao vive em `lib/`; a decisao sobre
+ *  o que cada numero significa fica aqui, que e onde vive o exit code. */
+async function mede() {
+  if (listarSo || medir.length === 0) return;
+  const { baselinesVermelhas, resultados } = await medeCobertura({ medir, copias });
+
+  for (const suite of baselinesVermelhas) {
+    console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer`);
+    falhou = true;
+  }
+
+  for (const { alvo, total, naoCobertos } of resultados) {
+    if (naoCobertos.length) {
+      console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos`);
+      for (const { ln, txt } of naoCobertos) console.log(`              L${ln}: ${txt}`);
+      falhou = true;
+    } else {
+      console.log(`  OK  ${alvo}: ${total}/${total} sitios — cada aviso fica vermelho`);
+    }
+    sitiosMedidos += total;
+  }
+}
 
 try {
-  if (!listarSo) copia = criarCopia();
+  if (!listarSo) copias = Array.from({ length: WORKERS }, () => criarCopia());
   // Se o pre-voo do --only ja reprovou, nao ha alvos para varrer.
   if (selecionados.length === 0) throw { __preflight: true };
 
@@ -390,56 +438,22 @@ try {
       continue;
     }
 
-    const alvoCopia = join(copia, alvo);
-    const suiteCopia = join(copia, suite);
-
-    // Baseline: a suite tem de estar VERDE antes de comecar, senao todo o resultado e ruido
-    // (cada mutacao "ficaria vermelha" por uma razao que nao tem nada a ver com ela).
-    writeFileSync(alvoCopia, src);
-    try {
-      execFileSync("node", [suiteCopia], { cwd: copia, stdio: "pipe" });
-    } catch {
-      console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer`);
-      falhou = true;
-      continue;
-    }
-
-    const naoCobertos = [];
-    for (const i of sitios) {
-      const mut = [...linhas];
-      // Mutar pelo INDICE achado na linha sem strings, e nao por `replace` sobre a original:
-      // assim a substituicao acerta sempre na chamada e nunca num literal de texto.
-      const m = visiveis[i].match(sinal);
-      mut[i] = linhas[i].slice(0, m.index) + neutro + linhas[i].slice(m.index + m[0].length);
-      writeFileSync(alvoCopia, mut.join("\n"));
-      let vermelha = false;
-      try {
-        execFileSync("node", [suiteCopia], { cwd: copia, stdio: "pipe" });
-      } catch {
-        vermelha = true;
-      }
-      if (!vermelha) naoCobertos.push({ ln: i + 1, txt: linhas[i].trim().slice(0, 90) });
-    }
-    writeFileSync(alvoCopia, src); // deixar a copia limpa para o alvo seguinte
-
-    if (naoCobertos.length) {
-      console.log(`  INCOMPLETA  ${alvo}: ${sitios.length - naoCobertos.length}/${sitios.length} sitios cobertos`);
-      for (const { ln, txt } of naoCobertos) console.log(`              L${ln}: ${txt}`);
-      falhou = true;
-    } else {
-      console.log(`  OK  ${alvo}: ${sitios.length}/${sitios.length} sitios — cada aviso fica vermelho`);
-    }
-    sitiosMedidos += sitios.length;
+    // Tudo o que decide SEM medir ja decidiu acima. O que sobra vai para a fila, e e a unica
+    // parte que corre em paralelo — a ordem por que estes alvos entram aqui e a ordem por que
+    // o relatorio os imprime, nao a ordem por que os workers os acabam.
+    medir.push({ alvo, suite, src, linhas, visiveis, sitios, sinal, neutro });
   }
+
+  await mede();
 } catch (err) {
   // Sentinela do pre-voo: sai pelo caminho normal (o `process.exit(falhou...)` no fim).
   if (!err || err.__preflight !== true) throw err;
 } finally {
   // Um temp dir esquecido e inofensivo (ao contrario de um verificador mutado no repo),
   // por isso a limpeza e best-effort e nunca mascara o resultado.
-  if (copia) {
+  for (const c of copias) {
     try {
-      rmSync(copia, { recursive: true, force: true });
+      rmSync(c, { recursive: true, force: true });
     } catch {}
   }
 }

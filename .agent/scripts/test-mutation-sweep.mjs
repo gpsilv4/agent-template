@@ -14,6 +14,10 @@
  * diz. Um par falso corre em milissegundos — varrer os verificadores reais aqui levaria
  * minutos e nao acrescentaria nada.
  *
+ * O MOTOR DE MEDICAO vive em `lib/varredura-paralela.mjs` (fila de sitios, uma copia por worker,
+ * baselines deduplicadas por suite) e e exercitado por estes testes atraves do varredor — nao
+ * tem suite propria, e por isso e aqui que ele esta coberto.
+ *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *
  *   node .agent/scripts/test-mutation-sweep.mjs
@@ -258,6 +262,23 @@ test("--diff com um alvo tocado varre esse alvo", { comGit: true, alterado: ".ag
 test("SEM flags varre tudo, mesmo num repo com diff", { comGit: true, parSao: true, alterado: ".agent/scripts/fake-check.mjs" }, ["--list"], {
   code: 0,
   includes: ["fake-check.mjs", "fake-check-2.mjs"],
+});
+
+// --- A baseline corre uma vez por SUITE, nao por alvo ------------------------
+// Optimizacao que so vale se ACONTECER, e o resultado nao a denuncia: a cobertura sai igual
+// com ou sem ela. O que muda e quantas vezes a suite corre — por isso a fixture tem dois alvos
+// a partilhar UMA suite, e a suite conta as suas proprias corridas num ficheiro.
+//
+// Com dedup: 1 baseline + 2 mutacoes = 3. Sem dedup: 2 baselines + 2 mutacoes = 4. No repo real
+// sao 28 alvos para 10 suites distintas — 18 corridas a medir o que ja tinha sido medido, das
+// quais 10 do `test-guards.mjs` a ~28s cada.
+test("a baseline corre UMA vez por suite partilhada, nao uma por alvo", { contaCorridas: true }, [], {
+  code: 0,
+  includes: ["Cobertura de mutacao completa — 2 sitios medidos"],
+  extra: (dir) => {
+    const n = readFileSync(join(dir, "corridas.log"), "utf8").trim().split("\n").length;
+    return n === 3 ? [] : [`a suite correu ${n} vezes, esperado 3 (1 baseline + 2 mutacoes)`];
+  },
 });
 
 // --- O proprio harness (achado da varredura de mutacao) ----------------------

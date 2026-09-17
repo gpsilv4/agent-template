@@ -15,18 +15,22 @@
  *
  *   node .agent/scripts/test-simulate-upgrade.mjs
  */
-import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
-import { dirname, resolve, join } from "path";
+import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "./lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico } from "./test-upgrade-harness.mjs";
+import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico, pontaAPonta } from "./test-upgrade-harness.mjs";
+import { contaLinhas, LIMITE } from "./guards/sizes.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
+
+/** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
+ *  que ele usa. Escrito a mao aqui e la, os dois lados tinham de concordar sem nada a
+ *  verifica-lo, e deixaram de concordar assim que uma constante mudou de ficheiro. */
+const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
 
 let passed = 0;
 const falhas = [];
@@ -143,10 +147,9 @@ test("documento NAO customizado fica com a versao nova", () => {
 // Uma lista de nomes a preservar envelhece a cada decisao nova que alguem acrescente e se
 // esqueca de inscrever. Uma pasta que o upgrade nao substitui nao envelhece.
 //
-// "Nunca substitui" e nao "nunca toca": a primeira versao desta regra excluia a pasta por
-// inteiro, e a simulacao contra a tag real reprovou — um consumidor anterior a `config/` existir
-// recebia o `check-bundle-sizes.mjs` novo, que a IMPORTA, sem o ficheiro importado. O par de
-// testes abaixo mede as duas direccoes, porque uma sozinha deixa passar a outra.
+// "Nunca substitui" e nao "nunca toca": excluir a pasta por inteiro deixava um consumidor
+// anterior a `config/` com o checker novo, que a IMPORTA, sem o ficheiro importado. O par de
+// testes abaixo mede as duas direccoes — uma sozinha deixa passar a outra.
 test("o upgrade NAO substitui a configuracao do projeto", () => {
   let c;
   try {
@@ -167,13 +170,10 @@ test("o upgrade NAO substitui a configuracao do projeto", () => {
   }
 });
 
-// A OUTRA METADE, e a que o CI apanhou quando este par ainda era so a de cima. Um consumidor
-// tirado de uma tag anterior a `config/` existir NAO a tem — e todos os projetos derivados
-// estao nesse caso na ronda em que ela nasce.
-//
-// Se o upgrade a saltasse por "e do projeto", trazia o `check-bundle-sizes.mjs` novo (que faz
-// `import ... from "./config/bundles.mjs"`) SEM o ficheiro importado, e o verificador rebentava
-// no arranque. Proteger a configuracao partindo o consumidor nao e proteger nada.
+// A OUTRA METADE, e a que o CI apanhou. Um consumidor tirado de uma tag anterior a `config/`
+// NAO a tem — e todos estao nesse caso na ronda em que ela nasce. Saltar a pasta por "e do
+// projeto" deixava o verificador a rebentar no arranque: proteger a configuracao partindo o
+// consumidor nao e proteger nada.
 test("consumidor SEM config/ recebe-a (senao fica com logica que importa o que nao existe)", () => {
   let c;
   try {
@@ -364,25 +364,6 @@ test("um cenario que REBENTA nao deixa diretorios temporarios para tras", () => 
 // A varredura de mutacao apontou-os um a um como nao cobertos; nenhum apareceu numa leitura.
 
 
-/** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. */
-function pontaAPonta(extra = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-e2e-"));
-  for (const [rel, c] of Object.entries(templateSintetico(extra))) {
-    if (c === null) continue;
-    mkdirSync(dirname(join(dir, rel)), { recursive: true });
-    writeFileSync(join(dir, rel), c);
-  }
-  git(dir, ["init", "-q", "-b", "main"]);
-  git(dir, ["config", "user.email", "t@t"]);
-  git(dir, ["config", "user.name", "t"]);
-  git(dir, ["add", "-A"]);
-  git(dir, ["commit", "-qm", "ontem"]);
-  git(dir, ["tag", "v1.0.0"]);
-  writeFileSync(join(dir, "NOVO.md"), "# ha delta\n");
-  git(dir, ["add", "-A"]);
-  git(dir, ["commit", "-qm", "hoje"]);
-  return { dir, ...corre(dir) };
-}
 
 // O archive vazio: a tag aponta para um commit sem ficheiros nenhuns, e o template so aparece
 // depois dela. E a unica forma de chegar a esse caminho sem partir o git de proposito.
@@ -419,8 +400,20 @@ test("template sintetico completo: o simulador corre ate ao fim", () => {
 // Cada um destes desliga uma peca que o simulador PRECISA, e exige que ele pare a dizer o que
 // falta — em vez de seguir e dar um veredicto sobre uma simulacao incompleta.
 for (const [nome, extra, marca] of [
-  ["sem o ficheiro onde a fixture customiza uma constante", { ".agent/scripts/check-bundle-sizes.mjs": null }, "nao representa um consumidor"],
-  ["com a constante da fixture noutra forma", { ".agent/scripts/check-bundle-sizes.mjs": "const TARGETS = [];\n" }, "a forma da constante mudou"],
+  // QUAL ficheiro e QUAL constante vem de `CONSTANTES_DO_PROJETO`, como no simulador. Cravados
+  // aqui, estes dois casos passavam a medir um ficheiro que a fixture ja nao customiza — e a
+  // reprovar por outra razao que nao a que dizem no nome. Foi o que aconteceu do outro lado.
+  [
+    "sem o ficheiro onde a fixture customiza uma constante",
+    { [CONST_FIXTURE[0]]: null },
+    "nao representa um consumidor",
+  ],
+  [
+    "com a constante da fixture noutra forma",
+    // Sem o `=` na forma que o simulador procura, a customizacao nao aplica e ele tem de parar.
+    { [CONST_FIXTURE[0]]: `const ${CONST_FIXTURE[1]} = [];\n` },
+    "a forma da constante mudou",
+  ],
   ["sem job `guard-tests` no ci.yml", { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" }, "nao derivei nenhum comando"],
   ["sem o guard dos tamanhos", { ".agent/scripts/guards/sizes.mjs": null }, "nao consigo aplicar a adaptacao"],
   ["sem `.agent/context/`", { ".agent/context/session.md": null }, "nao existe na copia"],
@@ -472,6 +465,26 @@ test("catalogo de anti-padroes do template em falta, REPROVA", () =>
 
 test("`anti-patterns.md` sem o separador `---`, REPROVA em vez de adivinhar", () =>
   exigeFatal({ ".agent/rules/anti-patterns.md": "# Projeto\n\nsem separador\n" }, "separador"));
+
+
+// A adaptacao 2b contava linhas por conta propria, sem aparar o newline final — media +1 em
+// TODOS os ficheiros, e nunca deu sinal (400 medido como 401 continua abaixo do limite). So
+// aparece na FRONTEIRA: um ficheiro em exactamente 500 era lido como 501, a 2b congelava-o em
+// `TETOS`, e o guard — que le 500 — mandava tirar a entrada. Punha o `/upgrade` de QUALQUER
+// consumidor vermelho. A contagem passou a vir de `guards/sizes.mjs`; este teste prende a
+// fronteira, que e onde uma contagem erra.
+test('a contagem da adaptacao 2b concorda com o Guard 17 na FRONTEIRA', () => {
+  const p = [];
+  const comNewlineFinal = 'x\n'.repeat(LIMITE);
+  if (contaLinhas(comNewlineFinal) !== LIMITE) {
+    p.push(`${LIMITE} linhas contadas como ${contaLinhas(comNewlineFinal)} — o newline final conta a mais`);
+  }
+  // O outro lado: uma linha a mais TEM de contar a mais, senao a contagem so estaria a subtrair.
+  if (contaLinhas('x\n'.repeat(LIMITE + 1)) !== LIMITE + 1) {
+    p.push('um ficheiro acima do limite deixou de ser contado acima do limite');
+  }
+  return p;
+});
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

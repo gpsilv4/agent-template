@@ -59,7 +59,7 @@ export const SUITES = [
   //
   // E mais grave do que parecer: uma entrada perdida no `PARES` nao produz vermelho nenhum —
   // a varredura passa a medir um conjunto mais pequeno e **reporta 100% sobre ele**.
-  { re: /^\.agent\/scripts\/(lib\/pares|test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/pares|lib\/varredura-paralela|test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point

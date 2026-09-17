@@ -51,6 +51,7 @@ export function repo({ comTag = null, comMarca = false, semBootstrap = false } =
  *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo. */
 export function corre(dir) {
   mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
+  mkdirSync(join(dir, ".agent", "scripts", "guards"), { recursive: true });
   for (const [de, para] of [
     [SIMULADOR, ".agent/scripts/simulate-upgrade.mjs"],
     [resolve(AQUI, "lib", "upgrade-mecanico.mjs"), ".agent/scripts/lib/upgrade-mecanico.mjs"],
@@ -171,7 +172,14 @@ export function templateSintetico(extra = {}) {
     ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
     ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
     ".agent/scripts/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
-    ".agent/scripts/guards/sizes.mjs": "export const TETOS = {\n};\n",
+    // O guard dos tamanhos exporta TRES coisas que a adaptacao 2b usa: a tabela que reescreve, e
+    // a contagem/limite que importa dele para nao existir uma segunda copia da mesma regra. Uma
+    // fixture so com a tabela fazia o import trazer `undefined` e a simulacao rebentava — a
+    // recusa estava certa, a fixture e que estava incompleta.
+    ".agent/scripts/guards/sizes.mjs":
+      "export const LIMITE = 500;\n" +
+      "export const contaLinhas = (src) => src.replace(/\\n$/, \"\").split(\"\\n\").length;\n" +
+      "export const TETOS = {\n};\n",
   };
   return {
     ".agent/BOOTSTRAP.md": "# Bootstrap\n\n### 2.2 Ficheiros a GERAR\n\n| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra\n",
@@ -184,4 +192,24 @@ export function templateSintetico(extra = {}) {
     ...constantes,
     ...extra,
   };
+}
+
+/** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. */
+export function pontaAPonta(extra = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "sim-up-e2e-"));
+  for (const [rel, c] of Object.entries(templateSintetico(extra))) {
+    if (c === null) continue;
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), c);
+  }
+  git(dir, ["init", "-q", "-b", "main"]);
+  git(dir, ["config", "user.email", "t@t"]);
+  git(dir, ["config", "user.name", "t"]);
+  git(dir, ["add", "-A"]);
+  git(dir, ["commit", "-qm", "ontem"]);
+  git(dir, ["tag", "v1.0.0"]);
+  writeFileSync(join(dir, "NOVO.md"), "# ha delta\n");
+  git(dir, ["add", "-A"]);
+  git(dir, ["commit", "-qm", "hoje"]);
+  return { dir, ...corre(dir) };
 }

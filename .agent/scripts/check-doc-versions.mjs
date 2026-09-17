@@ -39,6 +39,7 @@ import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
 import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
+import { guardIsolamento } from "./guards/isolamento.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
 
 // --- Ancoragem a raiz do repo -------------------------------------------------
@@ -403,6 +404,10 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+
+// --- Guard 19: as suites sao isoladas (e o que torna o paralelismo seguro) ---
+// A propriedade era verdade por acidente e nada a verificava. Ver o cabecalho do modulo.
+guardsRun += guardIsolamento({ read, warn, ok, skip, listTree });
 
 // --- Guard 17: o flag das 500 linhas mede-se ---
 // `core-rules.md` declarava-o e nada media; quatro ficheiros deste repo estavam acima.

@@ -103,7 +103,10 @@ test("as suites do mapa que o PARES conhece resolvem para alvos reais", () => {
 // fala do que verifica nao o verifica.
 test("cada modulo de `lib/` vai para uma suite que fala dele", () => {
   const problemas = [];
-  for (const rel of ["lib/pares.mjs", "lib/mapa-suites.mjs", "lib/registo.mjs"]) {
+  // DERIVADO do disco, nao escrito a mao: a lista fixa envelhecia no primeiro modulo novo, e
+  // envelheceu — o `lib/varredura-paralela.mjs` entrou e ficou a cair na regra generica, que o
+  // mandava para a suite do registo. E a mesma classe que este ficheiro existe para apanhar.
+  for (const rel of readdirSync(".agent/scripts/lib").filter((n) => n.endsWith(".mjs")).map((n) => `lib/${n}`)) {
     const r = regraDe(`.agent/scripts/${rel}`);
     if (r === null) {
       problemas.push(`${rel}: nenhuma regra`);
