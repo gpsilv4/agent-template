@@ -53,9 +53,15 @@ import {
   substituivel,
   andaFicheiros,
   PLACEHOLDER,
+  CONSTANTES_DO_PROJETO,
 } from "./lib/upgrade-mecanico.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** A marca que a fixture escreve dentro da constante customizada, e que tem de sobreviver ao
+ *  upgrade. E texto improvavel de proposito: se aparecesse por acaso no template, a assercao
+ *  passava sem a preservacao ter acontecido. */
+const MARCA_PROJETO = "// decisao deste projeto — nao vem do template";
 
 /** O nome que substitui os placeholders na copia. Um so sitio: a comparacao "customizado ou
  *  nao" faz-se contra a versao antiga JA substituida, logo os dois lados tem de usar o mesmo. */
@@ -239,14 +245,22 @@ ok(`bootstrapado: ${tocados} ficheiro(s) com placeholders, ${geradas.length} rul
   // (c) Uma constante adaptavel CUSTOMIZADA. Sem isto o caminho da preservacao nunca corria:
   //     todos os blocos ficavam iguais aos do template e nao havia nada para preservar — um
   //     teste que passa sem exercitar o que diz exercitar.
-  //     `TARGETS` de proposito: e o unico bloco curto cujos comentarios nao citam anti-padroes
-  //     do template, logo o que a preservacao traz e conteudo do PROJETO e mais nada.
-  const relAlvos = ".agent/scripts/check-bundle-sizes.mjs";
+  //     QUAL constante e DERIVADO de `CONSTANTES_DO_PROJETO` — a lista que o motor usa de facto.
+  //     Cravado a mao, envelhece: esta linha dizia `TARGETS` em `check-bundle-sizes.mjs`, e quando
+  //     essa constante se mudou para `config/` a fixture passou a customizar algo que o motor ja
+  //     nao preserva. **Nao deu erro enquanto a tag de baseline era anterior a mudanca**; so
+  //     apareceu na tag seguinte, no CI, com a mensagem a apontar para a forma da constante em vez
+  //     de para a causa. Derivado da lista, nao pode divergir dela.
+  const [relAlvos, nomeConst] = CONSTANTES_DO_PROJETO[0];
   const cAlvos = leOuNull(join(dir, relAlvos));
   if (cAlvos === null) fatal(`${relAlvos} nao existe no ${tag} — a fixture nao representa um consumidor`);
+  //     A customizacao e um COMENTARIO e nao uma entrada: as constantes da lista tem formas
+  //     diferentes (umas abrem em `[`, outras em `{`, e as entradas de cada uma sao objectos
+  //     distintos). Um comentario e valido em todas, e o que a travessia mede e se o bloco do
+  //     PROJETO sobrevive — nao o que esta escrito dentro dele.
   const cAlvosNovo = cAlvos.replace(
-    /^const TARGETS = \{$/m,
-    'const TARGETS = {\n  "/painel": { name: "Painel", target: 240, alarm: 260 },'
+    new RegExp(`^(const ${nomeConst} = [\\[{])$`, "m"),
+    `$1\n  ${MARCA_PROJETO}`
   );
   // A fixture REBENTA se nao alterou nada. Sem esta linha, uma mudanca de forma da constante
   // (era `[`, e um objecto `{`) fazia o `replace` nao casar, a customizacao nao acontecia, e a

@@ -28,6 +28,11 @@ import { git, repo, corre, exige, BASE, cenario, limpa, templateSintetico } from
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
 
+/** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
+ *  que ele usa. Escrito a mao aqui e la, os dois lados tinham de concordar sem nada a
+ *  verifica-lo, e deixaram de concordar assim que uma constante mudou de ficheiro. */
+const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
+
 let passed = 0;
 const falhas = [];
 
@@ -419,8 +424,20 @@ test("template sintetico completo: o simulador corre ate ao fim", () => {
 // Cada um destes desliga uma peca que o simulador PRECISA, e exige que ele pare a dizer o que
 // falta — em vez de seguir e dar um veredicto sobre uma simulacao incompleta.
 for (const [nome, extra, marca] of [
-  ["sem o ficheiro onde a fixture customiza uma constante", { ".agent/scripts/check-bundle-sizes.mjs": null }, "nao representa um consumidor"],
-  ["com a constante da fixture noutra forma", { ".agent/scripts/check-bundle-sizes.mjs": "const TARGETS = [];\n" }, "a forma da constante mudou"],
+  // QUAL ficheiro e QUAL constante vem de `CONSTANTES_DO_PROJETO`, como no simulador. Cravados
+  // aqui, estes dois casos passavam a medir um ficheiro que a fixture ja nao customiza — e a
+  // reprovar por outra razao que nao a que dizem no nome. Foi o que aconteceu do outro lado.
+  [
+    "sem o ficheiro onde a fixture customiza uma constante",
+    { [CONST_FIXTURE[0]]: null },
+    "nao representa um consumidor",
+  ],
+  [
+    "com a constante da fixture noutra forma",
+    // Sem o `=` na forma que o simulador procura, a customizacao nao aplica e ele tem de parar.
+    { [CONST_FIXTURE[0]]: `const ${CONST_FIXTURE[1]} = [];\n` },
+    "a forma da constante mudou",
+  ],
   ["sem job `guard-tests` no ci.yml", { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" }, "nao derivei nenhum comando"],
   ["sem o guard dos tamanhos", { ".agent/scripts/guards/sizes.mjs": null }, "nao consigo aplicar a adaptacao"],
   ["sem `.agent/context/`", { ".agent/context/session.md": null }, "nao existe na copia"],
