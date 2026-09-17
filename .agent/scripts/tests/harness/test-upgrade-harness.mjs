@@ -30,10 +30,36 @@ const SIMULADOR = resolve(AQUI, "simulate-upgrade.mjs");
 export const git = (dir, args) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 
+/** As fixtures que esta suite cria, para o `resumo()` as limpar.
+ *
+ *  PORQUE REGISTO E NAO `finally` EM CADA TESTE: o `limpa(c)` explicito existe e funciona, mas
+ *  depende de quem escreve o teste se lembrar — e nao se lembrou. Onze testes novos deixaram
+ *  **1508 pastas** em `tmpdir` num unico dia, porque a varredura de mutacao corre a suite uma vez
+ *  por sitio desligado e multiplica cada fuga por dezenas. Quem cria o recurso e que o tem de
+ *  saber limpar; um teste nao deve ter de se lembrar. */
+const tmpsDaSuite = [];
+
+/** Limpa e esvazia o registo. Exportada para o teste da fuga a poder CHAMAR: uma limpeza que
+ *  so acontecesse no fim da suite nao era observavel de dentro dela, e uma correccao que nao
+ *  se consegue afirmar nao e uma correccao. */
+export function limpaTmpsDaSuite() {
+  for (const d of tmpsDaSuite.splice(0)) {
+    try {
+      rmSync(d, { recursive: true, force: true });
+    } catch {
+      /* melhor esforco: nunca mascarar o veredicto da suite */
+    }
+  }
+}
+const registaTmp = (d) => {
+  tmpsDaSuite.push(d);
+  return d;
+};
+
 /** Um repo git minimo que passa o guarda "sou o template?": tem `BOOTSTRAP.md` e nao tem
  *  marca. O conteudo e o minimo para o simulador chegar ao passo que se quer medir. */
 export function repo({ comTag = null, comMarca = false, semBootstrap = false } = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-"));
+  const dir = registaTmp(mkdtempSync(join(tmpdir(), "sim-up-")));
   mkdirSync(join(dir, ".agent", "scripts"), { recursive: true });
   if (!semBootstrap) writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), "# Bootstrap\n");
   if (comMarca) writeFileSync(join(dir, ".agent/.template-version"), "sha: abc1234\n");
@@ -87,9 +113,9 @@ export function corre(dir, args = []) {
  * @param {object} o.projeto ficheiros a sobrepor no projeto (o estado proprio dele)
  * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
  */
-export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined } = {}) {
-  const tpl = mkdtempSync(join(tmpdir(), "sim-up-tpl-"));
-  const proj = mkdtempSync(join(tmpdir(), "sim-up-proj-"));
+export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined, base = tmpdir() } = {}) {
+  const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
+  const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
     for (const [rel, c] of Object.entries(ficheiros)) {
       if (c === null) {
@@ -278,7 +304,7 @@ export function templateSintetico(extra = {}) {
 
 /** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. */
 export function pontaAPonta(extra = {}) {
-  const dir = mkdtempSync(join(tmpdir(), "sim-up-e2e-"));
+  const dir = registaTmp(mkdtempSync(join(tmpdir(), "sim-up-e2e-")));
   for (const [rel, c] of Object.entries(templateSintetico(extra))) {
     if (c === null) continue;
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
@@ -326,6 +352,10 @@ export function test(nome, fn) {
  *  tirava o `process.exit(1)` de dentro do runner, que e a marca por onde o `check-test-surface`
  *  reconhece que uma suite ainda tem veredicto. Ja foi apanhado uma vez. */
 export function resumo() {
+  // As fixtures saem SEMPRE, passe ou falhe a suite. Antes deste bloco ficavam todas, e o
+  // custo nao e o disco: uma medicao de tempo feita com milhares de pastas orfas ao lado mede
+  // outra coisa (ja inflou uma em 3x).
+  limpaTmpsDaSuite();
   console.log("");
   console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
   if (falhas.length) {

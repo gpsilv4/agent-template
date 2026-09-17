@@ -15,14 +15,14 @@
  *
  *   node .agent/scripts/tests/test-simulate-upgrade.mjs
  */
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
 // Guard 17 exigiu a divisao antes de a deixar crescer mais. Ver `test-upgrade-harness.mjs`.
-import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, contraProjeto, test, resumo } from "./harness/test-upgrade-harness.mjs";
+import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, contraProjeto, limpaTmpsDaSuite, test, resumo } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
@@ -405,15 +405,23 @@ test("o projeto NAO e tocado pela medicao", () => {
 // reprovar, que se le como "este upgrade nao parte nada" (`TP2`).
 test("projeto sem `.git` -> REPROVA em vez de medir uma copia vazia", () => {
   const r = contraProjeto();
+  // O `finally` la em baixo nao e zelo: este era o unico tmpdir desta suite que ficava para
+  // tras depois do registo das fixtures, e apareceu a MEDIR o delta de pastas antes e depois
+  // de uma corrida (22 -> 1). Uma fuga de uma pasta por corrida e invisivel ate a varredura de
+  // mutacao correr a suite dezenas de vezes.
   const semGit = mkdtempSync(join(tmpdir(), "sim-up-sem-git-"));
   mkdirSync(join(semGit, ".agent"), { recursive: true });
   // O SHA e REAL, tirado do template: a recusa da marca vem ANTES desta, logo um sha inventado
   // fazia o teste passar pelo ramo errado — verde a medir outra coisa (`TP1`).
   writeFileSync(join(semGit, ".agent/.template-version"), `commit: ${git(r.tpl, ["rev-parse", "HEAD"]).trim()}\n`);
-  return exige(corre(r.tpl, [`--projeto=${semGit}`]), {
-    codigo: 1,
-    inclui: ["nao consegui copiar a arvore deste projeto"],
-  });
+  try {
+    return exige(corre(r.tpl, [`--projeto=${semGit}`]), {
+      codigo: 1,
+      inclui: ["nao consegui copiar a arvore deste projeto"],
+    });
+  } finally {
+    rmSync(semGit, { recursive: true, force: true });
+  }
 });
 
 // As DUAS listas de comandos tem a sua recusa, e as duas sao precisas: derivar zero comandos e
@@ -430,5 +438,27 @@ test("template sem job `guard-tests` no ci.yml -> REPROVA", () =>
     codigo: 1,
     inclui: ["guard-tests"],
   }));
+
+// CONTROLO DE RECURSOS, e nasceu de uma medicao e nao de uma suspeita: estes testes deixaram
+// **1508 pastas** em `tmpdir` num unico dia. Cada `contraProjeto()` cria duas, e a varredura de
+// mutacao corre a suite uma vez por sitio desligado — o que multiplica qualquer fuga por dezenas.
+// O custo nao e o disco: uma fuga igual ja inflou uma medicao de tempo em 3x, e uma medicao
+// errada e pior do que nenhuma.
+//
+// `base` propria de proposito: contar `sim-up-*` no `tmpdir()` do sistema era um teste a
+// depender do estado da maquina (`TP3`) — outra corrida ao mesmo tempo pintava-o de vermelho.
+test("as fixtures do modo --projeto nao ficam para tras", () => {
+  const base = mkdtempSync(join(tmpdir(), "fuga-2b-"));
+  try {
+    contraProjeto({ base });
+    const criadas = readdirSync(base).length;
+    if (criadas === 0) return ["a fixture nao criou nada — o teste nao esta a medir a fuga"];
+    limpaTmpsDaSuite();
+    const sobraram = readdirSync(base);
+    return sobraram.length === 0 ? [] : [`ficaram ${sobraram.length} pasta(s): ${sobraram.join(", ")}`];
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
 
 resumo();
