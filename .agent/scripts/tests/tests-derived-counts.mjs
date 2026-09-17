@@ -258,6 +258,12 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
     // passou a cita-lo tambem, este controlo negativo ficou vermelho sem haver defeito nenhum
     // — a fixture e que tinha por dentro uma segunda copia da lista de ficheiros do guard
     // (`TP8`). Varrer nao esquece o ficheiro seguinte.
+    // O `writeF` do BOOTSTRAP.md NAO e cosmetico e nao sai daqui: e ele que faz da fixture um
+    // TEMPLATE. Num derivado o ficheiro foi apagado no bootstrap, `ehDerivado()` da true e o
+    // guard faz SKIP em vez de WARN — sem esta linha o teste passava no template nu e
+    // reprovava em todos os consumidores. Apanhado pelo `simulate-upgrade.mjs`, que mede
+    // contra a ultima tag; a bateria inteira estava verde.
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem citacoes de contagens.\n");
     apagaCitacoes(dir, /^.*\d+\s+(?:guards\s+numerados|numbered\s+guards).*$/gim);
   }, { code: 1, includes: ["nenhum ficheiro cita o numero de guards numerados"] });
 
