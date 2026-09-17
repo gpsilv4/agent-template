@@ -39,7 +39,18 @@ export function comandosDoCI(raiz) {
   //  - `check-test-surface`: precisa de um `.git` com historia, e um archive nao traz nenhum;
   //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao.
   const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade"];
-  const achados = [...new Set([...job.matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]))];
+  // LINHA A LINHA, e as COMENTADAS ficam de fora. Um passo comentado no `ci.yml` e uma
+  // DECISAO do projeto — desligou-o —, e o regex corrido sobre o texto inteiro nao distinguia
+  // `run:` de `#   run:`. Num projeto real isso poe a medicao a correr a varredura de mutacao
+  // que o projeto tinha desligado: **duas vezes**, ~14 min cada, com as suites aninhadas la
+  // dentro. Medido num consumidor com nove releases de atraso; no template nunca apareceu,
+  // porque o `ci.yml` dele nao tem nenhuma linha `run:` comentada no `guard-tests`.
+  //
+  // So conta o `#` que ABRE a linha: `run: node x.mjs  # nota` e um passo activo com um
+  // comentario ao lado, e excluir a linha inteira ai era trocar um falso positivo por um
+  // falso negativo — a medicao passaria a nao correr um passo que o projeto corre.
+  const activas = job.split("\n").filter((l) => !/^\s*#/.test(l));
+  const achados = [...new Set([...activas.join("\n").matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]))];
   return achados.filter((c) => !EXCLUIR.some((x) => c.includes(x)));
 }
 
