@@ -41,7 +41,7 @@
 > cada metade da correcao, uma por vez, e exigir vermelho em cada uma. Historia completa e as
 > licoes transferiveis em `src/docs/anti-patterns-why.md` (`TP7`).
 
-> **`test-harness.mjs`, `tests-*.mjs` e `.claude/hooks/tests/` nao sao entry points.** Correm
+> **`tests/harness/*`, `tests/tests-*.mjs` e os testes dos hooks nao sao entry points.** Correm
 > por importacao a partir do `test-guards.mjs` (ou do runner dos hooks) e reprovam se alguem os
 > invocar diretamente — um ficheiro chamado `tests-x.mjs` que "passa" sem correr nada e a forma
 > canonica do `TP2`.

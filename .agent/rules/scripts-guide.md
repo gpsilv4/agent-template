@@ -48,7 +48,7 @@ sequencial. A copia por worker nao e detalhe: com uma copia partilhada mediram-s
 veredictos errados**, todos a acusar cobertura que existe.
 
 O `--diff` escolhe por **duas vias**: o ficheiro alterado **e** um alvo, ou leva a uma **suite**
-(e ai varrem-se todos os alvos que a usam — e como mexer no `test-harness.mjs` seleciona os
+(e ai varrem-se todos os alvos que a usam — e como mexer no `tests/harness/test-harness.mjs` seleciona os
 alvos todos que dependem dele). Sem baseline resoluvel **reprova**; sem alvos, **lista** o que
 nao casou regra nenhuma, para uma lacuna no mapa ficar visivel em vez de absorvida.
 
