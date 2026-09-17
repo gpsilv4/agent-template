@@ -19,7 +19,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, existsSync, readdirSync } from "fs";
 import { tmpdir } from "os";
 import { aplica } from "../lib/patch.mjs";
 import { fileURLToPath } from "url";
@@ -143,7 +143,12 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   // era o desejado", que vive num sitio so de proposito. Sem o copiar, o import rebenta e TODOS
   // estes casos falham por uma razao que nada tem a ver com eles.
   mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
-  for (const m of ["patch.mjs", "derivado.mjs", "ficheiros.mjs"]) {
+  // A `lib/` INTEIRA, derivada do disco, e nao os modulos nomeados um a um. A lista a mao era
+  // uma segunda copia das dependencias do script, a ter de concordar com os `import` dele sem
+  // nada a verifica-lo (`TP8`). E a TERCEIRA vez que este padrao morde: extrair um modulo novo
+  // rebenta as fixtures com `ERR_MODULE_NOT_FOUND`, que nao diz "falta uma linha no harness".
+  // Copiar de mais e barato: um modulo que ninguem importa nao chega a ser lido.
+  for (const m of readdirSync(join(ROOT, ".agent/scripts/lib")).filter((f) => f.endsWith(".mjs"))) {
     copyFileSync(join(ROOT, `.agent/scripts/lib/${m}`), join(dir, `.agent/scripts/lib/${m}`));
   }
   return dir;

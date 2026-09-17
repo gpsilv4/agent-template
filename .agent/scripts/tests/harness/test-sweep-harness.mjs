@@ -22,6 +22,38 @@ import { dirname, resolve, join } from "path";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const SWEEP = join(ROOT, ".agent/scripts/mutation-sweep.mjs");
 
+/** Os modulos de `lib/` que `entrada` alcanca, seguindo os `import` em profundidade.
+ *
+ *  DERIVADO do codigo, e nao escrito a mao: uma lista a mao e uma segunda copia das
+ *  dependencias do varredor, e envelhece em silencio — extrair um modulo novo rebenta a
+ *  fixture com `ERR_MODULE_NOT_FOUND`, que nao diz "falta uma linha aqui" (`TP8`).
+ *
+ *  ALCANCAVEIS e nao a `lib/` toda: esta fixture e um mundo sintetico minimo com o seu proprio
+ *  `pares.mjs`, e copiar a pasta inteira traz modulos com sitios de recusa que esse `pares.mjs`
+ *  nao declara — a descoberta em disco recusa-se a correr com `SEM PAR`, e bem. */
+function libsAlcancaveis(entrada, vistos = new Set()) {
+  const ler = (rel) => {
+    let src;
+    try {
+      src = readFileSync(join(ROOT, ".agent/scripts", rel), "utf8");
+    } catch {
+      return; // um modulo que nao se le nao tem dependencias a declarar
+    }
+    // De fora de `lib/` conta `./lib/X.mjs`; de dentro conta tambem o `./X.mjs` vizinho.
+    const daRaiz = /from\s+"\.\/lib\/([\w-]+\.mjs)"/g;
+    const vizinho = /from\s+"\.\/([\w-]+\.mjs)"/g;
+    const nomes = [...src.matchAll(daRaiz)].map((m) => m[1]);
+    if (rel.startsWith("lib/")) nomes.push(...[...src.matchAll(vizinho)].map((m) => m[1]));
+    for (const nome of nomes) {
+      if (vistos.has(nome)) continue;
+      vistos.add(nome);
+      ler(`lib/${nome}`);
+    }
+  };
+  ler(entrada);
+  return [...vistos];
+}
+
 // --- O verificador falso -----------------------------------------------------
 // Dois sitios de aviso. O `fake-test.mjs` abaixo so exercita o PRIMEIRO, logo a varredura
 // tem de reportar 1/2 — e e isso que prova que ela deteta um aviso sem teste.
@@ -176,6 +208,21 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
   }
   copyFileSync(SWEEP, join(dir, ".agent/scripts/mutation-sweep.mjs"));
   mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
+  // Os modulos de `lib/` que o varredor ALCANCA, derivados dos `import` dele e nao escritos a
+  // mao. Uma lista a mao era uma segunda copia das dependencias (`TP8`), e extrair um modulo
+  // novo rebentava a fixture com `ERR_MODULE_NOT_FOUND` — que nao diz "falta uma linha aqui".
+  //
+  // ALCANCAVEIS e nao a `lib/` toda, e a diferenca importa: esta fixture e um mundo SINTETICO
+  // minimo, com um `pares.mjs` proprio. Copiar a pasta inteira trouxe para ca modulos com
+  // sitios de recusa que esse `pares.mjs` nao declara, e a descoberta em disco recusou-se a
+  // correr com `SEM PAR` — o guard certo, a copia e que era grosseira.
+  //
+  // ANTES das escritas sinteticas que vem a seguir, e a ordem e a semantica: o `pares.mjs` e o
+  // `mapa-suites.mjs` desta fixture sao sinteticos de proposito — copiar os reais punha estes
+  // testes a depender das regras do repo (`TP3`). Copiar por cima deles apagava-os.
+  for (const m of libsAlcancaveis("mutation-sweep.mjs")) {
+    copyFileSync(join(ROOT, `.agent/scripts/lib/${m}`), join(dir, `.agent/scripts/lib/${m}`));
+  }
   writeFileSync(
     join(dir, ".agent/scripts/lib/pares.mjs"),
     "export const PARES = [{ alvo: \".agent/scripts/fake-check.mjs\", suite: " +

@@ -53,13 +53,13 @@
  *   node .agent/scripts/simulate-upgrade.mjs --projeto=/caminho/do/projeto   # mede a 2b de um derivado
  */
 
-import { mkdtempSync, readdirSync, rmSync, existsSync } from "fs";
+import { readdirSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-import { tmpdir } from "os";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
+import { criaTmp, limpaTmpsAntigos } from "./lib/tmp-limpo.mjs";
 import { comandosDoCI, correBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
 import { montaProjetoDeOntem } from "./lib/projeto-de-ontem.mjs";
 
@@ -106,6 +106,16 @@ process.on("SIGINT", () => {
   process.exit(130);
 });
 
+// A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha, e foi assim que
+// ficaram 33 MB por corrida interrompida. Quem varre o que sobrou e a corrida SEGUINTE, no
+// arranque — e so o que ja nao tem dono vivo, porque duas corridas em paralelo acontecem.
+// Os DOIS prefixos deste script: o modo template e o modo `--projeto`. Limpar so um deixava
+// o outro a acumular, e e o `--projeto` que copia 33 MB de cada vez.
+for (const p of ["upgrade-", "upgrade-2b-"]) {
+  const n = limpaTmpsAntigos(p);
+  if (n) console.log(`  OK    ${n} copia(s) ${p}* de corridas interrompidas apagadas`);
+}
+
 const git = (args, cwd = ROOT) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
@@ -128,7 +138,7 @@ if (argProjeto) {
   if (!existsSync(join(projeto, ".agent"))) {
     fatal(`${projeto} nao parece um projeto derivado deste template — nao tem .agent/`);
   }
-  const dirAqui = mkdtempSync(join(tmpdir(), "upgrade-2b-"));
+  const dirAqui = criaTmp("upgrade-2b-");
   copiaAtiva = dirAqui;
   const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, fatal });
   limpaCopia();
@@ -193,7 +203,7 @@ const sha = git(["rev-parse", "--short", tag]);
 ok(`baseline: ${tag} (${sha}) -> HEAD`);
 
 // --- 2. montar o projeto de ONTEM ------------------------------------------------
-const dir = mkdtempSync(join(tmpdir(), "upgrade-"));
+const dir = criaTmp("upgrade-");
 copiaAtiva = dir;
 montaProjetoDeOntem({ dir, root: ROOT, tag, sha, substituto: SUBSTITUTO, marcaProjeto: MARCA_PROJETO, ok, fatal });
 
