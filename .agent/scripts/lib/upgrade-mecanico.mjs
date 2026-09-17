@@ -79,7 +79,7 @@ export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
   [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
-  [".agent/scripts/surface-patterns.mjs", "CONTAGENS"],
+  [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
 ];
 
 /**

@@ -9,10 +9,10 @@
  * em divida) e o `mutation-sweep.mjs --diff` (que decide o que varrer). Se este mapa mentir,
  * os dois mentem juntos, e no mesmo sentido — o de medir menos do que dizem.
  *
- *   node .agent/scripts/test-mapa-suites.mjs
+ *   node .agent/scripts/tests/test-mapa-suites.mjs
  */
-import { SUITES, regraDe, comandoDe, verificadoresDe } from "./lib/mapa-suites.mjs";
-import { PARES } from "./lib/pares.mjs";
+import { SUITES, regraDe, comandoDe, verificadoresDe } from "../lib/mapa-suites.mjs";
+import { PARES } from "../lib/pares.mjs";
 import { readFileSync, readdirSync, existsSync } from "fs";
 
 let passed = 0;
@@ -41,7 +41,7 @@ console.log("\n=== Testes do mapa de suites ===\n");
 // errada — e nada no ecra o diria.
 test("a primeira regra que casa e a que vale (a ordem e semantica)", () => {
   const r = regraDe(".agent/scripts/guards/sizes.mjs");
-  return r?.verifica.includes(".agent/scripts/test-guards.mjs") ? [] : [`casou ${JSON.stringify(r?.verifica)}`];
+  return r?.verifica.includes(".agent/scripts/tests/test-guards.mjs") ? [] : [`casou ${JSON.stringify(r?.verifica)}`];
 });
 
 // O comando e DERIVADO. Escrito a mao ao lado do que verifica, eram dois campos a ter de
@@ -69,7 +69,7 @@ test("ficheiro sem regra sai em `semRegra`, nao desaparece", () => {
 
 test("cada verificador traz os ficheiros que o motivam", () => {
   const { porVerificador } = verificadoresDe([".agent/scripts/guards/a.mjs", ".agent/scripts/guards/b.mjs"]);
-  const fs = porVerificador.get(".agent/scripts/test-guards.mjs") ?? [];
+  const fs = porVerificador.get(".agent/scripts/tests/test-guards.mjs") ?? [];
   return fs.length === 2 ? [] : [`motivos: ${JSON.stringify(fs)}`];
 });
 
@@ -136,7 +136,7 @@ test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
       problemas.push(`${f}: nao declara entryPoint`);
       continue;
     }
-    const r = regraDe(`.agent/scripts/${f}`);
+    const r = regraDe(`.agent/scripts/tests/harness/${f}`);
     if (r === null) problemas.push(`${f}: nenhuma regra no mapa`);
     else if (!r.verifica.some((v) => v.endsWith(declarado))) {
       problemas.push(`${f} declara ${declarado} mas o mapa manda ${r.verifica.join(", ")}`);
@@ -150,7 +150,7 @@ test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
 // aconteceu duas vezes (o `pares.mjs`, e o harness do simulador de `/upgrade` no dia em que
 // nasceu). Esta e a terceira vez que a mesma classe aparece, logo passa a ter teste.
 test("todo o harness casa uma regra no mapa", () => {
-  const harnesses = readdirSync(".agent/scripts").filter((n) => /harness\.mjs$/.test(n));
+  const harnesses = readdirSync(".agent/scripts/tests/harness").filter((n) => n.endsWith(".mjs"));
   if (harnesses.length === 0) return ["nenhum harness encontrado — o teste mediria o vazio"];
   return harnesses.flatMap((f) => (regraDe(`.agent/scripts/${f}`) === null ? [`${f}: nenhuma regra no mapa`] : []));
 });

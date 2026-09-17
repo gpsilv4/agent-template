@@ -90,7 +90,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     em `PARES` no `mutation-sweep.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
     do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no
     `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
-28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/test-guards.mjs` + `node .agent/scripts/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
+28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/tests/test-guards.mjs` + `node .agent/scripts/tests/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.
 
 > **Evidencia em `src/docs/sync-docs-why.md`** (nao carregado): porque cada linha e assim.
 

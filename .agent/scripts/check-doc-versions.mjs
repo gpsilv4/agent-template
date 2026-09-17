@@ -25,7 +25,7 @@
  *   node .agent/scripts/check-doc-versions.mjs
  *
  * Sai com codigo != 0 se houver warnings (pode funcionar como gate no CI).
- * Testes: node .agent/scripts/test-guards.mjs
+ * Testes: node .agent/scripts/tests/test-guards.mjs
  * Correr antes de commit e apos merge de Dependabot PRs. Opt-in no CI (descomentar em .github/workflows/ci.yml).
  */
 

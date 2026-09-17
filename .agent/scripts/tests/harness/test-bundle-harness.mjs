@@ -20,7 +20,7 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 export const CHECKER = ".agent/scripts/check-bundle-sizes.mjs";
 
 

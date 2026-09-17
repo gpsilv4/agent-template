@@ -127,7 +127,7 @@ Depois de aplicar, correr **nesta ordem**:
 ```bash
 node .agent/scripts/check-doc-versions.mjs     # paridade, orcamentos, placeholders
 node .agent/scripts/check-backlog.mjs          # contadores do backlog
-node .agent/scripts/test-guards.mjs            # e as outras suites test-*
+node .agent/scripts/tests/test-guards.mjs            # e as outras suites test-*
 node .agent/scripts/mutation-sweep.mjs         # custa minutos; e o que interessa
 ```
 

@@ -13,7 +13,7 @@
  * a sua propria localizacao, logo copia-lo para a fixture faz com que ele simule a fixture: e
  * o mesmo truque do `test-harness.mjs`.
  *
- *   node .agent/scripts/test-simulate-derived.mjs
+ *   node .agent/scripts/tests/test-simulate-derived.mjs
  *
  * Sai `!= 0` se algum teste falhar. Corre no job `guard-tests` do `ci.yml`.
  */
@@ -21,11 +21,11 @@
 import { execFileSync } from "child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
-import { aplica } from "./lib/patch.mjs";
+import { aplica } from "../lib/patch.mjs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SIMULADOR = join(ROOT, ".agent/scripts/simulate-derived.mjs");
 
 /** Os caminhos que o simulador tem de correr. **A fixture e que manda**: ela escreve um

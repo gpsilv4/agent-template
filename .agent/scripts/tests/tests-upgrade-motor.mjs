@@ -13,9 +13,9 @@
  * que ficaram no entry point falam com o SIMULADOR (os guardas de arranque, a corrida de ponta a
  * ponta, os caminhos que tem de parar tudo).
  */
-import { cenario, limpa, test } from "./test-upgrade-harness.mjs";
-import { CONSTANTES_DO_PROJETO, PLACEHOLDER } from "./lib/upgrade-mecanico.mjs";
-import { contaLinhas, LIMITE } from "./guards/sizes.mjs";
+import { cenario, limpa, test } from "./harness/test-upgrade-harness.mjs";
+import { CONSTANTES_DO_PROJETO, PLACEHOLDER } from "../lib/upgrade-mecanico.mjs";
+import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -24,7 +24,7 @@ import { pathToFileURL } from "url";
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-upgrade-motor.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-simulate-upgrade.mjs`."
+      "Correr `node .agent/scripts/tests/test-simulate-upgrade.mjs`."
   );
   process.exit(1);
 }

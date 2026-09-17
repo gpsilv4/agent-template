@@ -223,27 +223,27 @@ jobs:
         with:
           node-version-file: .nvmrc
       - name: Doc guards — negative tests
-        run: node .agent/scripts/test-guards.mjs
+        run: node .agent/scripts/tests/test-guards.mjs
       - name: Bundle checker — negative tests
-        run: node .agent/scripts/test-bundle-sizes.mjs
+        run: node .agent/scripts/tests/test-bundle-sizes.mjs
       - name: Backlog checker — negative tests
-        run: node .agent/scripts/test-backlog.mjs
+        run: node .agent/scripts/tests/test-backlog.mjs
       - name: Mutation sweep — negative tests
-        run: node .agent/scripts/test-mutation-sweep.mjs
+        run: node .agent/scripts/tests/test-mutation-sweep.mjs
       - name: Test-surface checker — negative tests
-        run: node .agent/scripts/test-test-surface.mjs
+        run: node .agent/scripts/tests/test-test-surface.mjs
       - name: Registo de suites por descoberta — negative tests
-        run: node .agent/scripts/test-registo.mjs
+        run: node .agent/scripts/tests/test-registo.mjs
       - name: Mapa "caminho tocado -> o que o verifica" — negative tests
-        run: node .agent/scripts/test-mapa-suites.mjs
+        run: node .agent/scripts/tests/test-mapa-suites.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests
-        run: node .agent/scripts/test-commit-msg.mjs
+        run: node .agent/scripts/tests/test-commit-msg.mjs
       - name: Simulador de projeto derivado — negative tests
-        run: node .agent/scripts/test-simulate-derived.mjs
+        run: node .agent/scripts/tests/test-simulate-derived.mjs
       - name: Simulador de /upgrade — negative tests
-        run: node .agent/scripts/test-simulate-upgrade.mjs
+        run: node .agent/scripts/tests/test-simulate-upgrade.mjs
       # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).

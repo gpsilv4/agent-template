@@ -17,13 +17,13 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
 /** Modulos que o CHECKER importa e que a sandbox tem de levar consigo. Ao extrair as tabelas
  *  de padroes para `surface-patterns.mjs`, a sandbox deixou de resolver o import e as 61
  *  assercoes falharam de uma vez — nao por um defeito do verificador, mas por a fixture estar
  *  incompleta. Acrescentar aqui qualquer modulo novo que o verificador passe a importar. */
-const CHECKER_MODULOS = [".agent/scripts/surface-patterns.mjs"];
+const CHECKER_MODULOS = [".agent/scripts/lib/surface-patterns.mjs"];
 
 const git = (dir, args) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -32,9 +32,19 @@ const git = (dir, args) =>
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "surface-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
+  // As suites vivem em `tests/`: a pasta cria-se AQUI, uma vez, e nao em cada fixture que la
+  // escreva. Espalhada pelas fixtures, bastava uma esquecer-se para o teste rebentar com um
+  // ENOENT que fala do ficheiro e nao da pasta que falta.
+  mkdirSync(join(dir, ".agent/scripts/tests/harness"), { recursive: true });
   mkdirSync(join(dir, "tests"), { recursive: true });
   copyFileSync(CHECKER, join(dir, ".agent/scripts/check-test-surface.mjs"));
-  for (const m of CHECKER_MODULOS) copyFileSync(join(ROOT, m), join(dir, m));
+  // A pasta do modulo tem de existir ANTES da copia: o `surface-patterns.mjs` mudou-se para
+  // `lib/` e o `copyFileSync` nao cria diretorios — rebentava com um ENOENT que fala do ficheiro
+  // de destino, nao da pasta que falta.
+  for (const m of CHECKER_MODULOS) {
+    mkdirSync(dirname(join(dir, m)), { recursive: true });
+    copyFileSync(join(ROOT, m), join(dir, m));
+  }
   writeFileSync(join(dir, "tests/exemplo.test.js"), 'test("soma", () => { expect(1 + 1).toBe(2); });\n');
   git(dir, ["init", "-q", "-b", "main"]);
   git(dir, ["add", "-A"]);
@@ -116,7 +126,7 @@ function test(nome, mutate, expect) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "test-surface-harness.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-test-surface.mjs`."
+      "Correr `node .agent/scripts/tests/test-test-surface.mjs`."
   );
   process.exit(1);
 }

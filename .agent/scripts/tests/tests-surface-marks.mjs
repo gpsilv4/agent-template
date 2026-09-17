@@ -10,12 +10,12 @@
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git } from "./test-surface-harness.mjs";
+import { test, commit, git } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
     "tests-surface-marks.mjs nao e um entry point: nao corre testes por si.\n" +
-      "Correr `node .agent/scripts/test-test-surface.mjs`."
+      "Correr `node .agent/scripts/tests/test-test-surface.mjs`."
   );
   process.exit(1);
 }
@@ -182,11 +182,11 @@ export function registar() {
   test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
     // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a
     // contagem dele nao se move. O que desaparece e a referencia a contagem de falhas.
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"),
       "const failures = [];\nif (failures.length) {\n  process.exit(1);\n}\n");
     commit(dir, "harness");
     const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"),
       "const failures = [];\nif (false) {\n  process.exit(1);\n}\n");
     commit(dir, "desligar o veredicto");
     return ref;
@@ -227,11 +227,11 @@ export function registar() {
     // linha comentavel — e comenta-la faz o entry point correr so os testes inline, com
     // exit 0. `zero: true`: o que se afirma e que a descoberta existe em ALGUM sitio, nao
     // que o numero de entry points nunca desce.
-    writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/test-guards.mjs"),
       "await registaDescobertos({ dir, entryPoint: 'x', contagem });\nprocess.exit(1);\n");
     commit(dir, "entry point com descoberta");
     const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, ".agent/scripts/test-guards.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/test-guards.mjs"),
       "// await registaDescobertos({ dir, entryPoint: 'x', contagem });\nprocess.exit(1);\n");
     commit(dir, "desligar a descoberta");
     return ref;
@@ -241,21 +241,21 @@ export function registar() {
     // Medido num projeto derivado: contar ocorrencias penalizava um refactor legitimo (tres
     // `console.log` + `process.exit(1)` passaram a um helper, 3 -> 1, e dava WARN). O
     // invariante e "tem de existir um caminho de saida != 0", nao "tem de haver os mesmos".
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"),
       "if (a) { process.exit(1); }\nif (b) { process.exit(1); }\nif (c) { process.exit(1); }\n");
     commit(dir, "tres saidas");
     const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"),
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"),
       "const fatal = () => process.exit(1);\nif (a) fatal();\nif (b) fatal();\nif (c) fatal();\n");
     commit(dir, "consolidar num helper");
     return ref;
   }, { code: 0 });
 
   test("apagar o unico `process.exit(1)` E enfraquecimento", (dir) => {
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { process.exit(1); }\n");
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"), "if (falhas.length) { process.exit(1); }\n");
     commit(dir, "com veredicto");
     const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, ".agent/scripts/test-harness.mjs"), "if (falhas.length) { console.log('ha falhas'); }\n");
+    writeFileSync(join(dir, ".agent/scripts/tests/harness/test-harness.mjs"), "if (falhas.length) { console.log('ha falhas'); }\n");
     commit(dir, "sem veredicto");
     return ref;
   }, { code: 1, includes: ["veredicto do runner"] });

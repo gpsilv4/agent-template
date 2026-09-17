@@ -10,13 +10,13 @@
  * que passa quando devia falhar produz confianca infundada. E depois a varredura de
  * mutacao (`mutation-sweep.mjs`), porque esta suite ficar verde nao prova que afirma algo.
  *
- *   node .agent/scripts/test-guards.mjs
+ *   node .agent/scripts/tests/test-guards.mjs
  */
 
 import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./test-harness.mjs";
-import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "./lib/registo.mjs";
+import { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, ROOT, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
+import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 

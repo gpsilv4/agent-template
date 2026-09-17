@@ -123,9 +123,9 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > agente que siga esta seccao num template nu nao corre nada e marca a checkbox:
 >
 > ```
-> node .agent/scripts/test-guards.mjs          node .agent/scripts/test-backlog.mjs
-> node .agent/scripts/test-bundle-sizes.mjs    node .agent/scripts/test-mutation-sweep.mjs
-> node .agent/scripts/test-test-surface.mjs    node .claude/hooks/tests/test-hooks.mjs
+> node .agent/scripts/tests/test-guards.mjs          node .agent/scripts/tests/test-backlog.mjs
+> node .agent/scripts/tests/test-bundle-sizes.mjs    node .agent/scripts/tests/test-mutation-sweep.mjs
+> node .agent/scripts/tests/test-test-surface.mjs    node .claude/hooks/tests/test-hooks.mjs
 > ```
 >
 > Os `npm run` abaixo sao os da **app** e so existem depois de haver `package.json`.

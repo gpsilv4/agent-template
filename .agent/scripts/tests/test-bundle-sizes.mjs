@@ -13,7 +13,7 @@
  * `build-manifest.json` escrito a mao.
  *
  * Uso:
- *   node .agent/scripts/test-bundle-sizes.mjs
+ *   node .agent/scripts/tests/test-bundle-sizes.mjs
  *
  * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml.
  */
@@ -35,7 +35,7 @@ import {
   ligarAlvos,
   manifestoRsc,
   manifest,
-} from "./test-bundle-harness.mjs";
+} from "./harness/test-bundle-harness.mjs";
 
 // Os contadores sao da SUITE, nao do harness: quem monta fixtures nao conta veredictos.
 let passed = 0;

@@ -18,7 +18,10 @@
  * a primeira regra que casa e a que vale.
  */
 
-const S = (n) => `.agent/scripts/${n}`;
+// As suites vivem em `tests/`, os harnesses em `tests/harness/`, e os verificadores na raiz.
+// O helper decide pelo NOME em vez de obrigar cada regra a escrever a pasta: assim uma suite que
+// mude de sitio muda aqui, num sitio so.
+const S = (n) => (/^tests?-/.test(n) ? `.agent/scripts/tests/${/harness\.mjs$/.test(n) ? "harness/" : ""}${n}` : `.agent/scripts/${n}`);
 
 export const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
@@ -64,7 +67,7 @@ export const SUITES = [
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
-  { re: /^\.agent\/scripts\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da
