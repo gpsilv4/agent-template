@@ -280,3 +280,45 @@ teste, tenha a prosa que tiver.
   por construcao e o ramo continuava a nao disparar. A correcao real foi **restringir a
   contagem desse ramo a documentacao**, deixando as citacoes em codigo a contar para a
   deteccao de citacoes mortas, que e o que o guard realmente protege.
+
+## TP8 — Duas copias da mesma regra, a concordar a mao
+
+Cinco ocorrencias numa sessao. Sao diferentes a olho e sao a mesma coisa por dentro:
+
+| Onde | As duas copias | Como apareceu |
+|---|---|---|
+| `/upgrade` | a lista de constantes a preservar vs. as constantes que existem | uma decisao de um projeto (gate suspenso) perdeu-se **em silencio** numa ronda real |
+| teste do mapa | lista escrita a mao dos modulos de `lib/` vs. o disco | um modulo novo ficou mapeado para a suite errada |
+| descoberta da varredura | isencao por **caminho** vs. o que decide (ter ou nao sitios de recusa) | um harness legitimo levava `SEM PAR` permanente |
+| fixture do simulador | o par `(ficheiro, constante)` no codigo e no teste | ficou a customizar uma constante que mudara de ficheiro |
+| Guard 17 | `contaLinhas` no guard e reimplementada na adaptacao 2b | **+1 em todos os ficheiros**, invisivel ate um cair em exactamente 500 |
+
+### O que estes cinco ensinam, e nao e obvio
+
+**A copia nao falha onde esta testada.** Nos cinco casos, ambos os lados tinham suites verdes. O
+que ninguem mede e a **divergencia** entre eles — e a varredura de mutacao tambem nao a ve, pela
+mesma razao: cada copia e coberta pela sua suite.
+
+**Aparece na fronteira, nao no meio.** A contagem errada media +1 em todos os ficheiros e nao
+dava sinal nenhum: 400 lido como 401 continua abaixo de 500. So um ficheiro em **exactamente**
+500 a revelou. Se um valor esta duplicado, o teste que o apanha e o da fronteira — nunca o do
+caso tipico.
+
+**A mensagem aponta para o sintoma.** O erro dizia "a forma da constante mudou" e "remover a
+entrada de TETOS". Nenhuma das duas era a causa. Uma divergencia entre copias manifesta-se
+sempre longe de si propria.
+
+**Latencia.** Dois dos cinco so apareceram **uma release depois** de serem introduzidos, porque
+o simulador mede contra a ultima tag real. Isso nao e defeito do simulador: e o que acontece a
+quem usa o template, so que a tempo.
+
+### O caso que quase se resolveu mal
+
+Ao juntar `contaLinhas` num sitio so, a primeira tentativa foi um `import` estatico do guard no
+simulador. Partiu um teste — e bem: o simulador tem um caminho de recusa para "o guard nao
+existe na copia", e um import no topo transformava essa ausencia num **crash de arranque**, ou
+seja destruia a mensagem que ali existe para explicar o problema. A saida foi import **dinamico**
+depois do guarda de existencia.
+
+A licao secundaria: eliminar uma duplicacao nao pode custar um caminho de recusa. Se custar, a
+forma esta errada — nao o objectivo.
