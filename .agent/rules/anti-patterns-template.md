@@ -132,3 +132,24 @@
   um falso positivo e invisivel para ela). Sinal grosseiro:
   `git grep -nE "inalcancavel|codigo morto" -- .agent .claude`; cada ocorrencia paga um
   **controlo negativo por ramo** — desligar a correcao e exigir vermelho.
+
+## TP8 — Duas copias da mesma regra, a concordar a mao
+
+- **Origem**: cinco ocorrencias numa so sessao, todas diferentes a olho e iguais por dentro.
+- **Anti-padrao**: reimplementar (ou re-escrever por extenso) uma regra que ja existe noutro
+  ficheiro, e contar com que as duas se mantenham iguais. A copia **nao falha onde esta
+  testada** — falha na copia que ninguem sabe que e uma copia, e costuma so aparecer numa
+  **fronteira**, meses depois, com a mensagem a apontar para o sintoma e nao para a causa.
+  Formas: contagem de linhas reimplementada ao lado do guard que a define; lista de nomes a
+  preservar escrita a mao ao lado da lista que o motor usa; um par `(ficheiro, constante)`
+  repetido no codigo e no teste; uma isencao por **caminho** onde o que decide e o conteudo.
+- **Correto**: **derivar, nao duplicar.** Quem define a regra exporta-a; quem precisa dela
+  importa-a. Quando o import nao pode ser estatico (o ficheiro pode legitimamente faltar, e a
+  ausencia e para reportar), import dinamico **depois** do guarda de existencia. Em testes, a
+  lista deriva-se do disco ou da mesma fonte que o codigo usa — nunca se escreve a segunda vez.
+- **Detecao em review**: a varredura de mutacao **nao ve isto** — as duas copias estao ambas
+  cobertas pelas suas suites, e e a divergencia entre elas que ninguem mede. Sinais grosseiros:
+  `git grep -nE "\\.split\\(.\\\\n.\\)\\.length|> 500" -- .agent .claude` (uma constante ou uma
+  formula repetida fora de quem a define), e, ao rever um diff, a pergunta directa: **este valor
+  ja existe noutro sitio?** Se sim, importar. Cada copia nova paga um teste na **fronteira** —
+  e nas fronteiras que as duas divergem.
