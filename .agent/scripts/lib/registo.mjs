@@ -59,6 +59,20 @@ export function descobreModulos(dir) {
  *                               `registar()` rebentasse a meio passaria por registado.
  * @returns {Promise<string[]>}  nomes dos modulos registados
  */
+/** Os entry points DESTE repo que usam descoberta. Um modulo `tests-*.mjs` que declare outro
+ *  qualquer nao e corrido por ninguem, e sem esta lista esse erro de escrita era silencioso.
+ *
+ *  **Vive aqui porque tinha TRES copias** — uma em cada entry point, a ter de concordar a mao.
+ *  Acrescentar um quarto entry point exigia lembrar-se de editar as tres, e quem se esquecesse
+ *  nao levava erro nenhum: levava a suite nova a recusar os seus proprios modulos. E o `TP8`,
+ *  dentro do ficheiro que existe para impedir que uma suite se desligue em silencio. */
+export const ENTRY_POINTS = [
+  "test-guards.mjs",
+  "test-test-surface.mjs",
+  "test-hooks.mjs",
+  "test-simulate-upgrade.mjs",
+];
+
 export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, conhecidos }) {
   if (typeof contagem !== "function") fatal("registaDescobertos precisa de `contagem()` para medir o contributo de cada modulo");
   if (!entryPoint) fatal("registaDescobertos precisa de `entryPoint` — sem ele nao sabe que modulos sao seus");

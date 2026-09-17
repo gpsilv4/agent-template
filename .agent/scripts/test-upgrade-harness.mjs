@@ -89,7 +89,10 @@ export const BASE = {
  *  "nao ficou nada para tras" numa pasta que e SO dele: contar `sim-up-*` no `tmpdir()` do
  *  sistema seria um teste a depender do estado da maquina (`TP3`) — qualquer outra corrida a
  *  acontecer ao mesmo tempo pintava-o de vermelho sem haver defeito nenhum. */
-export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir() }) {
+/** `tag` e a versao de onde o consumidor saiu. Parametrizavel porque ha um caminho de recusa que
+ *  so se alcanca com uma tag que o `git` nao resolve — e sem ele a lista do que saiu do template
+ *  sairia VAZIA, que se le como "nada saiu" (`TP2`). */
+export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir(), tag = "v1.0.0" }) {
   ontem = { ...BASE, ...ontem };
   hoje = { ...BASE, ...hoje };
   if (consumidor) consumidor = { ...BASE, ...consumidor };
@@ -108,7 +111,14 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
     git(root, ["commit", "-qm", "ontem"]);
     git(root, ["tag", "v1.0.0"]);
     for (const [rel, c] of Object.entries(hoje)) {
-      if (c === null) continue;
+      if (c === null) {
+        // `null` em `hoje` = o template JA NAO TEM este ficheiro. Tem de o APAGAR, nao so saltar a
+        // escrita: o passo do `ontem` ja o pos no disco, e saltar deixava-o la. O comentario dizia
+        // "nao existe" e o codigo fazia "nao sobrescreve" — duas coisas diferentes, e a diferenca
+        // so aparece quando alguem tenta medir uma REMOCAO. Foi o que aconteceu.
+        rmSync(join(root, rel), { force: true });
+        continue;
+      }
       mkdirSync(dirname(join(root, rel)), { recursive: true });
       writeFileSync(join(root, rel), c);
     }
@@ -125,7 +135,7 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
     const medido = aplicaUpgradeMecanico({
       dir,
       root,
-      tag: "v1.0.0",
+      tag,
       fatal: (m) => {
         // A razao VAI na excepcao. Sem isto, um caso que rebentasse dizia so "__fatal__" e
         // obrigava a instrumentar o motor para se perceber porque — foi o que aconteceu.
@@ -212,4 +222,44 @@ export function pontaAPonta(extra = {}) {
   git(dir, ["add", "-A"]);
   git(dir, ["commit", "-qm", "hoje"]);
   return { dir, ...corre(dir) };
+}
+
+/** O runner desta suite e os seus contadores.
+ *
+ *  Vivem aqui pela mesma razao que o `sandbox()`: a suite passou as 500 linhas e a catraca do
+ *  Guard 17 manda dividir antes de acrescentar. E o mesmo desenho do `test-sweep-harness.mjs` —
+ *  quem monta fixtures conta tambem o veredicto, e a suite fica so com as ASSERCOES, que e o que
+ *  se le quando se quer saber o que esta garantido. */
+let passed = 0;
+const falhas = [];
+
+export function test(nome, fn) {
+  try {
+    const problemas = fn() ?? [];
+    if (problemas.length === 0) {
+      passed++;
+      console.log(`  PASS  ${nome}`);
+    } else {
+      falhas.push({ nome, problemas });
+      console.log(`  FAIL  ${nome}`);
+      for (const p of problemas) console.log(`          ${p}`);
+    }
+  } catch (err) {
+    falhas.push({ nome, problemas: [`rebentou: ${err.message}`] });
+    console.log(`  FAIL  ${nome}\n          rebentou: ${err.message}`);
+  }
+}
+
+/** O veredicto da suite. SAI daqui, como o `resumo()` do `test-harness.mjs`: devolver um codigo
+ *  tirava o `process.exit(1)` de dentro do runner, que e a marca por onde o `check-test-surface`
+ *  reconhece que uma suite ainda tem veredicto. Ja foi apanhado uma vez. */
+export function resumo() {
+  console.log("");
+  console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
+  if (falhas.length) {
+    console.log("\n  Um simulador que falhe ABERTO da por verificada a metade do produto que ninguem mede.\n");
+    process.exit(1);
+  }
+  console.log("\n  Todos os testes do simulador de /upgrade passaram.\n");
+  process.exit(0);
 }

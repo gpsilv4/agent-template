@@ -71,6 +71,14 @@ export function andaFicheiros(base, fn, rel = "") {
 //
 // As que ficam sao as que ainda vivem dentro de ficheiros de logica. A lista encolhe a cada
 // uma que se mude, e o objectivo e **desaparecer**.
+/** Os prefixos que o upgrade COPIA, e portanto os unicos sobre os quais pode dizer que algo
+ *  "saiu do template". Fora deles vive o projeto, e o que la desaparece nao e da nossa conta.
+ *
+ *  `.agent/rules/` fica de FORA de proposito: o upgrade so traz de la o catalogo de
+ *  anti-padroes do template, e as restantes rules sao diff-e-decidir. Propor apagar uma rule
+ *  que o projeto customizou seria propor apagar trabalho. */
+const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/"];
+
 export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
@@ -88,7 +96,9 @@ export const CONSTANTES_DO_PROJETO = [
  * seguranca tem de parar tudo. Escrever por cima dos ficheiros de um consumidor as cegas e
  * pior do que nao fazer upgrade nenhum.
  *
- * @returns {{repostas: number, trazidos: number, placeholders: number}} o que mediu
+ * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: string[]}} o que
+ *          mediu. `removidos` sao os ficheiros que sairam do template e o consumidor ainda tem —
+ *          uma LISTA a propor, nunca uma accao ja feita.
  */
 export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, constantes = CONSTANTES_DO_PROJETO }) {
   
@@ -117,6 +127,63 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     }
   };
   
+  /** Os ficheiros que a TAG tinha, sob os prefixos que o upgrade copia. `null` quando o `git`
+   *  falha — e quem chama decide, porque "nao havia nenhum" e "nao consegui listar" pedem accoes
+   *  diferentes (`TP2`). */
+  const arvoreNaTag = () => {
+    try {
+      return new Set(
+        execFileSync("git", ["ls-tree", "-r", "--name-only", tag], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] })
+          .split("\n")
+          .filter((p) => PREFIXOS_COPIADOS.some((pre) => p.startsWith(pre)))
+      );
+    } catch {
+      return null;
+    }
+  };
+
+  /** Os ficheiros que o template tem AGORA, lidos do DISCO e nao de `git ls-tree HEAD`.
+   *
+   *  Tem de ser do disco porque e do disco que o `trazerDoHead` copia. Com `ls-tree HEAD` as duas
+   *  metades respondiam a perguntas diferentes — "o que esta commitado" contra "o que se copiou" —
+   *  e um ficheiro acrescentado ao template e ainda por commitar aparecia como REMOVIDO. A
+   *  primeira versao usava `HEAD` e um teste apanhou-a: e o `TP1` na sua forma mais barata, duas
+   *  leituras do mesmo conceito com normalizacoes diferentes. */
+  const arvoreNoDisco = () => {
+    const fs = new Set();
+    for (const pre of PREFIXOS_COPIADOS) {
+      const base = join(root, pre);
+      if (!existsSync(base)) continue;
+      andaFicheiros(base, (sub) => fs.add(`${pre}${sub}`));
+    }
+    return fs;
+  };
+
+  /** O que SAIU do template entre a tag e o HEAD, e que o consumidor ainda tem.
+   *
+   *  PORQUE EXISTE: o upgrade copia com `cpSync`, que acrescenta e substitui — **nunca apaga**.
+   *  Um ficheiro renomeado ou removido no template ficava no consumidor para sempre, ao lado do
+   *  novo. Nao e so desarrumacao: a descoberta em disco encontra o orfao e exige-lhe par
+   *  (`SEM PAR`), o Guard 17 conta-o, e o `check-test-surface` ve a superficie duplicada. Ou
+   *  seja, uma renomeacao no template punha VERMELHO todos os projetos derivados.
+   *
+   *  A REGRA E DELIBERADAMENTE ESTREITA, e e ela que torna isto seguro: so entra o que **estava
+   *  na tag** de onde o projeto saiu, **ja nao esta no HEAD**, e **ainda existe no consumidor**.
+   *  Um ficheiro que o consumidor criou nunca esteve na tag, logo nunca entra — e a diferenca
+   *  entre propor apagar codigo do template e propor apagar trabalho de alguem.
+   *
+   *  **Isto NAO apaga nada.** Devolve a lista; a decisao e do passo de aprovacao do workflow, que
+   *  e onde tem de estar (`Fase 0: nada e copiado antes de aprovacao`).
+   */
+  const naTag = arvoreNaTag();
+  if (naTag === null) {
+    fatal(`nao consegui listar a arvore do ${tag} — sem ela nao sei o que saiu do template`);
+  }
+  const agora = arvoreNoDisco();
+  const removidos = [...naTag]
+    .filter((p) => !agora.has(p) && existsSync(join(dir, p)))
+    .sort();
+
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];
   for (const [rel, nome] of constantes) {
@@ -291,5 +358,5 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     }
   });
 
-  return { repostas, trazidos, placeholders: repostosPh };
+  return { repostas, trazidos, placeholders: repostosPh, removidos };
 }
