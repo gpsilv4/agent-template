@@ -24,6 +24,19 @@
 
 export const LIMITE = 500;
 
+/** Quantas linhas TEM um ficheiro, para efeitos deste guard.
+ *
+ *  O `replace` nao e cosmetico: sem ele, um ficheiro terminado em newline — todos, por convencao
+ *  — mede uma linha a mais do que o `wc -l` que qualquer pessoa vai correr para confirmar. Um
+ *  guard que discorda da ferramenta obvia gasta-se a ser desacreditado.
+ *
+ *  **Exportado porque tinha uma segunda copia.** A adaptacao 2b do `simulate-upgrade.mjs`, que
+ *  congela em `TETOS` os ficheiros do projeto acima do limite, contava sem o `replace` — logo
+ *  media sempre +1 e congelava ficheiros que este guard considera dentro do limite. Nao dava
+ *  sinal nenhum ate um ficheiro cair em EXACTAMENTE 500: ai a 2b congelava-o e o guard mandava
+ *  tirar a entrada, e o /upgrade de qualquer consumidor ficava vermelho por causa disso. */
+export const contaLinhas = (src) => src.replace(/\n$/, "").split("\n").length;
+
 /** Onde vive a maquinaria. Cada entrada e uma pasta varrida em profundidade. */
 const PASTAS = [".agent/scripts", ".claude/hooks"];
 
@@ -74,10 +87,7 @@ export function guardFileSizes({ read, warn, ok, skip, note, listTree }) {
   for (const f of ficheiros.sort()) {
     const src = read(f);
     if (src === null) continue; // listado e ilegivel: outro guard trata disso
-    // Sem o `replace`, um ficheiro terminado em newline — todos, por convencao — media uma
-    // linha a mais do que o `wc -l` que qualquer pessoa vai correr para confirmar. Um guard
-    // que discorda da ferramenta obvia gasta-se a ser desacreditado.
-    const n = src.replace(/\n$/, "").split("\n").length;
+    const n = contaLinhas(src);
     vistos.add(f);
     if (n > maior.n) maior = { f, n };
 

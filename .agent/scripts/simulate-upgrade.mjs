@@ -55,6 +55,7 @@ import {
   PLACEHOLDER,
   CONSTANTES_DO_PROJETO,
 } from "./lib/upgrade-mecanico.mjs";
+import { pathToFileURL } from "url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -401,13 +402,24 @@ if (fase1.length === 0) {
   const p = join(dir, relGuard);
   const c = leOuNull(p);
   if (c === null) fatal(`${relGuard} nao existe na copia — nao consigo aplicar a adaptacao do Guard 17`);
+  // A contagem e o limite vem do GUARD que esta adaptacao serve, e nao de uma copia local.
+  // Reimplementados aqui eram duas copias da mesma regra a ter de concordar a mao — e nao
+  // concordavam: esta contava sem aparar o newline final, logo media +1 em todos os ficheiros e
+  // congelava em `TETOS` ficheiros que o guard considera dentro do limite. Nunca deu sinal, ate
+  // um ficheiro cair em EXACTAMENTE 500.
+  //
+  // DINAMICO e nao estatico, e depois do guarda acima: um `import` no topo tornava a ausencia do
+  // guard um crash no arranque, e e precisamente essa ausencia que a linha anterior existe para
+  // reportar com uma razao. E le-se o guard do CONSUMIDOR, que e quem tem a palavra sobre o
+  // proprio limite.
+  const { contaLinhas, LIMITE } = await import(pathToFileURL(p).href);
   const grandes = [];
   for (const base of [".agent/scripts", ".claude/hooks"]) {
     andaFicheiros(join(dir, base), (sub, nome) => {
       if (!nome.endsWith(".mjs")) return;
       const rel = `${base}/${sub}`;
-      const n = readFileSync(join(dir, rel), "utf8").split("\n").length;
-      if (n > 500 && !c.includes(`"${rel}"`)) grandes.push([rel, n]);
+      const n = contaLinhas(readFileSync(join(dir, rel), "utf8"));
+      if (n > LIMITE && !c.includes(`"${rel}"`)) grandes.push([rel, n]);
     });
   }
   if (grandes.length) {
@@ -415,7 +427,7 @@ if (fase1.length === 0) {
     writeFileSync(p, c.replace(/^export const TETOS = \{$/m, `export const TETOS = {\n${entradas}`));
     ok(`adaptacao 2b (Guard 17): ${grandes.length} ficheiro(s) do projeto congelado(s) em TETOS`);
   } else {
-    ok("adaptacao 2b (Guard 17): nenhum ficheiro do projeto acima das 500 linhas por congelar");
+    ok(`adaptacao 2b (Guard 17): nenhum ficheiro do projeto acima das ${LIMITE} linhas por congelar`);
   }
 }
 
