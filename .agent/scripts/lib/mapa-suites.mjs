@@ -30,8 +30,12 @@ export const SUITES = [
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
+  // A `medida-upgrade.mjs` e a `projeto-de-ontem.mjs` entram aqui e nao na generica de `lib/`:
+  // a primeira e o instrumento que responde a seccao 2b (dos DOIS lados, template e derivado),
+  // a segunda e a fixture do modo template. Quem lhes mexe tem de correr esta suite, que e a
+  // unica que as exercita.
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/upgrade-mecanico\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },

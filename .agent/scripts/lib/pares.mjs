@@ -103,6 +103,24 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O INSTRUMENTO da seccao 2b, dos dois lados. Cada `fatal()` daqui e uma condicao em que a
+    // medicao NAO pode ser feita — e uma medicao que nao acontece tem de o dizer, nunca devolver
+    // uma lista vazia que se le como "nada a reportar" (`TP2`). E precisamente por um desses
+    // ramos faltar do lado do derivado que este issue existiu.
+    alvo: ".agent/scripts/lib/medida-upgrade.mjs",
+    suite: ".agent/scripts/tests/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // A FIXTURE do modo template. Cada `fatal()` aqui apanha uma fixture que deixou de
+    // representar um consumidor — e uma fixture que nao representa nada passa sempre.
+    alvo: ".agent/scripts/lib/projeto-de-ontem.mjs",
+    suite: ".agent/scripts/tests/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/sizes.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,

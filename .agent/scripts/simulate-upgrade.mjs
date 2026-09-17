@@ -37,26 +37,31 @@
  *     Compara-la obrigava a parsear prosa (que mente ao primeiro reformatar) ou a manter uma
  *     lista a mao que tem de concordar com ela (dois campos sem verificacao, o `TP1`).
  *
+ * DOIS MODOS, porque a pergunta da seccao 2b poe-se dos dois lados e o instrumento tem de
+ * existir onde ela se le:
+ *   - **no template** (sem argumentos): baseline = a ultima tag, consumidor = uma fixture;
+ *   - **contra um projeto derivado** (`--projeto=<caminho>`): baseline = a arvore que ele tem
+ *     HOJE, e o "depois" e essa arvore com o template novo por cima. Corre-se DAQUI, apontado
+ *     ao projeto: a copia que ele tem e a antiga, e nao conhece o modo. Sem isto, a 2b
+ *     nomeava um comando que salta no unico sitio onde ela e lida.
+ * A mecanica partilhada vive em `lib/medida-upgrade.mjs` — duas copias a concordar a mao eram
+ * o `TP8`, e a do lado menos corrido envelhecia sem ninguem dar por isso.
+ *
  * Uso:
  *   node .agent/scripts/simulate-upgrade.mjs
  *   node .agent/scripts/simulate-upgrade.mjs --keep     # nao apaga a copia
+ *   node .agent/scripts/simulate-upgrade.mjs --projeto=/caminho/do/projeto   # mede a 2b de um derivado
  */
 
-import { mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, readdirSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
-import {
-  aplicaUpgradeMecanico,
-  leOuNull,
-  substituivel,
-  andaFicheiros,
-  PLACEHOLDER,
-  CONSTANTES_DO_PROJETO,
-} from "./lib/upgrade-mecanico.mjs";
-import { pathToFileURL } from "url";
+import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
+import { comandosDoCI, correBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
+import { montaProjetoDeOntem } from "./lib/projeto-de-ontem.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -104,6 +109,32 @@ process.on("SIGINT", () => {
 const git = (args, cwd = ROOT) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
+// --- 0a. modo DERIVADO: medir a 2b de dentro de um projeto -----------------------
+// A seccao 2b do `/upgrade` manda medir o que passa a reprovar. So que o `/upgrade` corre num
+// DERIVADO, e ali o modo normal salta (as tags de la sao as releases desse projeto). Sem este
+// modo, a seccao apontava para um comando que nao responde no unico sitio onde e lida — pior
+// do que nao apontar para nenhum, porque quem o corre ve um `SKIP` e conclui que nao ha nada
+// a medir.
+//
+// CORRE-SE DO LADO DO TEMPLATE, apontado ao projeto — e nao de dentro do projeto apontado ao
+// template. A diferenca nao e de gosto: um projeto derivado corre a **sua** copia deste
+// ficheiro, que e a ANTIGA. Um flag que vivesse do lado do consumidor so funcionaria a partir
+// do upgrade seguinte aquele que o trouxesse, e o upgrade que precisa de ser medido e sempre
+// **este**. Medido: montado um derivado da v0.14.0, o flag do lado de la nem existia.
+const argProjeto = process.argv.find((a) => a.startsWith("--projeto="));
+if (argProjeto) {
+  const projeto = resolve(argProjeto.slice("--projeto=".length));
+  console.log("\n=== Impacto deste upgrade no projeto (seccao 2b) ===\n");
+  if (!existsSync(join(projeto, ".agent"))) {
+    fatal(`${projeto} nao parece um projeto derivado deste template — nao tem .agent/`);
+  }
+  const dirAqui = mkdtempSync(join(tmpdir(), "upgrade-2b-"));
+  copiaAtiva = dirAqui;
+  const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, fatal });
+  limpaCopia();
+  process.exit(codigo);
+}
+
 console.log("\n=== Simulacao de /upgrade (template de ontem -> hoje) ===\n");
 
 // --- 0. sou o template, ou ja sou um derivado? -----------------------------------
@@ -119,7 +150,12 @@ console.log("\n=== Simulacao de /upgrade (template de ontem -> hoje) ===\n");
 const bootstrapCorreu = ehDerivado((rel) => leOuNull(join(ROOT, rel)));
 if (bootstrapCorreu) {
   console.log("  SKIP  simulacao de /upgrade — este repo e um projeto derivado, nao o template.");
-  console.log("        As tags daqui sao as releases DESTE projeto; a simulacao mediria outra coisa.\n");
+  console.log("        As tags daqui sao as releases DESTE projeto; a simulacao mediria outra coisa.");
+  // O `SKIP` tem de dizer o que correr A SEGUIR. Sem esta linha, quem seguia a seccao 2b do
+  // `/upgrade` via um salto, lia-o como "nada a medir" e avancava — que foi exactamente como o
+  // #75 passou para um consumidor. Um salto que nao aponta para a alternativa e um beco.
+  console.log("\n        Para medir a seccao 2b DESTE projeto, correr do CLONE do template:");
+  console.log("          node <clone>/.agent/scripts/simulate-upgrade.mjs --projeto=$PWD\n");
   process.exit(0);
 }
 
@@ -159,148 +195,7 @@ ok(`baseline: ${tag} (${sha}) -> HEAD`);
 // --- 2. montar o projeto de ONTEM ------------------------------------------------
 const dir = mkdtempSync(join(tmpdir(), "upgrade-"));
 copiaAtiva = dir;
-// Um SO sitio de recusa para as duas formas de isto correr mal — o `git archive` a falhar e o
-// archive a sair vazio. Separados, o primeiro era um ramo que nenhum teste alcanca: nao ha
-// como fazer o `git archive` de uma tag valida falhar a pedido. O `TP7` diz o que fazer com um
-// ramo assim — nao e escrever a razao ao lado, e juntar ao que se consegue medir. O motivo
-// concreto vai na mensagem, logo nao se perde nada a quem le.
-let erroArchive = null;
-try {
-  execFileSync("sh", ["-c", `git archive ${tag} | tar -x -C ${JSON.stringify(dir)}`], { cwd: ROOT, stdio: "pipe" });
-} catch (err) {
-  erroArchive = err.message.split("\n")[0];
-}
-const nFicheiros = readdirSync(dir).length;
-if (erroArchive !== null || nFicheiros === 0) {
-  fatal(`nao consegui montar o template de ${tag}${erroArchive ? `: ${erroArchive}` : " — o archive saiu vazio"}`);
-}
-ok(`template de ontem extraido (${nFicheiros} entradas de topo)`);
-
-// --- 2b. bootstrapar esse template de ontem --------------------------------------
-// O mesmo estado que o `simulate-derived.mjs` monta, mas sobre a arvore da TAG: placeholders
-// substituidos e as rules que a Fase 2.2 manda gerar. Sem isto o "projeto de ontem" seria o
-// template nu, e um template nu nao e um consumidor.
-
-
-let tocados = 0;
-andaFicheiros(dir, (sub, nome) => {
-  if (!substituivel(sub, nome)) return;
-  const p = join(dir, sub);
-  const c = readFileSync(p, "utf8");
-  const novo = c.replace(PLACEHOLDER, SUBSTITUTO);
-  if (novo !== c) {
-    writeFileSync(p, novo);
-    tocados++;
-  }
-});
-
-// As rules GERADAS no bootstrap, derivadas da seccao 2.2 do BOOTSTRAP.md **da tag** — e nao do
-// HEAD. A tabela pode ter mudado entretanto, e o que interessa e o que o consumidor gerou na
-// altura em que bootstrapou.
-const bootstrapAntigo = leOuNull(join(dir, ".agent/BOOTSTRAP.md"));
-const seccao = bootstrapAntigo?.split(/^### 2\.2 /m)[1]?.split(/^### 2\.3 /m)[0] ?? "";
-const geradas = [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
-if (geradas.length === 0) {
-  fatal(`nao derivei nenhuma rule gerada da seccao 2.2 do BOOTSTRAP.md do ${tag} — o formato mudou?`);
-}
-for (const rel of geradas) {
-  const p = join(dir, rel);
-  mkdirSync(dirname(p), { recursive: true });
-  writeFileSync(p, `# ${rel.split("/").pop().replace(".md", "")} (ProjetoDeOntem)\n\nGerado no bootstrap.\n`);
-}
-
-// A marca. E o que poe o projeto no **Modo A** do `/upgrade` — o unico que isto simula.
-writeFileSync(join(dir, ".agent/.template-version"), `sha: ${sha}\nversao: ${tag}\n`);
-// E o `BOOTSTRAP.md` sai: a propria documentacao manda apaga-lo depois do bootstrap, e mante-lo
-// deixava o projeto a parecer um template por estrear para quem olha para esse sinal.
-rmSync(join(dir, ".agent/BOOTSTRAP.md"), { force: true });
-ok(`bootstrapado: ${tocados} ficheiro(s) com placeholders, ${geradas.length} rule(s) geradas, marca ${tag}`);
-
-// --- 2c. o conteudo PROPRIO do projeto -------------------------------------------
-// Um consumidor nao e um template bootstrapado e mais nada: tem coisas suas, e sao elas que
-// tornam um upgrade dificil. Cada item aqui existe para exercitar uma linha concreta da tabela
-// do `/upgrade` — sem eles a simulacao passava por construcao.
-{
-  // (a) Um anti-padrao SEU. Depois da separacao de prefixos o espaco `AP` e todo do projeto,
-  //     e e exactamente isso que a migracao deste upgrade tem de preservar.
-  const rel = ".agent/rules/anti-patterns.md";
-  const c = leOuNull(join(dir, rel));
-  if (c === null) fatal(`${rel} nao existe no ${tag} — a fixture nao representa um consumidor`);
-  const idProprio = "AP" + "1";
-  writeFileSync(
-    join(dir, rel),
-    c.replace(/<!--[\s\S]*?-->\n*/g, "") +
-      `\n## ${idProprio} — Anti-padrao proprio deste projeto\n\n` +
-      `- **Origem**: um bug deste projeto\n- **Anti-padrao**: o que nao fazer\n` +
-      `- **Correto**: o que fazer\n- **Detecao em review**: \`grep -rn "exemplo" src/\`\n`
-  );
-
-  // (b) Um ficheiro SEU acima das 500 linhas. E a linha "limiar apertado" da 2b: o Guard 17
-  //     reprova-o, e a adaptacao prescrita e entra-lo em `TETOS` com a contagem do dia da
-  //     migracao. Sem um ficheiro assim, essa linha da tabela nunca era exercitada.
-  writeFileSync(
-    join(dir, ".agent/scripts/check-dominio.mjs"),
-    "#!/usr/bin/env node\n// Verificador proprio deste projeto.\n" + "// linha\n".repeat(540)
-  );
-
-  // (c) Uma constante adaptavel CUSTOMIZADA. Sem isto o caminho da preservacao nunca corria:
-  //     todos os blocos ficavam iguais aos do template e nao havia nada para preservar — um
-  //     teste que passa sem exercitar o que diz exercitar.
-  //     QUAL constante e DERIVADO de `CONSTANTES_DO_PROJETO` — a lista que o motor usa de facto.
-  //     Cravado a mao, envelhece: esta linha dizia `TARGETS` em `check-bundle-sizes.mjs`, e quando
-  //     essa constante se mudou para `config/` a fixture passou a customizar algo que o motor ja
-  //     nao preserva. **Nao deu erro enquanto a tag de baseline era anterior a mudanca**; so
-  //     apareceu na tag seguinte, no CI, com a mensagem a apontar para a forma da constante em vez
-  //     de para a causa. Derivado da lista, nao pode divergir dela.
-  const [relAlvos, nomeConst] = CONSTANTES_DO_PROJETO[0];
-  const cAlvos = leOuNull(join(dir, relAlvos));
-  if (cAlvos === null) fatal(`${relAlvos} nao existe no ${tag} — a fixture nao representa um consumidor`);
-  //     A customizacao e um COMENTARIO e nao uma entrada: as constantes da lista tem formas
-  //     diferentes (umas abrem em `[`, outras em `{`, e as entradas de cada uma sao objectos
-  //     distintos). Um comentario e valido em todas, e o que a travessia mede e se o bloco do
-  //     PROJETO sobrevive — nao o que esta escrito dentro dele.
-  const cAlvosNovo = cAlvos.replace(
-    new RegExp(`^(const ${nomeConst} = [\\[{])$`, "m"),
-    `$1\n  ${MARCA_PROJETO}`
-  );
-  // A fixture REBENTA se nao alterou nada. Sem esta linha, uma mudanca de forma da constante
-  // (era `[`, e um objecto `{`) fazia o `replace` nao casar, a customizacao nao acontecia, e a
-  // simulacao passava a testar a preservacao de zero constantes — verde a afirmar nada. Foi
-  // exactamente o que aconteceu, e so se viu por o contador dizer `0 preservada(s)`.
-  if (cAlvosNovo === cAlvos) fatal(`nao consegui customizar TARGETS em ${relAlvos} — a forma da constante mudou`);
-
-  // (d) A DECISAO do projeto: o gate dos bundles SUSPENSO. Nao e um valor tecnico — e a posicao
-  //     que um consumidor toma quando liga a medicao a serio, encontra os alvos acima e abre um
-  //     ticket. Foi exactamente esta decisao que se perdeu numa ronda de `/upgrade` real: o
-  //     ficheiro veio, a constante voltou ao default, e o gate passou a reprovar **sem ninguem
-  //     decidir nada**. Em silencio, com o verificador a correr e a medir bem.
-  //
-  //     A verificacao que o consumidor tinha era por DIFERENCA de output, e nao apanhou: nenhuma
-  //     linha desapareceu — o veredicto e que mudou. Diferenca de output apanha o que some; nao
-  //     apanha um default que regressa. Por isso e que isto se mede aqui, e nao se confia.
-  writeFileSync(join(dir, relAlvos), cAlvosNovo);
-
-  //     A decisao vive na `config/`, que o upgrade NAO toca. E essa a mudanca que fecha a
-  //     classe: preservar por nome era mitigacao, e uma lista de nomes envelhece a cada decisao
-  //     nova que alguem acrescente e se esqueca de inscrever.
-  //     A fixture pode legitimamente NAO ter a `config/`: ela nasceu depois de algumas tags, e
-  //     um consumidor tirado de uma dessas e exactamente o caso real que mais interessa. Por
-  //     isso isto **garante** o ficheiro em vez de o exigir — escreve-o quando falta, e edita-o
-  //     quando ja veio da tag. As duas metades sao medidas: o teste do consumidor SEM `config/`
-  //     vive em `test-simulate-upgrade.mjs`, e prova que o upgrade lha traz.
-  const relCfg = ".agent/scripts/config/bundles.mjs";
-  const cCfg = leOuNull(join(dir, relCfg));
-  const comGateSuspenso =
-    cCfg === null
-      ? "export const TARGETS = {};\nexport const ALVOS_REPROVAM = false;\n"
-      : cCfg.replace(/export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
-  if (cCfg !== null && comGateSuspenso === cCfg) {
-    fatal(`nao consegui suspender o gate em ${relCfg} — o literal mudou de forma`);
-  }
-  mkdirSync(dirname(join(dir, relCfg)), { recursive: true });
-  writeFileSync(join(dir, relCfg), comGateSuspenso);
-}
-ok("conteudo proprio do projeto acrescentado (anti-padrao, verificador grande e uma constante customizada)");
+montaProjetoDeOntem({ dir, root: ROOT, tag, sha, substituto: SUBSTITUTO, marcaProjeto: MARCA_PROJETO, ok, fatal });
 
 // --- 3. FASE 1: o upgrade MECANICO -----------------------------------------------
 // As categorias que a tabela do `/upgrade` resolve sem julgamento. O motor vive em
@@ -379,43 +274,12 @@ if (contextoAntes === null) {
   fatal("`.agent/context/` nao existe na copia — sem ela nao consigo afirmar que o upgrade nao lhe tocou");
 }
 
-/** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` do HEAD —
- *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio. */
-function comandosDoCI() {
-  const ci = leOuNull(join(ROOT, ".github/workflows/ci.yml"));
-  const job = ci?.split(/^  guard-tests:/m)[1];
-  if (!job) return null;
-  // EXCLUSOES, cada uma por uma razao concreta:
-  //  - `check-test-surface`: precisa de um `.git` com historia, e o archive nao traz nenhum;
-  //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao.
-  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade"];
-  const achados = [...new Set([...job.matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]))];
-  return achados.filter((c) => !EXCLUIR.some((x) => c.includes(x)));
-}
-
-const COMANDOS = comandosDoCI();
+const COMANDOS = comandosDoCI(ROOT);
 if (COMANDOS === null || COMANDOS.length === 0) {
   fatal("nao derivei nenhum comando do job `guard-tests` do ci.yml — o job mudou de nome ou de formato?");
 }
 
-/** Corre a bateria na copia. Devolve os que sairam != 0, com a primeira linha util de cada um. */
-function corre() {
-  const falhados = [];
-  for (const c of COMANDOS) {
-    if (!existsSync(join(dir, c))) {
-      falhados.push([c, "ausente na copia"]);
-      continue;
-    }
-    try {
-      execFileSync(process.execPath, [join(dir, c)], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-    } catch (err) {
-      const out = (err.stdout ?? "") + (err.stderr ?? "");
-      const linha = out.split("\n").find((l) => /^\s*(WARN|FAIL)/.test(l))?.trim() ?? `exit ${err.status ?? 1}`;
-      falhados.push([c, linha]);
-    }
-  }
-  return falhados;
-}
+const corre = () => correBateria({ dir, comandos: COMANDOS });
 
 console.log("\n  --- FASE 1: o que este upgrade faz reprovar num projeto que estava verde ---\n");
 const fase1 = corre();
@@ -432,40 +296,9 @@ if (fase1.length === 0) {
 // --- 4. FASE 2: as adaptacoes que a seccao 2b prescreve ---------------------------
 // So as mecanicas. O que exige julgamento fica de fora, escrito, em vez de fingido.
 {
-  // "Limiar apertado" (Guard 17): os ficheiros do projeto ja acima das 500 linhas entram em
-  // `TETOS` com a contagem do dia da migracao. E catraca, nao isencao: podem encolher, crescer
-  // reprova. Mais do que uma adaptacao, isto verifica que a receita escrita na 2b FUNCIONA.
-  const relGuard = ".agent/scripts/guards/sizes.mjs";
-  const p = join(dir, relGuard);
-  const c = leOuNull(p);
-  if (c === null) fatal(`${relGuard} nao existe na copia — nao consigo aplicar a adaptacao do Guard 17`);
-  // A contagem e o limite vem do GUARD que esta adaptacao serve, e nao de uma copia local.
-  // Reimplementados aqui eram duas copias da mesma regra a ter de concordar a mao — e nao
-  // concordavam: esta contava sem aparar o newline final, logo media +1 em todos os ficheiros e
-  // congelava em `TETOS` ficheiros que o guard considera dentro do limite. Nunca deu sinal, ate
-  // um ficheiro cair em EXACTAMENTE 500.
-  //
-  // DINAMICO e nao estatico, e depois do guarda acima: um `import` no topo tornava a ausencia do
-  // guard um crash no arranque, e e precisamente essa ausencia que a linha anterior existe para
-  // reportar com uma razao. E le-se o guard do CONSUMIDOR, que e quem tem a palavra sobre o
-  // proprio limite.
-  const { contaLinhas, LIMITE } = await import(pathToFileURL(p).href);
-  const grandes = [];
-  for (const base of [".agent/scripts", ".claude/hooks"]) {
-    andaFicheiros(join(dir, base), (sub, nome) => {
-      if (!nome.endsWith(".mjs")) return;
-      const rel = `${base}/${sub}`;
-      const n = contaLinhas(readFileSync(join(dir, rel), "utf8"));
-      if (n > LIMITE && !c.includes(`"${rel}"`)) grandes.push([rel, n]);
-    });
-  }
-  if (grandes.length) {
-    const entradas = grandes.map(([rel, n]) => `  ${JSON.stringify(rel)}: ${n},`).join("\n");
-    writeFileSync(p, c.replace(/^export const TETOS = \{$/m, `export const TETOS = {\n${entradas}`));
-    ok(`adaptacao 2b (Guard 17): ${grandes.length} ficheiro(s) do projeto congelado(s) em TETOS`);
-  } else {
-    ok(`adaptacao 2b (Guard 17): nenhum ficheiro do projeto acima das ${LIMITE} linhas por congelar`);
-  }
+  const { congelados, limite } = await adapta2bGuard17({ dir, fatal });
+  if (congelados) ok(`adaptacao 2b (Guard 17): ${congelados} ficheiro(s) do projeto congelado(s) em TETOS`);
+  else ok(`adaptacao 2b (Guard 17): nenhum ficheiro do projeto acima das ${limite} linhas por congelar`);
 }
 
 console.log("\n  --- FASE 2: depois das adaptacoes ---\n");
