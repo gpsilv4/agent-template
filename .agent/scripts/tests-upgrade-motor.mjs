@@ -14,9 +14,9 @@
  * ponta, os caminhos que tem de parar tudo).
  */
 import { cenario, limpa, test } from "./test-upgrade-harness.mjs";
-import { CONSTANTES_DO_PROJETO } from "./lib/upgrade-mecanico.mjs";
+import { CONSTANTES_DO_PROJETO, PLACEHOLDER } from "./lib/upgrade-mecanico.mjs";
 import { contaLinhas, LIMITE } from "./guards/sizes.mjs";
-import { mkdtempSync, readdirSync, rmSync } from "fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
@@ -34,6 +34,18 @@ export const entryPoint = "test-simulate-upgrade.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza — DERIVADO da mesma lista que ele usa. */
 const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
+
+
+/** Todos os `.mjs` de uma pasta, em profundidade. Derivado do disco: uma lista escrita a mao
+ *  envelhecia no primeiro ficheiro novo, que e a classe que este modulo anda a apanhar. */
+function andaTudo(dir, out = []) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = `${dir}/${e.name}`;
+    if (e.isDirectory()) andaTudo(p, out);
+    else if (e.name.endsWith('.mjs')) out.push(p);
+  }
+  return out;
+}
 
 export function registar() {
   // --- O motor mecanico: e aqui que um erro custa DADOS -----------------------------
@@ -299,5 +311,47 @@ export function registar() {
     } finally {
       limpa(c);
     }
+  });
+
+  // --- Placeholders usados como EXEMPLO em prosa --------------------------------
+  // O sweep do bootstrap substitui `{{ MAIUSCULAS }}` (sem os espacos) em todo o lado e **nao
+  // marcador de um exemplo**. Um comentario que cite o placeholder por extenso fica, num
+  // derivado, a dizer «um `Referee Exam Study` la sobrevivia ao bootstrap» — sem sentido, em
+  // todos os projetos, para sempre.
+  //
+  // A solucao ja estava escrita no `sync-docs.md` (escrever com espacos) e **nao tinha sido
+  // varrida** para os sete sitios que a violavam — tres deles dentro do proprio guard dos
+  // placeholders. E o padrao que a ronda 5 poe no topo do relatorio, e o `TP8` deste repo.
+  const COLADO = `{${'{'}PROJECT_NAME}${'}'}`;
+  const ESPACADO = '{{ PROJECT_NAME }}';
+
+  test('o sweep do bootstrap COME a forma colada', () => {
+    const dentro = `uma frase com ${COLADO} no meio`;
+    return PLACEHOLDER.test(dentro) ? [] : ['o padrao deixou de casar a forma colada — o teste abaixo passa a nao provar nada'];
+  });
+
+  // A metade que interessa: a forma espacada SOBREVIVE. Sem este caso, o de cima sozinho era
+  // satisfeito por um padrao que casasse tudo.
+  test('a forma ESPACADA sobrevive ao sweep', () => {
+    const dentro = `uma frase com ${ESPACADO} no meio`;
+    return PLACEHOLDER.test(dentro) ? ['o sweep come a forma espacada — a solucao do sync-docs.md deixou de funcionar'] : [];
+  });
+
+  // E o que impede a RECORRENCIA, derivado do disco e nao de uma lista: nenhum ficheiro da
+  // maquinaria pode citar um placeholder colado fora do cabecalho. O cabecalho e o uso
+  // legitimo — la e um marcador, e tem mesmo de ser substituido.
+  test('nenhum ficheiro da maquinaria cita um placeholder colado em prosa', () => {
+    const problemas = [];
+    for (const dir of ['.agent/scripts', '.claude/hooks']) {
+      for (const rel of andaTudo(dir)) {
+        const linhas = readFileSync(rel, 'utf8').split('\n');
+        linhas.forEach((l, i) => {
+          // O cabecalho: ` * <titulo> — {{ PROJECT_NAME }}` (sem espacos) no topo de cada ficheiro.
+          if (/^ \* .* — \{\{[A-Z_]+\}\}$/.test(l)) return;
+          if (/\{\{[A-Z_]+\}\}/.test(l)) problemas.push(`${rel}:${i + 1} — placeholder colado em prosa`);
+        });
+      }
+    }
+    return problemas;
   });
 }

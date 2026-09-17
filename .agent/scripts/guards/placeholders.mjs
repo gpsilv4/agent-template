@@ -21,10 +21,12 @@
 // `.agent/BOOTSTRAP.md` e `README.md` DOCUMENTAM os placeholders — citam-nos por design.
 const DOCUMENTAM = new Set([".agent/BOOTSTRAP.md", "README.md"]);
 
-// Falsos positivos: expressoes do GitHub Actions, `${{ ... }}`. O caso que importa e
-// `${{VAR}}` — maiusculas, sem espacos e sem ponto — porque e o unico que o padrao de
-// placeholder abaixo tambem casaria. Formas como `${{ secrets.TOKEN }}` nunca casariam
-// (tem ponto e espacos), logo nao dependem desta constante.
+// Falsos positivos: expressoes do GitHub Actions, `${{ ... }}`. O caso que importa e o de um
+// `$` seguido de duas chavetas, MAIUSCULAS e duas chavetas, **sem espacos e sem ponto** —
+// porque e o unico que o padrao de placeholder abaixo tambem casaria. Formas como
+// `${{ secrets.TOKEN }}` nunca casariam (tem ponto e espacos), logo nao dependem desta
+// constante. A forma colada NAO se escreve aqui de proposito: o sweep do bootstrap casa-a e
+// comia-a, e este comentario passava a dizer disparate em todos os derivados.
 // A alternativa `{{args}}` dos command templates do Gemini foi removida por ser morta:
 // `PLACEHOLDER` so casa `[A-Z_]+` e `args` e minusculo.
 const FALSOS = /\$\{\{[^}]*\}\}/g;
@@ -71,10 +73,10 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     ...(listDir(".agent/scripts", ".mjs") || []).map((f) => `.agent/scripts/${f}.mjs`),
     ...(listDir(".agent/scripts/guards", ".mjs") || []).map((f) => `.agent/scripts/guards/${f}.mjs`),
     // `lib/` e um nivel abaixo, logo o `listDir` de `.agent/scripts/` nao o alcanca — e os
-    // modulos partilhados tem `{{PROJECT_NAME}}` no cabecalho como todos os outros.
+    // modulos partilhados tem `{{ PROJECT_NAME }}` no cabecalho como todos os outros.
     ...(listDir(".agent/scripts/lib", ".mjs") || []).map((f) => `.agent/scripts/lib/${f}.mjs`),
     ...(listDir(".claude/commands", ".md") || []).map((f) => `.claude/commands/${f}.md`),
-    // Os HOOKS e os subagentes. Sete ficheiros com `{{PROJECT_NAME}}` estavam fora desta
+    // Os HOOKS e os subagentes. Sete ficheiros com `{{ PROJECT_NAME }}` estavam fora desta
     // lista: o sweep do bootstrap substitui-os por EXTENSAO, logo na pratica saiam bem — o
     // que faltava era a rede que apanha um sweep falhado. Um guard que so cobre o caminho
     // feliz nao e uma rede.
@@ -85,7 +87,7 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     ...(listDir(".gemini/commands", ".toml") || []).map((f) => `.gemini/commands/${f}.toml`),
     // Os hooks do git. Nao tem extensao — o git exige o nome exacto do evento — e por isso
     // escaparam a Fase 2.1 do bootstrap **e** a esta lista quando foram criados: um
-    // `{{PROJECT_NAME}}` ficava la para sempre num projeto derivado. Apanhado pela varredura
+    // `{{ PROJECT_NAME }}` ficava la para sempre num projeto derivado. Apanhado pela varredura
     // do `simulate-derived.mjs`, no dia em que ela passou a olhar para alem das extensoes que
     // ela propria substitui.
     ...(listDir(".githooks", "") || []).map((f) => `.githooks/${f}`),
