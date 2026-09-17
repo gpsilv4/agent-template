@@ -178,10 +178,12 @@ gh pr create --fill     # then merge once CI is green
     │   ├── placeholders.mjs    <- Guard 13: {{...}} left behind after bootstrap
     │   ├── anti-patterns.mjs   <- Guard 15: anti-pattern citations resolve (TP7)
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
-    │   └── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
+    │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
+    │   └── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
     ├── lib/
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
-    │   └── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
+    │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
+    │   └── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── surface-patterns.mjs    <- Its pattern tables: what can't drop, what can't appear
@@ -197,6 +199,7 @@ gh pr create --fill     # then merge once CI is green
     ├── tests-budgets.mjs       <- Series-1 guard tests (mirrors guards/budgets.mjs)
     ├── tests-mcp.mjs           <- Guard 16 tests (mirrors guards/mcp.mjs)
     ├── tests-sizes.mjs         <- Guard 17 tests (mirrors guards/sizes.mjs)
+    ├── tests-isolamento.mjs    <- Guard 19 tests (each rule with its counter-case)
     ├── test-registo.mjs        <- Negative tests for the suite discovery in lib/registo.mjs
     ├── test-bundle-sizes.mjs   <- Negative tests for the bundle checker (no Next.js needed)
     ├── test-bundle-harness.mjs <- Its fixtures: sandbox + the config each test needs

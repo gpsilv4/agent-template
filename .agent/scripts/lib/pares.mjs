@@ -109,6 +109,16 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // Guard 19 (isolamento das suites). E o guard que torna a varredura PARALELA segura: se
+    // ele deixar de avisar, o paralelismo continua a parecer funcionar e passa a dar vermelhos
+    // que nao sao reais. Um verificador cuja falha e invisivel precisa desta rede mais do que
+    // qualquer outro.
+    alvo: ".agent/scripts/guards/isolamento.mjs",
+    suite: ".agent/scripts/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/mcp.mjs",
     suite: ".agent/scripts/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,

@@ -47,7 +47,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU");
 console.log("ok");
 `;
 
-export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, parSao = false, comGit = false, alterado = null } = {}) {
+export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -185,6 +185,14 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
         : "") +
       "];\n"
   );
+  // O motor de medicao e COPIADO, ao contrario do mapa e do PARES: e a peca que estes testes
+  // querem exercitar de verdade (o paralelismo, as copias por worker, a deduplicacao das
+  // baselines). Uma versao sintetica dele mediria uma reimplementacao, nao o motor.
+  copyFileSync(
+    join(ROOT, ".agent/scripts/lib/varredura-paralela.mjs"),
+    join(dir, ".agent/scripts/lib/varredura-paralela.mjs")
+  );
+
   // O mapa de suites da fixture. Minimo e SINTETICO, nao copiado: copiar o do repo fazia estes
   // testes depender das regras reais (`TP3`), e o que eles medem e o varredor, nao o mapa — que
   // tem suite propria. As regras cobrem os ficheiros falsos que a fixture escreve.
@@ -225,6 +233,40 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
       writeFileSync(alvo, antes + "\n// tocado\n");
     }
   }
+  if (contaCorridas) {
+    // DOIS alvos que partilham UMA suite, e a suite regista cada corrida sua. E a unica forma
+    // de medir a deduplicacao das baselines: a pergunta nao e "o resultado esta certo" (esse
+    // estaria certo com ou sem dedup) — e "quantas vezes e que a suite correu".
+    //
+    // O log vai para o diretorio da SANDBOX, por caminho absoluto, e nao para a copia: a copia
+    // e um tmpdir que o varredor cria e destroi, e o teste nunca lhe chegaria. O caminho e
+    // cravado no codigo gerado porque so aqui se sabe qual e.
+    const log = join(dir, "corridas.log");
+    const checkN = (n) =>
+      `const warn=(m)=>{console.log("  WARN  "+m)};\n` +
+      `if((process.argv[2]??"").includes("mau")){warn("check${n}");process.exit(1)}\nprocess.exit(0);\n`;
+    writeFileSync(join(dir, ".agent/scripts/fake-check.mjs"), checkN(1));
+    writeFileSync(join(dir, ".agent/scripts/fake-check-2.mjs"), checkN(2));
+    // A suite exercita os DOIS: se so exercitasse um, mutar o outro nunca a punha vermelha e
+    // a varredura reportaria INCOMPLETA em vez de medir o que este teste quer medir.
+    writeFileSync(join(dir, ".agent/scripts/fake-test.mjs"),
+      `import { execFileSync } from "child_process";\nimport { appendFileSync } from "fs";\n` +
+      `import { fileURLToPath } from "url";\nimport { dirname, resolve, join } from "path";\n` +
+      `appendFileSync(${JSON.stringify(log)}, "x\\n");\n` +
+      `const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");\n` +
+      `for (const [f, marca] of [[".agent/scripts/fake-check.mjs","check1"],[".agent/scripts/fake-check-2.mjs","check2"]]) {\n` +
+      `  let out="", code=0;\n` +
+      `  try { out = execFileSync("node",[join(ROOT,f),"isto e mau"],{encoding:"utf8"}); }\n` +
+      `  catch(e){ code = e.status ?? 1; out = (e.stdout ?? "") + (e.stderr ?? ""); }\n` +
+      `  if (code === 0 || !out.includes(marca)) { console.log("FALHOU " + f); process.exit(1); }\n` +
+      `}\nconsole.log("ok");\n`);
+    writeFileSync(join(dir, ".agent/scripts/lib/pares.mjs"),
+      `export const PARES = [\n` +
+      `  { alvo: ".agent/scripts/fake-check.mjs", suite: ".agent/scripts/fake-test.mjs", sinal: /(?<![\\w.$])warn\\(/, neutro: "(() => {})(" },\n` +
+      `  { alvo: ".agent/scripts/fake-check-2.mjs", suite: ".agent/scripts/fake-test.mjs", sinal: /(?<![\\w.$])warn\\(/, neutro: "(() => {})(" },\n` +
+      `];\n`);
+  }
+
   return dir;
 }
 
