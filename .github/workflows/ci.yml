@@ -238,6 +238,8 @@ jobs:
         run: node .agent/scripts/tests/test-mapa-suites.mjs
       - name: Detector de codigo morto — negative tests
         run: node .agent/scripts/tests/test-codigo-morto.mjs
+      - name: Limpeza de copias em tmpdir — negative tests
+        run: node .agent/scripts/tests/test-tmp-limpo.mjs
       - name: Hooks — negative tests
         run: node .claude/hooks/tests/test-hooks.mjs
       - name: commit-msg hook — negative tests

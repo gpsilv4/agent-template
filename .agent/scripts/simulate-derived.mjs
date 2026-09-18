@@ -35,13 +35,13 @@
  *   node .agent/scripts/simulate-derived.mjs --only=check-doc-versions,test-guards
  */
 
-import { cpSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
-import { tmpdir } from "os";
 import { aplica } from "./lib/patch.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
+import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { leOuNull } from "./lib/ficheiros.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -171,7 +171,12 @@ if (selecionados.length === 0) {
 console.log("\n=== Simulacao de projeto derivado ===\n");
 
 // --- 1. copiar -----------------------------------------------------------------
-const dir = mkdtempSync(join(tmpdir(), "derivado-"));
+// A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha, e foi assim que
+// ficaram 33 MB por corrida interrompida. Quem varre o que sobrou e a corrida SEGUINTE, no
+// arranque — e so o que ja nao tem dono vivo, porque duas corridas em paralelo acontecem.
+const abandonadas = limpaTmpsAntigos("derivado-") + limpaFixturesDeTeste();
+if (abandonadas) console.log(`  OK    ${abandonadas} copia(s) de corridas interrompidas apagadas`);
+const dir = criaTmp("derivado-");
 copiaAtiva = dir;
 /** Aplica-se a QUALQUER profundidade, e nao so a raiz.
  *
