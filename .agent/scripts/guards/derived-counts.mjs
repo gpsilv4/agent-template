@@ -269,5 +269,47 @@ if (metodo) {
   }
   guardsRun++;
 
+  // --- Guard 12f: contagens de FICHEIROS citadas em prosa ---
+  // Quinta instancia do padrao, e a que mais derivou: o inventario do `README.md` tinha QUATRO
+  // contagens erradas ao fim de seis releases. Nada as media — os guards acima cobrem
+  // checklists, fases, guards e workflows, e o inventario de ficheiros ficou de fora.
+  //
+  // PORQUE COMPARA COM A ARVORE E NAO COM O DISCO, e foi medido: as fixtures dos Guards 19 e 20
+  // escrevem `.mjs` falsos em `.agent/scripts/` e em `.agent/scripts/tests/` — e bem, e assim
+  // que se testa a maquinaria. Contra o disco, SETE testes ficavam vermelhos com uma mensagem a
+  // falar do README, a quilometros da causa, e toda a fixture futura pagava o mesmo imposto.
+  // Contar o disco das pastas da propria maquinaria esta acoplado as fixtures dela.
+  //
+  // O QUE ISTO NAO APANHA, dito por inteiro: um ficheiro acrescentado ao disco e nunca listado
+  // na arvore. Foram seis, encontrados a mao na mesma passagem. Essa classe precisava de
+  // comparar disco com arvore, e ai o acoplamento volta — fica para o `/review`, escrito em vez
+  // de tapado. Os dois numeros que o README citava sobre `tests/` foram REMOVIDOS: um numero que
+  // nao se consegue derivar barato nao se escreve, que e a mesma decisao tomada no `review.md`.
+  // A contagem da RAIZ de `.agent/scripts/` nao se mede em disco, e a razao e medida: as fixtures
+  // dos Guards 19 e 20 escrevem `.mjs` falsos nessa pasta — e bem, e assim que se testa a
+  // maquinaria. Contra o disco, sete testes ficavam vermelhos com uma mensagem a falar do
+  // README, a quilometros da causa, e toda a fixture futura pagava o mesmo imposto.
+  //
+  // Compara-se antes com a ARVORE do proprio ficheiro: "dizes 8, e listas 8". Sem acoplamento
+  // nenhum a fixtures, e apanha o defeito REAL — quando a raiz passou de 7 para 8 entradas, a
+  // arvore foi actualizada e a prosa nao. Era exactamente esta divergencia.
+  for (const alvo of ficheirosComProsa(listDir)) {
+    const c = read(alvo);
+    if (c === null) continue;
+    const m = /(\d+)\s+entry points at the root/i.exec(c);
+    if (!m) continue;
+    // As entradas da arvore sao as linhas que apontam para um `.mjs` no nivel da raiz de
+    // `scripts/` — quatro espacos de indentacao, sem pasta pelo meio.
+    const naArvore = [...c.matchAll(/^ {4}[├└]── ([\w-]+\.mjs)\s/gm)].length;
+    if (naArvore === 0) {
+      warn(`${alvo} cita "${m[1]} entry points" mas nao tem arvore que os liste — o bloco mudou de forma?`);
+    } else if (Number(m[1]) !== naArvore) {
+      warn(`${alvo} diz "${m[1]} entry points at the root" mas a arvore dele lista ${naArvore}`);
+    } else {
+      ok(`"${naArvore} entry points at the root" coerente com a arvore de ${alvo}`);
+    }
+  }
+  guardsRun++;
+
   return guardsRun;
 }
