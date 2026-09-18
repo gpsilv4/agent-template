@@ -59,7 +59,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
-import { criaTmp, limpaTmpsAntigos } from "./lib/tmp-limpo.mjs";
+import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { comandosDoCI, correBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
 import { montaProjetoDeOntem } from "./lib/projeto-de-ontem.mjs";
 
@@ -115,6 +115,10 @@ for (const p of ["upgrade-", "upgrade-2b-"]) {
   const n = limpaTmpsAntigos(p);
   if (n) console.log(`  OK    ${n} copia(s) ${p}* de corridas interrompidas apagadas`);
 }
+
+// E as fixtures que as SUITES deixam: sao elas que ocuparam 2,5 GB, e nao as copias dos
+// scripts. Caem no ramo da idade, logo uma suite a correr ao lado nao e tocada.
+limpaFixturesDeTeste();
 
 const git = (args, cwd = ROOT) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();

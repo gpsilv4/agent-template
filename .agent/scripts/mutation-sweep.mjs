@@ -57,7 +57,7 @@
  */
 
 import { readFileSync, cpSync, rmSync, readdirSync } from "fs";
-import { criaTmp, limpaTmpsAntigos } from "./lib/tmp-limpo.mjs";
+import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -300,7 +300,7 @@ function criarCopia() {
 // A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha, e foi assim que
 // ficaram 33 MB por corrida interrompida. Quem varre o que sobrou e a corrida SEGUINTE, no
 // arranque — e so o que ja nao tem dono vivo, porque duas corridas em paralelo acontecem.
-  const abandonadas = limpaTmpsAntigos("mutation-sweep-");
+  const abandonadas = limpaTmpsAntigos("mutation-sweep-") + limpaFixturesDeTeste();
   if (abandonadas) console.log(`  OK  ${abandonadas} copia(s) de corridas interrompidas apagadas`);
   const dir = criaTmp("mutation-sweep-");
   const excluir = new Set([".git", "node_modules", ".next", ".DS_Store"]);

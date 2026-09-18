@@ -16,7 +16,10 @@
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, utimesSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { criaTmp, limpaTmpsAntigos, processoVivo } from "../lib/tmp-limpo.mjs";
+import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste, processoVivo, PREFIXOS_DE_TESTE } from "../lib/tmp-limpo.mjs";
+import { readFileSync, readdirSync as lerPasta } from "fs";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 let passed = 0;
 const falhas = [];
@@ -163,6 +166,61 @@ test("base inexistente nao rebenta, devolve 0", () => {
   const naoExiste = mkdtempSync(join(tmpdir(), "t-limpo-ausente-"));
   rmSync(naoExiste, { recursive: true, force: true });
   return limpaTmpsAntigos("alvo-", naoExiste) === 0 ? [] : ["devia devolver 0 em silencio"];
+});
+
+// --- a lista dos prefixos de teste nao pode envelhecer --------------------------
+//
+// A `PREFIXOS_DE_TESTE` e mantida A MAO, e uma lista a mao envelhece em silencio (`TP8`) — foi
+// exactamente assim que 1580 fixtures ocuparam 2,5 GB. Este caso varre `tests/` em DISCO e
+// exige que cada prefixo que la aparece esteja coberto. A lista continua a mao; a divergencia
+// e que nao passa.
+test("todo o prefixo de fixture em tests/ esta coberto pela lista", () => {
+  const AQUI = dirname(fileURLToPath(import.meta.url));
+  const ficheiros = [];
+  const anda = (d) => {
+    for (const e of lerPasta(d, { withFileTypes: true })) {
+      if (e.isDirectory()) anda(`${d}/${e.name}`);
+      else if (e.name.endsWith(".mjs")) ficheiros.push(`${d}/${e.name}`);
+    }
+  };
+  anda(AQUI);
+
+  // As plicas e as crases saem ANTES de procurar. Uma fixture que escreve codigo de exemplo tem
+  // `mkdtempSync(join(tmpdir(), "prefixo-"))` dentro de uma string — e isso e texto, nao uma
+  // pasta que alguem crie. Sem isto o teste reprovava por um prefixo que nunca existe em disco,
+  // e a saida barata teria sido inscrever na lista um prefixo imaginario.
+  const semTexto = (src) =>
+    src
+      .split("\n")
+      .map((l) => l.replace(/'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`/g, '""'))
+      .join("\n");
+
+  const emFalta = new Set();
+  for (const p of ficheiros) {
+    for (const m of semTexto(readFileSync(p, "utf8")).matchAll(/mkdtempSync\(join\(tmpdir\(\),\s*"([^"]+)"/g)) {
+      if (!PREFIXOS_DE_TESTE.some((pre) => m[1].startsWith(pre))) emFalta.add(m[1]);
+    }
+  }
+  if (ficheiros.length === 0) return ["nao varri ficheiro nenhum — o teste nao esta a medir nada"];
+  return emFalta.size === 0 ? [] : [`prefixos sem cobertura: ${[...emFalta].join(", ")}`];
+});
+
+// E a varredura em si, sobre uma base propria: apanha as VELHAS de qualquer prefixo da lista.
+test("limpaFixturesDeTeste varre todos os prefixos da lista", () => {
+  const base = mkdtempSync(join(tmpdir(), "t-limpo-"));
+  try {
+    const ontem = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    for (const p of ["sweep-test-", "guard-test-", "backlog-test-"]) {
+      const d = comDono(base, p, null);
+      utimesSync(d, ontem, ontem);
+    }
+    const n = limpaFixturesDeTeste(base);
+    const restou = lerPasta(base);
+    if (n !== 3) return [`devia ter apagado 3, apagou ${n}`];
+    return restou.length === 0 ? [] : [`ficou: ${restou.join(", ")}`];
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });
 
 console.log("");

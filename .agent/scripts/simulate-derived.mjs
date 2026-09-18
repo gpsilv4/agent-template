@@ -41,7 +41,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
 import { aplica } from "./lib/patch.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
-import { criaTmp, limpaTmpsAntigos } from "./lib/tmp-limpo.mjs";
+import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { leOuNull } from "./lib/ficheiros.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -174,7 +174,7 @@ console.log("\n=== Simulacao de projeto derivado ===\n");
 // A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha, e foi assim que
 // ficaram 33 MB por corrida interrompida. Quem varre o que sobrou e a corrida SEGUINTE, no
 // arranque — e so o que ja nao tem dono vivo, porque duas corridas em paralelo acontecem.
-const abandonadas = limpaTmpsAntigos("derivado-");
+const abandonadas = limpaTmpsAntigos("derivado-") + limpaFixturesDeTeste();
 if (abandonadas) console.log(`  OK    ${abandonadas} copia(s) de corridas interrompidas apagadas`);
 const dir = criaTmp("derivado-");
 copiaAtiva = dir;

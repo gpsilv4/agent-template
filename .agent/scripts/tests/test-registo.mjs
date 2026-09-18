@@ -25,7 +25,7 @@ const falhas = [];
 
 /** Monta uma pasta com os modulos dados e corre um entry point sintetico. */
 function corre({ modulos = {}, entryPoint = "entry.mjs", conhecidos = ["entry.mjs", "outro.mjs"] }) {
-  const dir = mkdtempSync(join(tmpdir(), "registo-"));
+  const dir = mkdtempSync(join(tmpdir(), "registo-test-"));
   try {
     for (const [nome, conteudo] of Object.entries(modulos)) {
       writeFileSync(join(dir, nome), conteudo);
@@ -63,7 +63,7 @@ function corre({ modulos = {}, entryPoint = "entry.mjs", conhecidos = ["entry.mj
 /** Corre um entry point com argumentos a mao — para os caminhos de recusa que acontecem
  *  ANTES da descoberta (contrato da propria funcao) e para uma pasta ilegivel. */
 function correCru(corpoArgs) {
-  const dir = mkdtempSync(join(tmpdir(), "registo-cru-"));
+  const dir = mkdtempSync(join(tmpdir(), "registo-test-cru-"));
   try {
     writeFileSync(
       join(dir, "entry.mjs"),

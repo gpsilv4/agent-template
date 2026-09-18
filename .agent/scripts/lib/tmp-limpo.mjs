@@ -71,6 +71,36 @@ export function criaTmp(prefixo) {
   return mkdtempSync(join(tmpdir(), `${prefixo}${process.pid}-`));
 }
 
+/** Os prefixos que as SUITES usam para as suas fixtures.
+ *
+ *  PORQUE EXISTE: as fixtures de teste nao sao residuais — as 1580 pastas que ocuparam **2,5 GB**
+ *  eram `sim-up-root`/`sim-up-cons` do `cenario()`, e nao copias de scripts. No caminho normal as
+ *  suites limpam-nas; ficam quando uma corrida e interrompida, e a varredura de mutacao corre as
+ *  suites dezenas de vezes, o que multiplica qualquer interrupcao.
+ *
+ *  PORQUE UMA LISTA, e nao uma chamada em cada suite: eram catorze sitios a lembrar-se, e um
+ *  sitio que se esqueca nao da sinal nenhum. Uma lista a mao seria o `TP8` — por isso o
+ *  `test-tmp-limpo.mjs` varre `tests/` em disco e REPROVA se aparecer um prefixo que nao esteja
+ *  aqui. A lista e mantida a mao; a divergencia e que nao passa. */
+export const PREFIXOS_DE_TESTE = [
+  "sweep-test-",
+  "bundle-test-",
+  "surface-test-",
+  "morto-test-",
+  "sim-up-",
+  "guard-test-",
+  "guard-synth-",
+  "commit-msg-test-",
+  // `registo-test-` e nao `registo-`: a limpeza apaga pastas, e um prefixo que e uma PALAVRA
+  // comum podia casar o que outra ferramenta escreveu em `tmpdir`. Os irmaos todos sao
+  // compostos (`guard-test-`, `sweep-test-`); este era o unico elo fraco.
+  "registo-test-",
+  "backlog-test-",
+  "t-limpo-",
+  "sim-test-",
+  "fuga-2b-",
+];
+
 /**
  * Apaga as copias de `prefixo` que ja nao tem dono vivo. Corre-se no ARRANQUE.
  *
@@ -106,4 +136,21 @@ export function limpaTmpsAntigos(prefixo, base = tmpdir()) {
     }
   }
   return apagadas;
+}
+
+/**
+ * Varre as fixtures de teste abandonadas. Chamada pelos scripts no arranque: sao eles que
+ * correm com frequencia, e a varredura de mutacao corre as suites dezenas de vezes.
+ *
+ * As fixtures de teste nao levam o PID no nome (nao passam pelo `criaTmp`), logo caem todas no
+ * ramo da IDADE — o que e o comportamento certo: uma fixture com mais de uma hora nao pertence
+ * a nenhuma corrida a decorrer, e uma recente pode pertencer a uma suite que esta a correr ao
+ * lado. Apagar por PID exigia mudar catorze sitios; apagar por idade nao exige nenhum.
+ *
+ * @returns {number} quantas foram removidas
+ */
+export function limpaFixturesDeTeste(base = tmpdir()) {
+  let n = 0;
+  for (const p of PREFIXOS_DE_TESTE) n += limpaTmpsAntigos(p, base);
+  return n;
 }
