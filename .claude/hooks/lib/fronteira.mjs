@@ -29,8 +29,39 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-/** Os caminhos que constituem a fronteira. */
-const FRONTEIRA = /(?:^|[\s"'`=(])(?:\.\/)?(?:\.claude\/(?:settings(?:\.local)?\.json|hooks\/)|\.githooks\/)/;
+/** Os caminhos que constituem a fronteira, **em forma de dados**.
+ *
+ *  Uma entrada terminada em `/` e um prefixo de pasta; as outras sao ficheiros exactos. Desta
+ *  lista saem as DUAS leituras que a fronteira precisa — o regex que olha para o texto de um
+ *  comando, e o predicado que olha para um caminho — em vez de cada uma ter a sua copia a
+ *  concordar a mao (`TP8`). O `tests-fronteira.mjs` prende as duas uma a outra. */
+export const CAMINHOS_FRONTEIRA = [
+  ".claude/settings.json",
+  ".claude/settings.local.json",
+  ".claude/hooks/",
+  ".githooks/",
+];
+
+/** Este caminho pertence a fronteira?
+ *
+ *  Existe para quem ja TEM um caminho — o `stop-verify.mjs` le-os do `git status` — em vez de
+ *  ter de os procurar dentro do texto de um comando. Normaliza o `./` inicial e as barras do
+ *  Windows, porque um caminho que chegue como `.\claude\hooks\x.mjs` e o mesmo ficheiro e
+ *  responder "nao" a esse era falhar em silencio. */
+export function ehCaminhoFronteira(caminho) {
+  if (typeof caminho !== "string" || caminho === "") return false;
+  const p = caminho.split("\\").join("/").replace(/^\.\//, "");
+  return CAMINHOS_FRONTEIRA.some((f) => (f.endsWith("/") ? p.startsWith(f) : p === f));
+}
+
+/** O mesmo conjunto, para procurar DENTRO do texto de um comando. Derivado da lista acima:
+ *  escrito a mao ao lado dela, bastava acrescentar um caminho num sitio para o outro ficar a
+ *  proteger menos, sem sinal nenhum. */
+const FRONTEIRA = new RegExp(
+  "(?:^|[\\s\"'`=(])(?:\\./)?(?:" +
+    CAMINHOS_FRONTEIRA.map((f) => f.replace(/[.]/g, "\\.")).join("|") +
+    ")"
+);
 
 /** Verbos que apenas LEEM. Tudo o que nao esta aqui e tratado como escrita. */
 const LEITURA = new Set([

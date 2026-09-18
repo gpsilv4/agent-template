@@ -667,7 +667,7 @@ test("stop: divida identica cala-se; divida diferente volta a falar", () => {
 const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-hooks.mjs",
-  ctx: { test, corre, repo, eq, contem },
+  ctx: { test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP },
   contagem: () => passed + falhas.length,
   conhecidos: ENTRY_POINTS,
 });

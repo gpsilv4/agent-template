@@ -503,11 +503,11 @@ try {
     if (ehProtegido(br)) {
       const v = perigosas.map((p) => p.verbo ?? "(nao identificado)").join(", ");
       negar(
-        `\`${br}\` e um branch protegido (${dir}) e \`git ${v}\` nao esta na lista de verbos ` +
-          `seguros. Cria um branch primeiro (\`git switch -c <nome>\`) — ver "Regra de Branch" ` +
-          `em .agent/rules/process-rules.md. Se o verbo e inofensivo e devia passar, ` +
-          `acrescenta-o a SEGUROS em .claude/hooks/guard-protected-branch.mjs. ` +
-          `Para desligar a protecao: /hooks, ou remove a entrada de .claude/settings.json.`
+        // A saida de MUDAR faltava, e custou: quem corria `git checkout main` era mandado CRIAR.
+        `\`${br}\` e um branch protegido (${dir}) e \`git ${v}\` nao esta nos verbos seguros. ` +
+          `MUDAR de branch: \`git switch <ramo>\`. CRIAR: \`git switch -c <nome>\` — ver "Regra de ` +
+          `Branch" em .agent/rules/process-rules.md. O \`checkout\` fica de fora de proposito: o ` +
+          `porque, e onde se acrescenta um verbo, em lib/verbos-git.mjs. Desligar: \`/hooks\`.`
       );
     }
   }
