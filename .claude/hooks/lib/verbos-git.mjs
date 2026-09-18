@@ -87,6 +87,17 @@ export const SEGUROS = new Set([
   "pull", "push",
   // FORA de proposito: `difftool` (`-x <cmd>`) e `bisect` (`bisect run <cmd>`) correm comandos
   // arbitrarios; `gui`/`citool`/`instaweb`/`web--browse` abrem processos interativos.
+  //
+  // `checkout` TAMBEM fica de fora, e por uma razao que nao e obvia — escrita aqui porque ja
+  // foi proposto acrescenta-lo, com boas intencoes. `git checkout <nome>` faz DUAS coisas
+  // conforme o que `<nome>` seja: muda de ramo (inofensivo) ou **deita fora as alteracoes nao
+  // commitadas** de um ficheiro com esse nome. Da forma do comando nao se distingue, e este
+  // modulo nao resolve alvos por desenho — perguntar ao `git` aqui correria no cwd do HOOK e
+  // responderia sobre o repo errado.
+  //
+  // Nao e hipotetico: um `git checkout <ficheiro>` reverteu, numa sessao, as alteracoes de um
+  // dia inteiro. Quem quer mudar de ramo tem o `switch`, que ja esta em cima e nao tem esta
+  // ambiguidade — e a mensagem de recusa do hook nomeia-o.
 ]);
 
 /** Chaves de `git config` cuja ESCRITA e execucao de codigo ou desliga uma rede de

@@ -14,6 +14,7 @@
  */
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
+import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, alteraFronteira } from "../lib/fronteira.mjs";
 
 // NAO e um entry point: corrido diretamente nao afirmaria nada e sairia 0 — a forma canonica
 // do `TP2`.
@@ -30,7 +31,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
  *  cada modulo. Ver `lib/registo.mjs`. */
 export const entryPoint = "test-hooks.mjs";
 
-export function registar({ test, corre, repo, eq, contem }) {
+export function registar({ test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP }) {
 // --- BYPASSES: as formas conhecidas de contornar o guard ---------------------
 // Sem numero de propósito: escrever o tamanho da tabela em prosa foi errado duas vezes no
 // mesmo dia (dizia 28 com 47 casos). O que nao envelhece sao os EVENTOS: a primeira leitura
@@ -416,4 +417,79 @@ test("--force-with-lease NAO e negado (nao e force cru)", () => {
 });
 
 // --- Sem pista de diretorio: antes PERMITIA (lista vazia = ciclo que nao corre) -
+
+  // --- O aviso PROPRIO do `Stop`, e o contra-caso -------------------------------
+  //
+  // Um ficheiro de fronteira alterado ja aparecia no aviso do `Stop` — como "falta correr o
+  // test-guards.mjs", indistinguivel de qualquer outro ficheiro tocado. A frase que um humano
+  // precisa de ler e outra. Medido: um script alterou o `settings.json` por dentro, o aviso
+  // saiu como divida de suite, e so muito depois alguem percebeu o que tinha acontecido.
+  //
+  // E DETECCAO, nao barreira: o `PreToolUse` so ve o texto do comando, e um `node script.mjs`
+  // que escreva la dentro nao tem como ser apanhado ali. Isto torna-o visivel no fim do turno,
+  // que e quando ainda da para desfazer.
+  test("stop: mexer na fronteira produz aviso PROPRIO", () => {
+    const d = repo("feature/x");
+    try {
+      commitarEModificar(d, ".claude/settings.json", '{ "permissions": {} }\n');
+      const r = correNoCwd(STOP, d);
+      if (r.vazio) throw new Error("mexer na fronteira nao pode passar em silencio");
+      if (!r.ctx.includes("FRONTEIRA ALTERADA"))
+        throw new Error(`devia dizer FRONTEIRA ALTERADA; disse: ${r.ctx.slice(0, 200)}`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  // O CONTRA-CASO, e sem ele o de cima era satisfeito por um hook que gritasse sempre — e um
+  // aviso que grita a cada ficheiro treina quem o le a ignora-lo, que e como deixa de ser aviso.
+  test("stop: um ficheiro normal NAO e anunciado como fronteira", () => {
+    const d = repo("feature/x");
+    try {
+      commitarEModificar(d, ".agent/rules/core-rules.md");
+      const r = correNoCwd(STOP, d);
+      if (r.ctx.includes("FRONTEIRA ALTERADA")) throw new Error("um ficheiro de rules nao e fronteira");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  // --- As DUAS leituras da fronteira tem de concordar ---------------------------
+  //
+  // O modulo tem duas: um regex que procura a fronteira no TEXTO de um comando (para o
+  // `PreToolUse`) e um predicado que olha para um CAMINHO (para o `Stop`, que os le do
+  // `git status`). Escritas a mao lado a lado, bastava acrescentar um caminho numa para a
+  // outra passar a proteger menos — sem sinal nenhum (`TP8`). Hoje ambas derivam da mesma
+  // lista; este teste e o que garante que continuam a derivar.
+  test("cada caminho da fronteira e reconhecido pelas DUAS leituras", () => {
+    const p = [];
+    for (const c of CAMINHOS_FRONTEIRA) {
+      const exemplo = c.endsWith("/") ? `${c}x.mjs` : c;
+      if (!ehCaminhoFronteira(exemplo)) p.push(`o predicado nao reconhece ${exemplo}`);
+      // Em posicao de ARGUMENTO de um verbo de escrita: e assim que o regex o tem de ver.
+      if (!alteraFronteira(`sed -i '' s/a/b/ ${exemplo}`)) p.push(`o regex nao ve ${exemplo}`);
+    }
+    return p;
+  });
+
+  // O CONTRA-CASO, e sem ele o de cima era satisfeito por um predicado que dissesse sempre
+  // que sim — e ai o `Stop` gritava "mexeste na fronteira" a cada ficheiro tocado, o que
+  // treina quem le a ignorar o aviso.
+  test("um caminho de fora NAO e dado como fronteira", () => {
+    const p = [];
+    for (const c of [".agent/rules/core-rules.md", "README.md", ".claude/commands/plan.md", ""]) {
+      if (ehCaminhoFronteira(c)) p.push(`deu ${JSON.stringify(c)} como fronteira`);
+    }
+    return p;
+  });
+
+  // Um caminho pode chegar com `./` a frente ou com barras invertidas. Responder "nao" a
+  // esses era falhar em SILENCIO — o ficheiro e o mesmo e o aviso nao saia.
+  test("o predicado normaliza `./` e barras invertidas", () => {
+    const p = [];
+    for (const c of ["./.claude/settings.json", ".claude\\hooks\\x.mjs", "./.githooks/commit-msg"]) {
+      if (!ehCaminhoFronteira(c)) p.push(`nao reconheceu ${c}`);
+    }
+    return p;
+  });
 }

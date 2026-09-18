@@ -32,6 +32,9 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { regraDe, comandoDe } from "../../.agent/scripts/lib/mapa-suites.mjs";
+// A lista dos caminhos da fronteira vive num sitio so — o mesmo modulo que o `PreToolUse` usa
+// para olhar para o texto de um comando. Duas copias eram duas coisas a concordar a mao.
+import { ehCaminhoFronteira } from "./lib/fronteira.mjs";
 
 /** O mapa "caminho tocado -> o que o verifica" vive em `.agent/scripts/lib/mapa-suites.mjs`.
  *
@@ -91,9 +94,29 @@ try {
     if (!devidos.has(cmd)) devidos.set(cmd, []);
     devidos.get(cmd).push(f);
   }
-  if (devidos.size === 0) process.exit(0);
+  // A FRONTEIRA tem aviso proprio, e nao se mistura com a divida de suites.
+  //
+  // Um ficheiro de fronteira alterado ja aparecia aqui — mas como "falta correr a suite X",
+  // indistinguivel de qualquer outro ficheiro tocado. E a frase que um humano precisa de ler
+  // e outra: *mexeste na fronteira*. Medido: um script alterou o `.claude/settings.json` por
+  // dentro, o aviso saiu como divida do `test-guards.mjs`, e so muito depois alguem percebeu
+  // o que tinha acontecido.
+  //
+  // DETECCAO, nao barreira, e o `lib/fronteira.mjs` diz porque: o `PreToolUse` so ve o texto
+  // do comando, e um `node script.mjs` que escreva la dentro nao tem como ser apanhado ali.
+  // Isto nao fecha esse buraco — torna-o visivel no fim do turno, que e quando ainda da para
+  // desfazer.
+  const naFronteira = tocados.filter(ehCaminhoFronteira);
+
+  if (devidos.size === 0 && naFronteira.length === 0) process.exit(0);
 
   const linhas = [...devidos].map(([cmd, fs]) => `- \`${cmd}\`  ← ${fs.length === 1 ? fs[0] : `${fs.length} ficheiros`}`);
+  if (naFronteira.length) {
+    linhas.unshift(
+      `- **FRONTEIRA ALTERADA** (${naFronteira.join(", ")}) — sao as regras que protegem as ` +
+        `sessoes seguintes. Confirmar que a alteracao e deliberada e que nao AFROUXA nada.`
+    );
+  }
   // Calar se a divida for identica a da ultima vez.
   // A marca pertence ao repo que esta a ser medido: resolver ao ficheiro do hook fazia um
   // hook a correr noutro repo (ou uma suite num repo temporario) escrever a marca AQUI — e a
