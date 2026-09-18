@@ -51,7 +51,9 @@ export const TETOS = {
   // FORMA_EXIGIDA, que e politica e nao motor). RE-CONGELA a cada descida, senao a catraca
   // deixava a folga recuperada por recuperar.
   ".claude/hooks/guard-protected-branch.mjs": 517,
-  ".agent/scripts/tests/test-guards.mjs": 525,
+  // 525 -> 510: a divisao dos casos do modo `--projeto` para `tests-medida-2b.mjs` libertou 15
+  // linhas que ficaram por reclamar ate o ramo da folga existir. Foi ele que as encontrou.
+  ".agent/scripts/tests/test-guards.mjs": 510,
 };
 
 // O `mutation-sweep.mjs` esteve nesta lista (505 linhas) e SAIU: a tabela `PARES` — 186
@@ -128,6 +130,30 @@ export function guardFileSizes({ read, warn, ok, skip, note, listTree }) {
       warn(
         `${f} tem ${n} linhas e ja cabe no limite de ${LIMITE} — remover a entrada de TETOS ` +
           `em guards/sizes.mjs (a excecao sobreviveu ao problema)`
+      );
+      problemas++;
+    } else if (n < teto) {
+      // ENTRE o limite e o teto: o ficheiro encolheu e ninguem reclamou a folga.
+      //
+      // Faltava o ramo, e entre os dois de cima nao havia nada: um ficheiro congelado a 600 que
+      // descesse para 520 nao disparava nada — `520 > 600` falso, `520 <= 500` falso — e podia
+      // voltar a crescer 80 linhas em silencio. Uma catraca que permite recuperar o terreno
+      // perdido nao e uma catraca.
+      //
+      // A regra ja estava ESCRITA, no comentario da propria tabela ("RE-CONGELA a cada
+      // descida"), e era cumprida a mao. E o padrao que tres rondas seguidas encontraram: a
+      // licao aprendida, escrita com clareza, e nao varrida para o mecanismo.
+      //
+      // REPROVA, e nao e so uma nota: um aviso que nao reprova e a versao que ja existia — a
+      // prosa. Medido no momento em que este ramo nasceu: o `test-guards.mjs` estava a 510 com
+      // o teto em 525, com 15 linhas de folga por reclamar.
+      //
+      // O guard NAO reescreve a tabela sozinho: um medidor que altera o que mede deixa de o
+      // poder afirmar. Diz o numero, e quem decide escreve-o.
+      warn(
+        `${f} tem ${n} linhas e o teto congelado e ${teto} — encolheu ${teto - n} linha(s) e a ` +
+          `folga ficou por reclamar. Baixar o teto para ${n} em TETOS de guards/sizes.mjs, ou ` +
+          `este ficheiro pode voltar a crescer ate ${teto} sem ninguem dar por isso`
       );
       problemas++;
     }

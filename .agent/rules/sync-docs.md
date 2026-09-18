@@ -66,7 +66,9 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     100% a mentir. A soma dos sitios antes e depois de um refactor tem de ser a MESMA.
     **Ficheiro acima das 500 linhas?** O Guard 17 reprova. Dividi-lo (dados para um modulo
     proprio e o corte mais barato) ou, com razao escrita, congela-lo em `TETOS` de
-    `guards/sizes.mjs` — congelar e uma catraca (so encolhe), nao uma isencao.
+    `guards/sizes.mjs` — congelar e uma catraca (so encolhe), nao uma isencao. E ao ENCOLHER
+    um congelado, **baixar o teto no mesmo commit**: a folga que fica por reclamar e espaco
+    para voltar a crescer em silencio, e o guard reprova ate ela ser reclamada.
     **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
     (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
     permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre
