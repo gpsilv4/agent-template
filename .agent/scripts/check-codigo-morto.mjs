@@ -20,9 +20,38 @@
  * Contar texto dava o veredicto errado nos dois sentidos.
  *
  * O QUE NAO MEDE, dito por inteiro: so olha para **imports**. Uma funcao interna que ninguem
- * chama, uma constante exportada que ninguem importa, um ramo inalcancavel — nada disso e visto.
- * Alargar e possivel e e outro trabalho; prometer mais do que se mede era o defeito que este repo
- * passa a vida a apanhar.
+ * chama, uma variavel local por usar, um parametro supErfluo, um ramo inalcancavel — nada disso e
+ * visto. Prometer mais do que se mede era o defeito que este repo passa a vida a apanhar.
+ *
+ * E FICA ASSIM — decidido, nao adiado. As rondas 4 e 5 pediram as duas um `eslint` com
+ * `no-unused-vars`, que apanharia tambem as locais. A resposta e nao, por tres razoes, e a
+ * terceira e a que decide:
+ *
+ *   1. **A classe que VIAJA esta fechada.** O dano que os relatorios descrevem — codigo morto a
+ *      chegar aos derivados — e o dos imports: aparecem no topo do ficheiro, vem em cascata a
+ *      cada extraccao (cinco vezes numa so sessao), e o `/upgrade` leva-os a todos os
+ *      consumidores. Uma variavel local e **local**: nao cruza fronteiras de ficheiro, nao parte
+ *      suites, e o `/review` apanha-a a ler o diff.
+ *
+ *   2. **"Estender o detector" soa incremental e nao e.** Contar ocorrencias sobre codigo e uma
+ *      coisa; saber se uma declaracao e LIDA no seu ambito — sombreamento, closures, destructuring
+ *      — e outra ordem de dificuldade. Um analisador de ambito escrito a mao com defeitos e **pior
+ *      do que nenhum**: da confianca infundada. Ja custou caro aqui: a primeira versao do
+ *      `soCodigo()` comeu 92% de um ficheiro e deu quatro imports em uso como mortos.
+ *      E o `eslint` fecharia isso, mas com uma dependencia npm no `guard-tests` — ver a nota
+ *      "PORQUE NAO O `eslint`" acima. Opt-in tambem nao serve: nao correria no TEMPLATE, que e
+ *      onde o codigo morto nasce antes de viajar.
+ *
+ *   3. **Duas rondas reportaram isto e nenhuma mediu o dano.** Listam simbolos, nao consequencias.
+ *      O unico caso NAO-import que nomeiam — o parametro `base` do `test-test-surface.mjs` — vem
+ *      com a nota do proprio revisor: *"o teste calcula a sua propria baseline e devolve-a, logo o
+ *      parametro e mesmo superfluo — nao e um sinal de assercao em falta"*. Era ruido, e ruido e
+ *      trabalho do `/review`.
+ *
+ * O QUE MUDARIA ISTO, escrito para nao ter de ser re-discutido a cada ronda: **um caso real em que
+ * uma variavel local ou um parametro morto tenham causado um defeito** — nao apenas aparecido numa
+ * lista. Uma assercao que nunca corre porque o seu parametro nunca e lido, por exemplo. Com esse
+ * caso em maos, a conta muda e vale a pena pagar o custo do ponto 2.
  *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *
