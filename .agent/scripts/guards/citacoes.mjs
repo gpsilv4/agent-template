@@ -26,8 +26,20 @@
  *  proposito (`check-orfao.mjs`, `guards/inchado.mjs`), e acusa-las seria acusar o desenho. */
 const PASTAS = [".agent/rules", ".agent/workflows"];
 
-/** Onde os ficheiros citados podem viver. */
-const MAQUINARIA = [".agent/scripts", ".claude/hooks"];
+/** Onde os ficheiros citados podem viver.
+ *
+ *  ADAPTAVEL AO PROJETO, como os `TEST_GLOBS` do `check-test-surface.mjs`: um derivado tem as
+ *  suas proprias pastas de scripts, e cravar so as do template fazia este guard acusar citacoes
+ *  que resolvem. Medido num consumidor: a `business-logic.md` dele citava `seed.mjs`, que existe
+ *  em `scripts/seed.mjs`, e saiu como citacao morta.
+ *
+ *  O proprio cabecalho deste guard avisa contra isso — *"um guard que acusa quem lhe obedece e
+ *  desligado na primeira semana"* — e era ele a faze-lo.
+ *
+ *  As duas primeiras sao do template e nao se tiram; as seguintes acrescentam-se no bootstrap,
+ *  conforme onde o projeto poe os seus scripts. Uma pasta que nao exista e ignorada em silencio:
+ *  a lista diz onde PODE viver, nao o que tem de existir. */
+const MAQUINARIA = [".agent/scripts", ".claude/hooks", "scripts", "tools"];
 
 /** Um nome de ficheiro `.mjs` dentro de crases. */
 const CITADO = /`([a-z][\w-]*\.mjs)`/g;

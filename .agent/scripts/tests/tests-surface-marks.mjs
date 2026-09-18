@@ -284,6 +284,47 @@ export function registar() {
     return base;
   }, { code: 1, includes: [".claude/hooks/guardiao.mjs", "APAGADO"] });
 
+  // --- MIGRACAO nao e apagamento ------------------------------------------------
+  //
+  // Integrar a reorganizacao que moveu as suites para `tests/` produzia **25 avisos de APAGADO
+  // e exit 1** num consumidor, por uma mudanca de pasta que nao tirou um unico teste. O que a
+  // salvava era acidental — a deteccao de renames do git apanhava 22 dos 25, e os tres que
+  // tinham mudado demasiado ao migrar caiam abaixo do limiar de similaridade.
+  //
+  // O irmao ja tinha o conceito: o `simulate-upgrade.mjs` imprime "MIGRADO: o mesmo nome existe
+  // noutra pasta". Medido num derivado real, na ronda 6.
+  test("ficheiro MOVIDO de pasta e MIGRADO, nao apagado", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/vigia.mjs"), 'console.log("ola");\n');
+    commit(dir, "hook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    // O conteudo muda BASTANTE, e e deliberado: com o ficheiro igual, o git emparelha os dois
+    // por similaridade e o verificador nunca ve um apagamento — foi assim que 22 dos 25 casos
+    // reais passaram despercebidos. Os que exercitam este ramo sao os que mudaram demasiado ao
+    // migrar (imports reescritos, caminhos relativos novos) e cairam abaixo do limiar.
+    mkdirSync(join(dir, ".claude/hooks/lib"), { recursive: true });
+    writeFileSync(
+      join(dir, ".claude/hooks/lib/vigia.mjs"),
+      '// reescrito ao migrar: outros imports, outros caminhos\n' + 'const x = 1;\n'.repeat(40) + 'export default x;\n'
+    );
+    rmSync(join(dir, ".claude/hooks/vigia.mjs"));
+    commit(dir, "mover o hook de pasta");
+    return base;
+  }, { code: 0, includes: ["MIGRADO para .claude/hooks/lib/vigia.mjs"] });
+
+  // O CONTRA-CASO, e sem ele o de cima abria um buraco: apagar de verdade — sem nenhum ficheiro
+  // do mesmo nome noutra pasta — tem de continuar a ser APAGADO com exit 1. E a diferenca entre
+  // reconhecer uma migracao e deixar de ver apagamentos.
+  test("apagado SEM homonimo noutra pasta continua APAGADO", (dir) => {
+    mkdirSync(join(dir, ".claude/hooks"), { recursive: true });
+    writeFileSync(join(dir, ".claude/hooks/sozinho.mjs"), 'console.log("ola");\n');
+    commit(dir, "hook novo");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".claude/hooks/sozinho.mjs"));
+    commit(dir, "apagar mesmo");
+    return base;
+  }, { code: 1, includes: [".claude/hooks/sozinho.mjs", "APAGADO"] });
+
   // E o `.githooks/`, que nao tem extensao por onde ser apanhado por um glob de sufixo.
   test("hook do git apagado e reportado", (dir) => {
     mkdirSync(join(dir, ".githooks"), { recursive: true });

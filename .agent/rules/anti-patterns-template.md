@@ -153,3 +153,17 @@
   formula repetida fora de quem a define), e, ao rever um diff, a pergunta directa: **este valor
   ja existe noutro sitio?** Se sim, importar. Cada copia nova paga um teste na **fronteira** —
   e nas fronteiras que as duas divergem.
+
+## TP9 — Teste que pergunta por um caminho fixo que mudou de sitio
+
+- **Origem**: ronda 6 — apos a migracao para `tests/`, **28 de 32** ficheiros sem regra em
+  `lib/mapa-suites.mjs` e a suite verde: as regras apontavam para os caminhos de antes e o teste
+  perguntava pelos mesmos (`anti-patterns-why.md`).
+- **Anti-padrao**: escrever a mao, no teste, o **input** que ele pergunta ao codigo — tabela e
+  teste envelhecem juntos e continuam de acordo.
+- **Correto**: listar o **disco** e perguntar pelo que se listou (`TP8` aplicado ao input), e um
+  **catch-all** — *todo* o ficheiro da pasta casa uma regra — que declara o vazio (`total === 0`
+  -> "mediria o vazio"), senao a pasta renomeada cala-o.
+- **Detecao em review**: `git grep -nE '"\.(agent|claude)/[^"]+\.mjs"' -- '*/tests/*'` — caminho
+  literal num teste: legitimo se o MONTA, suspeito se o INTERROGA. Controlo negativo: **mover a
+  pasta**, a suite fica vermelha.

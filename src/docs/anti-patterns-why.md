@@ -322,3 +322,51 @@ depois do guarda de existencia.
 
 A licao secundaria: eliminar uma duplicacao nao pode custar um caminho de recusa. Se custar, a
 forma esta errada — nao o objectivo.
+
+---
+
+## TP9 — Teste que pergunta por um caminho fixo, e o caminho mudou de sitio
+
+O achado veio de fora: um `/upgrade` a um projeto real, com relatorio escrito por quem o sofreu.
+As suites do template tinham migrado da raiz de `.agent/scripts/` para `tests/`. O que se mediu
+depois, no template, com o mapa a responder sobre o disco de hoje:
+
+| | Antes da correcao | Depois |
+|---|---|---|
+| ficheiros de `tests/` sem regra em `lib/mapa-suites.mjs` | **28 de 32** | **0 de 32** |
+| suites vermelhas por causa disso | **0** | — |
+
+Dez regexes do mapa apontavam para `^\.agent/scripts/tests-[\w-]+\.mjs$`: o caminho de antes da
+migracao. Nao estavam apagadas — estavam a descrever um repo que ja nao existia.
+
+### Porque e que nada ficou vermelho
+
+O mapa tem suite propria, e a suite tinha dois testes sobre exactamente este assunto. Ambos
+perguntavam pelos caminhos **escritos a mao no proprio teste** — os mesmos caminhos de antes da
+migracao. Tabela e teste envelheceram juntos, na mesma direccao, e continuaram de acordo. Um
+teste so apanha uma mudanca se algo nele vier do lado que muda.
+
+### O erro de leitura que isto me apanhou a mim
+
+Ao ver o sintoma — *"os `tests-*.mjs` nao casam regra nenhuma"* — escrevi no ficheiro uma recusa
+**argumentada**: nao havia regra para eles, e explicava porque nao valia a pena haver. A premissa
+era falsa. A regra existia; apontava para outro sitio. Medir o sintoma e inferir a causa produz
+prosa convincente por cima de um facto errado, e a prosa depois defende-se sozinha. So a ronda
+seguinte, contra um projeto real, o desfez.
+
+### A forma da correcao
+
+Os dois testes passaram a **listar o disco** e a perguntar pelo caminho que listaram, e juntou-se
+um terceiro que varre `tests/` e `tests/harness/` inteiras. Esse declara o vazio antes de
+concluir: sem ficheiros listados devolve *"nao listei ficheiro nenhum — o teste mediria o vazio"*,
+senao uma pasta renomeada calava-o em vez de o reprovar (`TP2` outra vez, um nivel acima).
+
+Controlo negativo, e e o que dá confianca no resto: repor **uma** regra no caminho pre-migracao
+poe **dois** testes vermelhos. O anterior, com o mesmo defeito reposto, ficava verde.
+
+### O que isto nao prova
+
+O padrao "varrer por padrao em vez de por lista" ja tinha entrado no repo (v0.17.0) — e nao
+apanhou isto, porque a migracao e mais antiga do que a regra. Uma regra nova nao audita o
+passado: so o que lhe passa pelas maos a partir do dia em que existe. O que auditou o passado foi
+correr contra um consumidor real.

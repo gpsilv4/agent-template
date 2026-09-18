@@ -266,6 +266,26 @@ try {
 }
 
 const tocados = alterados.filter(naSuperficie);
+
+/** Os ficheiros da superficie que EXISTEM agora, para distinguir migracao de apagamento.
+ *
+ *  Calculado a pedido e uma so vez: so o ramo do ficheiro ausente precisa dele, e esse ramo e
+ *  raro. Ler `git ls-files` a cada ficheiro tocado seria pagar por todos o que so um usa.
+ *
+ *  `ls-files` e nao o disco: a superficie e o que esta RASTREADO. Um ficheiro por rastrear nao
+ *  conta como destino de uma migracao — se contasse, criar um ficheiro solto com o nome de um
+ *  teste apagado bastava para o apagamento passar por mudanca de pasta. */
+let _superficieNoDisco = null;
+const daSuperficieNoDisco = () => {
+  if (_superficieNoDisco === null) {
+    try {
+      _superficieNoDisco = git(["ls-files"]).split("\n").filter(Boolean).filter(naSuperficie);
+    } catch {
+      _superficieNoDisco = [];
+    }
+  }
+  return _superficieNoDisco;
+};
 /** Cada ficheiro tocado com os dois lados ja lidos, para o veredicto poder olhar ao total. */
 const medidos = [];
 if (tocados.length === 0) {
@@ -340,9 +360,28 @@ if (tocados.length === 0) {
     if (existsSync(noDisco)) {
       agora = readFileSync(noDisco, "utf8");
     } else {
-      // Estava na baseline e ja nao esta em HEAD: foi APAGADO. E a forma mais brutal de
-      // enfraquecer, e merece nome proprio. (Um ficheiro ausente das DUAS arvores nao pode
-      // aparecer no `git diff`, logo nao ha terceiro caso.)
+      // Estava na baseline e ja nao esta em HEAD. Duas coisas diferentes, e ate agora eram uma:
+      //
+      // MIGRADO — existe um ficheiro com o MESMO NOME noutra pasta da superficie. Uma
+      // reorganizacao que nao tira um unico teste produzia 25 avisos e exit 1 num consumidor que
+      // integrasse a migracao para `tests/`. O que a salvava era acidental: a deteccao de
+      // renames do git apanhava 22 dos 25, e os tres que tinham mudado demasiado ao migrar
+      // caiam abaixo do limiar de similaridade. Depender disso e depender de uma heuristica.
+      //
+      // O irmao ja tem este conceito e imprime-o: o `simulate-upgrade.mjs` diz "MIGRADO: o mesmo
+      // nome existe noutra pasta". Aqui usa-se a mesma leitura.
+      //
+      // O RISCO, escrito e nao tapado: apagar um teste quando existe outro com o mesmo nome
+      // noutra pasta passa a ler-se como migracao. E estreito — exige o mesmo nome de ficheiro,
+      // dentro da superficie — e a linha **continua no ecra** em vez de desaparecer, logo quem
+      // le a corrida ve o que aconteceu.
+      const nome = f.split("/").pop();
+      const migradoPara = daSuperficieNoDisco().find((o) => o !== f && o.split("/").pop() === nome);
+      if (migradoPara) {
+        ok(`${f}: MIGRADO para ${migradoPara} (mesmo nome noutra pasta da superficie)`);
+        continue;
+      }
+      // APAGADO de facto. E a forma mais brutal de enfraquecer, e merece nome proprio.
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;
     }

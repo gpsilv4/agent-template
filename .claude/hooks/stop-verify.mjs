@@ -64,7 +64,19 @@ function caminhosPorcelain(saida) {
   const caminhos = [];
   for (let i = 0; i < entradas.length; i++) {
     const estado = entradas[i].slice(0, 2);
-    caminhos.push(entradas[i].slice(3));
+    // O APAGADO vai junto, com o facto de o ser. Quem decide o que fazer com ele e o consumidor,
+    // e sao decisoes diferentes: um ficheiro apagado ainda **deve** a suite que o cobria (apagar
+    // `lib/pares.mjs` exige o `test-pares.mjs` mais do que modifica-lo), e apagar um ficheiro da
+    // FRONTEIRA e o afrouxamento mais forte que ha — calar isso era o oposto do que o aviso quer.
+    //
+    // Deitar o caminho fora aqui foi a primeira versao desta correcao, e afrouxava as duas
+    // coisas de uma vez. O contra-caso que eu tinha (o mesmo ficheiro MODIFICADO continua a
+    // gerar divida) nao lhe tocava: o defeito estava no ramo do APAGADO, nao no do modificado.
+    //
+    // Pelo ESTADO que o git da, e nao com um `existsSync`: os caminhos do porcelain sao
+    // relativos a raiz do repo e o hook pode correr de uma subpasta, logo um teste ao disco
+    // responderia sobre o sitio errado. O git ja sabe o que apagou.
+    caminhos.push({ caminho: entradas[i].slice(3), apagado: estado.includes("D") });
     // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado.
     if (estado[0] === "R" || estado[0] === "C") i++;
   }
@@ -85,9 +97,14 @@ try {
 
   const tocados = caminhosPorcelain(porcelain);
   const devidos = new Map(); // cmd -> ficheiros que o motivam
-  for (const f of tocados) {
+  for (const { caminho: f, apagado } of tocados) {
     const regra = regraDe(f);
     if (!regra) continue;
+    // O UNICO caso que um ficheiro apagado nao motiva: `suiteDeSi` monta `node <o proprio
+    // ficheiro>`, e mandar correr o que ja nao existe e um comando que so pode falhar. Numa
+    // migracao real, num consumidor, sairam varios assim. As regras com `verifica` nao entram
+    // nesta excecao — a suite que elas nomeiam existe, e e ela que tem de correr.
+    if (apagado && regra.suiteDeSi) continue;
     // O ficheiro vai junto: uma suite de entry point verifica-se a si propria, e a regra sabe
     // que e assim sem saber QUAL suite e. So o caminho tocado o diz.
     const cmd = comandoDe(regra, f);
@@ -106,7 +123,10 @@ try {
   // do comando, e um `node script.mjs` que escreva la dentro nao tem como ser apanhado ali.
   // Isto nao fecha esse buraco — torna-o visivel no fim do turno, que e quando ainda da para
   // desfazer.
-  const naFronteira = tocados.filter(ehCaminhoFronteira);
+  // O APAGADO conta, e conta a dobrar: remover um guard e a forma mais completa de o afrouxar.
+  const naFronteira = tocados
+    .filter((t) => ehCaminhoFronteira(t.caminho))
+    .map((t) => (t.apagado ? `${t.caminho} (APAGADO)` : t.caminho));
 
   if (devidos.size === 0 && naFronteira.length === 0) process.exit(0);
 

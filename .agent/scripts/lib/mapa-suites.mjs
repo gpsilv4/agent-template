@@ -59,25 +59,25 @@ export const SUITES = [
   //
   // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
-  { re: /^\.agent\/scripts\/(?:check-test-surface|surface-patterns|test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
-  { re: /^\.agent\/scripts\/test-harness\.mjs$/, verifica: [S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/test-harness\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
-  { re: /^\.agent\/scripts\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
   // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do
   // projeto: mexer na configuracao obriga a correr quem a le.
-  { re: /^\.agent\/scripts\/(test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
+  { re: /^\.agent\/scripts\/(tests\/harness\/test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   // A limpeza de `tmpdir` decide se uma copia de trabalho e apagada — e uma decisao errada aqui
   // apaga a copia de uma corrida VIVA. Regra propria, antes da generica de `lib/`, porque a
   // suite dela e a unica que exercita o contra-caso (o processo vivo que nao se toca).
   { re: /^\.agent\/scripts\/(lib\/tmp-limpo|tests\/test-tmp-limpo)\.mjs$/, verifica: [S("test-tmp-limpo.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
-  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|test-sweep-harness\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/test-sweep-harness\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
-  { re: /^\.agent\/scripts\/(lib\/mapa-suites|test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/mapa-suites|tests\/test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
   // O `pares.mjs` decide **o que a varredura mede de todo**, e caia na generica de `lib/` — ia
   // para o `test-registo.mjs`, que nao lhe toca (menciona `PARES` zero vezes; o
   // `test-mutation-sweep.mjs` menciona-o vinte). Exactamente a armadilha que a regra de cima
@@ -85,7 +85,7 @@ export const SUITES = [
   //
   // E mais grave do que parecer: uma entrada perdida no `PARES` nao produz vermelho nenhum —
   // a varredura passa a medir um conjunto mais pequeno e **reporta 100% sobre ele**.
-  { re: /^\.agent\/scripts\/(lib\/pares|lib\/varredura-paralela|test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/pares|lib\/varredura-paralela|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
@@ -95,8 +95,8 @@ export const SUITES = [
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da
   // erro nenhum, so deixa de gerar a obrigacao certa.
-  { re: /^\.agent\/scripts\/tests-upgrade-[\w-]+\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")], only: "upgrade" },
-  { re: /^\.agent\/scripts\/tests-[\w-]+\.mjs$/, verifica: [S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/tests-(upgrade|medida)-[\w-]+\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")], only: "upgrade" },
+  { re: /^\.agent\/scripts\/tests\/tests-[\w-]+\.mjs$/, verifica: [S("test-guards.mjs")] },
 
   // Uma suite de entry point verifica-se A SI PROPRIA. Oito das dez nao casavam regra nenhuma:
   // mexer no `test-guards.mjs` — 245 testes — nao gerava obrigacao de o correr. Escapou porque
@@ -108,7 +108,7 @@ export const SUITES = [
   //
   // Apanhado pelo aviso dos ficheiros sem regra, um minuto depois de esse aviso deixar de ser
   // engolido — que e o argumento inteiro a favor de o tornar visivel.
-  { re: /^\.agent\/scripts\/(test-[\w-]+)\.mjs$/, verifica: [], suiteDeSi: true },
+  { re: /^\.agent\/scripts\/tests\/(test-[\w-]+)\.mjs$/, verifica: [], suiteDeSi: true },
   // ANTES da regra generica de `lib/`: a ordem da tabela e a semantica, e o `lib/` generico
   // manda tudo para a suite do registo — que nao toca nestes dois.
   { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado|lib\/ficheiros)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
