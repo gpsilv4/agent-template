@@ -86,14 +86,35 @@ export function registar() {
     writeF(dir, CONGELADO, readF(dir, CONGELADO) + "// mais uma linha\n".repeat(Math.max(1, faltam)));
   }, { code: 1, includes: ["o teto congelado e", "so pode ENCOLHER"] });
 
-  test("G17: ficheiro congelado que ENCOLHE (sem chegar ao limite) nao avisa", (dir) => {
-    // Encolher para um valor entre o LIMITE (500) e o teto: nao pode avisar. O numero e
-    // derivado do teto real, nao fixado — fixa-lo aqui obrigava a mexer neste teste sempre
-    // que o ficheiro encolhesse, e foi o que aconteceu ao re-congelar o teto em 590.
+  // --- A catraca tem de FECHAR, e este teste dizia o contrario ----------------
+  //
+  // A versao anterior afirmava que encolher entre o LIMITE e o teto **nao avisa**, com
+  // `code: 0`. Consagrava o buraco: um ficheiro congelado a 600 que descesse para 520 nao
+  // disparava ramo nenhum e podia voltar a crescer 80 linhas em silencio. Uma catraca que
+  // permite recuperar o terreno perdido nao e uma catraca — e havia um teste a garantir que
+  // continuasse assim.
+  //
+  // A regra ja estava escrita no comentario da propria tabela ("RE-CONGELA a cada descida") e
+  // era cumprida a mao. Medido no dia em que o ramo nasceu: o `test-guards.mjs` estava a 510
+  // com o teto em 525, com 15 linhas de folga por reclamar.
+  test("G17: ficheiro congelado que ENCOLHE manda reclamar a folga", (dir) => {
+    // O alvo e DERIVADO do teto real, e nao fixado: fixa-lo obrigava a mexer neste teste
+    // sempre que o ficheiro encolhesse, e foi o que aconteceu ao re-congelar o teto em 590.
     const teto = TETOS[CONGELADO];
     const alvo = Math.floor((500 + teto) / 2);
     writeF(dir, CONGELADO, readF(dir, CONGELADO).split("\n").slice(0, alvo).join("\n") + "\n");
-  }, { code: 0, includes: ["tamanho de ficheiro:"] });
+    return { includes: [`Baixar o teto para ${alvo}`, "folga ficou por reclamar"] };
+  }, { code: 1 });
+
+  // O CONTRA-CASO, e sem ele o de cima era satisfeito por um guard que avisasse SEMPRE que
+  // existisse uma entrada em TETOS: no teto exacto nao ha folga nenhuma a reclamar.
+  test("G17: ficheiro congelado EXACTAMENTE no teto nao avisa", (dir) => {
+    const teto = TETOS[CONGELADO];
+    const linhas = readF(dir, CONGELADO).replace(/\n$/, "").split("\n");
+    const corpo = linhas.slice(0, teto - 1).join("\n");
+    writeF(dir, CONGELADO, corpo + "\n" + "// enche ate ao teto\n".repeat(teto - (teto - 1)));
+    return { excludes: ["folga ficou por reclamar", "so pode ENCOLHER"] };
+  }, { code: 0 });
 
   // --- A excecao nao sobrevive ao problema -----------------------------------
   // Sem isto, um ficheiro dividido ate as 200 linhas ficava com a entrada de TETOS para

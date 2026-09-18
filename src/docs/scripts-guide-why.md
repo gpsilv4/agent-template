@@ -56,3 +56,20 @@ orcamento de uma rule de referencia, para um inventario que o cabecalho de cada 
 mais detalhe. Saiu de la quando o ficheiro passou o tecto pela terceira vez no mesmo dia.
 
 Guards que correm sem config — orcamento de bytes com **um tecto unico de 12 000 para tudo o que se le** (NOTE a 11 500): rules carregadas, rules de referencia, **workflows** e catalogos de definicoes. Orcamenta tambem o **contexto** carregado (`.agent/context/`: NOTE 36 000 / gate 48 000, derivado das regras de arquivamento do `process-rules.md`; as rules ficam fora desta soma porque tem dono proprio no primeiro orcamento). Mais: paridade `CLAUDE.md`≡`GEMINI.md`, workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` resolvem, sanidade do `.claude/settings.json` (deny de secrets, allow sem wildcards abertos), **placeholders esquecidos apos o bootstrap** (salta enquanto o bootstrap nao correu), **as Fronteiras copiadas nos ponteiros do Cursor e do Copilot** (copia forcada — ver *why*), versao `package.json`≡`CHANGELOG`, `.nvmrc`, termos obsoletos e versoes de deps (configuravel). Caminhos ancorados a raiz do repo e **todo o skip e visivel**: um guard que nao corre imprime `SKIP`. Sai `!= 0` em warning (serve de gate). **Corre no CI** no job `guard-tests`, nao no `quality` (ver *why*). Correr antes de commit e apos Dependabot PRs.
+
+
+## Porque o simulador de derivado PREENCHE a configuracao
+
+O bloco `3c` do `simulate-derived.mjs` nomeia tres dimensoes de maturidade de um consumidor e
+implementava UMA. A quarta — **a configuracao preenchida** — nem sequer era nomeada, e e a mais
+barata e a que mais rende: os quatro defeitos que a quarta ronda de revisao abriu vivem TODOS
+nela.
+
+A relacao e causal e foi verificada num derivado real: **no momento em que a configuracao foi
+preenchida, quatro testes que estavam verdes ficaram vermelhos.** Nao escaparam por serem
+subtis — escaparam porque *o instrumento construido para os apanhar constroi um derivado que
+nao os pode manifestar*. Um template por estrear tem `CHECKS` vazia, `BANNED` vazia, `TARGETS`
+com uma rota de exemplo e o gate dos bundles no default.
+
+E o `TP3` — *"teste que depende do estado do repo em vez de o montar"* — do lado do simulador:
+ele proprio dependia de o repo estar por configurar.

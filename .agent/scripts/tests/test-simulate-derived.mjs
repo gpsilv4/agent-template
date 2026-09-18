@@ -101,7 +101,15 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   w(".agent/scripts/config/bundles.mjs", "export const ALVOS_REPROVAM = true;\n");
   w(".agent/rules/process-rules.md", "# Processo\n\nO metodo passa por 6 fases.\n");
   if (!semGuardTamanhos) {
-    w(".agent/scripts/guards/sizes.mjs", tetosOutraForma ? "export const TETOS = [];\n" : "export const TETOS = {\n};\n");
+    // O `contaLinhas` vem JUNTO com a tabela: o simulador importa-o do guard da copia em vez de
+    // reimplementar a contagem, e uma fixture so com `TETOS` fazia o import trazer `undefined`.
+    // E a mesma licao que o harness do `/upgrade` ja tinha aprendido — a recusa esta certa, a
+    // fixture e que estava incompleta.
+    w(
+      ".agent/scripts/guards/sizes.mjs",
+      'export const contaLinhas = (src) => src.replace(/\\n$/, "").split("\\n").length;\n' +
+        (tetosOutraForma ? "export const TETOS = [];\n" : "export const TETOS = {\n};\n")
+    );
   }
 
   w(".agent/rules/anti-patterns.md",
