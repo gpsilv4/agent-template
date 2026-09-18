@@ -37,7 +37,7 @@
 
 import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join, sep } from "path";
 import { aplica } from "./lib/patch.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
@@ -360,19 +360,9 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
 }
 
 // --- 3d. o derivado que CONFIGUROU -----------------------------------------------
-// PORQUE EXISTE: o bloco 3c acima nomeia tres dimensoes de maturidade e implementa UMA. A
-// quarta — **a configuracao preenchida** — nem sequer era nomeada, e e a mais barata e a que
-// mais rende: os quatro defeitos que a quarta ronda de revisao abriu vivem TODOS nela.
-//
-// A relacao e causal e foi verificada num derivado real: no momento em que a configuracao foi
-// preenchida, quatro testes que estavam verdes ficaram vermelhos. Nao escaparam por serem
-// subtis — escaparam porque **o instrumento construido para os apanhar constroi um derivado
-// que nao os pode manifestar**. Um template por estrear tem `CHECKS` vazia, `BANNED` vazia,
-// `TARGETS` com uma rota de exemplo e o gate dos bundles no default: nenhum teste que leia
-// essas listas em vez de as MONTAR pode falhar aqui, e todos falham no consumidor.
-//
-// E o `TP3` — "teste que depende do estado do repo em vez de o montar" — do lado do simulador:
-// ele proprio dependia de o repo estar por configurar.
+// PORQUE EXISTE: um template por estrear tem a configuracao VAZIA, e nenhum teste que leia
+// essas listas em vez de as MONTAR pode falhar aqui. E o `TP3` do lado do simulador. A medicao
+// que o prova esta em `src/docs/scripts-guide-why.md`.
 {
   /** Substitui um literal na copia, e REPROVA se nao casar. Um patch que nao aplica deixa a
    *  simulacao a medir o template por estrear outra vez, em silencio — que e o defeito que
@@ -441,7 +431,12 @@ ok(`${geradas.length} rule(s) do bootstrap geradas: ${geradas.map((g) => g.split
   const p = join(dir, relGuard);
   const c = leOuNull(p);
   if (c === null) fatal(`${relGuard} nao existe na copia`);
-  const n = readFileSync(join(dir, rel), "utf8").split("\n").length;
+  // A contagem vem do GUARD, nao de uma copia local: reimplementada aqui media +1 e congelava
+  // este ficheiro em 543 tendo 542 — a TERCEIRA copia do mesmo defeito, e o cabecalho do
+  // `contaLinhas` diz porque foi exportado. DINAMICO pela razao da 2b: um `import` no topo
+  // tornava a ausencia do guard um crash em vez do `fatal` acima, que a reporta.
+  const { contaLinhas } = await import(pathToFileURL(p).href);
+  const n = contaLinhas(readFileSync(join(dir, rel), "utf8"));
   // ACRESCENTA, nao substitui. Um derivado fica com os ficheiros grandes do template (que
   // copiou) **e** os seus — os dois conjuntos, nao um deles. Substituir simulava um projeto que
   // apagou os ficheiros do template, que nao e um derivado: e outra coisa. Medido — a versao
