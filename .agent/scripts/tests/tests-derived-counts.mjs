@@ -284,4 +284,33 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
       if (f.endsWith(".md")) rmSync(join(dir, ".agent/workflows", f));
     }
   }, { code: 1, includes: ["nao encontrei workflows em .agent/workflows"] });
+
+  // --- 12f: quantos FICHEIROS existem numa pasta ------------------------------
+  // O inventario do `README.md` tinha QUATRO contagens erradas ao fim de seis releases, e
+  // nada as media. Pior: foram corrigidas a mao com um script, e uma escapou — a mesma
+  // quantidade aparecia duas vezes no mesmo ficheiro, uma em ingles e outra em portugues.
+  // A RAIZ compara-se com a ARVORE do proprio ficheiro, e nao com o disco: as fixtures dos
+  // Guards 19/20 escrevem \`.mjs\` falsos em \`.agent/scripts/\` — contra o disco, sete testes
+  // ficavam vermelhos por uma razao que nada tem a ver com o que afirmam.
+  test("G12f: numero de entry points desalinhado com a arvore avisa", (dir) => {
+    writeF(dir, "README.md", "# Projeto\n\n99 entry points at the root\n\n\`\`\`\n    ├── a.mjs  <- um\n    └── b.mjs  <- dois\n\`\`\`\n");
+  }, { code: 1, includes: ["mas a arvore dele lista 2"] });
+
+  test("G12f: citacao sem arvore nenhuma avisa em vez de passar", (dir) => {
+    writeF(dir, "README.md", "# Projeto\n\nSao 99 entry points at the root, e mais nada.\n");
+  }, { code: 1, includes: ["nao tem arvore que os liste"] });
+
+  // O CONTRA-CASO, e sem ele os dois de cima eram satisfeitos por um guard que reprovasse
+  // sempre: com a prosa e a arvore de acordo tem de passar, e tem de o dizer.
+  test("G12f: prosa de acordo com a arvore nao avisa, e confirma", (dir) => {
+    writeF(dir, "README.md", "# Projeto\n\n2 entry points at the root\n\n\`\`\`\n    ├── a.mjs  <- um\n    └── b.mjs  <- dois\n\`\`\`\n");
+    return { includes: ['"2 entry points at the root" coerente com a arvore'] };
+  }, { code: 0 });
+
+  test("G12f: sem citacao nenhuma NAO avisa (o derivado substitui o README)", (dir) => {
+    writeF(dir, "README.md", "# O meu projeto\n\nSem contagens do template.\n");
+    return { excludes: ["pontos de entrada", "modulos descobertos"] };
+  }, { code: 0 });
+
 }
+

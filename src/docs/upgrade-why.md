@@ -227,3 +227,32 @@ lista; quem a quiser ler abre o modulo, onde cada entrada tem o comentario que e
 la. Saiu numa altura em que o ficheiro estava 400 bytes acima do tecto: encolher prosa teria
 custado varias passagens, e remover a copia resolveu-o de uma vez, que e o que a nota dos `TETOS`
 prescreve.
+
+## Porque o cabecalho do `anti-patterns.md` nao se traz inteiro
+
+A tabela do `/upgrade` dizia, sem ressalva: *"o **cabecalho** e prosa do template e traz-se"*. Uma
+instrucao mecanica e para ser cumprida a letra, e cumprida a letra esta poe um consumidor maduro
+**acima do tecto**.
+
+**Medido na ronda 6**, num projeto com oito anti-padroes proprios: 11 141 bytes de entradas +
+1 811 de cabecalho = **12 952**, contra um tecto de 12 000. O upgrade entregava um ficheiro que o
+Guard 1 reprova, e a culpa aparecia do lado do consumidor.
+
+O cabecalho tem duas naturezas, e so uma e para viajar:
+
+- **Regra duravel** (~563 bytes): onde vivem os `TPn` (`anti-patterns-template.md`, nao carregado)
+  e a regra do Guard 15 — o mesmo ID definido nos DOIS ficheiros reprova. Isto vale para qualquer
+  consumidor, em qualquer momento, e e o que o Guard 15 pressupoe que esteja escrito.
+- **Andaime de bootstrap** (~354 bytes): o *"Comeca no primeiro numero"* diz que o prefixo `AP`
+  esta todo livre. E conselho para quem tem **zero** entradas. Para quem ja tem oito, e um
+  paragrafo pago a cada sessao para dizer algo que ja aconteceu.
+
+A distincao foi feita a mao por quem correu a ronda, e correctamente. O defeito era ela ter de ser
+feita a mao: uma instrucao que so funciona se o leitor for cuidadoso nao e uma instrucao mecanica —
+e a tabela do `/upgrade` existe precisamente para separar o mecanico do que exige julgamento.
+
+**O que isto nao resolve.** Trazer so a regra duravel deixa aquele consumidor com folga quase
+nula, e um projeto que continua a encontrar bugs continua a acrescentar `APn`. A saida estrutural e
+a mesma que o template aplica a si proprio: a entrada sempre-carregada fica terse e a evidencia vai
+para um `-why`. O `anti-patterns.md` deste repo tem 1 811 bytes; o `anti-patterns-why.md` tem
+19 006.

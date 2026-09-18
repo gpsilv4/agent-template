@@ -74,16 +74,16 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 > Compara-se contra a versao do template **de onde o projeto saiu** (`.template-version`), com
 > os placeholders ja substituidos — nao contra o template nu, ou tudo aparece customizado.
 >
-> Nao e detalhe — porque custa (`src/docs/upgrade-why.md`).
+> Nao e detalhe — porque custa (`upgrade-why.md`).
 
 | Categoria | O que fazer | Porque |
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
-| **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** (mesma regra dos hooks) | E a configuracao deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
+| **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | E a configuracao deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
 | `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-mecanico.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Uma copia cega devolve o gate a **medir zero**, e ele diz "superficie intacta" sobre uma suite apagada |
 | **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
-| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova) — e do template, e os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto), mas o **cabecalho** e prosa do template e traz-se: o antigo cita IDs que ja nao existem, e o Guard 15 lista-os. As citacoes `TPn` nos scripts e workflows **copiam-se como estao** | Os prefixos tornam isto copia em vez de reescrita a mao (eram mais de vinte citacoes por ronda) |
+| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova) — e do template, e os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto). Do cabecalho traz-se a **regra duravel** (onde vivem os `TPn`, o Guard 15) e **nao o andaime de bootstrap**: o cabecalho inteiro rebenta o tecto de um consumidor maduro (`upgrade-why.md`). As citacoes `TPn` nos scripts e workflows **copiam-se como estao** | Os prefixos tornam isto copia, nao reescrita a mao |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |

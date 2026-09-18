@@ -131,7 +131,7 @@ gh pr create --fill     # then merge once CI is green
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- YOUR anti-patterns (prefix AP, starts free) + greps (loaded)
-│   ├── anti-patterns-template.md <- TP1-TP7: the template's own machinery (NOT loaded)
+│   ├── anti-patterns-template.md <- TP1-TP8: the template's own machinery (NOT loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
@@ -164,7 +164,7 @@ gh pr create --fill     # then merge once CI is green
 │   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/                    <- 7 pontos de entrada na raiz: o que se INVOCA
+└── scripts/                    <- 8 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
@@ -195,14 +195,17 @@ gh pr create --fill     # then merge once CI is green
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
+    │   ├── medida-upgrade.mjs  <- Section 2b measured from BOTH sides (template and consumer)
+    │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
+    │   ├── tmp-limpo.mjs      <- tmpdir copies don't outlive their owner (swept at startup)
     │   ├── surface-patterns.mjs   <- Pattern tables: what can't drop, what can't appear
     │   ├── patch.mjs           <- Text patching with THREE outcomes: applied / already-set / no-target
     │   ├── derivado.mjs        <- "Is this repo the template, or a project derived from it?"
     │   └── ficheiros.mjs       <- Reads that tell "missing" apart from "unreadable"
     │
     └── tests/                  <- Everything that TESTS the machinery above
-        ├── test-*.mjs          <- 10 entry points, one per verifier (run them directly)
-        ├── tests-*.mjs         <- 13 modules discovered on disk by an entry point
+        ├── test-*.mjs          <- one entry point per verifier (run them directly)
+        ├── tests-*.mjs         <- modules discovered on disk by an entry point
         └── harness/            <- Fixture builders: imported, never invoked
             ├── test-harness.mjs          <- Sandbox + test() + summary, for the doc guards
             ├── test-bundle-harness.mjs   <- Fake .next/ trees and the config each test needs
@@ -210,10 +213,10 @@ gh pr create --fill     # then merge once CI is green
             ├── test-sweep-harness.mjs    <- Fake checker + fake suite of known behaviour
             └── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
 
-> **Porque os testes estao numa pasta e os 7 verificadores nao.** A raiz responde a "o que posso
-> correr aqui?". E a distincao entre `test-*` (ponto de entrada) e `tests-*` (modulo descoberto)
-> era de **um carater** — e a maquinaria aplica-a: um modulo que declare o entry point errado e
-> recusado pelo `lib/registo.mjs`. A pasta torna visivel o que o sufixo escondia.
+> **Why the tests live in a folder and the checkers don't.** The root answers "what can I run
+> here?". And the difference between `test-*` (an entry point) and `tests-*` (a module found by
+> discovery) was **one character** — while the machinery enforces it: a module declaring the wrong
+> entry point is rejected by `lib/registo.mjs`. The folder makes visible what the suffix hid.
 
 .github/                        <- DevOps & governance
 ├── workflows/
@@ -221,12 +224,12 @@ gh pr create --fill     # then merge once CI is green
 │   ├── e2e.yml                 <- E2E + security tests (manual trigger)
 │   └── dependabot-auto-merge.yml <- Auto-merge patch/minor Dependabot PRs (OPT-IN, off by default)
 ├── ISSUE_TEMPLATE/
-│   ├── bug_report.md           <- Template para reportar bugs
-│   └── feature_request.md      <- Template para pedir features
+│   ├── bug_report.md           <- Structured bug reporting template
+│   └── feature_request.md      <- Structured feature request template
 ├── copilot-instructions.md     <- Thin pointer to AGENTS.md (the file Copilot loads)
-├── pull_request_template.md    <- Checklist obrigatoria em cada PR
-├── dependabot.yml              <- Updates automaticos de dependencias
-└── CODEOWNERS                  <- Reviewers automaticos por ficheiro
+├── pull_request_template.md    <- Required checklist on every PR
+├── dependabot.yml              <- Automatic dependency updates
+└── CODEOWNERS                  <- Automatic reviewers per file
 
 .claude/                        <- Native Claude Code layer (optional; other tools ignore it)
 ├── settings.json              <- Project permissions (deny secrets, allow safe scripts)
@@ -272,6 +275,9 @@ src/docs/
 ├── agent-guide.md              <- Guide for .agent/ and .github/
 ├── ticket-method-why.md        <- Where each rule came from, what it costs, what was measured
 ├── anti-patterns-why.md        <- Evidence behind each anti-pattern: what it cost, how it was caught
+├── scripts-guide-why.md        <- Why each checker is shaped the way it is
+├── sync-docs-why.md            <- Why the pre-commit checklist has the points it has
+├── upgrade-why.md              <- Why /upgrade decides by category, and what it measured
 └── CHANGELOG.md                <- Changelog template
 ```
 
@@ -297,6 +303,7 @@ src/docs/
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
 | Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — run locally after touching a `check-*.mjs` (opt-in in ci.yml) |
+| Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
