@@ -61,7 +61,7 @@ test("teste alterado SEM marcas de enfraquecimento passa", (dir) => {
   commit(dir, "reforcar");
 }, { code: 0, includes: ["sem marcas de enfraquecimento"], excludes: ["  WARN  "] });
 
-test("marca que JA existia na baseline nao conta como nova", (dir, base) => {
+test("marca que JA existia na baseline nao conta como nova", (dir) => {
   // A marca entra na baseline; depois muda-se outra coisa no mesmo ficheiro.
   writeFileSync(join(dir, "tests/exemplo.test.js"), 'test.skip("soma", () => {});\n');
   commit(dir, "com skip");
@@ -425,3 +425,23 @@ const descoberta = await registaDescobertos({
 console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
 resumo();
+
+// --- Os ficheiros POR RASTREAR sao ditos em voz alta -----------------------------
+//
+// A superficie deriva de `git ls-files` — o que esta RASTREADO — e isso e deliberado. A
+// consequencia e que um ficheiro novo nao conta ate ao `git add`, e numa migracao de pastas
+// isso e a diferenca entre 25 avisos com exit 1 e zero. Em silencio, o sintoma parece uma
+// regressao grave; ja custou uma sessao a alguem.
+test("ficheiro da superficie por rastrear e ANUNCIADO", (dir) => {
+  writeFileSync(join(dir, "tests/novo.test.js"), 'test("a", () => { expect(1).toBe(1); });\n');
+  // De PROPOSITO sem `commit`: e o estado que se quer medir.
+  return null;
+}, { code: 0, includes: ["por rastrear", "git add"] });
+
+// O CONTRA-CASO: com a arvore limpa a linha nao pode aparecer. Um aviso que sai sempre treina
+// quem o le a ignora-lo — e era essa a versao barata deste teste.
+test("sem ficheiros por rastrear, nao ha anuncio nenhum", (dir) => {
+  writeFileSync(join(dir, "tests/novo.test.js"), 'test("a", () => { expect(1).toBe(1); });\n');
+  commit(dir, "rastreado");
+  return null;
+}, { code: 0, excludes: ["por rastrear"] });

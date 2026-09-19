@@ -168,7 +168,7 @@ export async function adapta2bGuard17({ dir, fatal }) {
  *
  * @returns {number} o codigo de saida
  */
-export async function medeImpactoAqui({ raiz, template, dir, git, ok, fatal }) {
+export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fatal }) {
   const ref = versaoDeOrigem(raiz);
   if (ref === null) {
     fatal(
@@ -204,6 +204,30 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, fatal }) {
   const cmdDepois = comandosDoCI(template);
   if (!cmdAntes?.length) fatal("nao derivei comandos do job `guard-tests` do ci.yml DESTE projeto");
   if (!cmdDepois?.length) fatal(`nao derivei comandos do job \`guard-tests\` do ci.yml de ${template}`);
+
+  // O QUE O TEMPLATE CORRE E ESTE PROJETO NAO. Sao dois conjuntos ja calculados; faltava
+  // subtrai-los.
+  //
+  // PORQUE EXISTE: um consumidor real ficou SEIS RONDAS com a varredura de mutacao desligada.
+  // Ela estava **comentada** no `ci.yml` dele, com uma justificacao escrita ao lado. A categoria
+  // `.github/workflows/*` do `/upgrade` manda trazer "so os jobs em falta", e quem comparou fez
+  // exactamente isso — passo a passo, contra o que la estava. **Um passo comentado nao aparece
+  // como em falta: aparece como presente.**
+  //
+  // O `comandosDoCI` ja deita fora as linhas comentadas dos DOIS lados, logo um passo desligado
+  // simplesmente nao entra no `cmdAntes` — e ate hoje ninguem dizia nada. E a mesma leitura que
+  // esta ronda fez nos ficheiros ao separar migracao de limpeza, um nivel abaixo:
+  // **desactivado nao e o mesmo que decidido.**
+  //
+  // NOTE e nao `warn`: pode ser uma decisao legitima do projeto, e um gate que reprova por uma
+  // escolha alheia e desligado na primeira semana. O que nao pode e ser invisivel.
+  const soNoTemplate = cmdDepois.filter((c) => !cmdAntes.includes(c));
+  if (soNoTemplate.length) {
+    note(
+      `o \`guard-tests\` do template corre ${soNoTemplate.length} verificacao(oes) que o ci.yml deste projeto nao corre: ` +
+        `${soNoTemplate.join(", ")} — se alguma esta COMENTADA aqui, conta como ausente`
+    );
+  }
 
   const antes = new Set(correBateria({ dir, comandos: cmdAntes }).map(([c]) => c));
   ok(`estado actual: ${antes.size} de ${cmdAntes.length} verificacao(oes) ja reprovam antes do upgrade`);
