@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync } from "fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -631,32 +631,6 @@ test("reinject: seccao Fronteiras VAZIA nao reinjecta um bloco vazio", () => {
     writeFileSync(join(d, "CLAUDE.md"), "# P\n\n## Fronteiras\n\n## Outra\n\nx\n");
     const r = correNoCwd(REINJECT, d);
     if (!r.vazio) throw new Error("bloco vazio nao vale a pena reinjectar");
-  } finally {
-    rmSync(d, { recursive: true, force: true });
-  }
-});
-
-// --- A marca de "ja disse isto" pertence ao repo medido ------------------------
-test("stop: a marca fica no repo medido, nao no repo do hook", () => {
-  const d = repo("feature/x");
-  try {
-    commitarEModificar(d, ".agent/rules/core-rules.md");
-    correNoCwd(STOP, d);
-    if (!existsSync(join(d, ".claude/state/stop-verify.last")))
-      throw new Error("a marca nao ficou no repo medido — vai calar avisos de outro repo");
-  } finally {
-    rmSync(d, { recursive: true, force: true });
-  }
-});
-
-test("stop: divida identica cala-se; divida diferente volta a falar", () => {
-  const d = repo("feature/x");
-  try {
-    commitarEModificar(d, ".agent/rules/core-rules.md");
-    if (correNoCwd(STOP, d).vazio) throw new Error("a primeira vez tem de falar");
-    if (!correNoCwd(STOP, d).vazio) throw new Error("divida identica devia calar-se");
-    commitarEModificar(d, ".agent/scripts/mutation-sweep.mjs", "// muda\n");
-    if (correNoCwd(STOP, d).vazio) throw new Error("divida NOVA tem de voltar a falar");
   } finally {
     rmSync(d, { recursive: true, force: true });
   }

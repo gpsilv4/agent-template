@@ -46,7 +46,9 @@ const PASTAS = [".agent/scripts", ".claude/hooks"];
  * e bem-vindo — subi-lo e desligar a catraca, e o `sync-docs.md` di-lo por escrito.
  */
 export const TETOS = {
-  ".claude/hooks/tests/test-hooks.mjs": 696,
+  // 696 -> 670: os casos do `stop-verify` sairam para `tests/tests-stop.mjs`, quando a catraca
+  // exigiu a divisao ao acrescentar os do ficheiro apagado. Foi o ramo da folga a reclamar as 26.
+  ".claude/hooks/tests/test-hooks.mjs": 670,
   // 668 -> 590 (tabelas de verbos) -> 554 (verificacao da fronteira) -> 517 (a tabela
   // FORMA_EXIGIDA, que e politica e nao motor). RE-CONGELA a cada descida, senao a catraca
   // deixava a folga recuperada por recuperar.

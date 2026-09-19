@@ -128,16 +128,30 @@ test("cada modulo de `lib/` vai para uma suite que fala dele", () => {
 // Editar um modulo `tests-*.mjs` nao gerava obrigacao de verificacao nenhuma — nenhum casava
 // regra. Baixa gravidade (o CI descobre-os), mas o aviso local existia para todos menos para
 // eles. E a regra tem de mandar ao entry point que o PROPRIO modulo declara, nao a um qualquer.
+// LISTA o disco e pergunta ao mapa PELO CAMINHO QUE LISTOU. Nunca por um reconstruido.
+//
+// A versao anterior varria `.agent/scripts/` a procura de `tests-*.mjs` — e a migracao para
+// `tests/` levou-os todos, logo o ciclo corria sobre lista VAZIA e o teste passava. O `TP2` do
+// proprio template, dentro do teste que devia apanhar isto. E tinha um segundo erro na mesma
+// funcao: montava um caminho de `harness/` para um modulo `tests-`, ou seja perguntaria pelo
+// sitio errado mesmo que tivesse items.
+//
+// A guarda contra o vazio nao e zelo: e o que distingue "todos passam" de "nao olhei para
+// nenhum", e sem ela este teste ficou verde durante cinco releases com o mapa partido.
 test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
+  const dir = ".agent/scripts/tests";
+  const modulos = readdirSync(dir).filter((n) => /^tests-[\w-]+\.mjs$/.test(n));
+  if (modulos.length === 0) return [`nenhum modulo tests-*.mjs em ${dir} — o teste mediria o vazio`];
   const problemas = [];
-  for (const f of readdirSync(".agent/scripts").filter((n) => /^tests-[\w-]+\.mjs$/.test(n))) {
-    const declarado = readFileSync(`.agent/scripts/${f}`, "utf8").match(/entryPoint = "([^"]+)"/)?.[1];
+  for (const f of modulos) {
+    const caminho = `${dir}/${f}`;
+    const declarado = readFileSync(caminho, "utf8").match(/entryPoint = "([^"]+)"/)?.[1];
     if (!declarado) {
       problemas.push(`${f}: nao declara entryPoint`);
       continue;
     }
-    const r = regraDe(`.agent/scripts/tests/harness/${f}`);
-    if (r === null) problemas.push(`${f}: nenhuma regra no mapa`);
+    const r = regraDe(caminho);
+    if (r === null) problemas.push(`${caminho}: nenhuma regra no mapa`);
     else if (!r.verifica.some((v) => v.endsWith(declarado))) {
       problemas.push(`${f} declara ${declarado} mas o mapa manda ${r.verifica.join(", ")}`);
     }
@@ -149,10 +163,33 @@ test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
 // buraco que o `pares.mjs` tinha: mexer nele nao gera obrigacao de verificacao nenhuma. Ja
 // aconteceu duas vezes (o `pares.mjs`, e o harness do simulador de `/upgrade` no dia em que
 // nasceu). Esta e a terceira vez que a mesma classe aparece, logo passa a ter teste.
+// Este listava BEM e perguntava MAL: `regraDe(".agent/scripts/${f}")`, o caminho anterior a
+// migracao. E o mapa tinha as regras com esse mesmo caminho antigo — **os dois errados da mesma
+// maneira, logo concordavam**, e o ficheiro real ficava descoberto.
+//
+// E o `TP8` na forma mais cara: nao e uma copia que envelheceu, sao duas leituras do mesmo facto
+// a validarem-se uma a outra. Por isso a pergunta passa a usar o caminho LISTADO.
 test("todo o harness casa uma regra no mapa", () => {
-  const harnesses = readdirSync(".agent/scripts/tests/harness").filter((n) => n.endsWith(".mjs"));
-  if (harnesses.length === 0) return ["nenhum harness encontrado — o teste mediria o vazio"];
-  return harnesses.flatMap((f) => (regraDe(`.agent/scripts/${f}`) === null ? [`${f}: nenhuma regra no mapa`] : []));
+  const dir = ".agent/scripts/tests/harness";
+  const harnesses = readdirSync(dir).filter((n) => n.endsWith(".mjs"));
+  if (harnesses.length === 0) return [`nenhum harness em ${dir} — o teste mediria o vazio`];
+  return harnesses.flatMap((f) => (regraDe(`${dir}/${f}`) === null ? [`${dir}/${f}: nenhuma regra no mapa`] : []));
+});
+
+// A rede que apanha a proxima migracao: TODO o ficheiro de `tests/` casa regra. Os dois testes
+// acima olham para familias (`tests-*`, harnesses); este nao deixa nada de fora, e teria
+// apanhado o buraco de 28 em 32 no dia em que ele nasceu.
+test("todo o ficheiro de tests/ casa uma regra no mapa", () => {
+  const problemas = [];
+  let total = 0;
+  for (const dir of [".agent/scripts/tests", ".agent/scripts/tests/harness"]) {
+    for (const f of readdirSync(dir).filter((n) => n.endsWith(".mjs"))) {
+      total++;
+      if (regraDe(`${dir}/${f}`) === null) problemas.push(`${dir}/${f}`);
+    }
+  }
+  if (total === 0) return ["nao listei ficheiro nenhum — o teste mediria o vazio"];
+  return problemas.length ? [`${problemas.length} de ${total} sem regra: ${problemas.slice(0, 5).join(", ")}`] : [];
 });
 
 // Os guards de documentacao varrem pastas INTEIRAS (`listDir("src/docs", ".md")`), nao uma lista

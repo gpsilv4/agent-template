@@ -245,9 +245,12 @@ gh pr create --fill     # then merge once CI is green
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
-│       └── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
-│                                      the branch guard, plus the legitimate commands
-│                                      it must NOT block (TP6)
+│       ├── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
+│       │                              the branch guard, plus the legitimate commands
+│       │                              it must NOT block (TP6)
+│       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
+│                                      the "already said this" mark belongs to the
+│                                      repo being measured, not the hook's own
 └── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
 
 .githooks/                      <- Versioned git hooks (tool-independent)
