@@ -134,6 +134,23 @@ export const SUITES = [
 
 /** A linha de comando de uma regra, montada a partir do que ela declara. */
 export function comandoDe(regra, ficheiro) {
+  // O CASO EM QUE NAO HA COMANDO A MONTAR, dito em vez de interpolado.
+  //
+  // O segundo parametro so e preciso nas regras `suiteDeSi`, e nasceu depois delas. Um
+  // consumidor que tenha ficado com a chamada antiga — `comandoDe(regra)` — produzia
+  // literalmente `node undefined` como instrucao de verificacao. Um `undefined` interpolado
+  // nao da erro: da uma ordem inutil, com ar de ordem. Medido num derivado real.
+  //
+  // PORQUE NAO LANCA, que era a forma obvia: o unico consumidor em producao e o hook
+  // `stop-verify`, e ele tem um `catch` de ultimo recurso que sai `0` em silencio — de
+  // proposito, para um hook avariado nunca bloquear trabalho legitimo. Lancar aqui fazia UMA
+  // regra mal chamada engolir o aviso INTEIRO do fim do turno, incluindo a divida dos outros
+  // ficheiros. Trocava uma instrucao inutil por nenhuma instrucao, que e pior (`TP2`).
+  //
+  // A string comeca por `#` para nao poder ser copiada como comando, e diz o remedio.
+  if (regra.suiteDeSi && !ficheiro) {
+    return "# ERRO: regra `suiteDeSi` sem o caminho tocado — quem chama tem de usar `comandoDe(regra, ficheiro)`";
+  }
   // `suiteDeSi`: a regra nao sabe QUAL suite e, so que e ela propria. O ficheiro tocado e que
   // o diz — e por isso o comando so se pode montar com ele a mao.
   const alvos = regra.suiteDeSi ? [ficheiro] : regra.verifica;
