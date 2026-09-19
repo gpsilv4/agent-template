@@ -57,6 +57,24 @@ test("sem `only`, o comando nao inventa uma varredura", () => {
   return c.includes("mutation-sweep") ? [`nao devia chamar a varredura: ${c}`] : [];
 });
 
+// Uma regra `suiteDeSi` chamada SEM o caminho tocado nao tem comando a montar — o que ela manda
+// correr e o proprio ficheiro. Um consumidor com a chamada antiga produzia `node undefined`:
+// uma ordem inutil com ar de ordem, e sem erro nenhum no ecra. Medido num derivado real.
+test("`suiteDeSi` sem o ficheiro diz que falta, em vez de `node undefined`", () => {
+  const c = comandoDe({ verifica: [], suiteDeSi: true });
+  if (c.includes("undefined")) return [`interpolou undefined: ${c}`];
+  return c.startsWith("# ERRO") ? [] : [`devia dizer que falta o caminho; saiu ${JSON.stringify(c)}`];
+});
+
+// O CONTRA-CASO: com o caminho, a MESMA regra monta o comando de sempre. Sem ele, o de cima era
+// satisfeito por um `comandoDe` que recusasse tudo — e ai o hook deixava de dizer o que quer que
+// fosse, que e pior do que dizer uma coisa errada.
+test("`suiteDeSi` COM o ficheiro continua a montar o comando", () => {
+  const alvo = ".agent/scripts/tests/test-guards.mjs";
+  const c = comandoDe({ verifica: [], suiteDeSi: true }, alvo);
+  return c === `node ${alvo}` ? [] : [`saiu ${JSON.stringify(c)}`];
+});
+
 // O que NAO casa tem de vir a superficie. Engolir e transformar uma lacuna do mapa em
 // silencio, e e essa a unica forma de ela ser corrigida algum dia.
 test("ficheiro sem regra sai em `semRegra`, nao desaparece", () => {
