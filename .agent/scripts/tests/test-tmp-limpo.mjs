@@ -174,16 +174,41 @@ test("base inexistente nao rebenta, devolve 0", () => {
 // exactamente assim que 1580 fixtures ocuparam 2,5 GB. Este caso varre `tests/` em DISCO e
 // exige que cada prefixo que la aparece esteja coberto. A lista continua a mao; a divergencia
 // e que nao passa.
-test("todo o prefixo de fixture em tests/ esta coberto pela lista", () => {
+test("todo o prefixo de fixture na maquinaria esta coberto pela lista", () => {
   const AQUI = dirname(fileURLToPath(import.meta.url));
+  const RAIZ = join(AQUI, "..", "..", "..");
+
+  // AS DUAS pastas de testes da maquinaria, e nao so a propria.
+  //
+  // A primeira versao fazia `anda(AQUI)` — varria `.agent/scripts/tests/` e mais nada. A suite
+  // dos hooks vive noutra pasta, cria `hook-test-` com `mkdtempSync` cru, e esse prefixo nunca
+  // esteve na lista: este teste, que existe PARA a lista nao envelhecer, nao tinha como o ver.
+  // Prova encontrada em disco: uma `hook-test-*` de 16/Set ainda la tres dias depois.
+  //
+  // E a forma do `TP9` — uma regra que so olha para onde foi escrita da primeira vez.
+  const RAIZES = [join(RAIZ, ".agent/scripts/tests"), join(RAIZ, ".claude/hooks/tests")];
+
   const ficheiros = [];
+  const ausentes = [];
   const anda = (d) => {
-    for (const e of lerPasta(d, { withFileTypes: true })) {
+    let entradas;
+    try {
+      entradas = lerPasta(d, { withFileTypes: true });
+    } catch {
+      return false; // nao existe: quem chama decide se isso e legitimo
+    }
+    for (const e of entradas) {
       if (e.isDirectory()) anda(`${d}/${e.name}`);
       else if (e.name.endsWith(".mjs")) ficheiros.push(`${d}/${e.name}`);
     }
+    return true;
   };
-  anda(AQUI);
+  // Um derivado pode ter removido a camada so-Claude — isso e legitimo e nao e defeito. O que
+  // NAO pode acontecer e as duas faltarem e o teste passar a medir o vazio.
+  for (const r of RAIZES) if (anda(r) === false) ausentes.push(r);
+  if (ausentes.length === RAIZES.length) {
+    return [`nenhuma pasta de testes existe (${ausentes.join(", ")}) — o teste mediria o vazio`];
+  }
 
   // As plicas e as crases saem ANTES de procurar. Uma fixture que escreve codigo de exemplo tem
   // `mkdtempSync(join(tmpdir(), "prefixo-"))` dentro de uma string — e isso e texto, nao uma

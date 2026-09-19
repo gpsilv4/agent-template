@@ -14,7 +14,7 @@
  * ponta, os caminhos que tem de parar tudo).
  */
 import { cenario, limpa, test } from "./harness/test-upgrade-harness.mjs";
-import { CONSTANTES_DO_PROJETO, PLACEHOLDER } from "../lib/upgrade-mecanico.mjs";
+import { PLACEHOLDER } from "../lib/upgrade-mecanico.mjs";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -31,8 +31,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-simulate-upgrade.mjs";
 
-/** O par (ficheiro, constante) que o simulador customiza — DERIVADO da mesma lista que ele usa. */
-const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
 
 
 /** Todos os `.mjs` de uma pasta, em profundidade. Derivado do disco: uma lista escrita a mao

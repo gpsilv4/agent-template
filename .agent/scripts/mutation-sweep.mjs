@@ -29,9 +29,20 @@
  *   node .agent/scripts/mutation-sweep.mjs --list             # so contar, sem correr
  *   node .agent/scripts/mutation-sweep.mjs --workers=1        # sequencial (para comparar)
  *
- * CUSTO: recorre a suite inteira por sitio. Corre em 8 processos, cada um com a SUA copia do
- * repo — medido neste repo: 58 min em serie, 14m04s em paralelo, com o mesmo veredicto. Correr
- * apos mexer num verificador, nao a cada commit. Opt-in no CI (ver `.github/workflows/ci.yml`).
+ * CUSTO: recorre a suite inteira por sitio. Corre em ate 8 processos, cada um com a SUA copia do
+ * repo. Correr apos mexer num verificador, nao a cada commit. Condicional no CI (so quando o
+ * diff toca em verificadores/hooks — ver `.github/workflows/ci.yml`).
+ *
+ * **O tempo depende de ONDE corre, e nao ha um numero so.** Os workers saem de `cpus().length`,
+ * e o GitHub da 4 cores a repos publicos e 2 a privados (Free/Pro) — logo a VISIBILIDADE do repo
+ * duplica o tempo:
+ *
+ *   portatil (10 cores, 8 workers)      14m04s   (58 min em serie, 4,1x)
+ *   ubuntu-latest, repo publico  (4/4)  ~22 min
+ *   ubuntu-latest, repo privado  (2/2)  ~48 min
+ *
+ * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
+ * metade da margem. Detalhe e origem de cada medicao em `.agent/rules/scripts-guide.md`.
  *
  * O QUE ESTA VARREDURA **NAO** COBRE, e vale saber antes de confiar nela: ela muta **sitios
  * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** —

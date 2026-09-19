@@ -143,6 +143,45 @@ export function registar() {
       inclui: ["guard-tests"],
     }));
 
+  // --- Um passo COMENTADO no ci.yml do projeto conta como ausente ------------------
+  //
+  // O caso que custou SEIS RONDAS a um consumidor: a varredura de mutacao estava comentada no
+  // `ci.yml` dele, com uma justificacao escrita ao lado, e a categoria `.github/workflows/*` do
+  // `/upgrade` manda trazer "so os jobs em falta". Quem comparou fez isso — passo a passo,
+  // contra o que la estava — e um passo comentado **nao aparece como em falta: aparece como
+  // presente**.
+  //
+  // O `comandosDoCI` ja deitava fora as linhas comentadas dos dois lados; o que faltava era
+  // subtrair os conjuntos e dizer o resultado.
+  // O template da fixture corre `stub.mjs`. Aqui o PROJETO tem esse mesmo passo comentado (e
+  // outro activo, senao a medicao recusa por nao derivar comando nenhum): o `stub.mjs` tem de
+  // aparecer como algo que o template corre e este projeto nao.
+  const CI_PROJETO = (stubComentado) =>
+    "jobs:\n  guard-tests:\n    steps:\n" +
+    "      - run: node .agent/scripts/outro.mjs\n" +
+    `      ${stubComentado ? "# " : ""}- run: node .agent/scripts/stub.mjs\n`;
+  const OUTRO = { ".agent/scripts/outro.mjs": 'console.log("  1 passaram, 0 falharam.");\n' };
+
+  test("passo COMENTADO no ci.yml do projeto sai como ausente", () =>
+    exige(contraProjeto({ projeto: { ".github/workflows/ci.yml": CI_PROJETO(true), ...OUTRO } }), {
+      codigo: 0,
+      inclui: ["stub.mjs", "COMENTADA"],
+    }));
+
+  // O CONTRA-CASO: o MESMO passo, activo, nao pode ser anunciado. Sem ele, o de cima era
+  // satisfeito por uma medicao que acusasse toda a gente — e um aviso que grita sempre e
+  // desligado na primeira semana.
+  //
+  // A primeira versao deste par passou com o defeito presente: eu esperava um comando que a
+  // fixture nao usa, logo o contra-caso verificava a ausencia de texto que nunca la estaria.
+  // E o `TP1` — assercao satisfeita por outra coisa.
+  test("o mesmo passo ACTIVO nao e anunciado como ausente", () => {
+    const r = contraProjeto({ projeto: { ".github/workflows/ci.yml": CI_PROJETO(false), ...OUTRO } });
+    return r.out.includes("que o ci.yml deste projeto nao corre")
+      ? [`anunciou uma ausencia com os dois lados a correr o mesmo: ${r.out.slice(0, 200)}`]
+      : [];
+  });
+
   // CONTROLO DE RECURSOS, e nasceu de uma medicao e nao de uma suspeita: estes testes deixaram
   // **1508 pastas** em `tmpdir` num unico dia. Cada `contraProjeto()` cria duas, e a varredura de
   // mutacao corre a suite uma vez por sitio desligado — o que multiplica qualquer fuga por dezenas.

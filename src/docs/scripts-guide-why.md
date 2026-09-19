@@ -73,3 +73,50 @@ com uma rota de exemplo e o gate dos bundles no default.
 
 E o `TP3` — *"teste que depende do estado do repo em vez de o montar"* — do lado do simulador:
 ele proprio dependia de o repo estar por configurar.
+
+---
+
+## A varredura nao tem UM tempo — tem tres, e a variavel e a visibilidade do repo
+
+O `c4e4917` mediu a varredura paralela em **14m04s** e qualificou-o correctamente: *"medido
+nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
+
+| Onde | Visibilidade | Cores | Workers | Varredura completa |
+|---|---|---|---|---|
+| Portatil | — | 10 | 8 | **14m04s** (58 min em serie, 4,1x) |
+| `ubuntu-latest`, template | **publico** | 4 | 4 | **~22 min** |
+| `ubuntu-latest`, derivado | **privado** | 2 | 2 | **~48 min** |
+
+**O GitHub da runners de 4 cores a repos publicos e 2 a privados** nos planos Free/Pro, e
+`quantosWorkers()` sai de `cpus().length` — logo a visibilidade do repo duplica o tempo. A conta
+fecha: 22 x 2 = 44, contra ~48 observados.
+
+**Porque importa mais do que parece**: a maioria dos projetos derivados de um template e
+privada. O template mede-se num runner de 4 cores e publica esse numero; o consumidor tipico
+corre em 2. Quem dimensionar o `timeout-minutes` pelo numero do template fica com **metade da
+margem que julga ter**. Um numero sem o sitio onde foi medido ja levou uma ronda a recomendar
+"custa 15-20 minutos" sobre um caso de 48.
+
+### A hipotese que parecia obvia e estava errada
+
+A primeira explicacao foi *"o derivado tem 908 testes e o template bem menos, logo cada sitio
+custa mais"*. Mediram-se os dois lados antes de a escrever:
+
+| | Sitios ligados ao `test-guards` | Duracao do `test-guards` |
+|---|---|---|
+| Template | 98 | 32 s |
+| Derivado | 100 | 34 s |
+
+**Oito por cento**, nao o dobro. O raciocinio confundia dois numeros: os 908 testes correm **uma
+vez cada** no job; o que a varredura recorre 100 vezes e a suite **emparelhada**, e essa custa o
+mesmo nos dois. Em ambos, o `test-guards` sozinho e ~79% do custo em serie.
+
+### O que isto NAO autoriza
+
+Parece seguir-se que `cpus().length` e o denominador errado e que se devia oversubscrever. **Foi
+medido, e nao e.** A varredura completa a 8 workers consome **743% de CPU** — 0,93 CPU por
+worker, sem espera ociosa para preencher. Subir o tecto so acrescenta contencao.
+
+O comentario de `quantosWorkers()` diz que *"o gargalo nao e CPU"* e essa frase nunca foi medida;
+tres leituras independentes acreditaram nela antes de alguem pegar num cronometro. **O remedio
+para um runner de 2 cores nao e mais workers — e menos trabalho** (ver o fail-fast).
