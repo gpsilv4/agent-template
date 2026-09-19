@@ -256,3 +256,34 @@ nula, e um projeto que continua a encontrar bugs continua a acrescentar `APn`. A
 a mesma que o template aplica a si proprio: a entrada sempre-carregada fica terse e a evidencia vai
 para um `-why`. O `anti-patterns.md` deste repo tem 1 811 bytes; o `anti-patterns-why.md` tem
 19 006.
+
+---
+
+## Duas licoes da ronda 6 que o `upgrade.md` nao tem espaco para dizer
+
+Ambas vieram de um `/upgrade` real. Ficam aqui **porque o `upgrade.md` esta a 20 bytes do seu
+tecto de 12 000** — e o Guard 1e manda a evidencia para ca. Quem mexer no workflow deve leva-las
+para la assim que houver espaco; sao instrucoes, nao racional.
+
+### 1. Um passo COMENTADO conta como AUSENTE
+
+A categoria `.github/workflows/*` diz *"so os jobs em falta, nao substituir o CI do projeto"*.
+Um consumidor aplicou-a correctamente e mesmo assim ficou **seis rondas** com a varredura de
+mutacao desligada: ela estava **comentada** no `ci.yml` dele, com uma justificacao escrita.
+
+A regra estava certa; a leitura e que nao podia estar. **Um passo comentado nao aparece como "em
+falta" — aparece como presente.** Quem compara passo a passo contra o que ja la esta nunca o ve.
+
+A comparacao tem de ser contra o **ficheiro do template**, nao contra a lista de passos activos
+do projeto. E a distincao e a mesma que a ronda 6 aprendeu nos ficheiros ao separar *migracao*
+de *limpeza*, um nivel abaixo: **desactivado nao e o mesmo que decidido.**
+
+### 2. `git add` ANTES do `check-test-surface.mjs`
+
+O verificador deriva a superficie de `git ls-files`, logo um ficheiro novo **por rastrear nao
+conta**. Numa migracao de pastas isso e a diferenca entre **25 avisos com exit 1 e zero**: sem
+`add`, os caminhos antigos leem-se como APAGADOS e os novos ainda nao existem para ele.
+
+Nao e defeito do verificador — e o que ele mede, e mede-o de proposito (a baseline tem de ser
+uma referencia estavel, e o disco por rastrear nao e). Mas custa uma sessao a quem nao saiba, e
+o sintoma parece uma regressao grave em vez de um passo em falta.

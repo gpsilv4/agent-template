@@ -250,6 +250,7 @@ const naSuperficie = (f) =>
   TEST_GLOBS.some((r) => r.test(f)) || eConfigOpaca(f) || CONFIG_CONTAVEIS.some((r) => r.test(f));
 
 let alterados;
+let naoRastreados = [];
 try {
   // `${base}` e nao `${base}..HEAD`: compara a baseline com a **arvore de trabalho**. Com
   // `..HEAD` o verificador ignorava tudo o que nao estivesse commitado — ou seja, "correr
@@ -259,13 +260,21 @@ try {
   // Os NAO RASTREADOS nao aparecem no `git diff`, logo a afirmacao "compara com a arvore de
   // trabalho" so valia para caminhos rastreados: um `vitest.config.ts` novo que estreitasse a
   // selecao passava sem aviso enquanto nao fosse ao `git add`. Uniao com os untracked.
-  const naoRastreados = git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
+  naoRastreados = git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean);
   alterados = [...new Set([...alterados, ...naoRastreados])];
 } catch (err) {
   fatal(`o git nao conseguiu listar as alteracoes: ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`);
 }
 
 const tocados = alterados.filter(naSuperficie);
+
+// OS POR RASTREAR, DITOS EM VOZ ALTA: o dado ja estava calculado acima, faltava a afirmacao.
+// `NOTE` e nao aviso — nao e defeito, e um passo em falta. Custo medido: `upgrade-why.md`.
+const porRastrear = naoRastreados.filter(naSuperficie);
+if (porRastrear.length) {
+  const amostra = porRastrear.slice(0, 3).join(", ") + (porRastrear.length > 3 ? ", ..." : "");
+  console.log(`  NOTE  ${porRastrear.length} ficheiro(s) da superficie por rastrear nao contam para a baseline — \`git add\` antes de confiar neste resultado: ${amostra}`);
+}
 
 /** Os ficheiros da superficie que EXISTEM agora, para distinguir migracao de apagamento.
  *

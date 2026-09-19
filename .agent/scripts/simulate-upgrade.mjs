@@ -76,6 +76,9 @@ const SUBSTITUTO = "ProjetoDeOntem";
 
 let problemas = 0;
 const ok = (m) => console.log(`  OK    ${m}`);
+/** Visivel, mas NAO reprova. Para o que o leitor tem de saber e nao e defeito deste simulador —
+ *  uma decisao do projeto medido, por exemplo. A mesma convencao dos guards. */
+const note = (m) => console.log(`  NOTE  ${m}`);
 const warn = (m) => {
   console.log(`  WARN  ${m}`);
   problemas++;
@@ -144,7 +147,7 @@ if (argProjeto) {
   }
   const dirAqui = criaTmp("upgrade-2b-");
   copiaAtiva = dirAqui;
-  const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, fatal });
+  const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, note, fatal });
   limpaCopia();
   process.exit(codigo);
 }
