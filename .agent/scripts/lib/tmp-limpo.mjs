@@ -95,6 +95,14 @@ export const PREFIXOS_DE_TESTE = [
   // comum podia casar o que outra ferramenta escreveu em `tmpdir`. Os irmaos todos sao
   // compostos (`guard-test-`, `sweep-test-`); este era o unico elo fraco.
   "registo-test-",
+  // Os DOIS da suite dos hooks (`.claude/hooks/tests/`). Faltavam desde sempre, e nao por
+  // descuido de quem escreveu a lista: o teste que existe para ela nao envelhecer so varria
+  // `.agent/scripts/tests/`, logo nunca viu esta pasta. Encontrados quando ele passou a varrer
+  // as duas — e a prova estava em disco, uma `hook-test-*` de tres dias que ninguem limpava.
+  //
+  // `naorepo-` e composto e nao ambiguo: as fixtures que montam uma pasta que NAO e um repo git.
+  "hook-test-",
+  "naorepo-",
   "backlog-test-",
   "t-limpo-",
   "sim-test-",
