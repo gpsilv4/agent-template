@@ -22,7 +22,6 @@
  */
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 // Os construtores de fixture vivem no harness: a suite passou as 500 linhas e a catraca do
@@ -31,8 +30,6 @@ import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { registar as registarMedida2b } from "./tests-medida-2b.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
-
-const AQUI = dirname(fileURLToPath(import.meta.url));
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
  *  que ele usa. Escrito a mao aqui e la, os dois lados tinham de concordar sem nada a
