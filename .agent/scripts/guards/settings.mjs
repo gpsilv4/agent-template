@@ -15,13 +15,15 @@
  */
 
 /** @returns {number} guards executados (0 se o ficheiro nao existe) */
-export function guardSettings({ read, warn, ok, note, skip }) {
+export function guardSettings({ read, warn, ok, note, skip, listDir }) {
   let guardsRun = 0;
 
 // --- Guard 11: sanidade do .claude/settings.json ---
 // E a fronteira de seguranca do projeto e nao tinha rede nenhuma: um `allow` demasiado
 // largo passava CI sem sinal. Nao substitui revisao humana — apanha as regressoes obvias.
 const SETTINGS_PATH = ".claude/settings.json";
+/** Onde vivem os hooks. So a RAIZ e hook: `lib/` e o que eles usam, `tests/` e o que os testa. */
+const HOOKS_DIR = ".claude/hooks";
 const settingsRaw = read(SETTINGS_PATH);
 if (settingsRaw === null) {
   skip(`Guard 11 (${SETTINGS_PATH}) — ficheiro ausente (projeto pode nao usar Claude Code)`);
@@ -297,7 +299,74 @@ if (settingsRaw === null) {
       flag(`\`defaultMode: "${mode}"\` desliga a fronteira de permissoes deste ficheiro`);
     }
 
-    if (issues === 0) ok(`${SETTINGS_PATH} (deny de secrets cobre .env*, allow sem concessoes largas)`);
+    // --- Todo o hook em disco esta REGISTADO, e todo o registo aponta para algo que existe ---
+    //
+    // PORQUE EXISTE: um hook que ninguem liga e indistinguivel, para toda a maquinaria, de um
+    // hook a funcionar. A varredura de mutacao chega a certifica-lo — `1/1 sitios, cada aviso
+    // fica vermelho` — sobre um ficheiro que nenhuma sessao executa. E o `TP2` um nivel acima:
+    // nao "zero resultados lido como zero problemas", mas **cobertura medida lida como
+    // proteccao existente**. Medido num consumidor real: o `prompt-fase0.mjs` esteve TRES
+    // rondas por ligar, e nada no ecra o denunciou.
+    //
+    // AQUI e nao num guard proprio: este guard e a "sanidade do settings.json", e "todo o hook
+    // esta registado" e precisamente isso. Um ficheiro novo exigia entrada em `PARES`, suite
+    // propria e uma linha no `scripts-guide.md` — que esta a 51 bytes do tecto.
+    //
+    // ANTES do `ok()` final, e nao depois. A primeira versao vinha a seguir, e o `issues++` do
+    // `flag` chegava tarde: saia um `OK  settings.json (...)` seguido de um `WARN settings.json`
+    // — uma linha verde e uma vermelha sobre o mesmo ficheiro. Este ficheiro ja tem essa licao
+    // escrita mais acima ("o guard imprimia o WARN E o `ok()` final ... a unica frase que nao
+    // podia ser dita"), e eu reintroduzi-a por ordem de instrucoes. Apanhado na passagem de
+    // julgamento, antes do commit.
+    /** Quantos hooks foram VERIFICADOS. `null` = a camada nao existe, e entao o `ok()` final
+     *  nao pode prometer nada sobre eles. */
+    let hooksVistos = null;
+    const hooksNoDisco = listDir(HOOKS_DIR, ".mjs");
+    if (hooksNoDisco === null) {
+      // Um derivado pode ter removido a camada so-Claude. "Nao encontrei" tem de o DIZER.
+      skip(`Guard 11b (hooks registados) — ${HOOKS_DIR} nao existe`);
+    } else {
+      // `listDir` nao desce a `lib/` nem a `tests/`, que nao sao hooks — sao o que eles usam e
+      // o que os testa.
+      const registado = JSON.stringify(settings.hooks ?? {});
+      for (const nome of hooksNoDisco) {
+        const ficheiro = `${nome}.mjs`;
+        // `hooks/<nome>` e nao o nome nu: uma mencao numa string qualquer, ou um
+        // `.claude/hooks/antigos/<nome>.mjs`, nao sao registo. E nao o comando exacto: ele traz
+        // `$CLAUDE_PROJECT_DIR` e aspas, e exigir a forma acusava quem invoca de outra maneira.
+        if (registado.includes(`hooks/${ficheiro}`)) continue;
+        // A VALVULA, com a razao por escrito — o mesmo desenho do `TETOS` do Guard 17, que nao
+        // aceita uma isencao mas sim uma isencao justificada. Uma valvula sem custo vira o
+        // caminho facil: escreve-se a marca e o guard cala-se.
+        const razao = /@opt-in:[ \t]*(\S.*)$/m.exec(read(`${HOOKS_DIR}/${ficheiro}`) ?? "")?.[1]?.trim();
+        if (razao) {
+          note(`${ficheiro} nao esta registado, e declara-se opt-in: ${razao}`);
+          continue;
+        }
+        flag(
+          `${HOOKS_DIR}/${ficheiro} existe mas NAO esta na chave \`hooks\` do ${SETTINGS_PATH} — ` +
+            `nunca dispara, e e indistinguivel de um hook a funcionar. Registar, apagar, ou ` +
+            `declarar \`@opt-in: <razao>\` no cabecalho`
+        );
+      }
+      // A DIRECCAO INVERSA, que e a mesma subtraccao ao contrario: um comando a apontar para um
+      // ficheiro que ja nao existe falha em silencio a cada evento.
+      for (const m of registado.matchAll(/hooks\/([\w-]+\.mjs)/g)) {
+        if (!hooksNoDisco.includes(m[1].replace(/\.mjs$/, ""))) {
+          flag(`a chave \`hooks\` do ${SETTINGS_PATH} invoca \`${m[1]}\`, que nao existe em ${HOOKS_DIR} — hook morto`);
+        }
+      }
+      hooksVistos = hooksNoDisco.length;
+    }
+
+    // O VEREDICTO do guard, depois de TUDO o que ele mede. A frase nomeia as duas coisas
+    // verificadas; quando a camada so-Claude nao existe, nao promete nada sobre hooks.
+    if (issues === 0) {
+      ok(
+        `${SETTINGS_PATH} (deny de secrets cobre .env*, allow sem concessoes largas` +
+          `${hooksVistos === null ? "" : `, ${hooksVistos} hook(s) em disco e todos ligados`})`
+      );
+    }
   }
   guardsRun++;
 }

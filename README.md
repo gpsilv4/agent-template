@@ -179,7 +179,9 @@ gh pr create --fill     # then merge once CI is green
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
-    │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
+    │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary,
+    │   │                          and that every hook on disk is wired to the `hooks` key
+    │   │                          (an unwired hook looks exactly like a working one)
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed
     │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap
