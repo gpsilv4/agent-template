@@ -259,11 +259,12 @@ para um `-why`. O `anti-patterns.md` deste repo tem 1 811 bytes; o `anti-pattern
 
 ---
 
-## Duas licoes da ronda 6 que o `upgrade.md` nao tem espaco para dizer
+## Duas licoes da ronda 6 — a evidencia das instrucoes que o `upgrade.md` ja traz
 
-Ambas vieram de um `/upgrade` real. Ficam aqui **porque o `upgrade.md` esta a 20 bytes do seu
-tecto de 12 000** — e o Guard 1e manda a evidencia para ca. Quem mexer no workflow deve leva-las
-para la assim que houver espaco; sao instrucoes, nao racional.
+Ambas vieram de um `/upgrade` real. **As instrucoes ja subiram para o `upgrade.md`** (#106): a
+primeira esta na linha `.github/workflows/*` da tabela da §2, a segunda no bloco de verificacao
+da §3. O que fica aqui e o porque — a medicao e a historia do defeito, que e o que pertence a
+este ficheiro.
 
 ### 1. Um passo COMENTADO conta como AUSENTE
 
@@ -287,3 +288,32 @@ conta**. Numa migracao de pastas isso e a diferenca entre **25 avisos com exit 1
 Nao e defeito do verificador — e o que ele mede, e mede-o de proposito (a baseline tem de ser
 uma referencia estavel, e o disco por rastrear nao e). Mas custa uma sessao a quem nao saiba, e
 o sintoma parece uma regressao grave em vez de um passo em falta.
+
+
+## Porque o `--verify ...^{commit}` e obrigatorio ao gravar a marca
+
+O `upgrade.md` §4 diz que e obrigatorio e nao explica porque — a explicacao e esta, e e um modo
+de falha silencioso na direcao perigosa.
+
+Sem `--verify`, o `rev-parse main` num template cujo branch principal se chame `master`
+**IMPRIME a palavra "main"** em vez de falhar, e grava uma marca invalida. O upgrade seguinte
+extrai um SHA vazio, o `git log ""..main` vira `HEAD..main` — que e vazio — e o workflow reporta
+**"nada a trazer"**. Ou seja: um template com dezenas de melhorias por trazer aparece como
+estando em dia, e ninguem tem como dar por isso.
+
+## O principio por tras da §2b
+
+> Um upgrade que deixa o projeto vermelho sem que ninguem tenha decidido isso e pior do que nao
+> ter feito upgrade nenhum.
+
+E daqui que sai a exigencia de **medir antes de aplicar**: nao para impedir que um criterio
+aperte, mas para que apertar seja uma decisao tomada por alguem, com o numero a vista.
+
+## Duas consequencias que sairam das celulas "Porque" da tabela da §2
+
+Sairam no #106 por serem historia de defeito e nao ajuda a decidir. Ficam medidas:
+
+- **`.agent/scripts/**/*.mjs`** — uma copia cega devolve o gate a medir zero. **Ja estava medido
+  aqui**, em *"Os tres defeitos que a simulacao encontrou"*, ponto 1 — nao se repete.
+- **`.claude/hooks/*`** — trazer os hooks sem `.claude/hooks/tests/` deixa um hook sem testes, e
+  um hook errado **bloqueia trabalho legitimo em silencio**, antes de cada ferramenta.

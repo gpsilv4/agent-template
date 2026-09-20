@@ -42,7 +42,7 @@
  *   ubuntu-latest, repo privado  (2/2)  ~48 min
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
- * metade da margem. Detalhe e origem de cada medicao em `.agent/rules/scripts-guide.md`.
+ * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.
  *
  * O QUE ESTA VARREDURA **NAO** COBRE, e vale saber antes de confiar nela: ela muta **sitios
  * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** —

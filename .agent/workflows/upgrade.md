@@ -68,29 +68,26 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 ## 2. Decidir por categoria, nao por ficheiro
 
 > **Regra geral, antes da tabela.** Um ficheiro que o projeto **nao modificou** desde o
-> bootstrap traz-se por inteiro: nao ha julgamento a fazer sobre uma copia intacta, e mante-la
-> so a deixa a apodrecer. O "diff e decidir" da tabela aplica-se ao que ele **customizou**.
+> bootstrap traz-se por inteiro. O "diff e decidir" da tabela aplica-se ao que ele **customizou**.
 >
 > Compara-se contra a versao do template **de onde o projeto saiu** (`.template-version`), com
 > os placeholders ja substituidos — nao contra o template nu, ou tudo aparece customizado.
->
-> Nao e detalhe — porque custa (`upgrade-why.md`).
 
 | Categoria | O que fazer | Porque |
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | E o estado e a historia deste projeto. Nao existem em mais sitio nenhum |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | E a configuracao deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-mecanico.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto. Uma copia cega devolve o gate a **medir zero**, e ele diz "superficie intacta" sobre uma suite apagada |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-mecanico.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
 | **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova) — e do template, e os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** nunca se tocam (sao os `APn` deste projeto). Do cabecalho traz-se a **regra duravel** (onde vivem os `TPn`, o Guard 15) e **nao o andaime de bootstrap**: o cabecalho inteiro rebenta o tecto de um consumidor maduro (`upgrade-why.md`). As citacoes `TPn` nos scripts e workflows **copiam-se como estao** | Os prefixos tornam isto copia, nao reescrita a mao |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
-| `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`). Nao substituir o CI do projeto | O CI do projeto pode ter passos proprios |
+| `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`), comparando contra o ficheiro do **TEMPLATE** e nao contra os passos activos do projeto: um passo **comentado** conta como AUSENTE. Nao substituir o CI do projeto | O CI do projeto pode ter passos proprios |
 | `.claude/settings.json` | Trazer regras de `deny`/`ask` novas; **acrescentar** ao `allow` os scripts novos | O `allow` do projeto reflete o que ele corre |
 | `.claude/agents/*` | Copia se ausentes. **Load-bearing**: a Fase 4 exige o `code-reviewer` e a Fase 0 de um `L` o `plan-auditor` | Sem eles essas fases nao correm no Claude Code |
-| `.claude/hooks/*` + a chave `hooks` do `settings.json` | Copia se ausentes, **e adaptar** `PROTEGIDOS` (branches deste projeto) e os verbos que o projeto tenha acrescentado a `SEGUROS` no `guard-protected-branch`. Trazer `.claude/hooks/tests/` **inteiro** — um hook sem testes bloqueia trabalho legitimo em silencio | **So-Claude Code**, e o `CLAUDE.md` diz o que isso custa |
+| `.claude/hooks/*` + a chave `hooks` do `settings.json` | Copia se ausentes, **e adaptar** `PROTEGIDOS` (branches deste projeto) e os verbos que o projeto tenha acrescentado a `SEGUROS` no `guard-protected-branch`. Trazer `.claude/hooks/tests/` **inteiro** | **So-Claude Code**; trazer os testes com eles (`upgrade-why.md`) |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` deste projeto | Governance: metade e do projeto |
 | **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
@@ -122,12 +119,8 @@ e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precis
 
 > Corre sobre uma copia em `tmpdir`: **nao toca neste projeto**. Sai `0` mesmo com lista cheia —
 > uma lista cheia e o output desta secao, nao uma reprovacao. So a impossibilidade de medir sai
-> `!= 0`, e ai diz porque. Sem `.agent/.template-version` utilizavel recusa-se, e bem: e o **Modo
-> B**, julgamento e nao mecanica, e ai a lista faz-se a mao com a tabela acima. Sem argumentos,
-> do lado do template, mede o mesmo contra a ultima tag — e o que o CI corre.
-
-> Um upgrade que deixa o projeto vermelho sem que ninguem tenha decidido isso e pior do que
-> nao ter feito upgrade nenhum.
+> `!= 0`, e ai diz porque. Sem `.agent/.template-version` utilizavel recusa-se: e o **Modo B**, e
+> ai a lista faz-se a mao com a tabela acima.
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
@@ -138,6 +131,7 @@ node .agent/scripts/check-doc-versions.mjs     # paridade, orcamentos, placehold
 node .agent/scripts/check-backlog.mjs          # contadores do backlog
 node .agent/scripts/tests/test-guards.mjs            # e as outras suites test-*
 node .agent/scripts/mutation-sweep.mjs         # custa minutos; e o que interessa
+git add -A && node .agent/scripts/check-test-surface.mjs   # `git add` ANTES: ele le `git ls-files`
 ```
 
 Ler com atencao dois resultados da varredura:
@@ -153,10 +147,7 @@ ser identico. E, se alguem no projeto trabalha em Windows, confirmar num clone c
 
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
-# `--verify ...^{commit}` e obrigatorio: sem ele, `rev-parse main` num template cujo branch
-# principal se chame `master` IMPRIME a palavra "main" e grava uma marca invalida. O upgrade
-# seguinte extrai um SHA vazio, o `git log ""..main` vira `HEAD..main` (vazio) e o workflow
-# reporta "nada a trazer" — falha silenciosa, na direcao perigosa.
+# O `--verify ...^{commit}` e obrigatorio (porque: `upgrade-why.md`).
 BR=$(git -C "$TPL" symbolic-ref --short HEAD)                # nao assumir `main`
 SHA=$(git -C "$TPL" rev-parse --verify "$BR^{commit}") || { echo "FALHOU: sem commit em $BR"; exit 1; }
 printf 'template: %s\ncommit: %s\ndata: %s\n' \
