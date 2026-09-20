@@ -38,6 +38,19 @@ test("deteta um sitio de aviso que nenhum teste exercita", {}, [], {
   includes: ["INCOMPLETA", "1/2 sitios cobertos", "encontrei 'zzz'", "VARREDURA NAO CONCLUSIVA"],
 });
 
+// --- Vermelho NAO e o mesmo que coberto --------------------------------------
+// O CONTROLO NEGATIVO do #114. A mutacao parte a SINTAXE de um modulo que a suite importa: ela
+// rebenta a carregar, sai `!= 0` e nao imprime um unico `FAIL`. Antes disto, o varredor lia o
+// exit code e dava o sitio por coberto — o defeito que o `lib/pares.mjs` documenta DUAS vezes
+// (`:260`, `:279`) e que la foi remendado a mao, com um lookbehind de cada vez.
+test("suite que REBENTA nao conta como cobertura", { mutacaoRebenta: true }, [], {
+  code: 1,
+  includes: ["REBENTOU", "sem nenhum FAIL", "INCOMPLETA", "VARREDURA NAO CONCLUSIVA"],
+  // A prova de que isto mede o que diz: sem a exigencia de `FAIL`, este mesmo cenario dava
+  // `Cobertura de mutacao completa`. E o unico sitio do repo onde os dois se distinguem.
+  excludes: ["Cobertura de mutacao completa"],
+});
+
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {
   code: 0,
   // Sem o segundo sitio o verificador falso tem 1 — e a suite exercita-o.

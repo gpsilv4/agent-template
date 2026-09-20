@@ -66,6 +66,11 @@ process.exit(avisos > 0 ? 1 : 0);
 `;
 
 // Suite falsa: exercita SO o primeiro sitio.
+// A suite falsa imprime `  FAIL  `, a MESMA forma das treze suites reais deste repo — medido,
+// nao assumido. Nao e cosmetica: o motor exige essa prova para contar um vermelho como cobertura
+// (senao uma suite que REBENTA passa por uma suite que apanhou a mutacao). Uma fixture que
+// sinalize falha de outra maneira deixa de representar o que substitui, e passa a medir o motor
+// contra um caso que nao existe la fora.
 const FAKE_TEST = `import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -75,11 +80,11 @@ function corre(arg) {
   catch (e) { return { code: e.status ?? 1, out: (e.stdout ?? "") + (e.stderr ?? "") }; }
 }
 const r = corre("isto e mau");
-if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("FALHOU"); process.exit(1); }
+if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("  FAIL  o verificador nao avisou"); process.exit(1); }
 console.log("ok");
 `;
 
-export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
+export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -145,6 +150,25 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
     writeFileSync(join(dir, ".agent/scripts/tests/harness/test-novo-harness.mjs"),
       'export const fixture = () => ({ rotas: ["/"], teto: 160 });\n');
   }
+  if (mutacaoRebenta) {
+    // O CONTRA-CASO do "vermelho e cobertura": aqui a mutacao parte a SINTAXE de um modulo que a
+    // suite **importa**, logo a suite nem chega a correr um teste — rebenta a carregar, sai `!= 0`
+    // e nao imprime um unico `FAIL`. Sem a prova de falha, isto contava como cobertura, e o
+    // `lib/pares.mjs` documenta duas vezes que ja aconteceu (`:260`, `:279`).
+    //
+    // Tem de ser um modulo IMPORTADO e nao o verificador invocado: uma suite bem escrita deteta o
+    // verificador a rebentar e reporta `FAIL` — que e o comportamento certo e NAO o caso a medir.
+    mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
+    writeFileSync(
+      join(dir, ".agent/scripts/lib/fake-mod.mjs"),
+      "export function warn(m) { console.log(m); }\n"
+    );
+    writeFileSync(
+      join(dir, ".agent/scripts/fake-test.mjs"),
+      'import { warn } from "./lib/fake-mod.mjs";\nif (typeof warn !== "function") { console.log("  FAIL  sem warn"); process.exit(1); }\nconsole.log("ok");\n'
+    );
+  }
+
   if (harnessComThrow) {
     // O contra-caso, e o que prende a isencao: um harness cujo unico sitio de recusa e um
     // `throw`. A verificacao de conteudo nao conhecia `throw new Error(` — dizia "nao tem
@@ -164,7 +188,13 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
 
   writeFileSync(
     join(dir, ".agent/scripts/fake-test.mjs"),
-    baselineVermelha ? 'console.log("sempre vermelha"); process.exit(1);\n' : FAKE_TEST
+    // `mutacaoRebenta` ja escreveu a SUA suite acima (uma que importa o modulo que a mutacao
+    // parte). Sem esta guarda, a escrita por omissao apagava-a e o cenario media outra coisa.
+    mutacaoRebenta
+      ? readFileSync(join(dir, ".agent/scripts/fake-test.mjs"), "utf8")
+      : baselineVermelha
+        ? 'console.log("sempre vermelha"); process.exit(1);\n'
+        : FAKE_TEST
   );
 
   // Copiar o varredor TAL COMO ESTA e escrever um `lib/pares.mjs` proprio com o par falso.
@@ -188,7 +218,7 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
       'let out="", code=0;\n' +
       'try { out = execFileSync("node",[join(ROOT,".agent/scripts/fake-check-2.mjs"),"isto e mau"],{encoding:"utf8"}); }\n' +
       'catch(e){ code = e.status ?? 1; out = (e.stdout ?? "") + (e.stderr ?? ""); }\n' +
-      'if (code === 0 || !out.includes("dois")) { console.log("FALHOU"); process.exit(1); }\n' +
+      'if (code === 0 || !out.includes("dois")) { console.log("  FAIL  o segundo verificador nao avisou"); process.exit(1); }\n' +
       'console.log("ok");\n');
   }
 
@@ -225,7 +255,12 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
   }
   writeFileSync(
     join(dir, ".agent/scripts/lib/pares.mjs"),
-    "export const PARES = [{ alvo: \".agent/scripts/fake-check.mjs\", suite: " +
+    // No cenario `mutacaoRebenta` o alvo e o modulo IMPORTADO pela suite, e nao o verificador
+    // invocado: o `sinal` por omissao casa a definicao `export function warn(m)`, logo a mutacao
+    // deixa `export function (() => {})(m)` e o ficheiro deixa de ser sintacticamente valido.
+    "export const PARES = [{ alvo: " +
+      JSON.stringify(mutacaoRebenta ? ".agent/scripts/lib/fake-mod.mjs" : ".agent/scripts/fake-check.mjs") +
+      ", suite: " +
       (suite === null ? "null" : JSON.stringify(suite)) +
       ", sinal: " + sinal + ", neutro: \"(() => {})(\"" + (opcional ? ", opcional: true" : "") + " }" +
       (parSao
@@ -307,7 +342,7 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
       `  let out="", code=0;\n` +
       `  try { out = execFileSync("node",[join(ROOT,f),"isto e mau"],{encoding:"utf8"}); }\n` +
       `  catch(e){ code = e.status ?? 1; out = (e.stdout ?? "") + (e.stderr ?? ""); }\n` +
-      `  if (code === 0 || !out.includes(marca)) { console.log("FALHOU " + f); process.exit(1); }\n` +
+      `  if (code === 0 || !out.includes(marca)) { console.log("  FAIL  " + f); process.exit(1); }\n` +
       `}\nconsole.log("ok");\n`);
     writeFileSync(join(dir, ".agent/scripts/lib/pares.mjs"),
       `export const PARES = [\n` +

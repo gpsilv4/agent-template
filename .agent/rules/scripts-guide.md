@@ -44,8 +44,8 @@
 | Onde | O que correr | Porque |
 |---|---|---|
 | **Local, a trabalhar** | `node .agent/scripts/mutation-sweep.mjs --diff` | So os alvos que este branch tocou. Minutos em vez de dezenas deles |
-| **Local, excepcao** | a completa, sem flags | **So** ao mexer no proprio `mutation-sweep.mjs` ou em `lib/mapa-suites.mjs`: usar o filtro para validar o filtro e circular |
-| **CI** | a completa, sem flags | Nao muda. O CI e o **portao** — e nao ha troca a fazer: a varredura corre em paralelo e afirma exactamente o mesmo |
+| **Local, excepcao** | a completa, sem flags | **So** ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs` (porque: *why*) |
+| **CI** | a completa, sem flags | Nao muda. O CI e o **portao** |
 
 A varredura corre em **8 processos** (ou o numero de cores, o que for menor), cada um com a **sua
 copia do repo** — a copia por worker nao e detalhe. `--workers=1` devolve o sequencial, para
@@ -56,9 +56,12 @@ nao tem orcamento, com a visibilidade do repo ao lado (publico/privado duplica);
 no `-why`. Duas copias de um numero medido a concordar a mao e o `TP8`, e ja envelheceram uma vez.
 
 O `--diff` escolhe por **duas vias**: o ficheiro alterado **e** um alvo, ou leva a uma **suite**
-(e ai varrem-se todos os alvos que a usam — e como mexer no `tests/harness/test-harness.mjs` seleciona os
-alvos todos que dependem dele). Sem baseline resoluvel **reprova**; sem alvos, **lista** o que
-nao casou regra nenhuma, para uma lacuna no mapa ficar visivel em vez de absorvida.
+(e ai varrem-se todos os alvos que a usam). Sem baseline resoluvel **reprova**; sem alvos,
+**lista** o que nao casou regra nenhuma, em vez de a absorver.
+
+**Vermelho nao e o mesmo que coberto.** Um sitio so conta como coberto se a suite mutada imprimir
+um `FAIL` — a prova de que um TESTE apanhou a mutacao. Sair `!= 0` sem isso e a suite a rebentar
+(sintaxe partida, import morto), e reporta-se `REBENTOU`, nao cobertura.
 
 > **Guard 18** (no mesmo modulo do 15): cada `TPn` do catalogo do template tem de ter a sua
 > seccao em `src/docs/anti-patterns-why.md`. A outra direccao ja estava fechada — uma seccao

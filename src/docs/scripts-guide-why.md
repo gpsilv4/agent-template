@@ -192,3 +192,33 @@ a segunda pessoa.
   da superficie (ele compara o TOTAL), e esvaziar as tabelas de padroes reprova.
 - **Detector de codigo morto** — nao tem dependencias porque o `eslint` quebrava a regra de os
   verificadores so precisarem de `node`, que e o que os torna corriveis por qualquer agente.
+
+## Porque a varredura completa e a excepcao local, e nao o habito
+
+A regra no `scripts-guide.md` diz *"so ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs`"*.
+A razao e circular por desenho: sao essas as duas pecas que **escolhem o que varrer**. Usar o
+`--diff` para validar uma alteracao ao proprio `--diff` e pedir ao filtro que se valide a si
+proprio — se a seleccao estiver partida, ela escolhe-se a ela mesma como correcta.
+
+E no CI nao ha troca a fazer entre a completa e a `--diff`: a varredura corre **em paralelo** e
+afirma exactamente o mesmo, logo o unico custo e tempo de maquina — que e o custo que um portao
+deve pagar.
+
+## `REBENTOU`: vermelho deixou de ser o mesmo que coberto (#114)
+
+O motor decidia cobertura a partir de um **exit code**, e nao sabia distinguir *"um teste apanhou
+a mutacao"* de *"a suite rebentou"*. Uma mutacao que parta a sintaxe de um modulo **importado**
+pela suite faz o processo morrer a carregar: sai `!= 0` sem correr um unico teste — e contava
+como cobertura.
+
+**Nao e teorico**: o `lib/pares.mjs` documenta o defeito duas vezes (`:260`, `:279`), e as duas
+correccoes foram lookbehinds escritos a mao, um de cada vez, a impedir *aquela* mutacao
+especifica de partir a sintaxe. Nenhuma impedia a seguinte.
+
+**Medido antes de mudar**: dos **213** sitios do repo, **zero** estavam nesta situacao. O zero nao
+e a ausencia do problema — e o resultado desses remendos. O que mudou foi a natureza da defesa:
+deixou de depender de alguem se lembrar do lookbehind certo.
+
+**O contra-caso importa tanto como o caso**: partir o verificador que a suite **invoca** nao serve
+de controlo negativo, porque uma suite bem escrita deteta-o e reporta `FAIL` — que e o
+comportamento correcto. O cenario tem de partir um modulo **importado**.
