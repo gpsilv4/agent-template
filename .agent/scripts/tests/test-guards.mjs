@@ -13,10 +13,13 @@
  *   node .agent/scripts/tests/test-guards.mjs
  */
 
-import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { test, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
+// A TERCEIRA copia da receita do "bootstrap concluido" vivia aqui, a concordar a mao com as das
+// duas suites. Uma delas ja divergiu uma vez (o `.mdc` em falta) — `TP8`.
+import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
@@ -456,25 +459,6 @@ test("G10: sem pastas de wrappers da SKIP visivel", (dir) => {
   rmSync(file(dir, ".gemini/commands"), { recursive: true, force: true });
 }, { code: 0, includes: ["SKIP  Guard 10"] });
 
-/** Simula o estado de um projeto DERIVADO: marcador de bootstrap presente e placeholders
- *  substituidos. As duas coisas andam juntas — escrever o marcador sozinho liga o Guard 13
- *  numa fixture que ainda tem `{{...}}` por todo o lado, e o teste falha por 8 avisos sem
- *  relacao com o que afirma. Um derivado a serio ja os substituiu. */
-function derivado(dir) {
-  const anda = (rel) => {
-    for (const e of readdirSync(file(dir, rel), { withFileTypes: true })) {
-      const sub = rel ? `${rel}/${e.name}` : e.name;
-      if (e.name === ".git" || e.name === "node_modules") continue;
-      if (e.isDirectory()) { anda(sub); continue; }
-      if (!/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) && e.name !== "LICENSE" && e.name !== "CODEOWNERS") continue;
-      const c = readF(dir, sub);
-      const novo = c.replace(/\{\{(?!args\})[A-Z_]+\}\}/g, "VALOR");
-      if (novo !== c) writeF(dir, sub, novo);
-    }
-  };
-  anda("");
-  writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
-}
 
 test("G3: CHANGELOG sem entrada de versao da NOTE visivel", (dir) => {
   // O Guard 3 so chega a este ramo com um `package.json` (senao salta antes, com outra

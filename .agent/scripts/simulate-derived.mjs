@@ -215,6 +215,11 @@ for (const e of readdirSync(ROOT, { withFileTypes: true })) {
 // de ter sitios de recusa e suite propria. Codigo de defesa que nenhum teste cobre e peso morto
 // — e a varredura reprova-o, com razao (a mesma nota existe no `check-test-surface.mjs`).
 
+// --- 2.0. marcador de origem. ESTAVA EM FALTA: sem ele `ehDerivado()` da false na copia e o
+// Guard 13 — a unica rede de placeholders — saltava em TODAS as corridas (`scripts-guide-why.md`).
+writeFileSync(join(dir, ".agent/.template-version"), "template: simulacao\ncommit: 0000000\nversao: v0.0.0\ndata: 1970-01-01\n");
+ok("marcador `.agent/.template-version` gravado (Fase 2.0) — e ele que liga o Guard 13");
+
 // --- 2. substituir placeholders -------------------------------------------------
 let tocados = 0;
 const anda = (rel) => {

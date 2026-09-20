@@ -60,7 +60,11 @@ export const SUITES = [
   // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
   { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
-  { re: /^\.agent\/scripts\/tests\/harness\/test-harness\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // O harness dos doc guards e o construtor de fixture que o Guard 21 obriga a ter. O segundo
+  // nao casa a convencao `test-*` (nao e uma suite, e um construtor), logo precisa de nome
+  // proprio aqui — sem ele, mexer-lhe nao gerava obrigacao nenhuma e ele DECIDE se uma fixture
+  // esta bem montada.
+  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado)\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
@@ -128,7 +132,21 @@ export const SUITES = [
   // nao gerava obrigacao nenhuma — o `--diff` apontou-o com `sem regra no mapa` ao ver o
   // `upgrade-why.md` a ser tocado.
   { re: /^src\/docs\/.+\.md$/, verifica: [S("check-doc-versions.mjs")] },
-  { re: /^\.agent\/context\/backlog/, verifica: [S("check-backlog.mjs")] },
+  // O backlog verifica-se pelos DOIS: o `check-backlog.mjs` recalcula os contadores, e o
+  // Guard 21 (dentro do `check-doc-versions.mjs`) exige que no template ele esteja por estrear.
+  // Sem o segundo, editar o backlog aqui nao gerava obrigacao de correr quem o congela.
+  { re: /^\.agent\/context\/backlog/, verifica: [S("check-backlog.mjs"), S("check-doc-versions.mjs")] },
+  // **Se acrescentares um verificador a regra da pasta abaixo, acrescenta-o tambem na do
+  // backlog acima.** A primeira regra que casa vence (`regraDe`), logo a do backlog nao herda
+  // nada desta — e uma divergencia entre as duas nao produz erro nenhum, so deixa de gerar a
+  // obrigacao certa para os dois ficheiros do backlog.
+  //
+  // Os OUTROS cinco ficheiros de contexto nao casavam regra NENHUMA — `implementation_plan.md`,
+  // `session.md`, `task.md`, `walkthrough.md`, `decisions.md`. Tocar-lhes nao gerava obrigacao de
+  // verificar coisa nenhuma, e foi exactamente num deles que se escreveram 189 linhas que nada
+  // travou. A regra e por PASTA e nao por nome (`TP9`): um `.agent/context/X.md` novo tem de
+  // casar a partir do primeiro dia, que e quando o Guard 21 tem de o ver.
+  { re: /^\.agent\/context\//, verifica: [S("check-doc-versions.mjs")] },
   { re: /^\.claude\/settings\.json$/, verifica: [S("test-guards.mjs")] },
 ];
 

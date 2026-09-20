@@ -185,6 +185,8 @@ gh pr create --fill     # then merge once CI is green
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed
     │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap
+    │   ├── context-virgem.mjs  <- Guard 21: in the TEMPLATE, .agent/context/ stays unstarted
+    │   │                          (frozen content hashes; skips in a derived project)
     │   ├── anti-patterns.mjs   <- Guards 15/18: citations resolve; each TPn has its evidence
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
     │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
@@ -213,7 +215,9 @@ gh pr create --fill     # then merge once CI is green
             ├── test-bundle-harness.mjs   <- Fake .next/ trees and the config each test needs
             ├── test-surface-harness.mjs  <- A real git repo as a fixture
             ├── test-sweep-harness.mjs    <- Fake checker + fake suite of known behaviour
-            └── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
+            ├── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
+            └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
+                                             .agent/context/ (derived from the fixture, not the repo)
 
 > **Why the tests live in a folder and the checkers don't.** The root answers "what can I run
 > here?". And the difference between `test-*` (an entry point) and `tests-*` (a module found by

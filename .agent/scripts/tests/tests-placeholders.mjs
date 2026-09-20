@@ -7,10 +7,14 @@
  * A fixture tem de simular um projeto JA bootstrapado, senao o guard salta — e um teste que
  * passa por o guard nao correr nao afirma nada.
  */
-import { readdirSync, rmSync } from "fs";
-import { join } from "path";
+import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, readF, writeF, file } from "./harness/test-harness.mjs";
+// A receita do "bootstrap concluido" — os placeholders substituidos E o marcador escrito, que
+// andam sempre juntos. Estava aqui e no `tests-context-virgem.mjs`, a concordar a mao: a lista
+// de extensoes ja divergiu uma vez (faltava o `.mdc` nas DUAS, e a regra do Cursor ficava com o
+// placeholder para sempre). Agora e uma so (`TP8`).
+import { bootstrapado } from "./harness/projeto-derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -25,32 +29,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 // derivado e estas asserções passariam a esperar "VALOR". Achado a simular o bootstrap.
 const ph = (nome) => "{" + "{" + nome + "}" + "}";
 
-/** Simula um bootstrap CONCLUIDO: escreve o `.agent/.template-version` (o marcador que o
- *  `ehDerivado()` procura) e substitui TODOS os `{{...}}` em toda a fixture. Substituir so
- *  num punhado de ficheiros deixava 40+ a avisar, e o teste falhava por a fixture estar a
- *  meio bootstrap em vez de pelo que queria afirmar.
- *
- *  O marcador mudou de `business-logic.md` para `.template-version`: aquela rule e um
- *  artefacto de DOMINIO que uma CLI ou uma lib nao geram, logo um meio-bootstrap desligava
- *  o Guard 13 para sempre. Ver o cabecalho de `guards/placeholders.mjs`. */
-const bootstrapado = (dir) => {
-  const anda = (rel) => {
-    for (const e of readdirSync(join(dir, rel), { withFileTypes: true })) {
-      if (e.name === ".git" || e.name === "node_modules") continue;
-      const sub = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) anda(sub);
-      // A lista de tipos espelha a Fase 2.1 do BOOTSTRAP. Faltava `.mdc` nas DUAS — o helper
-      // e o bootstrap — o que deixava a regra do Cursor com o placeholder para sempre.
-      else if (/\.(md|mdc|mjs|json|yml|toml)$/.test(e.name) || e.name === "LICENSE" || e.name === "CODEOWNERS" || sub.startsWith(".githooks/")) {
-        const c = readF(dir, sub);
-        const novo = c.replace(/\{\{(?!args\})[A-Z_]+\}\}/g, "VALOR");
-        if (novo !== c) writeF(dir, sub, novo);
-      }
-    }
-  };
-  anda("");
-  writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
-};
 
 /** Entry point a que este modulo pertence. Obrigatorio: dois entry points partilham
  *  a pasta `.agent/scripts/`, e a descoberta em disco precisa de saber de quem e

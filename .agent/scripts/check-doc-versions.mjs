@@ -36,6 +36,7 @@ import { guardSettings } from "./guards/settings.mjs";
 import { guardChangelogVersion, guardDependencyVersions } from "./guards/versions.mjs";
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
+import { guardContextVirgem } from "./guards/context-virgem.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
 import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
@@ -407,6 +408,12 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+
+// --- Guard 21: no TEMPLATE, `.agent/context/` esta por estrear ---
+// O par do Guard 13, e o inverso dele: aquele so corre DEPOIS do bootstrap, este so ANTES.
+// Nada media a promessa central deste repo — um agente escreveu 189 linhas de planeamento no
+// `implementation_plan.md` e nenhuma rede disparou. Ver o cabecalho de `guards/context-virgem.mjs`.
+guardsRun += guardContextVirgem({ read, warn, ok, skip, listTree, ehDerivado });
 
 // --- Guard 20: um ficheiro citado numa instrucao existe, e e um so ---
 // Uma citacao morta nao da erro: fica a mentir ate alguem a seguir.

@@ -6,6 +6,11 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 > explicar antes de fazer, e **esperar aprovacao**. Num ticket `M`/`L` o resultado escreve-se
 > em `.agent/context/implementation_plan.md`, com as **alternativas rejeitadas e porque**.
 > Detalhe e escala por tamanho: `.agent/rules/ticket-method.md` (nao carregado).
+>
+> **Excecao enquanto `.agent/.template-version` nao existir** (o repo ainda e o template por
+> estrear): o plano vai para um **issue**, nunca para `.agent/context/`. Um template nao tem
+> sitio onde guardar trabalho pendente, por desenho — o que la ficar nasce dentro de cada
+> projeto criado a partir dele. O **Guard 21** reprova. Razao por extenso: `process-rules.md`.
 
 ## 0. Verificar Backlog
 
@@ -94,6 +99,7 @@ Antes de comecar a implementacao, perguntar ao utilizador:
 ## 9. Output
 
 - Criar `.agent/context/implementation_plan.md` detalhado com ficheiros novos/modificados
-- Criar `.agent/context/task.md` com a lista de tarefas da feature
+  (**no template, um issue** — ver a excecao no topo)
+- Criar `.agent/context/task.md` com a lista de tarefas da feature (idem)
 - Incluir exemplos de codigo para logica complexa
 - Pedir aprovacao do utilizador antes de implementar

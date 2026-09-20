@@ -44,6 +44,12 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
    campos na rule, a evidencia no `-why`). Idem `.agent/rules/ticket-method.md` (instrucoes) **e** `src/docs/ticket-method-why.md` (evidencia: de onde veio a regra, o que custa) — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
    **Renumerar ou mudar o ambito de uma fase obriga a atualizar quem a cita por numero**: `process-rules.md`
    (ponteiro + "Ao iniciar um item"), `/plan` (Fase 0), `/debug` (Fase 0+1), `/refactor` (Fase 0+4), `/review` (Fase 3)
+
+> **Pontos 7 a 13, enquanto `.agent/.template-version` NAO existir** (este repo e o template por
+> estrear): **saltam-se todos.** Nada se escreve em `.agent/context/` — esses ficheiros sao o
+> andaime que cada projeto derivado herda, e o que la ficar nasce dentro dele. O estado e o
+> trabalho pendente vivem em **issues**. O **Guard 21** reprova; a razao esta em `process-rules.md`.
+
 7. [ ] `.agent/context/session.md` — estado da sessao atual
 8. [ ] `.agent/context/task.md` — tarefas atualizadas
 9. [ ] `.agent/context/backlog.md` + `.agent/context/backlog-archive.md`:
