@@ -52,8 +52,14 @@ export function quantosWorkers(pedido) {
 /** Corre uma suite e diz se passou. Nunca lanca: "falhou" e um resultado, nao um acidente. */
 const passa = (suiteCopia, cwd) =>
   new Promise((resolve) => {
-    execFile("node", [suiteCopia], { cwd }, (err) => resolve(!err));
+    execFile("node", [suiteCopia], { cwd }, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: (stdout ?? "") + (stderr ?? "") })
+    );
   });
+
+/** A PROVA de que a suite ficou vermelha porque um TESTE apanhou a mutacao, e nao porque
+ *  rebentou. As treze suites deste repo imprimem a mesma forma — medido, nao assumido. */
+const PROVA_DE_FALHA = /^\s*FAIL\s/m;
 
 /** N tarefas de cada vez, cada worker com um indice FIXO — e o indice e que lhe da a copia.
  *  Sem indice fixo, duas tarefas concorrentes podiam cair na mesma arvore, que e precisamente a
@@ -90,7 +96,7 @@ export async function medeCobertura({ medir, copias }) {
   const suites = [...new Set(medir.map((m) => m.suite))];
   const baseline = new Map();
   await emParalelo(suites, workers, async (suite, w) => {
-    baseline.set(suite, await passa(join(copias[w], suite), copias[w]));
+    baseline.set(suite, (await passa(join(copias[w], suite), copias[w])).ok);
   });
 
   const baselinesVermelhas = suites.filter((s) => !baseline.get(s));
@@ -111,11 +117,19 @@ export async function medeCobertura({ medir, copias }) {
     const match = m.visiveis[i].match(m.sinal);
     mut[i] = m.linhas[i].slice(0, match.index) + m.neutro + m.linhas[i].slice(match.index + match[0].length);
     writeFileSync(alvoCopia, mut.join("\n"));
-    const ficouVermelha = !(await passa(join(copias[w], m.suite), copias[w]));
+    const r = await passa(join(copias[w], m.suite), copias[w]);
+    const ficouVermelha = !r.ok;
     // Repor ANTES de o worker pegar no item seguinte: o proximo item pode ser de outro alvo, e
     // uma copia deixada suja envenenava-o.
     writeFileSync(alvoCopia, m.src);
-    if (!ficouVermelha) naoCobertos[t].push({ ln: i + 1, txt: m.linhas[i].trim().slice(0, 90) });
+    const entrada = { ln: i + 1, txt: m.linhas[i].trim().slice(0, 90) };
+    if (!ficouVermelha) naoCobertos[t].push(entrada);
+    else if (!PROVA_DE_FALHA.test(r.out)) {
+      // Vermelha SEM um unico `FAIL`: a suite rebentou, nao houve teste a apanhar nada. Contar
+      // isto como cobertura e o defeito que o `pares.mjs` ja documentou duas vezes.
+      console.log(`  REBENTOU  ${m.alvo}:${i + 1} saiu != 0 sem nenhum FAIL — nao e cobertura`);
+      naoCobertos[t].push({ ...entrada, motivo: "rebentou" });
+    }
   });
 
   return {

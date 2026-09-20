@@ -179,6 +179,21 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O MOTOR da varredura. Estava isento da descoberta por nao ter um unico sitio de recusa —
+    // devolvia um booleano e mais nada. Ganhou um: o `REBENTOU`, que decide se um vermelho conta
+    // como cobertura. E o sitio mais consequente do repo: desligado, uma suite que **rebenta**
+    // volta a contar como testada, e a varredura certifica o nada em silencio — exactamente o
+    // defeito que o `pares.mjs` (este ficheiro) ja documentou duas vezes, e que so foi remendado
+    // com lookbehinds a mao.
+    //
+    // `console.log(` como sinal, pelo mesmo motivo dos hooks: este modulo nao reprova, INFORMA —
+    // quem reprova e o `mutation-sweep.mjs` a partir do que ele devolve.
+    alvo: ".agent/scripts/lib/varredura-paralela.mjs",
+    suite: ".agent/scripts/tests/test-mutation-sweep.mjs",
+    sinal: /(?<![\w.$])console\.log\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A seleccao do runner (TP4, invariante 2). Vive em `lib/` e nao em `guards/` porque
     // nao e um guard de documentacao — mas tem sitios de recusa, logo tem de ter rede.
     alvo: ".agent/scripts/lib/registo.mjs",
