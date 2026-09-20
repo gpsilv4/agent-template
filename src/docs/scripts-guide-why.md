@@ -120,3 +120,40 @@ worker, sem espera ociosa para preencher. Subir o tecto so acrescenta contencao.
 O comentario de `quantosWorkers()` diz que *"o gargalo nao e CPU"* e essa frase nunca foi medida;
 tres leituras independentes acreditaram nela antes de alguem pegar num cronometro. **O remedio
 para um runner de 2 cores nao e mais workers — e menos trabalho** (ver o fail-fast).
+
+## O simulador de derivado esteve a correr com o Guard 13 desligado
+
+O `simulate-derived.mjs` declara no cabecalho que se pode confiar na lista de extensoes do passo
+2 porque, *"se faltar alguma, sobram placeholders e o **Guard 13 dispara** no passo 4"*. Essa
+frase foi verdade quando foi escrita e deixou de o ser sem nada avisar.
+
+O que aconteceu: o discriminador de "bootstrap concluido" mudou. Era a existencia das rules
+geradas (`business-logic.md`); passou a ser o ficheiro `.agent/.template-version`, escrito no
+passo **2.0** do `BOOTSTRAP.md` — precisamente porque um meio-bootstrap (placeholders
+substituidos, rules nao geradas) deixava o Guard 13 desligado **para sempre**, em silencio. A
+mudanca esta documentada em `lib/derivado.mjs` e no cabecalho de `guards/placeholders.mjs`.
+
+**O simulador nunca foi atualizado.** Ele simula os passos 2.1, 2.2 e 2.8, e nao o 2.0 — logo a
+copia derivada que ele monta **nunca tem o marcador**, `ehDerivado()` devolve `false`, e o Guard
+13 saltou em todas as corridas desde entao. O simulador montava o proprio meio-bootstrap que a
+sua unica rede existe para apanhar.
+
+**Como foi encontrado**: pelo Guard 21 (`.agent/context/` por estrear no template). Ele corre
+apenas quando `ehDerivado()` e falso — e reprovou a copia *derivada*, porque a estava a ler como
+se fosse o template. O sintoma apontava para os ficheiros de contexto; a causa era o marcador em
+falta. Nenhuma suite via isto: as suites correm **dentro** da copia, e la dentro o estado errado
+era consistente consigo proprio.
+
+**A licao, que nao e sobre este ficheiro**: um discriminador partilhado tem mais do que um
+consumidor, e mudar de discriminador obriga a visitar todos. `lib/derivado.mjs` nasceu para
+eliminar as copias da deteccao (`TP8`) e conseguiu-o — mas quem **simula** o estado que a
+deteccao le nao importa essa funcao, escreve o estado a mao, e por isso ficou de fora da unica
+lista que havia. A fixture que monta um estado e tao consumidor da regra como o codigo que o le.
+
+**O que a correccao NAO faz, dito para nao ser lido a mais**: o `ehDerivado()` tem **dois**
+sinais (o marcador presente, ou o `BOOTSTRAP.md` ausente) e a simulacao passou a escrever
+**um**. O `.agent/BOOTSTRAP.md` continua na copia de proposito — o passo 3 deriva dele as rules
+a gerar, e o Guard 12d le dele a contagem de guards. Logo o estado simulado (marcador presente
+**e** `BOOTSTRAP.md` presente) nao e o de nenhum derivado real, que ja apagou o segundo. Isso
+nao invalida a simulacao para o que ela mede, mas "Fase 2.0 corrigida" nao se deve ler como "a
+simulacao agora e fiel".

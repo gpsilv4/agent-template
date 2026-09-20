@@ -54,6 +54,9 @@ aprovacao**.
 | `M` | ficheiro `.agent/context/implementation_plan.md` |
 | `L`, ou toca no nucleo do dominio | ficheiro, com as alternativas rejeitadas escritas |
 
+> **Sem `.agent/.template-version`** (o repo ainda e o template): a forma e **issue**, nunca
+> ficheiro — `.agent/context/*` fica por estrear e o Guard 21 reprova. Ver `process-rules.md`.
+
 > **O nucleo do dominio** e o conjunto de sitios onde um erro nao da uma resposta errada —
 > destroi dados ou a confianca na correcao. Definir na Fase 2 do bootstrap; tipicamente o
 > reducer/store, o seed, a pontuacao, as migracoes, o calculo de precos.

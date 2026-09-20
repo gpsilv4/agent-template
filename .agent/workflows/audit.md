@@ -68,6 +68,11 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 6. **Guardar o relatorio datado** (resumo por lente + severidades) — por defeito, para servir de **baseline** ao delta da proxima auditoria em **`.agent/context/audit-history.md`** — ficheiro **acumulado e NAO importado**, criado a
    primeira vez que correres o `/audit`. **Nao usar o `session.md`**: ele declara-se substituido
    a cada sessao, logo a baseline desaparecia e o passo 3 nunca teria com que comparar.
+   > **No template** (sem `.agent/.template-version`): **nao criar** o `audit-history.md`. Ele
+   > nao existe aqui de proposito — `.agent/context/` e o andaime que cada derivado herda, e um
+   > historico de auditorias do template nasceria dentro de todos eles. O **Guard 21** reprova
+   > um ficheiro sem entrada em `PRISTINOS`, e a resposta certa e **nao o criar**, nao congelar
+   > o hash. O relatorio vai para um issue. Ver `process-rules.md`.
 
 ## Sessao (Handoff)
 

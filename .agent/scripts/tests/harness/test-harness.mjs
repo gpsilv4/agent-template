@@ -26,6 +26,10 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { tmpdir } from "os";
 import { TETOS } from "../../guards/sizes.mjs";
+// Re-exportado para as suites nao terem de conhecer dois caminhos: quem monta uma fixture
+// importa tudo do harness.
+import { recongelarContexto } from "./recongelar-contexto.mjs";
+export { recongelarContexto };
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -373,6 +377,7 @@ function syntheticSandbox() {
       allow: ["Read(./.agent/**)", "Bash(npx tsc --noEmit)"],
     },
   }, null, 2));
+  recongelarContexto(dir);
   return dir;
 }
 

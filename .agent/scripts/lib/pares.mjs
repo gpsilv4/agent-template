@@ -64,6 +64,16 @@ export const PARES = [
     neutro: "(() => {})(",
   },
   {
+    // O construtor de fixture do Guard 21. Tem UM sitio de recusa — o "o patch nao aplicou" —
+    // e ele nao e decorativo: sem ele, uma fixture que nao consegue re-congelar segue em frente
+    // e o teste passa a medir um aviso do Guard 21 em vez do que afirma. Mesma forma de recusa
+    // (`throw`) e mesma razao que o harness do simulador de `/upgrade`.
+    alvo: ".agent/scripts/tests/harness/recongelar-contexto.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])throw new Error\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/tests/harness/test-surface-harness.mjs",
     suite: ".agent/scripts/tests/test-test-surface.mjs",
     sinal: /(?<![\w.$])problemas\.push\(/,
@@ -209,6 +219,16 @@ export const PARES = [
   },
   {
     alvo: ".agent/scripts/guards/placeholders.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // Guard 21 (o `.agent/context/` do template por estrear). E o unico guard cuja falha nao
+    // produz nada de errado NESTE repo — produz um projeto derivado que nasce com o trabalho
+    // de outra pessoa dentro. Ninguem repara ate criar um projeto, logo a varredura e a unica
+    // coisa que pode afirmar que os quatro sitios de recusa ficam mesmo vermelhos.
+    alvo: ".agent/scripts/guards/context-virgem.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
     neutro: "(() => {})(",

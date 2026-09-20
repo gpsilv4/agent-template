@@ -97,6 +97,14 @@ limpo". Git tambem um passo por vez: um "avanca" cobre o passo em causa e nao os
 O detalhe, a escala por tamanho (`S`/`M`/`L`) e a lista de angulos estao em
 **`.agent/rules/ticket-method.md`** — **nao carregado**; abrir ao iniciar um ticket `M` ou `L`.
 
+> **Excecao enquanto `.agent/.template-version` NAO existir** — ou seja, neste repo enquanto ele
+> for o template por estrear, e nao depois do bootstrap. A Fase 0 de um `M`/`L` **nao** vai para
+> o `implementation_plan.md`: vai para um **issue** (ou para o chat), e `.agent/context/*` fica
+> intocado. Um template nao tem sitio onde guardar trabalho pendente **por desenho** — tudo o
+> que la ficar nasce dentro de cada projeto criado a partir dele. O **Guard 21** reprova.
+> Medido: 189 linhas de planeamento escritas no `implementation_plan.md` do template, e nada
+> travou — a regra acima estava a apontar para o sitio certo num derivado e errado aqui.
+
 ---
 
 ### Conventional Commits (Obrigatorio)

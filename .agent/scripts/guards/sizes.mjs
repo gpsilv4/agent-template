@@ -53,9 +53,11 @@ export const TETOS = {
   // FORMA_EXIGIDA, que e politica e nao motor). RE-CONGELA a cada descida, senao a catraca
   // deixava a folga recuperada por recuperar.
   ".claude/hooks/guard-protected-branch.mjs": 517,
-  // 525 -> 510: a divisao dos casos do modo `--projeto` para `tests-medida-2b.mjs` libertou 15
-  // linhas que ficaram por reclamar ate o ramo da folga existir. Foi ele que as encontrou.
-  ".agent/scripts/tests/test-guards.mjs": 510,
+  // 525 -> 510 -> **entrada removida**. A catraca chegou ao fim: ao extrair a receita do
+  // "bootstrap concluido" para `tests/harness/projeto-derivado.mjs` (era a TERCEIRA copia da
+  // mesma coisa, `TP8`), o ficheiro caiu para 494 e passou a caber no limite. O proprio guard
+  // mandou tirar a entrada — "a excecao sobreviveu ao problema" — e e para isto que a catraca
+  // serve: uma isencao permanente teria deixado o ficheiro voltar aos 510 sem uma palavra.
 };
 
 // O `mutation-sweep.mjs` esteve nesta lista (505 linhas) e SAIU: a tabela `PARES` — 186
