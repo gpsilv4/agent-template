@@ -157,3 +157,38 @@ a gerar, e o Guard 12d le dele a contagem de guards. Logo o estado simulado (mar
 **e** `BOOTSTRAP.md` presente) nao e o de nenhum derivado real, que ja apagou o segundo. Isso
 nao invalida a simulacao para o que ela mede, mas "Fase 2.0 corrigida" nao se deve ler como "a
 simulacao agora e fiel".
+
+## Racional que saiu do `scripts-guide.md` no #106
+
+O ficheiro estava a **29 bytes** do tecto de 12 000 e nao tinha onde crescer. O criterio do corte
+foi o que o Guard 1e ja mandava e que o #106 tornou regra: **fica o que se executa, sai o que
+justifica**. O que saiu, com a medicao intacta:
+
+### Porque a varredura paralela usa uma copia POR WORKER
+
+O **ganho** da paralelizacao ja esta medido acima, em *"A varredura nao tem UM tempo"*, e com o
+ambiente ao lado — que e a forma certa de o citar. Aqui fica so o que faltava: **o custo de nao
+ter uma copia por worker**.
+
+Com uma copia **partilhada** mediram-se **12% de veredictos errados**, todos na direcao
+perigosa — a acusar cobertura que existe. Um worker restaurava o ficheiro que outro tinha
+acabado de mutar, e a suite ficava verde sobre um aviso desligado.
+
+### Porque a regra "`--diff` local, completa no CI" esta escrita
+
+Sem ela corre-se a completa por habito — a seguir a checklist — e o habito passa por decisao.
+Aconteceu no proprio PR que introduziu o `--diff`, e so se viu porque alguem perguntou *"porque
+estas a correr a completa?"*. Uma regra que so existe na cabeca de quem a escreveu nao sobrevive
+a segunda pessoa.
+
+### Quatro detalhes que eram historia de defeito
+
+- **`tests/` vs `tests-*`** — a pasta existe porque `test-*` (entry point) e `tests-*` (modulo
+  descoberto) diferiam de **um carater**, e a maquinaria aplica a distincao.
+- **`lib/patch.mjs`** — colapsar `ja-estava` e `sem-alvo` num `if (depois === texto) fatal(...)`
+  ja custou **tres vezes**: um valor que ja era o desejado nao e erro, e trata-lo como tal
+  reprova um upgrade correcto.
+- **Modulos de guard** — duas consequencias visiveis de fora: uma extraccao **nao** fecha o gate
+  da superficie (ele compara o TOTAL), e esvaziar as tabelas de padroes reprova.
+- **Detector de codigo morto** — nao tem dependencias porque o `eslint` quebrava a regra de os
+  verificadores so precisarem de `node`, que e o que os torna corriveis por qualquer agente.

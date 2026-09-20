@@ -38,3 +38,22 @@
 > correspondente a tabela do `/upgrade`.
 
 > Regra de paridade: qualquer edicao a `CLAUDE.md` tem espelho em `GEMINI.md` (so difere `@[...]`) — validado por `check-doc-versions.mjs`.
+
+## O que fica na instrucao e o que vai para o `-why`
+
+Quando uma rule de referencia ou um workflow chega ao tecto de bytes, o Guard 1e manda "separar
+instrucoes de evidencia". A fronteira, decidida no #106 e valida para todos os ficheiros:
+
+| Fica | Vai para `src/docs/*-why.md` |
+|---|---|
+| O que se **executa**: passos, comandos, tabelas que se consultam a fazer | A **medicao** que originou a regra (um tempo antes/depois, uma percentagem de veredictos errados) |
+| O que se **verifica**: criterios de pronto, o que reprova | A **historia do defeito**: o que aconteceu, quantas vezes custou, quem o apanhou |
+| A **decisao** e o seu alcance | A **alternativa rejeitada** e porque |
+| Um ponteiro curto: `(porque: <ficheiro>-why.md)` | O **principio** por tras da regra, quando nao muda o que se faz |
+
+**O teste, numa pergunta**: *se eu apagar esta frase, alguem passa a fazer a coisa errada?* Se
+sim, e instrucao e fica. Se so passa a nao saber **porque** a faz, e evidencia e desce.
+
+> **Nada se apaga — move-se.** O `-why` e ficheiro versionado e nao tem orcamento. Um corte que
+> perca a medicao troca um problema de bytes por um problema pior: a regra seguinte deixa de ter
+> como ser defendida, e a primeira pessoa que discordar dela ganha por falta de prova.
