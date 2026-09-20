@@ -398,7 +398,7 @@ if (workflows && (claudeCmds || geminiCmds)) {
 // --- Guard 11: sanidade do .claude/settings.json ---
 // Extraido para `guards/settings.mjs` (eram 266 linhas). Os avisos vivem la, logo esse
 // ficheiro esta registado em `PARES` no mutation-sweep.mjs.
-guardsRun += guardSettings({ read, warn, ok, note, skip });
+guardsRun += guardSettings({ read, warn, ok, note, skip, listDir });
 
 // --- Guards 12 e 12c: contagens citadas em prosa como dados DERIVADOS ---
 // Extraidos para `guards/derived-counts.mjs`.

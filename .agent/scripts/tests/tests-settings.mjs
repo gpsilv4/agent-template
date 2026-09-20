@@ -252,4 +252,54 @@ test("CHECKS: versao de dependencia desatualizada na doc avisa", (dir) => {
   writeF(dir, alvo, g);
 }, { code: 1, synthetic: true, includes: ["documentado 15.0.0", "atual 16.2.2"] });
 
+// --- G11b: todo o hook em disco esta registado ---------------------------------
+//
+// PORQUE: um hook que ninguem liga e indistinguivel, para toda a maquinaria, de um hook a
+// funcionar — a varredura chega a certifica-lo a 100%. Medido num consumidor: o
+// `prompt-fase0.mjs` esteve tres rondas por ligar, sem uma palavra no ecra.
+
+test("G11b: hook em disco que ninguem registou avisa", (dir) => {
+  writeF(dir, ".claude/hooks/orfao.mjs", "// um hook que ninguem ligou\n");
+}, { code: 1, includes: ["orfao.mjs", "NAO esta na chave"] });
+
+// A VALVULA, e o que a torna diferente de um interruptor: exige a razao escrita.
+test("G11b: hook com `@opt-in: <razao>` passa, e diz porque", (dir) => {
+  writeF(dir, ".claude/hooks/manual.mjs", "// @opt-in: so corre em auditorias, liga-se a mao\n");
+}, { code: 0, includes: ["opt-in"], excludes: ["manual.mjs existe mas NAO esta"] });
+
+// O CONTRA-CASO DA VALVULA: a marca PELADA nao chega. Sem isto, a valvula era um interruptor
+// de silencio — escreve-se `@opt-in` e o guard cala-se, que e o caminho facil que o `TETOS` do
+// Guard 17 ja aprendeu a fechar exigindo a razao.
+test("G11b: `@opt-in` sem razao NAO serve de valvula", (dir) => {
+  writeF(dir, ".claude/hooks/pelado.mjs", "// @opt-in\n");
+}, { code: 1, includes: ["pelado.mjs", "NAO esta na chave"] });
+
+// A DIRECCAO INVERSA: um registo a apontar para o que nao existe falha em silencio a cada
+// evento, e o Claude Code nao o reporta.
+test("G11b: registo a apontar para um hook que nao existe avisa", (dir) => {
+  patchSettings(dir, (cfg) => {
+    cfg.hooks = cfg.hooks ?? {};
+    cfg.hooks.Stop = [{ hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/fantasma.mjs"' }] }];
+    return cfg;
+  });
+}, { code: 1, includes: ["fantasma.mjs", "hook morto"] });
+
+// `lib/` e `tests/` NAO sao hooks — sao o que eles usam e o que os testa. Acusa-los era acusar
+// o desenho, e um guard que acusa quem lhe obedece e desligado na primeira semana.
+test("G11b: um modulo em `lib/` nao e tratado como hook por registar", (dir) => {
+  writeF(dir, ".claude/hooks/lib/ajuda.mjs", "export const x = 1;\n");
+}, { code: 0, excludes: ["ajuda.mjs"] });
+
+// Um derivado pode ter removido a camada so-Claude, e isso e legitimo. O ramo existe para o
+// DIZER — "nao encontrei" nao pode ser silencio (`TP2`) — e sem este caso ninguem o exercitava:
+// a fixture traz sempre a pasta. Um ramo que nunca corre e indistinguivel de um ramo partido.
+// A fixture SINTETICA nao tem `.claude/hooks/` — e por isso que serve aqui. Na copia do repo,
+// apagar a pasta faz o Guard 20 disparar (as rules citam `stop-verify.mjs`), e o teste passava a
+// medir esse aviso em vez deste ramo.
+test("G11b: sem `.claude/hooks/` o guard SALTA em vez de se calar", () => {}, {
+  code: 0,
+  synthetic: true,
+  includes: ["Guard 11b", "nao existe"],
+});
+
 }
