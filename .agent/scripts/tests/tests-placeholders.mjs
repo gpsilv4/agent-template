@@ -82,6 +82,11 @@ export function registar() {
     ".claude/hooks/tests/tests-bypasses.mjs",
     ".claude/agents/code-reviewer.md",
     ".agent/scripts/lib/registo.mjs",
+    // As duas pastas que faltavam (#110). O `.claude/hooks/tests/` ja estava na lista de alvos do
+    // guard e o equivalente dos scripts nao — 33 ficheiros fora da rede. Um alvo de cada pasta:
+    // as suites, e os construtores de fixture um nivel abaixo.
+    ".agent/scripts/tests/tests-placeholders.mjs",
+    ".agent/scripts/tests/harness/test-harness.mjs",
   ]) {
     test(`G13: placeholder esquecido em ${alvo} avisa`, (dir) => {
       bootstrapado(dir);
