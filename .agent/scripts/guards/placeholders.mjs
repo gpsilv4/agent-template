@@ -75,6 +75,13 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     // `lib/` e um nivel abaixo, logo o `listDir` de `.agent/scripts/` nao o alcanca — e os
     // modulos partilhados tem `{{ PROJECT_NAME }}` no cabecalho como todos os outros.
     ...(listDir(".agent/scripts/lib", ".mjs") || []).map((f) => `.agent/scripts/lib/${f}.mjs`),
+    // As SUITES e os seus construtores de fixture. Faltavam — 33 ficheiros com placeholder fora
+    // da rede — e a assimetria denunciava o lapso: o `.claude/hooks/tests/` abaixo ja ca estava,
+    // o equivalente dos scripts nao. O sweep do bootstrap substitui por EXTENSAO, logo na pratica
+    // saiam bem; o que faltava era a rede que apanha um sweep FALHADO. E a terceira vez que esta
+    // lista enumerada a mao deixa uma pasta de fora.
+    ...(listDir(".agent/scripts/tests", ".mjs") || []).map((f) => `.agent/scripts/tests/${f}.mjs`),
+    ...(listDir(".agent/scripts/tests/harness", ".mjs") || []).map((f) => `.agent/scripts/tests/harness/${f}.mjs`),
     ...(listDir(".claude/commands", ".md") || []).map((f) => `.claude/commands/${f}.md`),
     // Os HOOKS e os subagentes. Sete ficheiros com `{{ PROJECT_NAME }}` estavam fora desta
     // lista: o sweep do bootstrap substitui-os por EXTENSAO, logo na pratica saiam bem — o
