@@ -14,7 +14,7 @@
  * pasta, acusava 13 citacoes correctas.
  */
 import { pathToFileURL } from "url";
-import { test, writeF } from "./harness/test-harness.mjs";
+import { test, writeF, readF } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -83,4 +83,52 @@ export function registar() {
   test("G20: nome inventado por uma FIXTURE em .agent/scripts/ nao e acusado", (dir) => {
     writeF(dir, ".agent/scripts/tests/tests-inventa.mjs", 'const f = "`check-que-nao-existe.mjs`";\n');
   }, { code: 0, includes: ["todas resolvem para um so"] });
+
+  // --- Guard 20b: a ANCORA de um ponteiro de racional (#112) -------------------
+  // O guard ja garantia que um ficheiro citado EXISTE. Nao garantia que ele contem o que a
+  // citacao promete — e foi por ai que dois ponteiros partiram ao mover evidencia no #106,
+  // com a bateria inteira verde. Um ficheiro que existe com a seccao movida para fora
+  // le-se exactamente como um ponteiro valido.
+
+  test("G20: ponteiro para uma seccao que NAO existe no destino avisa", (dir) => {
+    writeF(dir, ".agent/rules/core-rules.md",
+      readF(dir, ".agent/rules/core-rules.md") +
+      '\n\nVer o detalhe (porque: `upgrade-why.md` § "Seccao Que Nunca Existiu").\n');
+  }, { code: 1, includes: ['aponta para "Seccao Que Nunca Existiu"', "a evidencia mudou de sitio"] });
+
+  // O CASO DO #106, montado: a seccao existe, o ponteiro aponta-lhe, e depois ela **sai**.
+  // E a unica forma de provar que isto apanha o defeito real e nao so um nome inventado.
+  test("G20: seccao APAGADA do destino deixa o ponteiro a mentir", (dir) => {
+    // ACRESCENTAR, nunca substituir: o `upgrade-why.md` real e o destino de tres ponteiros deste
+    // repo, e reescreve-lo partia-os — o teste passava a medir o estrago da propria fixture.
+    const why = readF(dir, "src/docs/upgrade-why.md");
+    writeF(dir, "src/docs/upgrade-why.md", why + "\n## Uma Seccao Qualquer\n\nracional.\n");
+    writeF(dir, ".agent/rules/core-rules.md",
+      readF(dir, ".agent/rules/core-rules.md") +
+      '\n\nVer (porque: `upgrade-why.md` § "Uma Seccao Qualquer").\n');
+    // ... e agora a evidencia muda de sitio, exactamente como no #106: so ESTA seccao sai.
+    writeF(dir, "src/docs/upgrade-why.md", why + "\n## Outro Titulo\n\nracional.\n");
+  }, { code: 1, includes: ['aponta para "Uma Seccao Qualquer"'] });
+
+  // O terceiro ramo: o ficheiro de destino nao existe DE TODO. Distinto do anterior — la o
+  // ficheiro existe e a seccao e que nao; aqui nem ha destino. Sem este caso o ramo ficava sem
+  // cobertura, e a varredura dizia-o (4/5).
+  test("G20: ponteiro para um ficheiro `-why` que nao existe avisa", (dir) => {
+    writeF(dir, ".agent/rules/core-rules.md",
+      readF(dir, ".agent/rules/core-rules.md") +
+      '\n\nVer (porque: `inventado-why.md` § "Qualquer Titulo").\n');
+  }, { code: 1, includes: ["aponta para `inventado-why.md`", "que nao existe"] });
+
+  test("G20: ponteiro SEM ancora avisa (a convencao nao e opcional)", (dir) => {
+    writeF(dir, ".agent/rules/core-rules.md",
+      readF(dir, ".agent/rules/core-rules.md") + "\n\nVer (porque: `upgrade-why.md`).\n");
+  }, { code: 1, includes: ["sem ancora", "Titulo exacto da seccao"] });
+
+  test("G20: ponteiro com ancora que RESOLVE nao avisa", (dir) => {
+    writeF(dir, "src/docs/upgrade-why.md",
+      readF(dir, "src/docs/upgrade-why.md") + "\n## Titulo Que Existe\n\nracional.\n");
+    writeF(dir, ".agent/rules/core-rules.md",
+      readF(dir, ".agent/rules/core-rules.md") +
+      '\n\nVer (porque: `upgrade-why.md` § "Titulo Que Existe").\n');
+  }, { code: 0, excludes: ["sem ancora", "a evidencia mudou de sitio"] });
 }

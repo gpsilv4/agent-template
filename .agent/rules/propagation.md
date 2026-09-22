@@ -49,10 +49,15 @@ instrucoes de evidencia". A fronteira, decidida no #106 e valida para todos os f
 | O que se **executa**: passos, comandos, tabelas que se consultam a fazer | A **medicao** que originou a regra (um tempo antes/depois, uma percentagem de veredictos errados) |
 | O que se **verifica**: criterios de pronto, o que reprova | A **historia do defeito**: o que aconteceu, quantas vezes custou, quem o apanhou |
 | A **decisao** e o seu alcance | A **alternativa rejeitada** e porque |
-| Um ponteiro curto: `(porque: <ficheiro>-why.md)` | O **principio** por tras da regra, quando nao muda o que se faz |
+| Um ponteiro com **ancora**: `` (porque: `<ficheiro>-why.md` § "Titulo exacto") `` | O **principio** por tras da regra, quando nao muda o que se faz |
 
 **O teste, numa pergunta**: *se eu apagar esta frase, alguem passa a fazer a coisa errada?* Se
 sim, e instrucao e fica. Se so passa a nao saber **porque** a faz, e evidencia e desce.
+
+> **A ancora nao e decorativa, e o Guard 20 verifica-a.** Um ponteiro sem seccao nomeada aponta
+> para um ficheiro, nao para uma explicacao — e quando a evidencia muda de sitio ele fica a
+> mentir sem nada o denunciar. Medido no #106: mover racional de **dois** ficheiros partiu **dois**
+> ponteiros, um em cada sentido, com a bateria inteira verde.
 
 > **Nada se apaga — move-se.** O `-why` e ficheiro versionado e nao tem orcamento. Um corte que
 > perca a medicao troca um problema de bytes por um problema pior: a regra seguinte deixa de ter

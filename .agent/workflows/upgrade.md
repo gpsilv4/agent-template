@@ -96,7 +96,7 @@ O que esta **ausente** e candidato a copia. O que existe nos dois vai para a tab
 
 Nem toda a melhoria e aditiva: quando o template **aperta** um criterio, um projeto que passava
 deixa de passar. Nao se trazem em silencio — **dizem-se na Fase 0, com o numero que cada uma custa
-neste projeto, medido ANTES de aplicar** (porque, em `upgrade-why.md`).
+neste projeto, medido ANTES de aplicar** (porque: `upgrade-why.md` § "Porque as mudancas que REPROVAM se anunciam antes de aplicar").
 
 A taxonomia serve para **reconhecer** uma destas, e para as fazer a mao no Modo B. A lista em si
 nao se escreve: mede-se, logo abaixo.
@@ -113,7 +113,7 @@ node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
 ```
 
 Corre-se **do clone do template** (`$TPL`, o da secao 1) apontado a este projeto, e nao ao
-contrario: a copia daqui e a antiga e nao conhece o modo (porque, em `upgrade-why.md`). Sai: o que **passa** a reprovar aqui
+contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **passa** a reprovar aqui
 (o que ja estava vermelho e subtraido), o que **saiu** do template com a marca migracao/limpeza,
 e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precisa de decisao.
 
@@ -147,7 +147,7 @@ ser identico. E, se alguem no projeto trabalha em Windows, confirmar num clone c
 
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
-# O `--verify ...^{commit}` e obrigatorio (porque: `upgrade-why.md`).
+# O `--verify ...^{commit}` e obrigatorio (porque: `upgrade-why.md` § "Porque o `--verify ...^{commit}` e obrigatorio ao gravar a marca").
 BR=$(git -C "$TPL" symbolic-ref --short HEAD)                # nao assumir `main`
 SHA=$(git -C "$TPL" rev-parse --verify "$BR^{commit}") || { echo "FALHOU: sem commit em $BR"; exit 1; }
 printf 'template: %s\ncommit: %s\ndata: %s\n' \
