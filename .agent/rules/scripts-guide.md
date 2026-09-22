@@ -21,11 +21,11 @@
 >
 > **Onde vive o que** (arvore no `README.md`): a raiz tem os **8 pontos de entrada** — o que se
 > invoca — e **`tests/`** tudo o que os testa, com os construtores de fixture em
-> `tests/harness/`. `test-*` e entry point, `tests-*` e modulo descoberto (porque: `scripts-guide-why.md`).
+> `tests/harness/`. `test-*` e entry point, `tests-*` e modulo descoberto (porque: `scripts-guide-why.md` § "Racional que saiu do `scripts-guide.md` no #106").
 
-- **Doc Guards** (`check-doc-versions.mjs` + `guards/*.mjs`): 28 guards numerados que correm **sem configuracao** — orcamentos de bytes, paridade entre os pontos de entrada, `@imports` que resolvem, placeholders esquecidos, contexto por estrear, tamanho de ficheiro, isolamento das suites, citacoes de ficheiro, politica MCP, versoes. Caminhos ancorados a raiz do repo e **todo o skip e visivel**: um guard que nao corre imprime `SKIP`, nunca desaparece. Sai `!= 0` em warning (serve de gate) e **corre no CI** no job `guard-tests`, nao no `quality`. O que cada um mede esta no seu cabecalho; o porque, em `src/docs/scripts-guide-why.md`.
-- **Guard 16 — politica MCP** (`.agent/scripts/guards/mcp.mjs`): le a configuracao MCP **dos quatro agentes** (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` — chave `servers` —, `.gemini/settings.json`), quando existe, e reprova em segredo literal, em servidor sem linha em *Servidores aprovados* (`.agent/rules/mcp-policy.md`) e em JSON ilegivel (`TP2`). **`SKIP` visivel no template nu.** Verifica a configuracao, nao o comportamento — ver *why*.
-- **Guard 17 — tamanho de ficheiro** (`guards/sizes.mjs`): o flag das 500 linhas, nos `.mjs` da maquinaria (a app e trabalho do `/review`). Os que ja estavam acima entram em `TETOS`: **catraca, nao isencao** — cada descida obriga a baixar o teto, e ao chegar ao limite a entrada sai.
+- **Doc Guards** (`check-doc-versions.mjs` + `guards/*.mjs`): 28 guards numerados que correm **sem configuracao** — orcamentos de bytes, paridade entre os pontos de entrada, `@imports` que resolvem, placeholders esquecidos, contexto por estrear, tamanho de ficheiro, isolamento das suites, citacoes de ficheiro, politica MCP, versoes. Caminhos ancorados a raiz do repo; **todo o skip e visivel**. Sai `!= 0` em warning e corre no CI no job `guard-tests`. O que cada um mede esta no seu cabecalho; o porque, em `src/docs/scripts-guide-why.md`.
+- **Guard 16 — politica MCP** (`.agent/scripts/guards/mcp.mjs`): le a configuracao MCP **dos quatro agentes** (`.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json` — chave `servers` —, `.gemini/settings.json`), quando existe, e reprova em segredo literal, em servidor sem linha em *Servidores aprovados* (`.agent/rules/mcp-policy.md`) e em JSON ilegivel (`TP2`). **`SKIP` visivel no template nu.** Verifica a configuracao, nao o comportamento.
+- **Guard 17 — tamanho de ficheiro** (`guards/sizes.mjs`): o flag das 500 linhas, nos `.mjs` da maquinaria (a app e trabalho do `/review`). Os que ja estavam acima entram em `TETOS`: **catraca, nao isencao** — cada descida obriga a baixar o teto.
 - **`lib/patch.mjs`** — patch de texto com TRES resultados: `aplicado`, `ja-estava` (o valor ja era o desejado — **nao e erro**) e `sem-alvo` (o ficheiro mudou de forma). Ver o cabecalho do modulo.
 - **Medicao da seccao 2b** (`lib/medida-upgrade.mjs`): responde a *o que e que este upgrade faz reprovar?* dos **dois** lados. No template, `simulate-upgrade.mjs` sem argumentos (baseline = a ultima tag). Num consumidor, `--projeto=<caminho>` corrido **do clone do template** — a copia que o projeto tem e a antiga, e um flag do lado dele so serviria no upgrade seguinte. Mede o antes e o depois e reporta a **diferenca**: o que ja estava vermelho nao se imputa ao upgrade. Corre sobre uma copia; **nao toca no projeto**.
 - **`lib/tmp-limpo.mjs`** — as copias em `tmpdir` limpam-se no **arranque** e nao a saida (um `SIGKILL` nao se apanha), e so as que ja nao tem dono vivo: duas corridas em paralelo acontecem. O porque esta no cabecalho.
@@ -44,7 +44,7 @@
 | Onde | O que correr | Porque |
 |---|---|---|
 | **Local, a trabalhar** | `node .agent/scripts/mutation-sweep.mjs --diff` | So os alvos que este branch tocou. Minutos em vez de dezenas deles |
-| **Local, excepcao** | a completa, sem flags | **So** ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs` (porque: *why*) |
+| **Local, excepcao** | a completa, sem flags | **So** ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs` (porque: `scripts-guide-why.md` § "Porque a varredura completa e a excepcao local, e nao o habito") |
 | **CI** | a completa, sem flags | Nao muda. O CI e o **portao** |
 
 A varredura corre em **8 processos** (ou o numero de cores, o que for menor), cada um com a **sua

@@ -87,6 +87,12 @@ const FIXTURE_PATHS = [
   // na fixture, o Guard 18 dava SKIP em TODOS os testes — e um guard que salta sempre passa
   // por verde sem nunca ter sido medido.
   "src/docs/anti-patterns-why.md",
+  // Os dois `-why` para onde os ponteiros de racional apontam. O Guard 20 passou a verificar que
+  // a SECCAO citada existe no destino (#112); sem eles na fixture, os cinco ponteiros do repo
+  // apontam para ficheiros ausentes e o guard avisa em TODOS os testes — a mesma armadilha que o
+  // `anti-patterns-why.md` acima ja documenta.
+  "src/docs/upgrade-why.md",
+  "src/docs/scripts-guide-why.md",
 ];
 
 let passed = 0;

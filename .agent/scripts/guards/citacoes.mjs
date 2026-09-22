@@ -54,6 +54,18 @@ const CITADO = /`([a-z][\w-]*\.mjs)`/g;
  *     qualquer com este feitio". */
 const EXEMPLO = /^(?:tests?-[a-z]\.mjs|nome\.mjs|x\.mjs)$/;
 
+/** Um ponteiro de RACIONAL: `(porque: \`ficheiro.md\` § "Titulo")`. A ancora e o titulo EXACTO
+ *  de uma seccao do destino, e nao um slug — computar slugs seria uma segunda copia da regra
+ *  do GitHub, mantida aqui a mao (`TP8`), e um titulo com crases ou acentos torna-a fragil.
+ *  Comparacao literal contra o texto que vem depois de `##`/`###`: sem algoritmo, sem deriva. */
+const PONTEIRO = /\(porque[:,][^)]*?`([a-z][\w-]*\.md)`\s*§\s*"([^"]+)"\)/g;
+
+/** Um `(porque ...)` que NAO tem a forma acima. Existe para a convencao nao ser opcional: sem
+ *  isto, escrever `(porque: X)` sem ancora continuava a passar, e uma convencao que se pode
+ *  ignorar nao e uma convencao. A forma de DEFINICAO — a que documenta o proprio padrao — usa
+ *  `<ficheiro>` entre sinais de menor/maior e fica de fora. */
+const PONTEIRO_SEM_ANCORA = /\(porque[:,](?![^)]*§)(?![^)]*<ficheiro>)[^)]*\)/g;
+
 /**
  * @returns {number} guards executados
  */
@@ -76,8 +88,20 @@ export function guardCitacoes({ read, warn, ok, skip, listDir, listTree }) {
     }
   }
 
+  // O indice das SECCOES de cada `.md` do repo: ficheiro -> titulos. Derivado do disco, como o
+  // indice acima — uma lista a mao seria a mesma classe de defeito.
+  const seccoes = new Map();
+  for (const base of [...PASTAS, "src/docs"]) {
+    for (const n of listDir(base, ".md") ?? []) {
+      const c = read(`${base}/${n}.md`);
+      if (c === null) continue;
+      seccoes.set(`${n}.md`, [...c.matchAll(/^#{2,3}\s+(.+?)\s*$/gm)].map((m) => m[1]));
+    }
+  }
+
   let problemas = 0;
   let citadas = 0;
+  let ancoras = 0;
 
   for (const f of instrucoes) {
     const src = read(f);
@@ -96,9 +120,29 @@ export function guardCitacoes({ read, warn, ok, skip, listDir, listTree }) {
           problemas++;
         }
       }
+      // A ANCORA de um ponteiro de racional. O Guard 20 ja garantia que um ficheiro citado
+      // existe; nao garantia que ele **contem o que a citacao promete** — e foi por ai que dois
+      // ponteiros partiram ao mover evidencia (#112). Um ficheiro que existe com a seccao
+      // movida para fora le-se como ponteiro valido.
+      for (const m of linha.matchAll(PONTEIRO)) {
+        const [, alvo, titulo] = m;
+        ancoras++;
+        const tem = seccoes.get(alvo);
+        if (!tem) {
+          warn(`${f}:${i + 1} aponta para \`${alvo}\`, que nao existe`);
+          problemas++;
+        } else if (!tem.includes(titulo)) {
+          warn(`${f}:${i + 1} aponta para "${titulo}" em \`${alvo}\`, e essa seccao NAO existe la — a evidencia mudou de sitio e o ponteiro ficou a mentir`);
+          problemas++;
+        }
+      }
+      for (const m of linha.matchAll(PONTEIRO_SEM_ANCORA)) {
+        warn(`${f}:${i + 1} tem \`${m[0]}\` sem ancora — a forma e (porque: \`ficheiro.md\` § "Titulo exacto da seccao")`);
+        problemas++;
+      }
     });
   }
 
-  if (problemas === 0) ok(`Guard 20: ${citadas} citacao(oes) de ficheiro nas instrucoes, todas resolvem para um so`);
+  if (problemas === 0) ok(`Guard 20: ${citadas} citacao(oes) de ficheiro nas instrucoes, todas resolvem para um so; e ${ancoras} ponteiro(s) de racional apontam para uma seccao que existe`);
   return 1;
 }
