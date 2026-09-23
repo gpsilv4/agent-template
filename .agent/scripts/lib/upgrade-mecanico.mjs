@@ -337,8 +337,31 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       if (sub.startsWith(".agent/context/") || sub.startsWith(".agent/scripts/") || sub.startsWith(".claude/hooks/")) return;
       if (JA_TRATADO.has(sub) || !substituivel(sub, nome)) return;
       const antigo = tagFicheiro(sub);
-      if (antigo === null) return;
       const doConsumidor = leOuNull(join(dir, sub));
+      // FICHEIRO NOVO desde a tag. O consumidor nunca o teve, logo **nao ha customizacao a
+      // respeitar** — copia-se se ele nao o tiver, e nunca se sobrepoe nada.
+      //
+      // Sem isto, NENHUMA rule, workflow ou `-why` novo chegava alguma vez a um projeto
+      // derivado: o `trazerDoHead` cobre so `.agent/scripts` e `.claude/hooks`, e este ciclo
+      // saltava tudo o que nao existia na tag antiga.
+      //
+      // Apanhado pelo `simulate-upgrade` ao criar o `src/docs/review-why.md` (#109), e **so
+      // porque um ponteiro apontava para ele**: o Guard 20 reprovou a apontar para um ficheiro
+      // ausente. Um ficheiro novo SEM ponteiro de entrada chegava ausente em silencio, e o
+      // consumidor ficava sem ele para sempre sem nada o denunciar.
+      //
+      // Os placeholders SUBSTITUEM-SE aqui, ao contrario do caminho de baixo: um ficheiro novo
+      // entra no consumidor pela primeira vez e o bootstrap dele ja correu ha muito, logo
+      // ninguem os vai la substituir depois — e o Guard 13 reprova-os no projeto do consumidor.
+      if (antigo === null) {
+        if (doConsumidor !== null) return;
+        const novoC = leOuNull(join(root, sub));
+        if (novoC === null) return;
+        mkdirSync(dirname(join(dir, sub)), { recursive: true });
+        writeFileSync(join(dir, sub), novoC.replace(PLACEHOLDER, substituto));
+        trazidos++;
+        return;
+      }
       // A comparacao e contra a versao antiga **com os placeholders ja substituidos**, que e o
       // estado em que o ficheiro ficou depois do bootstrap. Comparar com o bruto dava tudo por
       // customizado e a regra nunca disparava.

@@ -214,6 +214,67 @@ test("`anti-patterns.md` sem o separador `---`, REPROVA em vez de adivinhar", ()
 
 
 // --- O que SAIU do template (o upgrade copia, nunca apaga) -------------------
+// --- Um ficheiro NOVO do template tem de CHEGAR ao consumidor -------------------
+// Ate ao #109 nao chegava: o ciclo lia o ficheiro na tag antiga e, se ele nao existisse la,
+// saltava — logo NENHUMA rule, workflow ou `-why` novo alcancava um projeto derivado. So
+// `.agent/scripts/` e `.claude/hooks/` escapavam, por serem copiados por inteiro.
+//
+// Falhou ALTO por acidente: o `simulate-upgrade` reprovou porque o ticket que criou o ficheiro
+// tambem lhe deixou um ponteiro, e o Guard 20 apanhou o ponteiro pendurado. Um ficheiro novo
+// SEM ponteiro chegava ausente em silencio. Ver #128.
+test("ficheiro NOVO do template chega ao consumidor", () => {
+  let c;
+  try {
+    c = cenario({
+      ontem: {},                                        // nao existia na tag
+      hoje: { ".agent/rules/regra-nova.md": "# Regra nova\n" },
+    });
+    return c.ler(".agent/rules/regra-nova.md") === "# Regra nova\n"
+      ? []
+      : ["o ficheiro novo do template nao chegou ao consumidor"];
+  } finally {
+    limpa(c);
+  }
+});
+
+// Os placeholders TEM de ser substituidos neste caminho. O bootstrap do consumidor correu ha
+// muito, logo ninguem os la vai substituir depois — e o Guard 13 reprova-os no projeto dele.
+// O literal constroi-se, nunca se escreve: a Fase 2.1 do bootstrap varre os `.mjs` e
+// substituia-o, deixando esta fixture sem o que ela precisa.
+test("ficheiro NOVO chega com os placeholders ja substituidos", () => {
+  let c;
+  const ph = "{" + "{" + "PROJECT_NAME" + "}" + "}";
+  try {
+    c = cenario({ ontem: {}, hoje: { ".agent/rules/regra-nova.md": `# ${ph}\n` } });
+    const lido = c.ler(".agent/rules/regra-nova.md");
+    if (lido === null) return ["nao chegou"];
+    if (lido.includes("{" + "{")) return [`chegou com o placeholder por substituir: ${JSON.stringify(lido)}`];
+    return lido.includes("Consumidor") ? [] : [`substituiu por outra coisa: ${JSON.stringify(lido)}`];
+  } finally {
+    limpa(c);
+  }
+});
+
+// O CONTRA-CASO, e e ele que torna o ramo seguro: se o consumidor JA TEM um ficheiro com esse
+// caminho, nao se lhe toca. Sem isto, o ramo deixava de ser "trazer o que falta" e passava a
+// ser "sobrepor o que o projeto escreveu" — e um ficheiro proprio do consumidor nunca esteve
+// na tag, logo cai exactamente neste mesmo ramo.
+test("ficheiro NOVO que o consumidor JA TEM nao e sobreposto", () => {
+  let c;
+  try {
+    c = cenario({
+      ontem: {},
+      hoje: { ".agent/rules/regra-nova.md": "# a versao do template\n" },
+      consumidor: { ".agent/rules/regra-nova.md": "# a versao do PROJETO\n" },
+    });
+    return c.ler(".agent/rules/regra-nova.md") === "# a versao do PROJETO\n"
+      ? []
+      : ["sobrepos o ficheiro do projeto com o do template"];
+  } finally {
+    limpa(c);
+  }
+});
+
 // `cpSync` acrescenta e substitui. Um ficheiro renomeado ou removido no template ficava no
 // consumidor para sempre, ao lado do novo — e nao e desarrumacao: a descoberta exige-lhe par
 // (`SEM PAR`), o Guard 17 conta-o, o `check-test-surface` ve a superficie duplicada. Uma
