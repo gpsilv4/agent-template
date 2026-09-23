@@ -104,7 +104,8 @@ export function registar() {
   //
   // A linha do comentario `// --- Guard 21:` fica: e dela que o Guard 12d deriva a contagem
   // de guards numerados, e removendo-a o teste ficaria vermelho pela razao errada (a citacao
-  // de "28 guards numerados" deixaria de bater).
+  // do numero de guards numerados deixaria de bater). O numero NAO se escreve aqui: escrito,
+  // era mais uma copia a mao a envelhecer — esta dizia 28 quando ja eram 29.
   test("G21: [controlo negativo] sem o Guard 21, a mesma poluicao sai VERDE", (dir) => {
     comoTemplate(dir);
     writeF(dir, ALVO, readF(dir, ALVO) + PLANEAMENTO);

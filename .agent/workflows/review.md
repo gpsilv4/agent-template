@@ -109,7 +109,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > `anti-patterns.md` define, para cada entrada, um **`grep` de detecao "para o /review"**.
 > Este e o passo que os corre — sem ele, esse campo nao tem consumidor.
 
-- [ ] Correr os `grep` de detecao de **cada entrada** dos **dois** ficheiros: `.agent/rules/anti-patterns.md` (vazio no template nu) e `.agent/rules/anti-patterns-template.md` (`TP1`-`TP7`). Varrer so o primeiro e correr zero greps e marcar a caixa sobre o diff
+- [ ] Correr os `grep` de detecao de **cada entrada** dos **dois** ficheiros: `.agent/rules/anti-patterns.md` (vazio no template nu) e `.agent/rules/anti-patterns-template.md` (`TP1`-`TP9`). Varrer so o primeiro e correr zero greps e marcar a caixa sobre o diff
 - [ ] Algum achado -> corrigir, ou justificar por escrito porque nao se aplica
 - [ ] Duvida sobre o que uma deteccao apanha, ou porque a entrada existe? -> `src/docs/anti-patterns-why.md`
       (evidencia e receitas por inteiro; **nao** carregado, abrir so quando faz falta)

@@ -1,17 +1,17 @@
-# Anti-Padroes do TEMPLATE (TP1-TP7) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP9) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
 > uma citacao concreta.
 >
-> **Porque vive aqui e nao no `anti-patterns.md`.** Estas sete entradas vieram do template e
+> **Porque vive aqui e nao no `anti-patterns.md`.** Estas entradas vieram do template e
 > sao sobre a maquinaria DELE: `TP5` e sobre `.trim()` num `git status --porcelain`, `TP6`
 > sobre uma blocklist num hook `.mjs`. Um projeto Python pagava 9,6 KB **em todas as sessoes,
 > para sempre**, para transportar licoes sobre ficheiros Node que nao tem — 24% do orcamento
 > sempre-carregado, sem uma unica entrada sobre o seu proprio dominio.
 >
 > **Continuam a ser citaveis e citadas.** Dezenas de ficheiros do template (`.agent/scripts/`,
-> `.claude/hooks/`, as rules e os workflows) referem `TP1`..`TP7`, e o Guard 15 varre os DOIS
+> `.claude/hooks/`, as rules e os workflows) referem os `TPn`, e o Guard 15 varre os DOIS
 > ficheiros — apagar uma entrada daqui deixa essas citacoes penduradas e o guard reprova,
 > dizendo quais. Nao as substituas pelas tuas: os teus vao para
 > `.agent/rules/anti-patterns.md` com o prefixo `AP`, que esta todo livre. Sao **espacos de

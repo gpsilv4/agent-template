@@ -17,7 +17,7 @@
 
 ## Porque o prefixo do template e `TP` e nao `AP`
 
-As sete entradas nasceram no prefixo `AP` — o mesmo que um projeto derivado usa para as suas.
+As entradas do template nasceram no prefixo `AP` — o mesmo que um projeto derivado usa para as suas.
 (Escrever aqui um ID concreto desse prefixo seria uma citacao morta, e o Guard 15 apanhou-a ao
 escrever este paragrafo.) Enquanto o template estava sozinho isso nao custava nada; ao segundo `/upgrade` custou
 duas vezes.
@@ -283,7 +283,7 @@ teste, tenha a prosa que tiver.
 
 ## TP8 — Duas copias da mesma regra, a concordar a mao
 
-Cinco ocorrencias numa sessao. Sao diferentes a olho e sao a mesma coisa por dentro:
+Seis ocorrencias. Sao diferentes a olho e sao a mesma coisa por dentro:
 
 | Onde | As duas copias | Como apareceu |
 |---|---|---|
@@ -292,8 +292,9 @@ Cinco ocorrencias numa sessao. Sao diferentes a olho e sao a mesma coisa por den
 | descoberta da varredura | isencao por **caminho** vs. o que decide (ter ou nao sitios de recusa) | um harness legitimo levava `SEM PAR` permanente |
 | fixture do simulador | o par `(ficheiro, constante)` no codigo e no teste | ficou a customizar uma constante que mudara de ficheiro |
 | Guard 17 | `contaLinhas` no guard e reimplementada na adaptacao 2b | **+1 em todos os ficheiros**, invisivel ate um cair em exactamente 500 |
+| intervalo dos anti-padroes | o intervalo escrito em **quatro** prosas vs. os cabecalhos em disco | o `/review` mandava correr os greps de **7 de 9** entradas, e marcava-se a caixa |
 
-### O que estes cinco ensinam, e nao e obvio
+### O que estes seis ensinam, e nao e obvio
 
 **A copia nao falha onde esta testada.** Nos cinco casos, ambos os lados tinham suites verdes. O
 que ninguem mede e a **divergencia** entre eles — e a varredura de mutacao tambem nao a ve, pela
@@ -311,6 +312,30 @@ sempre longe de si propria.
 **Latencia.** Dois dos cinco so apareceram **uma release depois** de serem introduzidos, porque
 o simulador mede contra a ultima tag real. Isso nao e defeito do simulador: e o que acontece a
 quem usa o template, so que a tempo.
+
+### O sexto trouxe duas coisas que os outros cinco nao tinham
+
+**Havia um guard sobre o assunto, e estava verde.** O Guard 15 verifica que cada citacao de
+anti-padrao **resolve** para uma entrada definida. `TP1` resolve, e o setimo resolve — logo um
+intervalo que acabasse ali passava, com nove definidos. *"Estes sao todos"* e uma afirmacao
+diferente de *"estes existem"*, e a primeira nao tinha dono. Um guard no tema nao e cobertura do
+tema: a pergunta e sempre **que afirmacao concreta** e que ele verifica.
+
+> **Esta frase nao escreve o intervalo errado por extenso**, e a razao e o proprio Guard 12g: a
+> primeira versao dela citava-o, e o guard acusou-a — com razao, porque em prosa um intervalo
+> literal e indistinguivel de uma declaracao. E o imposto de qualquer guard que leia texto, e
+> paga-se a escrever de outra maneira, nunca a isentar o ficheiro. Isentar `-why.md` abria um vao
+> exactamente onde a evidencia vive.
+
+**Uma das copias era executavel.** As outras cinco eram dados que uma ferramenta lia. Esta vivia
+num item de checklist do `/review` — *"correr o `grep` de deteccao de cada entrada"* — fechado
+dois numeros antes do fim. Quem seguisse a instrucao corria **7 de 9** greps e marcava a caixa
+com razao. E dos dois que ficavam de fora, um era este proprio anti-padrao: a copia a mao tinha
+apagado da checklist a procura pela copia a mao.
+
+**E as quatro copias nem entre si concordavam** (duas diziam 7, duas 8, existiam 9) — o que diz
+que ninguem as leu juntas desde que divergiram. Duas copias detectam-se por comparacao; quatro
+nao se comparam, derivam-se.
 
 ### O caso que quase se resolveu mal
 

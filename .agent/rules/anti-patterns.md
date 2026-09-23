@@ -4,7 +4,7 @@
 > Adicionar uma entrada sempre que um bug revele um padrao evitavel; quando vira regra estavel,
 > migrar para `core-rules.md`.
 >
-> **Os oito anti-padroes do template (`TP1`-`TP8`) vivem em `anti-patterns-template.md`** — NAO
+> **Os anti-padroes do template (`TP1`-`TP9`) vivem em `anti-patterns-template.md`** — NAO
 > carregado, lido on-demand. Sao sobre a maquinaria do template (hooks `.mjs`, `git status
 > --porcelain`), e mante-los aqui custava 24% do orcamento sempre-carregado a todos os
 > projetos, incluindo aos que nao sao Node. O Guard 15 varre os dois ficheiros, logo as

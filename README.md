@@ -131,7 +131,7 @@ gh pr create --fill     # then merge once CI is green
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- YOUR anti-patterns (prefix AP, starts free) + greps (loaded)
-│   ├── anti-patterns-template.md <- TP1-TP8: the template's own machinery (NOT loaded)
+│   ├── anti-patterns-template.md <- TP1-TP9: the template's own machinery (NOT loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
@@ -183,7 +183,7 @@ gh pr create --fill     # then merge once CI is green
     │   │                          and that every hook on disk is wired to the `hooks` key
     │   │                          (an unwired hook looks exactly like a working one)
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
-    │   ├── derived-counts.mjs  <- Guards 12/12c/12d/12e: counts cited in prose, recomputed
+    │   ├── derived-counts.mjs  <- Guard series 12: counts cited in prose, recomputed
     │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap
     │   ├── context-virgem.mjs  <- Guard 21: in the TEMPLATE, .agent/context/ stays unstarted
     │   │                          (frozen content hashes; skips in a derived project)
