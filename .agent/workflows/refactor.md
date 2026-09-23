@@ -89,6 +89,8 @@ Seguir o checklist estrito:
 
 > Perguntar ao utilizador antes de terminar:
 
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
+
 - [ ] Atualizar `.agent/context/session.md`?
 - [ ] Atualizar `.agent/context/walkthrough.md`?
 - [ ] Marcar tarefas concluidas em `.agent/context/task.md`?

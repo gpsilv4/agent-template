@@ -97,6 +97,8 @@ verificacao que nao depende de alguem se lembrar de repetir os passos daqui a se
 - [ ] **Regras do Agente** (`.agent/rules/business-logic.md`) atualizadas se a causa foi uma regra mal interpretada?
 - [ ] **`.agent/rules/anti-patterns.md`** — o bug revelou um padrao evitavel? Registar entrada (origem, anti-padrao, correto, `grep` de detecao)
 - [ ] **Workflows do Agente** (`.agent/workflows/`) atualizados se o processo de debug revelou melhoria?
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
+
 - [ ] **`.agent/context/decisions.md`** atualizado se a causa raiz revelou decisao importante?
 - [ ] **`.agent/context/backlog.md`** — bug removido das tabelas ativas e movido para o Historico em `backlog-archive.md`; contadores validados (`node .agent/scripts/check-backlog.mjs`)?
 - [ ] **`.agent/context/session.md`** atualizado?

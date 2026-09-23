@@ -12,9 +12,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 0. Escala por tamanho do ticket (ler ANTES de comecar)
 
-> Esta checklist nao escalava: um `S` (**< 30 min** no backlog) pagava as mesmas caixas que
-> um `L`. Um processo que custa tanto como o trabalho e abandonado ao terceiro ticket — e a
-> aritmetica que o mostra esta em `src/docs/ticket-method-why.md`.
+> Um `S` nao paga as caixas de um `L` (porque: `review-why.md` § "Porque a checklist tem escala por tamanho").
 
 | Tamanho | Seccoes obrigatorias | Porque |
 |---------|---------------------|--------|
@@ -23,9 +21,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 | **`L`** | **Todas**, a 11 incluida | Um `L` toca no nucleo ou atravessa fronteiras: e onde um segundo par de olhos paga. |
 
 > **As seccoes saltadas dizem-se em voz alta.** No relatorio da Fase 5, listar quais e
-> porque — "saltei 3, 5, 6, 7 (ticket `S`)". Uma seccao saltada em silencio e
-> indistinguivel de uma seccao esquecida, e o objetivo da escala e tornar a diferenca
-> visivel, nao esconder trabalho por fazer.
+> porque — "saltei 3, 5, 6, 7 (ticket `S`)" (porque: `review-why.md` § "Porque uma seccao
+> saltada se diz em voz alta").
 >
 > **Um `S` que revele algo maior deixa de ser `S`.** Se a seccao 8 apanhar um anti-padrao
 > real ou a 9 revelar um buraco de cobertura, sobe para `M` e corre o resto.
@@ -34,10 +31,9 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 1. Build & CI Check  — a partir de `S`
 
-> **No template nu ainda nao ha `package.json`**, logo os dois primeiros passos saem em erro
-> ("Missing script") e nao ha nada a concluir dai. Nesse estado, o que substitui esta seccao
-> sao as suites de `.agent/scripts/` (ver §9) e o job `guard-tests` do CI. A partir do momento
-> em que o projeto tem app, estes passos passam a valer.
+> **No template nu ainda nao ha `package.json`**: estes passos saem em erro e o que os
+> substitui sao as suites de `.agent/scripts/` (§9) e o job `guard-tests` do CI (porque:
+> `review-why.md` § "Porque o template nu nao tem os passos de build").
 
 - `npx tsc --noEmit` — 0 erros
 - `npm run lint` — passa
@@ -56,10 +52,10 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 - [ ] Alteracoes significativas registadas em `src/docs/CHANGELOG.md`?
 
-> **Excecao, no template**: `src/docs/CHANGELOG.md` e os ficheiros de `.agent/context/`
-> ficam **deliberadamente vazios/nao tocados** enquanto isto e um template — sao o estado
-> inicial que cada projeto derivado herda. Escrever historia do template neles daria a cada
-> novo projeto um passado que nao e o dele. Num projeto derivado, a regra vale por inteiro.
+> **Excecao, no template**: `src/docs/CHANGELOG.md` e os ficheiros de `.agent/context/` ficam
+> **deliberadamente vazios/nao tocados**. Num projeto derivado a regra vale por inteiro
+> (porque: `review-why.md` § "Porque o CHANGELOG e o `.agent/context/` ficam vazios no
+> template").
 
 ## 3. Performance  — a partir de `M`
 
@@ -120,8 +116,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 9. Testes  — a partir de `S`
 
 > **Os testes da camada de agente correm sempre**, com ou sem app, e a lista deles **nao se
-> escreve aqui**: sai do `ci.yml`, que e a fonte. A copia que aqui estava tinha ficado em 6
-> das 12 — um agente que a seguisse corria metade e marcava a checkbox na mesma.
+> escreve aqui**: sai do `ci.yml`, que e a fonte (porque: `review-why.md` § "Porque a lista de
+> suites da camada de agente nao se escreve no workflow").
 >
 > ```
 > grep -oE 'node [^ ]+tests/[a-z-]+\.mjs' .github/workflows/ci.yml | sh -e
@@ -149,19 +145,19 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 ## 11. Leitor Independente (Fase 4)  — a partir de `L`
 
-> Este `/review` e a Fase 3 — o teu julgamento. A Fase 4 e outra coisa: **outra leitura, sem
-> o raciocinio de quem escreveu**. Nao substitui nada acima; le codigo (logica, invariantes,
-> ramos mortos, escopo) e nao corre a app nem olha para o output.
+> A Fase 4 nao substitui nada acima: le codigo (logica, invariantes, ramos mortos, escopo) e
+> nao corre a app nem olha para o output (porque: `review-why.md` § "Porque a Fase 4 nao
+> substitui o `/review`").
 
 - [ ] **Corre?** `S`: nao. `M`: se pedires. `L` ou toca no nucleo do dominio: **sim**.
 - [ ] Invocado como subagente `code-reviewer` (Claude Code) ou, noutro agente, uma sessao
       separada a quem se da so o diff e as regras — **sem** o teu raciocinio.
 - [ ] **Instruido a atacar**, nao a elogiar: "assume que esta errado ate prova em contrario",
       cada achado com `ficheiro:linha` + reproducao, e **CONFIRMADO** vs **PLAUSIVEL** explicito.
-- [ ] **Cada achado verificado** contra o ficheiro real antes de agir — subagentes alucinam, e
-      um achado que nao se confirma custa mais do que nao o ter tido.
-- [ ] Confirmado **que ferramentas o subagente tem de facto** (pedir-lhe que as enumere): o
-      campo `tools:` do frontmatter nao entrega necessariamente o que declara.
+- [ ] **Cada achado verificado** contra o ficheiro real antes de agir.
+- [ ] Confirmado **que ferramentas o subagente tem de facto** (pedir-lhe que as enumere).
+      (porque: `review-why.md` § "Porque cada achado da Fase 4 se verifica, e porque se
+      pergunta pelas ferramentas")
 - [ ] Se encontrou algo -> **volta-se a Fase 2** (o loop da maquina) antes de seguir.
 
 > Detalhe e a escala por tamanho: `.agent/rules/ticket-method.md`.
@@ -176,6 +172,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 ## 13. Sessao (Handoff)  — a partir de `S`
 
 > Perguntar ao utilizador antes de terminar:
+
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
 
 - [ ] Atualizar `.agent/context/session.md` com o estado atual?
 - [ ] Atualizar `.agent/context/walkthrough.md` com o resumo do que foi implementado?

@@ -105,6 +105,8 @@ e o custo dela vira **ticket**. Assim qualquer salto **novo** maior continua a f
 
 ## Sessao (Handoff)
 > Perguntar ao utilizador antes de terminar:
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
+
 - [ ] Atualizar `.agent/context/session.md` / `walkthrough.md`?
 - [ ] Algum achado vira ticket no `backlog.md` ou entrada em `anti-patterns.md`?
 
