@@ -56,7 +56,7 @@ const falhas = [];
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 const ap = (n) => "AP" + n;
 
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -127,8 +127,17 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   const listaStubs = comandoExtra ? [...COMANDOS, ".agent/scripts/test-delta.mjs"] : COMANDOS;
   for (const [i, c] of semStubs ? [] : listaStubs.entries()) {
     const falha = stubFalha !== null && c.includes(stubFalha);
-    w(c, `#!/usr/bin/env node\nconsole.log("  ${i} passaram, ${falha ? 1 : 0} falharam.");\n` +
-         `process.exit(${falha ? 1 : 0});\n`);
+    // Um stub que AFIRMA sobre a copia em vez de so devolver um codigo. E a unica forma de
+    // provar que o `BOOTSTRAP.md` foi mesmo apagado: afirmar sobre a mensagem do simulador
+    // media a mensagem, nao o ficheiro — e uma mensagem sobrevive a remocao da linha que a
+    // justifica.
+    const corpo = stubExigeSemBootstrap && i === 0
+      ? `#!/usr/bin/env node\nimport { existsSync } from "fs";\n` +
+        `if (existsSync(".agent/BOOTSTRAP.md")) { console.log("  0 passaram, 1 falharam. BOOTSTRAP.md AINDA EXISTE na copia"); process.exit(1); }\n` +
+        `console.log("  1 passaram, 0 falharam.");\n`
+      : `#!/usr/bin/env node\nconsole.log("  ${i} passaram, ${falha ? 1 : 0} falharam.");\n` +
+        `process.exit(${falha ? 1 : 0});\n`;
+    w(c, corpo);
   }
 
   // O `ci.yml` e a FONTE da lista de comandos do simulador.
@@ -253,6 +262,20 @@ test("fixture sa: corre tudo e declara quantas verificacoes passaram", {}, {
 test("um verificador a falhar reprova a simulacao, e e nomeado", { stubFalha: COMANDOS[0] }, {
   code: 1,
   includes: [COMANDOS[0], "exit 1"],
+});
+
+// --- O `BOOTSTRAP.md` tem de estar APAGADO quando os verificadores correm -----------
+// O `ehDerivado()` tem dois sinais: o marcador presente **ou** este ficheiro ausente. Ate ao
+// #107 a simulacao escrevia o primeiro e nunca apagava o segundo, montando um estado que
+// nenhum derivado real tem — a checklist manda apagar o `BOOTSTRAP.md` no fim, e e por isso
+// que ele conta como sinal.
+//
+// AFIRMA-SE PELO STUB, e nao pela mensagem do simulador: uma mensagem sobrevive a remocao da
+// linha que a produz. Aqui e um verificador a correr DENTRO da copia a dizer o que la ve —
+// se alguem tirar o `rmSync`, este teste fica vermelho e nomeia o ficheiro.
+test("o BOOTSTRAP.md ja nao existe na copia quando os verificadores correm", { stubExigeSemBootstrap: true }, {
+  code: 0,
+  excludes: ["AINDA EXISTE"],
 });
 
 // --- "Nao consegui medir" tem de REPROVAR, nao dar OK (TP2) ---------------------
@@ -389,7 +412,12 @@ test("segredos e estado local em subpastas NAO entram na copia", { segredosAninh
       if (existsSync(join(dir, rel))) problemas.push(`${rel} entrou na copia e nao devia`);
     }
     // O contra-teste: se a copia estivesse vazia, o de cima passava por nao haver nada.
-    if (!existsSync(join(dir, ".agent/BOOTSTRAP.md"))) problemas.push("a copia nao tem o que devia ter — o teste acima nao prova nada");
+    //
+    // A sentinela era o `.agent/BOOTSTRAP.md`, e deixou de servir no #107: o simulador passou a
+    // apaga-lo no fim, que e o que a checklist manda e o que faz dele um sinal do
+    // `ehDerivado()`. Uma sentinela tem de ser um ficheiro que a copia GUARDA — este e escrito
+    // pela fixture e sobrevive a todos os passos.
+    if (!existsSync(join(dir, ".agent/rules/core-rules.md"))) problemas.push("a copia nao tem o que devia ter — o teste acima nao prova nada");
     if (!existsSync(join(dir, "infra/certs"))) problemas.push("a subpasta `infra/certs` devia existir (so o .pem e que sai)");
     return problemas;
   },
