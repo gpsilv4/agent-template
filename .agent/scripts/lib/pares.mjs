@@ -83,11 +83,27 @@ export const PARES = [
     // Guard 17 (tamanho de ficheiro). A catraca so vale se cada um dos seus sitios de recusa
     // estiver medido: uma excecao que deixa de avisar e uma catraca aberta, e ninguem repara.
     // O simulador NAO casava a convencao `check-*.mjs` da descoberta, logo nunca foi medido —
-    // e tem 8 sitios `fatal()`. E o proprio caso que a descoberta existe para nao ter: um
+    // e tem sitios `fatal()` seus (a contagem NAO se escreve aqui: escrita, era mais uma copia
+    // a mao a envelhecer, e envelheceu — dizia 8 depois de a extraccao os levar para
+    // `derivado-maduro.mjs`). E o proprio caso que a descoberta existe para nao ter: um
     // verificador com sitios de recusa, com suite propria, e sem rede que prove que eles ficam
     // vermelhos. Nao veio de nenhum relatorio: apareceu ao tentar varre-lo.
     alvo: ".agent/scripts/simulate-derived.mjs",
     suite: ".agent/scripts/tests/test-simulate-derived.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // A MATURIDADE do derivado, extraida do simulador quando ele bateu nas 500 linhas do
+    // Guard 17. As recusas vieram com ela: sem esta entrada, a varredura media so o ficheiro
+    // de origem e anunciava cobertura completa sobre um sitio que ja la nao esta. E a regra
+    // escrita na matriz de propagacao — a soma dos sitios antes e depois de um refactor tem de
+    // ser a MESMA, e foi assim que se confirmou (220 antes, 216 sem esta entrada, 220 com ela).
+    //
+    // Mesmo `sinal` que o ficheiro de origem, e nao por simetria: a forma de recusa e a mesma
+    // (`fatal()`), porque o veredicto continua a ser o exit code do que o simulador orquestra.
+    alvo: ".agent/scripts/lib/derivado-maduro.mjs",
+    suite: ".agent/scripts/tests/test-derivado-maduro.mjs",
     sinal: /(?<![\w.$])fatal\(/,
     neutro: "(() => {})(",
   },
@@ -282,6 +298,19 @@ export const PARES = [
     // `fatal(` entra ao lado do `warn(`: os tres sitios de "nao consegui medir" eram
     // `console.log` + `process.exit` soltos, logo ficavam fora desta contagem e a varredura
     // anunciava cobertura completa a medir metade. Ver a nota no cabecalho do `fatal`.
+    sinal: /(?<![\w.$])(?:warn|fatal)\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // A baseline e a exigencia de superficie, extraidas do `check-test-surface.mjs` quando ele
+    // chegou a 499 linhas. As cinco recusas vieram com elas — sem esta entrada a varredura
+    // media so o ficheiro de origem e anunciava cobertura sobre sitios que ja la nao estao.
+    //
+    // Sao as recusas de "NAO CONSEGUI MEDIR", e e por isso que importam mais do que parecem:
+    // um verificador que falhe ABERTO ao nao conseguir medir da por intacta uma superficie que
+    // nunca leu. Mesmo `sinal` do ficheiro de origem, onde `fatal(` entra ao lado do `warn(`.
+    alvo: ".agent/scripts/lib/baseline-superficie.mjs",
+    suite: ".agent/scripts/tests/test-baseline-superficie.mjs",
     sinal: /(?<![\w.$])(?:warn|fatal)\(/,
     neutro: "(() => {})(",
   },

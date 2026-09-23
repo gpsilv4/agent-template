@@ -232,6 +232,8 @@ jobs:
         run: node .agent/scripts/tests/test-mutation-sweep.mjs
       - name: Test-surface checker — negative tests
         run: node .agent/scripts/tests/test-test-surface.mjs
+      - name: Baseline e superficie — negative tests
+        run: node .agent/scripts/tests/test-baseline-superficie.mjs
       - name: Registo de suites por descoberta — negative tests
         run: node .agent/scripts/tests/test-registo.mjs
       - name: Mapa "caminho tocado -> o que o verifica" — negative tests
@@ -246,6 +248,8 @@ jobs:
         run: node .agent/scripts/tests/test-commit-msg.mjs
       - name: Simulador de projeto derivado — negative tests
         run: node .agent/scripts/tests/test-simulate-derived.mjs
+      - name: Maturidade do derivado — negative tests
+        run: node .agent/scripts/tests/test-derivado-maduro.mjs
       - name: Simulador de /upgrade — negative tests
         run: node .agent/scripts/tests/test-simulate-upgrade.mjs
       # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
