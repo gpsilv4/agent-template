@@ -10,6 +10,8 @@
  * Os avisos vivem aqui, logo este ficheiro esta em `PARES` no `mutation-sweep.mjs`.
  */
 
+import { AP_FILES, CABECALHO_AP, semHtml } from "./anti-patterns.mjs";
+
 /** Ficheiros onde uma contagem citada em prosa pode viver. Era uma lista duplicada entre os
  *  dois guards, e as duas versoes tinham DIVERGIDO: o 12c nao incluia `CLAUDE.md`/`GEMINI.md`,
  *  logo um numero errado na rule sempre-carregada passava — e o Guard 2 (paridade) tambem nao
@@ -307,6 +309,128 @@ if (metodo) {
       warn(`${alvo} diz "${m[1]} entry points at the root" mas a arvore dele lista ${naArvore}`);
     } else {
       ok(`"${naArvore} entry points at the root" coerente com a arvore de ${alvo}`);
+    }
+  }
+  guardsRun++;
+
+  // --- Guard 12g: o INTERVALO de anti-padroes citado em prosa e dado DERIVADO ---
+  // Sexta instancia do mesmo padrao, e a mais cara de todas porque um dos sitios e EXECUTAVEL:
+  // o item do `/review` que manda correr o grep de deteccao "de cada entrada" fechava o
+  // intervalo dois numeros antes do fim, logo corriam-se 7 de 9 greps e marcava-se a caixa. Um
+  // dos dois que ficavam de fora e o anti-padrao "duas copias da mesma regra a concordar a
+  // mao" — ou seja, o defeito que a checklist deixava de procurar era este.
+  //
+  // PORQUE O GUARD 15 NAO CHEGA, e e a licao: ele verifica que cada citacao RESOLVE, e as duas
+  // pontas resolviam. "Estes sao todos" e outra afirmacao, e ninguem a media. OITO copias a
+  // mao, e nem entre si concordavam — quatro foram corrigidas a olho e as outras quatro so
+  // apareceram na leitura independente, uma delas SEIS linhas abaixo de uma ja corrigida, no
+  // mesmo ficheiro. Quem corrige copias a mao a olho deixa copias por corrigir: e a
+  // demonstracao do porque isto tinha de virar guard.
+  //
+  // O CONJUNTO, e nao so o extremo. A primeira versao validava so o topo, e uma leitura
+  // independente derrubou-a com uma fixture: o primeiro e o terceiro definidos, o do meio
+  // apagado, prosa a declarar o intervalo inteiro — tudo verde. A mentira "estes sao todos" tem
+  // duas formas e esta e a de dentro; apagar uma entrada do meio e operacao normal (a propria
+  // rule manda migrar uma entrada estavel para `core-rules.md`). No template o Guard 15 tapava-a
+  // por acidente, porque cada entrada esta citada a solta nalgum ficheiro; NUM DERIVADO nao tapa
+  // nada — e o derivado e para quem isto existe.
+  //
+  // (Os IDs concretos nao se escrevem neste ficheiro. O Guard 15 varre-o e uma citacao ao
+  // prefixo do projeto e uma citacao morta no template — foi o que aconteceu a este comentario
+  // na primeira versao. O cabecalho do `anti-patterns.mjs` ja avisava.)
+  //
+  // O extremo INFERIOR nao se valida a parte: cai no mesmo teste de pertenca do conjunto.
+  //
+  // NAO VALIDA CONTAGENS POR EXTENSO, e a razao esta em disco: `src/docs/upgrade-why.md` diz
+  // "num projeto com oito anti-padroes proprios", que e uma medicao correcta sobre OUTRO
+  // projeto. Um guard que leia numeros por extenso acusa-a. A saida foi apagar as contagens por
+  // extenso que duplicavam um intervalo — remover a copia, nao arranjar-lhe um segundo
+  // verificador. Nao eram uma, eram duas, e a segunda so apareceu na leitura independente.
+  //
+  // `semHtml`: um intervalo dentro de um exemplo comentado nao e uma afirmacao. Sem isto, quem
+  // acabou de bootstrapar levava um aviso sobre uma linha que o markdown nem mostra.
+  //
+  // O IMPOSTO DE LER PROSA, e este guard cobrou-o ao proprio autor na primeira hora: a
+  // evidencia que descreve este defeito citava o intervalo errado como **citacao historica**, e
+  // levou aviso. Esta certo — em texto corrido, um intervalo literal e indistinguivel de uma
+  // declaracao, e nao ha contexto que os separe de forma fiavel. A saida e escrever a frase de
+  // outra maneira ("um intervalo que acabasse no setimo"), nunca isentar o ficheiro: isentar os
+  // `-why.md` abria o vao exactamente onde a evidencia vive, e e de la que as regras se
+  // defendem. Quem acrescentar um `-why` com historia de intervalos paga o mesmo imposto.
+  const porPrefixo = new Map();
+  for (const f of AP_FILES) {
+    const c = read(f);
+    if (c === null) continue;
+    for (const m of semHtml(c).matchAll(new RegExp(CABECALHO_AP.source, "gm"))) {
+      const pref = m[1].slice(0, 2);
+      if (!porPrefixo.has(pref)) porPrefixo.set(pref, new Set());
+      porPrefixo.get(pref).add(Number(m[1].slice(2)));
+    }
+  }
+  {
+    // UM SO `skip`, e a fusao foi medida. O ramo separado para "nao ha nenhuma definicao" so se
+    // conseguia exercitar limpando as citacoes de mais de vinte `.mjs` a mao — ou seja, o unico
+    // estado que o alcancava era o da propria fixture. E o TP7 a nascer: um ramo cuja
+    // justificacao ia ser prosa. Sem definicoes, cada intervalo cai no `continue` de baixo e o
+    // contador de validados fica a zero, que e o mesmo destino por um caminho que existe.
+    // OS SEPARADORES: hifen, trace curto e `..`. O `..` entrou depois de uma leitura
+    // independente encontrar DUAS copias escritas assim — uma delas 13 linhas abaixo de uma que
+    // este ticket ja tinha corrigido, no mesmo ficheiro, e o guard passou-lhe ao lado. Um
+    // alfabeto de separadores curto demais e uma blocklist a fingir de allowlist (`TP6`).
+    //
+    // O travessao longo fica DE FORA, e e deliberado: em portugues ele e o marcador de aposto —
+    // "o `TP1` — e o `TP9` tambem — sao..." passava a ler-se como intervalo. Aceita-se o falso
+    // negativo teorico (zero ocorrencias no repo) para nao pagar um falso positivo na forma de
+    // pontuacao mais comum da lingua em que este repo escreve.
+    const INTERVALO_AP = /`?((?:AP|TP))(\d+)`?\s*(?:[-–]|\.\.)\s*`?((?:AP|TP))(\d+)`?/g;
+    let validados = 0;
+    let mal = 0;
+    for (const alvo of ficheirosComProsa(listDir)) {
+      const bruto = read(alvo);
+      if (bruto === null) continue;
+      semHtml(bruto)
+        .split("\n")
+        .forEach((linha, i) => {
+          for (const m of linha.matchAll(INTERVALO_AP)) {
+            const [, pref, ini, prefFim, fim] = m;
+            if (pref !== prefFim) {
+              warn(`${alvo}:${i + 1}: o intervalo ${m[0]} mistura os prefixos ${pref} e ${prefFim} — cada prefixo tem a sua numeracao`);
+              mal++;
+              // Conta como observado: senao um repo cujos unicos intervalos fossem mistos
+              // imprimia o `skip` "nao havia nada a verificar" por cima do aviso que este guard
+              // acabou de dar, e a regra deste repo e que um skip diz a verdade sobre si.
+              validados++;
+              continue;
+            }
+            const definidos = porPrefixo.get(pref);
+            // Prefixo sem nenhuma definicao: o Guard 15 ja reprova as duas pontas como citacoes
+            // mortas, e com o numero concreto em vez do intervalo. Avisar aqui tambem era dizer
+            // o mesmo por duas bocas — e quem le passa a procurar dois defeitos onde ha um.
+            // Alcancavel e barato: um derivado que escreva o intervalo antes do primeiro
+            // cabecalho, que e o dia 1 de quem bootstrapa. Tem teste proprio.
+            if (definidos === undefined) continue;
+            validados++;
+            const topo = Math.max(...definidos);
+            if (Number(fim) !== topo) {
+              warn(`${alvo}:${i + 1}: o intervalo ${m[0]} acaba em ${fim} mas o ultimo ${pref} definido e o ${pref}${topo} — quem seguir a instrucao trata ${topo - Number(fim)} entrada(s) como inexistentes`);
+              mal++;
+              continue;
+            }
+            // O buraco no MEIO. Um intervalo promete tudo o que abrange, e quem seguir a
+            // instrucao vai procurar cada um deles.
+            const emFalta = [];
+            for (let k = Number(ini); k <= Number(fim); k++) if (!definidos.has(k)) emFalta.push(`${pref}${k}`);
+            if (emFalta.length) {
+              warn(`${alvo}:${i + 1}: o intervalo ${m[0]} abrange ${emFalta.join(", ")}, que nao esta(o) definido(s) — quem seguir a instrucao procura o que nao ha`);
+              mal++;
+            }
+          }
+        });
+    }
+    if (validados === 0) {
+      skip("Guard 12g — nenhuma prosa cita um intervalo de anti-padroes com prefixo definido");
+    } else if (mal === 0) {
+      ok(`${validados} intervalo(s) de anti-padroes coerentes com o que esta definido`);
     }
   }
   guardsRun++;

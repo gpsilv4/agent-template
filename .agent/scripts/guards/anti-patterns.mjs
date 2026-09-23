@@ -32,7 +32,7 @@
  *  primeiro numero do seu prefixo, com o espaco todo livre, e um `/upgrade` deixa de ter de
  *  reescrever citacoes.
  *
- *  Contar os dois e obrigatorio na mesma: dezenas de ficheiros citam `TP1`..`TP7`, e olhar so
+ *  Contar os dois e obrigatorio na mesma: dezenas de ficheiros citam os `TPn`, e olhar so
  *  para o primeiro ficheiro dava essas citacoes como MORTAS — o guard passaria a reprovar o
  *  repo inteiro pela sua propria arrumacao. */
 export const AP_FILES = [".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"];
@@ -49,7 +49,7 @@ export const AP_FILE = AP_FILES[0];
  *  `(?:-->|$)`: um `<!--` sem fecho comenta ate ao fim do ficheiro, e e assim que o markdown
  *  o le. Sem o `$`, apagar a linha `-->` (o que acontece a quem remove o exemplo ilustrativo
  *  a meio) trazia de volta avisos sobre texto comentado. */
-const semHtml = (t) => t.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => m.replace(/[^\n]/g, " "));
+export const semHtml = (t) => t.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => m.replace(/[^\n]/g, " "));
 
 /** UM padrao de cabecalho de definicao, usado pelos dois lados da contagem. Esteve escrito
  *  duas vezes, e alterar so um (um derivado que passe a usar `####`, por exemplo) devolvia em
@@ -65,7 +65,7 @@ const semHtml = (t) => t.replace(/<!--[\s\S]*?(?:-->|$)/g, (m) => m.replace(/[^\
  *  (Nenhum ID concreto se escreve nestes comentarios: o guard varre-se a si mesmo, e um do
  *  prefixo do projeto seria uma citacao morta num template por estrear. Foi o que aconteceu
  *  ao escrever este bloco.) */
-const CABECALHO_AP = /^#{2,3}\s+((?:AP|TP)\d+)\b/;
+export const CABECALHO_AP = /^#{2,3}\s+((?:AP|TP)\d+)\b/;
 
 /** Uma CITACAO no meio do texto. **O mesmo alfabeto de IDs que o cabecalho** — se divergirem,
  *  um prefixo passa a ser definivel e nao citavel (ou o contrario) e o guard mente dos dois
