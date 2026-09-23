@@ -341,6 +341,24 @@ comHistoria({ dir, ok });
 queConfigurou({ dir, ok, fatal });
 await comFicheirosGrandes({ dir, ok, fatal });
 
+// --- 3f. apagar o BOOTSTRAP.md, que e o ULTIMO passo da checklist ------------------
+// O `ehDerivado()` tem dois sinais: o marcador presente **ou** este ficheiro ausente. Desde o
+// #100 a simulacao escrevia o primeiro e nunca apagava o segundo, logo montava um estado que
+// nenhum derivado real tem — a propria checklist manda apagar o `BOOTSTRAP.md` no fim, e e por
+// isso que ele e um sinal.
+//
+// POR AQUI E NAO ANTES, e a ordem importa: e o ultimo passo da Fase 2 tal como na checklist. O
+// que o le durante a simulacao le o do REPO DE ORIGEM e nao o da copia (a lista de rules a
+// gerar, acima), logo apaga-lo aqui nao rouba nada a nenhum passo.
+//
+// MEDIDO ANTES DE APAGAR, porque um verde depois de remover um ficheiro pode ser "menos coisas
+// verificadas" em vez de "tudo continua verificado" — que e o `TP2`. Montou-se o derivado,
+// correram-se os guards com e sem o ficheiro, e compararam-se as listas de `SKIP`: **4 e 4,
+// identicas**. O Guard 12e (numero de workflows) continua a validar, com a citacao que vive
+// fora deste ficheiro. Nao se perde verificacao nenhuma.
+rmSync(join(dir, ".agent/BOOTSTRAP.md"), { force: true });
+ok("BOOTSTRAP.md apagado (passo final da checklist) — o segundo sinal do ehDerivado() fica montado");
+
 // --- 4. correr -------------------------------------------------------------------
 console.log("");
 let corridos = 0;
