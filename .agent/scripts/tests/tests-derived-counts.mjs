@@ -339,8 +339,17 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
     writeF(dir, "src/docs/anti-patterns-why.md", readF(dir, "src/docs/anti-patterns-why.md") + cab);
   };
 
-  /** Tres anti-padroes do PROJETO, o prefixo de quem usa o template. */
-  const AP123 = "\n## AP1 — um\n\n## AP2 — dois\n\n## AP3 — tres\n";
+  /** ESCREVE o catalogo do projeto com exactamente as entradas pedidas, e a prosa que as
+   *  declara. Escreve, nao acrescenta: o `simulate-derived.mjs` semeia um anti-padrao proprio
+   *  para montar um "derivado com historia", logo acrescentar deixava a fixture a depender do
+   *  que o repo base ja trazia — TP3, e foi assim que um destes testes reprovou so na simulacao
+   *  de derivado, com a bateria local inteira verde. */
+  const catalogoDoProjeto = (dir, nums, prosa) =>
+    writeF(
+      dir,
+      ".agent/rules/anti-patterns.md",
+      "# Anti-Padroes\n" + nums.map((n) => `\n## AP${n} — entrada ${n}\n`).join("") + `\n${prosa}\n`
+    );
 
   test("G12g: o repo como esta passa — os intervalos batem com o que esta definido", null, {
     code: 0,
@@ -376,8 +385,7 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   }, { code: 0 });
 
   test("G12g: intervalo que mistura prefixos avisa", (dir) => {
-    writeF(dir, ".agent/rules/anti-patterns.md",
-      readF(dir, ".agent/rules/anti-patterns.md") + "\n## AP1 — do projeto\n\n- **Origem**: fixture\n");
+    catalogoDoProjeto(dir, [1], "");
     writeF(dir, ".agent/rules/exemplo-intervalo.md", "# Exemplo\n\nVer `TP1`-`AP1`.\n");
   }, { code: 1, includes: ["mistura os prefixos TP e AP"] });
 
@@ -394,13 +402,11 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   //
   // A correccao e o primeiro do par: afirma o prefixo PELO NOME, e reprova.
   test("G12g: derivado com intervalo AP desalinhado avisa, nomeando o AP", (dir) => {
-    writeF(dir, ".agent/rules/anti-patterns.md",
-      readF(dir, ".agent/rules/anti-patterns.md") + AP123 + "\nOs deste projeto (`AP1`-`AP2`) vivem aqui.\n");
+    catalogoDoProjeto(dir, [1, 2, 3], "Os deste projeto (`AP1`-`AP2`) vivem aqui.");
   }, { code: 1, includes: ["o ultimo AP definido e o AP3"] });
 
   test("G12g: derivado com prefixo AP proprio e intervalo certo passa", (dir) => {
-    writeF(dir, ".agent/rules/anti-patterns.md",
-      readF(dir, ".agent/rules/anti-patterns.md") + AP123 + "\nOs deste projeto (`AP1`-`AP3`) vivem aqui.\n");
+    catalogoDoProjeto(dir, [1, 2, 3], "Os deste projeto (`AP1`-`AP3`) vivem aqui.");
     return { includes: ["intervalo(s) de anti-padroes coerentes"] };
   }, { code: 0 });
 
@@ -410,9 +416,7 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // dentro. Apagar uma entrada do meio e operacao normal: a rule manda migrar uma entrada
   // estavel para `core-rules.md`.
   test("G12g: buraco no MEIO do intervalo avisa", (dir) => {
-    writeF(dir, ".agent/rules/anti-patterns.md",
-      readF(dir, ".agent/rules/anti-patterns.md") + "\n## AP1 — um\n\n## AP3 — tres\n" +
-        "\nOs deste projeto (`AP1`-`AP3`) vivem aqui.\n");
+    catalogoDoProjeto(dir, [1, 3], "Os deste projeto (`AP1`-`AP3`) vivem aqui.");
   }, { code: 1, includes: ["abrange AP2", "procura o que nao ha"] });
 
   // O separador `..`. Duas copias do repo estavam escritas assim e escapavam — uma delas 13
@@ -428,7 +432,16 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // O `code: 1` vem do Guard 15 (as duas pontas sao citacoes mortas) e NAO prova nada aqui — e
   // exactamente por isso que a afirmacao esta toda no `excludes`: o que este teste mede e o
   // SILENCIO do 12g, e que ele e deliberado em vez de acidental.
+  //
+  // O CATALOGO DO PROJETO ESVAZIA-SE A MAO, e custou uma reprovacao a aprender: a primeira
+  // versao deste teste assumia que nao havia nenhum `AP` definido — verdade no template nu,
+  // FALSA em qualquer derivado. O `simulate-derived.mjs` semeia um anti-padrao proprio para
+  // montar um "derivado com historia", logo la o prefixo tem definicoes, o intervalo passava a
+  // ser validado e o `excludes` caia. TP3 na forma canonica: o teste lia o estado do repo em
+  // vez de o montar, e so a simulacao de derivado o apanhou — a bateria local inteira estava
+  // verde. Esvaziar e seguro: o que a simulacao semeia nao e citado em lado nenhum.
   test("G12g: intervalo de um prefixo sem definicoes fica calado (quem o diz e o Guard 15)", (dir) => {
+    writeF(dir, ".agent/rules/anti-patterns.md", "# Anti-Padroes\n\n(nenhum ainda)\n");
     writeF(dir, ".agent/rules/exemplo-intervalo.md", "# Exemplo\n\nVer `AP1`-`AP5`.\n");
     return { excludes: ["o ultimo AP definido", "abrange AP"] };
   }, { code: 1 });
