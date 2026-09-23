@@ -91,6 +91,8 @@ decidido" e verificavel mais tarde; um ramo esquecido nao e.
 ## 5. Output — Decisoes Fechadas
 
 O que sai alimenta directamente a Fase 0. Num ticket `L` vai para
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
+
 `.agent/context/implementation_plan.md`; noutros casos fica no chat.
 
 ```

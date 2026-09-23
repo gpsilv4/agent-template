@@ -39,6 +39,8 @@ Research **externo** de produto para o {{PROJECT_NAME}}: o que fazem apps semelh
 
 - Relatorio: comparativo + gaps + ideias + sugestoes priorizadas (com **fontes web datadas + confianca**)
 - **Proposta de backlog**: features aprovadas -> items (seccao Features Futuras), com esforco e sprint sugerido — aguardar aprovacao
+> **No template**: o output vai para um **issue**, nunca para `.agent/context/` (o Guard 21 reprova).
+
 - Registar decisoes de produto relevantes em `.agent/context/decisions.md`
 
 ## Sessao (Handoff)
