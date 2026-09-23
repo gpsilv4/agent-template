@@ -424,7 +424,6 @@ const descoberta = await registaDescobertos({
 });
 console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
-resumo();
 
 // --- Os ficheiros POR RASTREAR sao ditos em voz alta -----------------------------
 //
@@ -445,3 +444,6 @@ test("sem ficheiros por rastrear, nao ha anuncio nenhum", (dir) => {
   commit(dir, "rastreado");
   return null;
 }, { code: 0, excludes: ["por rastrear"] });
+
+
+resumo();
