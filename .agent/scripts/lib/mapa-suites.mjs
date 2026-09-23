@@ -60,6 +60,10 @@ export const SUITES = [
   // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
   { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  // A baseline saiu do verificador quando ele chegou a 499 linhas, e traz a sua suite. Leva
+  // TAMBEM a do ficheiro de origem: mexer aqui muda o que ele mede, e essa e a afirmacao
+  // que so a suite dele faz.
+  { re: /^\.agent\/scripts\/lib\/baseline-superficie\.mjs$/, verifica: [S("test-baseline-superficie.mjs"), S("test-test-surface.mjs")] },
   // O harness dos doc guards e o construtor de fixture que o Guard 21 obriga a ter. O segundo
   // nao casa a convencao `test-*` (nao e uma suite, e um construtor), logo precisa de nome
   // proprio aqui — sem ele, mexer-lhe nao gerava obrigacao nenhuma e ele DECIDE se uma fixture
@@ -116,6 +120,9 @@ export const SUITES = [
   // ANTES da regra generica de `lib/`: a ordem da tabela e a semantica, e o `lib/` generico
   // manda tudo para a suite do registo — que nao toca nestes dois.
   { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado|lib\/ficheiros)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A
+  // regra vem ANTES da geral de `lib/` porque o mapa decide pela primeira que casa.
+  { re: /^\.agent\/scripts\/lib\/derivado-maduro\.mjs$/, verifica: [S("test-derivado-maduro.mjs"), S("test-simulate-derived.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },

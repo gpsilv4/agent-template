@@ -91,6 +91,11 @@ export const PREFIXOS_DE_TESTE = [
   "guard-test-",
   "guard-synth-",
   "commit-msg-test-",
+  // Da suite do `lib/derivado-maduro.mjs`, que saiu do simulador quando ele bateu nas 500
+  // linhas. Entrou aqui porque o teste desta lista o exigiu — e foi a **simulacao de derivado**
+  // a dize-lo primeiro, por correr todas as suites: eu tinha criado a fixture e nao corrido
+  // esta. Composto como os irmaos, nunca uma palavra solta.
+  "derivado-maduro-teste-",
   // `registo-test-` e nao `registo-`: a limpeza apaga pastas, e um prefixo que e uma PALAVRA
   // comum podia casar o que outra ferramenta escreveu em `tmpdir`. Os irmaos todos sao
   // compostos (`guard-test-`, `sweep-test-`); este era o unico elo fraco.

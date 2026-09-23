@@ -23,7 +23,7 @@ const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
  *  de padroes para `surface-patterns.mjs`, a sandbox deixou de resolver o import e as 61
  *  assercoes falharam de uma vez — nao por um defeito do verificador, mas por a fixture estar
  *  incompleta. Acrescentar aqui qualquer modulo novo que o verificador passe a importar. */
-const CHECKER_MODULOS = [".agent/scripts/lib/surface-patterns.mjs"];
+const CHECKER_MODULOS = [".agent/scripts/lib/surface-patterns.mjs", ".agent/scripts/lib/baseline-superficie.mjs"];
 
 const git = (dir, args) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
