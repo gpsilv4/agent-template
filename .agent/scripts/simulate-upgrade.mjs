@@ -245,6 +245,21 @@ ok(
 //
 // Por isso a simulacao **aplica** as remocoes e **diz que as aplicou**. A linha existe para
 // ninguem ler isto como "o /upgrade apaga sozinho": num projeto real sao propostas, uma a uma.
+// CONSTANTES QUE MUDARAM DE CASA. O consumidor que as tinha customizadas perde a customizacao
+// em silencio: o ficheiro da logica e substituido, a entrada sai da lista de preservadas, e o
+// `config/` novo chega com os defaults. E o modo de falha que o `upgrade-why.md` descreve — uma
+// verificacao por diferenca de output apanha o que some, **nao apanha um default que regressa**.
+//
+// Avisa e nao migra: o formato pode ter mudado com a mudanca de casa, e um motor que adivinhasse
+// o merge entregava configuracao que ninguem escreveu.
+if (medido.migracoes?.length) {
+  ok(`${medido.migracoes.length} constante(s) customizada(s) mudaram de casa — migrar A MAO:`);
+  for (const { nome, de, para } of medido.migracoes) {
+    console.log(`        ${nome}: ${de}  ->  ${para}`);
+  }
+  console.log("        O valor antigo esta no historico do git; o novo ficheiro chega com os defaults.");
+}
+
 if (medido.removidos.length) {
   const migrados = medido.removidos.filter((r) => r.migrado);
   ok(`${medido.removidos.length} ficheiro(s) sairam do template desde ${tag} e continuam no projeto:`);

@@ -14,7 +14,7 @@
  * ponta, os caminhos que tem de parar tudo).
  */
 import { cenario, limpa, test } from "./harness/test-upgrade-harness.mjs";
-import { PLACEHOLDER } from "../lib/upgrade-mecanico.mjs";
+import { PLACEHOLDER, MIGRACOES } from "../lib/upgrade-mecanico.mjs";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -325,6 +325,48 @@ export function registar() {
   test('o sweep do bootstrap COME a forma colada', () => {
     const dentro = `uma frase com ${COLADO} no meio`;
     return PLACEHOLDER.test(dentro) ? [] : ['o padrao deixou de casar a forma colada — o teste abaixo passa a nao provar nada'];
+  });
+
+  // --- Constantes que MUDARAM DE CASA (#119) --------------------------------
+  // Quando uma constante sai da logica para `config/`, o consumidor que a tinha CUSTOMIZADA
+  // perde-a em silencio: o ficheiro da logica e substituido, a entrada sai da lista de
+  // preservadas, e o `config/` novo chega com os defaults ("copiar se AUSENTE"). E o modo de
+  // falha que o `upgrade-why.md` descreve — diferenca de output apanha o que some, **nao apanha
+  // um default que regressa**.
+  test('constante que mudou de casa E estava customizada e ANUNCIADA', () => {
+    const { rel, nome } = MIGRACOES[0];
+    let c;
+    try {
+      c = cenario({
+        ontem: { [rel]: `const ${nome} = [];\n` },
+        hoje: { [rel]: `const ${nome} = [];\n` },
+        consumidor: { [rel]: `const ${nome} = [/meu-padrao/];\n` },
+      });
+      return c.medido.migracoes?.some((m) => m.nome === nome)
+        ? []
+        : [`${nome} customizada e nao anunciada: ${JSON.stringify(c.medido.migracoes)}`];
+    } finally {
+      limpa(c);
+    }
+  });
+
+  // O CONTRA-CASO, e e ele que impede isto de virar ruido: um projeto que NUNCA tocou na
+  // constante nao tem trabalho de migracao nenhum, e avisa-lo era mandar-lhe fazer nada.
+  test('constante que mudou de casa mas NAO estava customizada nao e anunciada', () => {
+    const { rel, nome } = MIGRACOES[0];
+    let c;
+    try {
+      c = cenario({
+        ontem: { [rel]: `const ${nome} = [];\n` },
+        hoje: { [rel]: `const ${nome} = [];\n` },
+        consumidor: { [rel]: `const ${nome} = [];\n` },
+      });
+      return (c.medido.migracoes ?? []).length === 0
+        ? []
+        : [`anunciou migracao a quem nao customizou: ${JSON.stringify(c.medido.migracoes)}`];
+    } finally {
+      limpa(c);
+    }
   });
 
   // A metade que interessa: a forma espacada SOBREVIVE. Sem este caso, o de cima sozinho era
