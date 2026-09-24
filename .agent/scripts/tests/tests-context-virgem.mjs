@@ -10,11 +10,12 @@
  * negativo abaixo e o teste mais importante do ficheiro: ele prova que, ANTES do Guard 21, a
  * bateria inteira dava verde sobre um `implementation_plan.md` com 189 linhas de planeamento.
  */
-import { rmSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, existsSync, readdirSync } from "fs";
+import { rmSync, readFileSync, writeFileSync, mkdtempSync, mkdirSync, readdirSync } from "fs";
 import { pathToFileURL } from "url";
 import { join } from "path";
 import { tmpdir } from "os";
 import { test, file, readF, writeF, GUARD, recongelarContexto, registarResultado } from "./harness/test-harness.mjs";
+import { comoTemplate } from "./harness/projeto-derivado.mjs";
 // A receita do "bootstrap concluido" vive no harness: estava escrita aqui E no
 // `tests-placeholders.mjs`, a concordar a mao, e a lista de extensoes ja divergiu uma vez (`TP8`).
 import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";
@@ -70,20 +71,6 @@ const PLANEAMENTO = [
  * Chama-se SEMPRE antes da mutacao: re-congelar depois de acrescentar ou apagar um ficheiro
  * congelava o proprio defeito que o teste quer ver.
  */
-const comoTemplate = (dir) => {
-  try {
-    rmSync(file(dir, ".agent/.template-version"));
-  } catch {
-    /* no template nu nao existe — e o estado que queremos */
-  }
-  if (!existsSync(file(dir, ".agent/BOOTSTRAP.md"))) {
-    // Sem contagens: os guards 12d/12e comparam citacoes com a fonte, e um ficheiro que nao
-    // cita nada nao acrescenta aviso nenhum. Escrever numeros aqui a mao era o que eles
-    // existem para apanhar.
-    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do `ehDerivado()`.\n");
-  }
-  recongelarContexto(dir);
-};
 
 export function registar() {
   // --- O caso que originou o guard -------------------------------------------

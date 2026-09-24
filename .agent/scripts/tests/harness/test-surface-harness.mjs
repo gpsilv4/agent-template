@@ -12,18 +12,48 @@
  */
 import { pathToFileURL } from "url";
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
-import { dirname, resolve, join } from "path";
+import { dirname, resolve, join, sep } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
-/** Modulos que o CHECKER importa e que a sandbox tem de levar consigo. Ao extrair as tabelas
- *  de padroes para `surface-patterns.mjs`, a sandbox deixou de resolver o import e as 61
- *  assercoes falharam de uma vez — nao por um defeito do verificador, mas por a fixture estar
- *  incompleta. Acrescentar aqui qualquer modulo novo que o verificador passe a importar. */
-const CHECKER_MODULOS = [".agent/scripts/lib/surface-patterns.mjs", ".agent/scripts/lib/baseline-superficie.mjs"];
+/** Os modulos que o CHECKER importa, DERIVADOS dele e nao enumerados.
+ *
+ *  A versao anterior era uma lista a mao com uma instrucao ao lado — *"acrescentar aqui
+ *  qualquer modulo novo que o verificador passe a importar"* — e a instrucao nao chegou: a
+ *  lista envelheceu **duas** vezes. Da primeira, ao extrair as tabelas de padroes para
+ *  `surface-patterns.mjs`, a sandbox deixou de resolver o import e **61 assercoes falharam de
+ *  uma vez**; da segunda, ao extrair a resolucao da baseline. Nas duas, a mensagem foi
+ *  `ERR_MODULE_NOT_FOUND` sobre um caminho dentro de uma pasta temporaria — nada que aponte
+ *  para "a fixture esta incompleta", e das duas vezes o defeito foi procurado no verificador.
+ *
+ *  EM PROFUNDIDADE, e nao so um nivel: hoje nenhum dos dois modulos importa de `./`, mas o
+ *  `lib/derivado-maduro.mjs` importa `patch.mjs` e `ficheiros.mjs` — o caso transitivo ja
+ *  existe no repo e chega aqui a primeira extracao que o traga.
+ *
+ *  So imports RELATIVOS: `fs`, `path` e companhia resolvem-se sozinhos na sandbox. */
+export function modulosImportadosPor(rel, raiz = ROOT, vistos = new Set()) {
+  // `raiz` e parametro para o teste poder montar uma arvore sintetica. Sem isso, o unico teste
+  // possivel era contra este repo — e um teste que le o repo nao distingue derivar de acertar
+  // por acaso no que hoje la esta (`TP3`).
+  if (vistos.has(rel)) return vistos;
+  vistos.add(rel);
+  const src = readFileSync(join(raiz, rel), "utf8");
+  for (const m of src.matchAll(/^\s*import\s[^"']*from\s*["'](\.[^"']+)["']/gm)) {
+    // O caminho e relativo ao ficheiro que importa, nunca a raiz: aritmetica sobre a string
+    // funcionava para `./lib/x` e mentia para `../lib/x`.
+    const alvo = join(dirname(rel), m[1]).split(sep).join("/");
+    modulosImportadosPor(alvo, raiz, vistos);
+  }
+  return vistos;
+}
+
+/** O checker sai do conjunto: ele e copiado a parte, para o seu proprio caminho. */
+export const CHECKER_MODULOS = [...modulosImportadosPor(".agent/scripts/check-test-surface.mjs")].filter(
+  (f) => f !== ".agent/scripts/check-test-surface.mjs"
+);
 
 const git = (dir, args) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
