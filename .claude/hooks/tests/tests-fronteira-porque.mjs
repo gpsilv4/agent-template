@@ -47,13 +47,16 @@ const CONDICOES = [
   // `sed -i` le e escreve no mesmo comando: o verbo esta na lista de leitura e mesmo assim
   // escreve. Sem ramo proprio, este passava por ser `sed`.
   ["edita no sitio", "sed -i '' s/a/b/ .claude/settings.json", "edita-no-sitio"],
-  // `codigo-inline` so dispara com o caminho VISIVEL (fora de aspas) e um `-e` noutro sitio do
-  // MESMO comando — porque `inline` e testado sobre o comando inteiro e o verbo por segmento.
-  // Quando o caminho esta dentro das aspas do proprio `node -e`, a decisao sai antes, pelo ramo
-  // `citado-mas-executado`. A diferenca nao e academica: ESTA e a forma exacta do falso positivo
-  // que abriu o ticket — um `cat` de leitura negado por haver um `node -e` noutro segmento.
-  ["codigo inline noutro segmento", 'cat .claude/hooks/lib/fronteira.mjs; node -e "console.log(1)"', "codigo-inline"],
-  // O mesmo do lado do wrapper opaco, e pela mesma razao.
+  // `codigo-inline` dispara quando o interpretador inline esta NO SEGMENTO que toca a fronteira.
+  //
+  // ESTE CASO MUDOU. Era `cat <fronteira>; node -e "..."` — o `-e` noutro segmento — e isso
+  // passou a ser PERMITIDO: o alcance do `inline` alinhou-se ao do verbo, porque negava leitura
+  // legitima (o `-c` de um `grep` a jusante era lido como sendo do `node`). Ver
+  // `tests-fronteira-alcance.mjs`.
+  ["codigo inline no segmento que toca", 'cat /tmp/x; node -e "console.log(1)" .claude/hooks/y.mjs', "codigo-inline"],
+  // O `opaco` NAO se alinhou, e a assimetria e deliberada: com `|`, o segmento que toca a
+  // fronteira **alimenta** o consumidor a jusante, e quem apaga nao tem o caminho escrito. Por
+  // isso este caso continua a ser noutro segmento, e continua a negar.
   ["wrapper opaco noutro segmento", 'cat .claude/hooks/lib/fronteira.mjs; eval "echo ok"', "wrapper-opaco"],
   // Redireccao para dentro da fronteira. O verbo pode ser de leitura — o que escreve e o `>`.
   ["redireciona", "echo '{}' > .claude/settings.json", "redireciona"],
