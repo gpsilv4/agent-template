@@ -130,6 +130,22 @@ export function porqueAltera(texto) {
   const alvo = tocam.join("\n");
   const primeiro = tocam[0].trim().split(/\s+/)[0].replace(/^.*\//, "");
   const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
+  // O `inline` avalia-se sobre os segmentos que TOCAM a fronteira, e nao sobre o comando
+  // inteiro. Duas leituras legitimas eram negadas por causa do alcance largo, as duas medidas
+  // numa sessao real e diagnosticadas so porque a parte 1 (#101) pos o rotulo na mensagem:
+  //
+  //   `node <ficheiro>; grep -c x y`  — o `-c` do GREP era lido como sendo do `node`, porque
+  //     o regex corre sobre a linha toda. As flags sao comuns: `grep -c`, `sort -c`, `cp -p`,
+  //     `git log -p`.
+  //   `cat <fronteira>; node -e "..."` — um interpretador inline noutro segmento, que nao toca
+  //     a fronteira nenhuma, negava o `cat`.
+  //
+  // O `opaco` NAO se alinha, e a assimetria e deliberada. Com `|`, o segmento que toca a
+  // fronteira **alimenta** o consumidor a jusante: em `ls <fronteira> | xargs rm`, quem apaga
+  // e o `xargs`, que nao tem o caminho escrito. Alinhar os dois passava esse comando a
+  // PERMITIDO — apagava a pasta dos hooks inteira. Foi uma leitura independente a dar o
+  // contra-exemplo, e os casos dele sao os primeiros do `tests-fronteira-alcance.mjs`.
+  const inlineNoAlvo = CODIGO_INLINE.test(alvo);
   // Uma allowlist por BINARIO e grossa quando o binario tem sub-verbos que apagam: `git rm`,
   // `git restore` e `git checkout --` passavam por `git` estar na lista. Medido ao remover um
   // hook obsoleto, minutos depois de escrever esta verificacao.
@@ -141,7 +157,7 @@ export function porqueAltera(texto) {
   // mesmo tempo, e reporta-las todas dava uma lista sem accao.
   if (!LEITURA.has(primeiro)) return `verbo-nao-e-leitura:${primeiro}`;
   if (editaNoSitio) return "edita-no-sitio";
-  if (inline) return "codigo-inline";
+  if (inlineNoAlvo) return "codigo-inline";
   if (opaco) return "wrapper-opaco";
   if (redireciona) return "redireciona";
   if (gitQueEscreve) return "git-que-escreve";
