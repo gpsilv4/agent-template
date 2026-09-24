@@ -88,10 +88,27 @@ const OPACO = /\b(?:eval|xargs)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
 
 /**
+ * PORQUE e que este comando seria negado — o mesmo veredicto de `alteraFronteira()`, com o
+ * nome da condicao que o produziu.
+ *
+ * PORQUE EXISTE: a decisao combina SETE condicoes com alcances diferentes (umas por segmento,
+ * outras sobre o comando inteiro), e bastava uma disparar para o comando ser negado com uma
+ * razao generica. Quem levava com a negacao nao sabia qual — e das quatro negacoes de LEITURA
+ * medidas numa sessao real, duas ficaram por explicar por nao haver forma de as diagnosticar.
+ * Duas delas bloquearam passos que o proprio processo exige: correr a suite dos hooks, e
+ * publicar um comentario sobre o assunto.
+ *
+ * Um agente que nao perceba a negacao ou desliga o hook — e perde a proteccao toda — ou salta a
+ * verificacao. Nenhum dos dois e o que o hook quer, e os dois sao mais provaveis do que
+ * investigar.
+ *
+ * NAO MUDA O QUE E NEGADO. So diz porque. A correccao do que a fronteira deve casar e outro
+ * trabalho, e este existe para o informar com dados em vez de suposicoes.
+ *
  * @param {string} texto o comando completo
- * @returns {boolean} true se o comando ESCREVE na fronteira e deve ser negado
+ * @returns {string|null} o rotulo da condicao que nega, ou `null` se o comando passa
  */
-export function alteraFronteira(texto) {
+export function porqueAltera(texto) {
   const visivel = semCitacoes(texto);
   const opaco = OPACO.test(texto);
   const inline = CODIGO_INLINE.test(texto);
@@ -99,13 +116,16 @@ export function alteraFronteira(texto) {
   // A fronteira so aparece DENTRO de aspas ou de um heredoc: e texto. Excepto quando o
   // comando executa esse texto (`eval`, `sh -c`) ou o passa a um interpretador (`node -e`),
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
-  if (!FRONTEIRA.test(visivel)) return FRONTEIRA.test(texto) && (opaco || inline);
+  if (!FRONTEIRA.test(visivel)) {
+    if (!FRONTEIRA.test(texto)) return null;
+    return opaco || inline ? "citado-mas-executado" : null;
+  }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
   // comando e o "verbo" do segmento seguinte e um pedaco do padrao de procura.
   const segmentos = visivel.split(/(?:&&|\|\||[;|\n])+|\bdo\b|\bthen\b/);
   const tocam = segmentos.filter((s) => FRONTEIRA.test(s));
-  if (tocam.length === 0) return false;
+  if (tocam.length === 0) return null;
 
   const alvo = tocam.join("\n");
   const primeiro = tocam[0].trim().split(/\s+/)[0].replace(/^.*\//, "");
@@ -116,8 +136,23 @@ export function alteraFronteira(texto) {
   const gitQueEscreve = /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/.test(alvo.trim());
   const redireciona = /(?:^|[^>\d])>{1,2}\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
 
-  return !LEITURA.has(primeiro) || editaNoSitio || inline || opaco || redireciona || gitQueEscreve;
+  // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
+  // porque e essa a condicao a relaxar se a negacao for indevida. Varias podem ser verdade ao
+  // mesmo tempo, e reporta-las todas dava uma lista sem accao.
+  if (!LEITURA.has(primeiro)) return `verbo-nao-e-leitura:${primeiro}`;
+  if (editaNoSitio) return "edita-no-sitio";
+  if (inline) return "codigo-inline";
+  if (opaco) return "wrapper-opaco";
+  if (redireciona) return "redireciona";
+  if (gitQueEscreve) return "git-que-escreve";
+  return null;
 }
+
+/**
+ * @param {string} texto o comando completo
+ * @returns {boolean} true se o comando ESCREVE na fronteira e deve ser negado
+ */
+export const alteraFronteira = (texto) => porqueAltera(texto) !== null;
 
 /** A razao, escrita uma vez e usada pelo hook e pelos testes. */
 export const RAZAO_FRONTEIRA =
