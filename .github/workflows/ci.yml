@@ -422,6 +422,16 @@ jobs:
           # ESPERADO — ela avisa sempre que nao consegue confirmar que um secret existe, e este
           # e opcional por desenho. Nao e erro de CI: o job passa sem o secret definido.
           #
+          # NAO HA COMO SILENCIAR, e nao vale a pena procurar: a supressao por linha ou por
+          # ficheiro e um pedido em aberto na extensao (github/vscode-github-actions#123), e a
+          # propria classe de falso positivo esta reportada (#222, #533). Os workarounds que se
+          # encontram — fazer login, recarregar a janela — servem para ela ENCONTRAR o secret, e
+          # aqui nao ha nenhum para encontrar.
+          #
+          # O aviso ate diz uma coisa verdadeira: "estas num repo PESSOAL". Num derivado que
+          # viva numa ORGANIZACAO o secret passa a existir, porque e la que a acao o exige — e
+          # ai desaparece sozinho.
+          #
           # Organizacoes (nao repos pessoais) precisam de GITLEAKS_LICENSE, gratis. Fica
           # DESCOMENTADO: sem secret definido o valor e vazio e a acao comporta-se como antes;
           # com secret, funciona. Comentado, nem definir o secret resolvia — e o aviso acima
