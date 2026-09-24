@@ -193,7 +193,12 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
     mutacaoRebenta
       ? readFileSync(join(dir, ".agent/scripts/fake-test.mjs"), "utf8")
       : baselineVermelha
-        ? 'console.log("sempre vermelha"); process.exit(1);\n'
+        // Imprime uma linha `FAIL` porque e o que as 14 suites REAIS imprimem, e e dela que o
+        // varredor extrai a razao da baseline vermelha (#123). A versao anterior dizia so
+        // "sempre vermelha": saia 1 na mesma, mas nao era representativa — um teste sobre a
+        // razao mediria a fixture e nao o mecanismo. E a mesma cicatriz do #114, onde uma
+        // fixture imprimia `FALHOU` onde as reais imprimem `FAIL`.
+        ? 'console.log("  FAIL  o cenario pediu uma baseline vermelha");\nconsole.log("  0 passaram, 1 falharam.");\nprocess.exit(1);\n'
         : FAKE_TEST
   );
 

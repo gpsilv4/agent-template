@@ -352,8 +352,8 @@ async function mede() {
   if (listarSo || medir.length === 0) return;
   const { baselinesVermelhas, resultados } = await medeCobertura({ medir, copias });
 
-  for (const suite of baselinesVermelhas) {
-    console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer`);
+  for (const { suite, falhas } of baselinesVermelhas) {
+    console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer` + falhas.map((l) => `\n                     ${l}`).join(""));
     falhou = true;
   }
 

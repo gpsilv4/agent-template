@@ -80,7 +80,7 @@ export async function emParalelo(lista, n, fn) {
  *                Tudo o que se decide SEM correr nada (alvo ausente, sinal errado, sem suite,
  *                linha ambigua) ja foi decidido por quem chama — aqui so entra o que e para medir.
  * @param copias  uma copia do repo por worker. `copias.length` **e** o grau de paralelismo.
- * @returns {Promise<{baselinesVermelhas: string[], resultados: Array<{alvo, suite, total, naoCobertos}>}>}
+ * @returns {Promise<{baselinesVermelhas: Array<{suite, falhas: string[]}>, resultados: Array<{alvo, suite, total, naoCobertos}>}>}
  *          `resultados` vem na ordem de `medir` — nunca na ordem por que os workers acabaram.
  */
 export async function medeCobertura({ medir, copias }) {
@@ -96,11 +96,30 @@ export async function medeCobertura({ medir, copias }) {
   const suites = [...new Set(medir.map((m) => m.suite))];
   const baseline = new Map();
   await emParalelo(suites, workers, async (suite, w) => {
-    baseline.set(suite, (await passa(join(copias[w], suite), copias[w])).ok);
+    // GUARDA-SE O `{ok, out}` INTEIRO, e nao so o `.ok`. O `passa()` devolve o texto da corrida
+    // desde o #114, e este `.ok` deitava-o fora AQUI — quando chegava ao reporte ja so havia
+    // nomes de suite, e a mensagem `BASELINE VERMELHA` so podia dizer que algo falhou, nunca o
+    // que. A unica accao disponivel perante ela era RECORRER, que e o habito que um falso
+    // vermelho num portao ensina.
+    baseline.set(suite, await passa(join(copias[w], suite), copias[w]));
   });
 
-  const baselinesVermelhas = suites.filter((s) => !baseline.get(s));
-  const medidos = medir.filter((m) => baseline.get(m.suite));
+  // Leva a RAZAO consigo, ja extraida. A extraccao vive aqui e nao em quem reporta porque e
+  // MEDICAO — ler o output e dele tirar as linhas que interessam. O cabecalho do `mede()` no
+  // `mutation-sweep.mjs` diz onde fica a fronteira: a medicao em `lib/`, a decisao sobre o que
+  // cada numero significa la, que e onde vive o exit code. Deixar o filtro la passava o ficheiro
+  // das 500 linhas do Guard 17, e teria sido a razao errada para o dividir.
+  //
+  // O TECTO DE CINCO e deliberado: uma suite vermelha pode ter dezenas de falhas, e despejar
+  // todas afoga o resto do relatorio. Cinco chegam para reconhecer a causa; quem quiser o resto
+  // corre a suite.
+  const baselinesVermelhas = suites
+    .filter((s) => !baseline.get(s).ok)
+    .map((suite) => ({
+      suite,
+      falhas: (baseline.get(suite).out ?? "").split("\n").filter((l) => PROVA_DE_FALHA.test(l)).slice(0, 5).map((l) => l.trim()),
+    }));
+  const medidos = medir.filter((m) => baseline.get(m.suite).ok);
 
   // --- 2. A fila de (alvo, sitio) --------------------------------------------
   // Por ITEM e nao por alvo: por alvo, o maior sozinho (`guards/settings.mjs`, 22 sitios) fixava um
