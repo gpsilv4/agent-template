@@ -298,6 +298,36 @@ test("apagar um teste sem o mover REPROVA (o total desce)", (dir) => {
 // mexer no `dependabot-auto-merge.yml` ou no `e2e.yml` dava WARN e exit 1. Dois falsos
 // positivos a fechar o gate por ficheiros que nao selecionam teste nenhum.
 
+// --- `.agent/scripts/config/` esta na superficie congelada (#119) ----------------
+// Estava FORA, e isso era um vao que crescia: o que vive nessa pasta decide COMO as
+// verificacoes correm. O `ALVOS_REPROVAM` do `config/bundles.mjs` liga e desliga um gate
+// inteiro, e desliga-lo nao produzia uma palavra — nem contagem, nem aviso. E o invariante 2
+// do `TP4` (estreitar a seleccao sem tocar num teste) aplicado a um directorio criado DEPOIS
+// de o verificador existir.
+//
+// Medido com uma sonda antes da correccao: um ficheiro novo la dentro dava "1 ficheiro
+// alterado, **nenhum na superficie**".
+test("config: um ficheiro de config/ APAGADO e apanhado", (dir) => {
+  mkdirSync(join(dir, ".agent/scripts/config"), { recursive: true });
+  writeFileSync(join(dir, ".agent/scripts/config/bundles.mjs"), "export const ALVOS_REPROVAM = true;\n");
+  commit(dir, "add config do projeto");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, ".agent/scripts/config/bundles.mjs"));
+  return ref;
+}, { code: 1, includes: ["config/bundles.mjs", "APAGADO"] });
+
+// O CONTRA-CASO, e e ele que impede o de cima de ser satisfeito por um verificador que
+// reprovasse qualquer apagamento: um ficheiro FORA da superficie, apagado, nao diz nada.
+// Sem isto, o teste acima passava mesmo que o padrao nunca tivesse sido acrescentado.
+test("config: um ficheiro fora da superficie, apagado, continua a nao dizer nada", (dir) => {
+  mkdirSync(join(dir, "src"), { recursive: true });
+  writeFileSync(join(dir, "src/nota.md"), "# nota\n");
+  commit(dir, "add ficheiro da app");
+  const ref = git(dir, ["rev-parse", "HEAD"]);
+  rmSync(join(dir, "src/nota.md"));
+  return ref;
+}, { code: 0, excludes: ["APAGADO"] });
+
 test("workflow do CI sem steps de teste nao pede confirmacao", (dir) => {
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
   writeFileSync(join(dir, ".github/workflows/deploy.yml"), "jobs:\n  d:\n    steps:\n      - run: echo deploy\n");

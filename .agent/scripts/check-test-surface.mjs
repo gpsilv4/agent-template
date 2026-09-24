@@ -111,6 +111,20 @@ const CONFIG_CONTAVEIS = [
   // "ficheiro da superficie de teste APAGADO" com exit 1 — a mesma classe de falso positivo
   // que o comentario acima ja documenta ter fechado uma vez.
   /(^|\/)\.agent\/scripts\/lib\/[^/]+\.mjs$/,
+  // `.agent/scripts/config/`: a configuracao do PROJETO, que a matriz de propagacao ja nomeia
+  // como o sitio preferido para tudo o que e decisao e nao logica. Estava FORA da superficie
+  // congelada — medido com uma sonda: um ficheiro novo la dentro dava "1 ficheiro alterado,
+  // nenhum na superficie".
+  //
+  // Isso e um vao, e cresce: o que vive nesta pasta decide COMO as verificacoes correm. O
+  // `ALVOS_REPROVAM` do `config/bundles.mjs` liga e desliga um gate inteiro, e desliga-lo nao
+  // produzia uma palavra — nem contagem, nem aviso. E o invariante 2 do `TP4` (estreitar a
+  // seleccao sem tocar num teste) aplicado a um directorio que foi criado depois de o
+  // verificador existir.
+  //
+  // Em CONTAVEIS e nao em GLOBS: o que aqui interessa mede-se por contagem, e o aviso generico
+  // de "confirmar" em cada alteracao a configuracao do proprio projeto seria ruido diario.
+  /(^|\/)\.agent\/scripts\/config\/[^/]+\.mjs$/,
   /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
 ];
 
