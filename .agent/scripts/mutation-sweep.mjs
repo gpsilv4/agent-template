@@ -38,7 +38,7 @@
  * duplica o tempo:
  *
  *   portatil (10 cores, 8 workers)      14m04s   (58 min em serie, 4,1x)
- *   ubuntu-latest, repo publico  (4/4)  ~22 min
+ *   ubuntu-latest, repo publico  (4/4)  25-38 min (n=8; ver scripts-guide-why.md)
  *   ubuntu-latest, repo privado  (2/2)  ~48 min
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com

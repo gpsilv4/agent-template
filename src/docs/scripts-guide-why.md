@@ -84,12 +84,36 @@ nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
 | Onde | Visibilidade | Cores | Workers | Varredura completa |
 |---|---|---|---|---|
 | Portatil | — | 10 | 8 | **14m04s** (58 min em serie, 4,1x) |
-| `ubuntu-latest`, template | **publico** | 4 | 4 | **~22 min** |
+| `ubuntu-latest`, template | **publico** | 4 | 4 | **25-38 min** (n=8, ver abaixo) |
 | `ubuntu-latest`, derivado | **privado** | 2 | 2 | **~48 min** |
 
 **O GitHub da runners de 4 cores a repos publicos e 2 a privados** nos planos Free/Pro, e
 `quantosWorkers()` sai de `cpus().length` — logo a visibilidade do repo duplica o tempo. A conta
 fecha: 22 x 2 = 44, contra ~48 observados.
+
+### O numero do runner publico envelheceu, e a correccao foi um INTERVALO
+
+O `~22 min` da tabela era a primeira medicao, e ficou la. Oito corridas de CI depois, no mesmo
+runner e no mesmo repo:
+
+```
+26m00 · 26m21 · 26m55 · 26m59 · 25m21 · 27m21 · 38m27 · 30m01
+```
+
+Media **~28,4 min**, intervalo **25-38**. O numero escrito estava **6 minutos abaixo** da media
+real, e a tendencia e de subida: cada PR que acrescente um sitio de recusa acrescenta trabalho.
+
+**Escreve-se o intervalo e o `n`, nao a media.** Um numero unico para uma grandeza que varia
+**13 minutos** entre corridas volta a envelhecer da mesma maneira — parece preciso, e nao e. Um
+intervalo com o numero de medicoes ao lado convida a actualizar quando sair fora dele, em vez de
+fingir uma precisao que a medicao nao tem.
+
+**Nao se deriva**, e vale dizer porque: ao contrario das contagens que a serie 12 de guards
+verifica, o tempo de uma corrida de CI nao esta no repo. E dos poucos numeros que so se podem
+escrever a mao — logo o que se pode fazer e escreve-lo de forma que envelheca bem.
+
+**A conta da visibilidade continua a fechar** com os numeros novos: 28,4 x 2 = 57, e o observado
+num derivado privado foi ~48. A ordem de grandeza mantem-se; o factor 2 e do numero de cores.
 
 **Porque importa mais do que parece**: a maioria dos projetos derivados de um template e
 privada. O template mede-se num runner de 4 cores e publica esse numero; o consumidor tipico
