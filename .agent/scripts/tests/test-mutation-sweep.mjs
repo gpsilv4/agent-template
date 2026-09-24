@@ -99,6 +99,29 @@ test("baseline ja vermelha reprova antes de varrer", { baselineVermelha: true, p
   excludes: ["NADA MEDIDO"],
 });
 
+// --- A baseline vermelha diz PORQUE (#123) --------------------------------------
+// Ela dizia so que a suite falhava. A unica accao disponivel perante isso era **re-correr** — e
+// uma corrida que fica verde a seguir ensina a re-correr da proxima, em vez de investigar.
+//
+// A direccao perigosa nem e esta: uma baseline vermelha aborta ALTO, o que chateia mas e seguro.
+// A mesma causa do lado MUTADO fica vermelha em silencio e le-se como COBERTURA, com o sitio a
+// ficar certificado por acidente. E a mesma familia que o #114 fechou com o `PROVA_DE_FALHA`.
+//
+// O output ja existia — o `passa()` devolve `{ok, out}` desde o #114 — e era deitado fora no
+// `lib/varredura-paralela.mjs`, no `.ok`. Nao era falta de dados: era um `.ok` a meio caminho.
+test("baseline vermelha imprime a RAZAO, nao so o facto", { baselineVermelha: true, parSao: true }, [], {
+  code: 1,
+  includes: ["BASELINE VERMELHA", "o cenario pediu uma baseline vermelha"],
+});
+
+// O CONTRA-CASO, e sem ele o de cima era satisfeito por um varredor que despejasse o output
+// inteiro de todas as corridas: com a baseline VERDE nao pode aparecer linha nenhuma de razao.
+// Um relatorio que mostre sempre o output treina quem o le a ignora-lo.
+test("baseline verde nao imprime razao nenhuma", { segundoSitio: false }, [], {
+  code: 0,
+  excludes: ["BASELINE VERMELHA", "o cenario pediu uma baseline vermelha"],
+});
+
 test("--only sem correspondencia reprova e lista os alvos", {}, ["--only=nao-existe"], {
   code: 1,
   includes: ["nao casa nenhum alvo", "fake-check.mjs"],
