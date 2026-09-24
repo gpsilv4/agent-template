@@ -25,6 +25,7 @@
 
 import { execFileSync } from "child_process";
 import { CONTAGENS, MARCAS } from "./lib/surface-patterns.mjs";
+import { TEST_GLOBS_DO_PROJETO, CONFIG_GLOBS_DO_PROJETO } from "./config/superficie-de-teste.mjs";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -36,34 +37,21 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 // A superficie congelada: onde vivem os testes E a configuracao que os seleciona.
 // Congelar so os testes nao basta: estreitar o `include` do runner remove falhas
 // igualmente bem. Adaptar no bootstrap a stack do projeto.
+// A stack do CONSUMIDOR vem de `config/superficie-de-teste.mjs`, que o `/upgrade` nunca
+// substitui — esta na superficie congelada desde o commit anterior deste ticket, logo mover-a
+// para la nao a tirou da vigilancia. A fronteira (o que e do projeto, o que e do template) esta
+// escrita la, junto das tabelas.
+//
+// O GLOB DE PREFIXO FICA AQUI, e e deliberado: `tests?[-_]...` existe porque as suites DESTE
+// repo se chamam assim — e elas viajam para dentro de cada derivado. E conhecimento do template,
+// nao do consumidor. Se estivesse na config dele, um projeto que a "limpasse" desligava a
+// vigilancia sobre as suites que herdou, e apagar TODAS dava "superficie intacta" com exit 0.
+// Ja aconteceu uma vez, e e o `TP2` na sua forma mais cara.
 const TEST_GLOBS = [
-  /(^|\/)(tests?|__tests__|spec|e2e)\//i,
-  /\.(test|spec)\.[cm]?[jt]sx?$/i,
-  /_test\.py$/i,
-  /(^|\/)test_[^/]+\.py$/i,
-  // `test-guards.mjs`, `tests-settings.mjs`, `test_algo.js`: nem o sufixo `.test.js` nem a
-  // pasta `tests/` cobrem quem nomeia a suite pelo **prefixo**, que e como quase todas as
-  // deste repo se chamam. Apagar TODAS dava "superficie intacta" com exit 0 — um gate a
-  // afirmar que estava bem. E o `TP2` na sua forma mais cara.
-  //
-  // **A fracao nao se escreve aqui.** Foi escrita tres vezes e esteve errada tres vezes: "9
-  // das 10" envelheceu ao dividir-se uma suite em duas; "todas menos uma" tambem estava
-  // errada (duas eram visiveis, pela pasta `tests/`). Conta-se, nao se cita:
-  //   git ls-files | grep -E '(^|/)tests?[-_][^/]+\.mjs$|(^|/)tests?/[^/]+\.mjs$'
+  ...TEST_GLOBS_DO_PROJETO,
   /(^|\/)tests?[-_][^/]+\.[cm]?[jt]sx?$/i,
 ];
-// Configuracao **opaca**: mexer nela pode estreitar a selecao de testes de uma forma que
-// nenhuma contagem apanha, logo qualquer alteracao pede confirmacao humana.
-const CONFIG_GLOBS = [
-  /(^|\/)(vitest|jest|playwright|cypress|karma)\.config\.[cm]?[jt]s$/i,
-  /(^|\/)(conftest|factories)\.py$/i,
-  // `pytest.ini`/`tox.ini` sao **so** configuracao de teste: qualquer alteracao merece
-  // confirmacao. O `pyproject.toml` e o `setup.cfg` nao — misturam deps e versao com a
-  // selecao de testes, logo passam para `CONFIG_CONTAVEIS` (um bump de versao dava exit 1
-  // em qualquer projeto Python, medido).
-  /(^|\/)(pytest\.ini|tox\.ini)$/i,
-  /(^|\/)\.mocharc\./i,
-];
+const CONFIG_GLOBS = CONFIG_GLOBS_DO_PROJETO;
 
 // Configuracao **contavel**: o que seleciona os testes NESTE repo nao e um `vitest.config`,
 // e a lista de steps do `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step

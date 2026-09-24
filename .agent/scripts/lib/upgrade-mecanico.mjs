@@ -74,11 +74,29 @@ export function andaFicheiros(base, fn, rel = "") {
  *  que o projeto customizou seria propor apagar trabalho. */
 const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/"];
 
+/** Constantes que MUDARAM DE CASA entre versoes, e para onde foram.
+ *
+ *  PORQUE EXISTE: quando uma constante sai da logica para `config/`, um consumidor que a tenha
+ *  customizado **perde a customizacao em silencio** — o ficheiro da logica e substituido, a
+ *  entrada sai de `CONSTANTES_DO_PROJETO`, e o `config/` novo chega com os defaults ("copiar se
+ *  AUSENTE"). O `upgrade-why.md` ja o diz melhor: *"diferenca de output apanha o que some, nao
+ *  apanha um default que regressa"*.
+ *
+ *  NAO MIGRA AUTOMATICAMENTE, e e deliberado: o formato pode ter mudado com a mudanca de casa
+ *  (aqui mudou — `TEST_GLOBS` passou a ser a concatenacao da config com um glob do template), e
+ *  um motor que adivinhasse o merge entregava uma configuracao que ninguem escreveu. Avisa, e
+ *  quem decide e o consumidor.
+ *
+ *  ENCOLHE COM O TEMPO: uma entrada so serve enquanto houver consumidores a saltar por cima da
+ *  versao em que a mudanca aconteceu. Ao remover uma, remover tambem o seu caso de teste. */
+export const MIGRACOES = [
+  { rel: ".agent/scripts/check-test-surface.mjs", nome: "TEST_GLOBS", para: ".agent/scripts/config/superficie-de-teste.mjs" },
+  { rel: ".agent/scripts/check-test-surface.mjs", nome: "CONFIG_GLOBS", para: ".agent/scripts/config/superficie-de-teste.mjs" },
+];
+
 export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
-  [".agent/scripts/check-test-surface.mjs", "TEST_GLOBS"],
-  [".agent/scripts/check-test-surface.mjs", "CONFIG_GLOBS"],
   [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
 ];
 
@@ -223,6 +241,19 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     const naTagSubst = naTagBruto === null ? null : naTagBruto.replace(PLACEHOLDER, substituto);
     if (antigo !== null && antigo === naTagSubst) continue; // intacto: fica o do template novo
     if (antigo !== null) guardados.push([rel, nome, antigo]);
+  }
+
+  // Constantes que mudaram de casa: se o consumidor as tinha CUSTOMIZADAS na casa antiga, a
+  // customizacao perde-se — e perde-se em silencio, que e o modo de falha pior. Compara-se
+  // contra a TAG e nao contra o template nu: e a mesma regra do ciclo acima, e sem ela um
+  // projeto que nunca lhes tocou levava um aviso sobre trabalho que nao tem.
+  const migracoes = [];
+  for (const { rel, nome, para } of MIGRACOES) {
+    const doConsumidor = blocoDaConstante(leOuNull(join(dir, rel)), nome);
+    if (doConsumidor === null) continue;
+    const naTag = blocoDaConstante(tagFicheiro(rel), nome);
+    const naTagSub = naTag === null ? null : naTag.replace(PLACEHOLDER, substituto);
+    if (doConsumidor !== naTagSub) migracoes.push({ nome, de: rel, para });
   }
   
   /** Copia recursiva de uma pasta do HEAD para a copia. */
@@ -391,5 +422,5 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     }
   });
 
-  return { repostas, trazidos, placeholders: repostosPh, removidos };
+  return { repostas, trazidos, placeholders: repostosPh, removidos, migracoes };
 }
