@@ -28,7 +28,10 @@
  * (bom, e a entrada sai da lista) ou a fixture mudou de forma (mau, e quer-se saber).
  */
 import { pathToFileURL } from "url";
+import { existsSync } from "fs";
+import { join } from "path";
 import { sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
+import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -43,51 +46,81 @@ export const entryPoint = "test-guards.mjs";
 
 /** Os `SKIP` que a fixture sa produz, com a RAZAO de cada um — sem ela, a proxima pessoa nao
  *  sabe qual pode desaparecer nem porque. Guardam-se por um fragmento estavel da mensagem: a
- *  frase inteira muda quando alguem a melhora, e um teste que reprove por isso e ruido. */
-const SKIPS_ESPERADOS = [
-  // Os dois ficheiros que a Fase 2.2 do bootstrap GERA. Na fixture ainda nao existem, e isso e
-  // o estado correcto de um template por estrear. Contam duas vezes: uma pela existencia do
-  // ficheiro, outra pelo `@import` que o CLAUDE.md lhe faz.
-  { chave: "business-logic.md — gerado no bootstrap", vezes: 2 },
-  { chave: "pages-architecture.md — gerado no bootstrap", vezes: 2 },
-  // A fixture nao tem app. E o estado do template nu, e o guard di-lo em vez de o esconder.
+ *  frase inteira muda quando alguem a melhora, e um teste que reprove por isso e ruido.
+ *
+ *  SAO DOIS CONJUNTOS PORQUE HA DOIS ESTADOS, e a primeira versao deste modulo so conhecia um:
+ *  assumia o template, e no `simulate-derived` ficou vermelha. `TP3` — o teste lia o estado do
+ *  repo em vez de o montar, e a diferenca e exactamente de um: num derivado o Guard 13 deixa de
+ *  saltar (o bootstrap correu) e o Guard 21 passa a saltar (aqueles ficheiros sao o estado do
+ *  projeto). Nove dos dois lados, um trocado pelo outro. */
+const COMUNS = [
+  // A fixture nao tem app, nos dois estados.
   { chave: "Guard 3 (versoes) — sem package.json", vezes: 1 },
   { chave: "Guards de versoes de dependencias", vezes: 1 },
-  // Listas de opt-in vazias: o template nao tem termos banidos proprios nem servidor MCP.
+  // Listas de opt-in vazias: nem termos banidos proprios nem servidor MCP.
   { chave: "Guard 4 (termos banidos) — lista BANNED vazia", vezes: 1 },
   { chave: "Guard 16 (politica MCP) — nenhum servidor configurado", vezes: 1 },
-  // O bootstrap ainda nao correu, logo nao ha placeholders por substituir a acusar.
-  { chave: "Guard 13 (placeholders) — bootstrap ainda nao correu", vezes: 1 },
 ];
 
+/** As rules que a Fase 2.2 do bootstrap GERA. Se existem na sandbox, os guards leem-nas e nao
+ *  saltam; se nao existem, saltam duas vezes cada — uma pelo ficheiro, outra pelo `@import` que
+ *  o CLAUDE.md lhe faz.
+ *
+ *  DERIVADO DO DISCO, e nao escrito na lista congelada: e um eixo INDEPENDENTE do marcador de
+ *  derivado, e foi o que fez a primeira versao deste modulo reprovar no `simulate-derived`. A
+ *  `FIXTURE_PATHS` copia `.agent/rules` como PASTA, logo num repo derivado — onde o bootstrap
+ *  ja as gerou — elas vao para a sandbox e os quatro `SKIP` desaparecem. Congelar a expectativa
+ *  era congelar o estado deste repo, que e o `TP3` que este proprio ticket combate. */
+const GERADAS_NO_BOOTSTRAP = ["business-logic.md", "pages-architecture.md"];
+const porGerar = (dir) =>
+  GERADAS_NO_BOOTSTRAP.filter((f) => !existsSync(join(dir, ".agent/rules", f))).map((f) => ({
+    chave: `${f} — gerado no bootstrap`,
+    vezes: 2,
+  }));
+
+/** O que distingue os dois estados, e e a medida do `ehDerivado()` vista pelos guards. */
+const SO_TEMPLATE = [{ chave: "Guard 13 (placeholders) — bootstrap ainda nao correu", vezes: 1 }];
+const SO_DERIVADO = [{ chave: "Guard 21 (.agent/context/ por estrear) — projeto derivado", vezes: 1 }];
+
 export function registar() {
-  const dir = sandbox();
-  const out = runGuard(dir).out ?? "";
-  const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
+  /** Monta um estado, corre a bateria, e afirma sobre o conjunto de `SKIP` que ele produz. */
+  const mede = (rotulo, montar, esperados) => {
+    const dir = sandbox();
+    montar(dir);
+    const out = runGuard(dir).out ?? "";
+    const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
+    const esp = [...esperados, ...porGerar(dir)];
+    const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
-  const afirma = (nome, problemas) => registarResultado(nome, problemas, out);
+    // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o
+    //    guard que o le saltar, e o salto aparece aqui com o nome dele.
+    afirma("nenhum guard salta alem dos que a fixture justifica", linhas
+      .filter((l) => !esp.some((e) => l.includes(e.chave)))
+      .map((l) => `SKIP inesperado — ou a fixture esta incompleta, ou e legitimo e falta na lista: ${l.trim()}`));
 
-  // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o
-  //    guard que o le saltar, e o salto aparece aqui com o nome dele.
-  afirma("skips: nenhum guard salta alem dos que a fixture sa justifica", (() => {
-    const sobra = linhas.filter((l) => !SKIPS_ESPERADOS.some((e) => l.includes(e.chave)));
-    return sobra.map((l) => `SKIP inesperado — ou a fixture esta incompleta, ou e legitimo e falta na lista: ${l.trim()}`);
-  })());
+    // NAO HA assercao "os esperados continuam todos la", e a ausencia dela e deliberada.
+    //
+    // Ela existiu, e foi REMOVIDA depois de tres falsos alarmes e zero achados. Falhava sempre
+    // que um guard deixava de saltar por uma razao legitima, e as razoes sao eixos
+    // independentes que se vao acumulando: o marcador de derivado (Guard 13 vs 21), as rules
+    // que o bootstrap gera, e as listas de opt-in que um projeto preenche (o `BANNED` do
+    // Guard 4, no passo do derivado que CONFIGUROU). Cada uma pedia a sua derivacao, e a
+    // seguinte apareceria na mesma.
+    //
+    // E a direccao errada: **um guard que DEIXA de saltar passou a medir**, o que e bom. O
+    // defeito que este modulo existe para apanhar e o inverso — um guard que COMECA a saltar
+    // porque a fixture ficou incompleta, e le-se como verde. Esse e o ponto 1, e esse mede.
+    //
+    // O que se perde, dito por inteiro: uma entrada desta lista pode ficar obsoleta sem nada o
+    // denunciar. E rot inofensivo — permite um `SKIP` que ja nao acontece — e o preco de um
+    // aviso que saia sempre e mais alto: treina quem o le a ignora-lo.
 
-  // 2. Nenhum SKIP a menos, e nao e simetria: um esperado que desapareca significa que o guard
-  //    passou a medir (e a entrada sai) ou que a fixture mudou de forma (e quer-se saber).
-  afirma("skips: os esperados continuam todos la, com a contagem certa", (() => {
-    const p = [];
-    for (const e of SKIPS_ESPERADOS) {
-      const n = linhas.filter((l) => l.includes(e.chave)).length;
-      if (n !== e.vezes) p.push(`"${e.chave}": esperava ${e.vezes}, encontrei ${n}`);
-    }
-    return p;
-  })());
+    // 3. O CONTRA-CASO, e sem ele os dois de cima eram satisfeitos por um `out` vazio — o `TP2`
+    //    a entrar pela porta do lado.
+    afirma("a fixture produz de facto os skips que se medem", linhas.length > 0 ? [] : ["zero SKIP no output — o guard correu?"]);
+  };
 
-  // 3. O CONTRA-CASO, e sem ele os dois de cima eram satisfeitos por uma fixture que nao
-  //    produzisse SKIP nenhum — ou por um `out` vazio, que e o `TP2` a entrar pela porta do
-  //    lado. Se um dia nenhum guard saltar, esta lista fica vazia DE PROPOSITO e alguem o
-  //    escreve aqui.
-  afirma("skips: a fixture produz de facto os skips que se medem", linhas.length > 0 ? [] : ["zero SKIP no output — o guard correu?"]);
+  // OS DOIS ESTADOS, montados e nao herdados. Correr so um foi o defeito da primeira versao.
+  mede("template", comoTemplate, [...COMUNS, ...SO_TEMPLATE]);
+  mede("derivado", bootstrapado, [...COMUNS, ...SO_DERIVADO]);
 }

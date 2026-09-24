@@ -14,8 +14,9 @@
  * Guard 13 numa fixture que ainda tem `{{ ... }}` por todo o lado, e o teste falha por avisos de
  * placeholders que nada tem a ver com o que afirma. Um derivado a serio ja os substituiu.
  */
-import { readdirSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join, dirname } from "path";
+import { recongelarContexto } from "./recongelar-contexto.mjs";
 
 /** Os tipos que a Fase 2.1 do `BOOTSTRAP.md` manda varrer. Se esta lista ficar curta, sobram
  *  placeholders — e e exactamente o defeito que ja aconteceu com o `.mdc`. */
@@ -54,4 +55,39 @@ export function bootstrapado(dir, valor = "VALOR") {
   const marca = join(dir, ".agent/.template-version");
   mkdirSync(dirname(marca), { recursive: true });
   writeFileSync(marca, "sha: abc1234\nversao: v0.3.0\n");
+}
+
+/**
+ * O ESTADO INVERSO: forcar a copia a parecer o template por estrear.
+ *
+ * Vive ao lado do `bootstrapado()` porque e o seu par — os dois montam um dos dois lados do
+ * `ehDerivado()`, e uma fixture que queira afirmar sobre ambos precisa dos dois.
+ *
+ * PORQUE E PRECISO: uma sandbox construida a partir de um repo que JA e derivado herda o
+ * marcador, e entao as assercoes sobre "o template nu" medem outra coisa. Aconteceu duas vezes:
+ * ao Guard 21 (que so salta num derivado) e ao conjunto de `SKIP` congelado, onde o Guard 13
+ * deixa de saltar e o 21 passa a saltar — nove dos dois lados, um trocado pelo outro, e a
+ * assercao ficava vermelha so no `simulate-derived`. E o `TP3` na sua forma mais dificil de
+ * ver, porque o teste passa aqui.
+ *
+ * Estava escrita dentro do `tests-context-virgem.mjs`. Copia-la para o segundo consumidor era
+ * o `TP8` — duas copias da mesma receita a concordar a mao — dentro do ticket que existe para
+ * tirar listas a mao do caminho.
+ *
+ * @param {string} dir  raiz da sandbox
+ */
+export function comoTemplate(dir) {
+  try {
+    rmSync(join(dir, ".agent/.template-version"));
+  } catch {
+    /* no template nu nao existe — e o estado que queremos */
+  }
+  if (!existsSync(join(dir, ".agent/BOOTSTRAP.md"))) {
+    // Sem contagens: os guards 12d/12e comparam citacoes com a fonte, e um ficheiro que nao
+    // cita nada nao acrescenta aviso nenhum. Escrever numeros aqui a mao era o que eles
+    // existem para apanhar.
+    mkdirSync(join(dir, ".agent"), { recursive: true });
+    writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), "# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do `ehDerivado()`.\n");
+  }
+  recongelarContexto(dir);
 }
