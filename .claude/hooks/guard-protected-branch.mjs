@@ -47,7 +47,7 @@ import { readFileSync } from "fs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA } from "./lib/verbos-git.mjs";
-import { alteraFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
+import { porqueAltera, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
 
 /** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
 const PROTEGIDOS_LISTA = ["main", "master", "develop"];
@@ -479,9 +479,9 @@ try {
     }
   );
 
-  // A fronteira nao se reescreve a si propria. A logica (e os tres falsos positivos que a
-  // moldaram) vive em `lib/fronteira.mjs`.
-  if (alteraFronteira(texto)) negar(RAZAO_FRONTEIRA);
+  // A fronteira nao se reescreve a si propria. A logica vive em `lib/fronteira.mjs`, que agora
+  // diz QUAL das sete condicoes negou — reconstruir o comando depois nao chega (#101).
+  { const porque = porqueAltera(texto); if (porque) negar(`${RAZAO_FRONTEIRA}\n\n(condicao: ${porque})`); }
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando
