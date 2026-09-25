@@ -66,6 +66,52 @@ const FECHADO = [
 ];
 
 /**
+ * NEGADO HOJE **PELA CABECA**, e nao pelo verbo real — o grupo mais importante deste ficheiro.
+ *
+ * Em todos estes, o primeiro token do segmento (`sudo`, `env`, `timeout`, `command`, ou uma
+ * atribuicao) nao esta na `LEITURA`, e e isso que os nega. O verbo a seguir — `git rm`,
+ * `find -delete`, `node` com `--require` — **nao chega a ser olhado**.
+ *
+ * ## Porque sao armadilhas, e nao casos normais
+ *
+ * Ha um trabalho pendente no #101 para corrigir um falso positivo real: `timeout 60 node <suite>`
+ * e negado hoje, e nao devia ser. A correccao obvia — saltar a cabeca e julgar o token seguinte —
+ * **faz todos estes passarem**, porque em todos o verbo real ou esta na `LEITURA` (`git`, `find`,
+ * `node`) ou e alcancado por um regex ancorado no inicio do segmento (`^git`, que falha contra
+ * `"sudo git rm …"`).
+ *
+ * Foi isso que uma auditoria independente apanhou num plano meu, e e a terceira vez que o mesmo
+ * modo de falha — converter um `deny` num `allow` sem dar por isso — sobrevive ao meu
+ * julgamento e morre na leitura de outro.
+ *
+ * ## Afirmam NEGADO, nao o ROTULO
+ *
+ * De proposito. A correccao **certa** muda o rotulo (passa a nomear `git`, `find`, `node` em vez
+ * de `sudo`, `env`, `timeout`) e mantem a negacao — e continua verde. A correccao **ingenua**
+ * mantem o rotulo impossivel e perde a negacao — e fica vermelha. Afirmar o rotulo trocava os
+ * dois resultados.
+ *
+ * As tres ultimas sao de outra familia: variaveis de ambiente que fazem um binario de LEITURA
+ * executar codigo arbitrario. Hoje negam por acidente — o `basename` do extractor deixa
+ * `evil.js` como "verbo", que nao esta na `LEITURA`. Um acidente nao e uma proteccao.
+ */
+const FECHADO_PELA_CABECA = [
+  ["sudo + git rm", `sudo git rm ${H}`],
+  ["env + git rm", `env git rm ${H}`],
+  ["timeout + git restore", "timeout 5 git restore .claude/settings.json"],
+  ["command + git checkout --", `command git checkout -- ${H}`],
+  // Cabeca saltavel + verbo que ESTA na `LEITURA` e destroi. A forma nua (`find … -delete`) ja
+  // escapa hoje e esta em ABERTO: aqui o que se guarda e que o wrapper nao a torne pior.
+  ["env + find -delete", "env find .claude/hooks/ -delete"],
+  ["timeout + find -exec rm", "timeout 60 find .githooks/ -type f -exec rm {} +"],
+  // Atribuicoes que INJECTAM codigo num binario de leitura. Nao sao inertes, e por isso nao se
+  // saltam como as outras — `FOO=1` e inofensiva, estas nao.
+  ["NODE_OPTIONS --require", `NODE_OPTIONS=--require=/tmp/evil.js node ${S}`],
+  ["BASH_ENV", `BASH_ENV=/tmp/evil.sh bash ${S}`],
+  ["LD_PRELOAD", `LD_PRELOAD=/tmp/evil.so cat ${H}`],
+];
+
+/**
  * O que ESCAPA hoje. Cada entrada leva a CLASSE, porque e ela que decide se entra no ambito: o
  * `CLAUDE.md` diz que os hooks sao *"uma barreira contra o **descuido**, nao contra quem a
  * queira contornar"*, e essa linha nunca foi escrita em casos concretos.
@@ -121,6 +167,18 @@ export function registar({ test, eq }) {
   for (const [nome, comando, rotulo] of FECHADO) {
     test(`inventario/fechado: ${nome}`, () => {
       eq(porqueAltera(comando), rotulo, `"${comando}" tinha de ser negado por ${rotulo}`);
+    });
+  }
+
+  // Afirma a NEGACAO, nunca o rotulo — ver o cabecalho do grupo. A correccao certa muda o
+  // rotulo e mantem isto verde; a ingenua perde a negacao e poe-o vermelho.
+  for (const [nome, comando] of FECHADO_PELA_CABECA) {
+    test(`inventario/cabeca: ${nome}`, () => {
+      eq(
+        porqueAltera(comando) !== null,
+        true,
+        `"${comando}" passou a ser PERMITIDO — a correccao do verbo tem de o negar pelo verbo REAL, nao pela cabeca (#101)`
+      );
     });
   }
 
