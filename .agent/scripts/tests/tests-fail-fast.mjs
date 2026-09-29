@@ -64,7 +64,7 @@ resumo();
 
 /** Corre a suite falsa e devolve `{ code, out }`. Nunca lanca: "falhou" e um resultado. */
 function correr({ comFalha, failFast }) {
-  const dir = mkdtempSync(join(tmpdir(), "fail-fast-"));
+  const dir = mkdtempSync(join(tmpdir(), "fail-fast-test-"));
   try {
     const f = join(dir, "suite-falsa.mjs");
     writeFileSync(f, SUITE_FALSA(comFalha));
