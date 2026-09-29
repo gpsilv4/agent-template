@@ -87,6 +87,104 @@ const OPACO = /\b(?:eval|xargs)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
 
+/** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
+ *
+ *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do `guard-protected-branch.mjs`, e digo-o em
+ *  vez de escrever "reutiliza": ali as formas nao sao exportadas, logo nao ha nada a reutilizar,
+ *  e isto e um `TP8` assumido — uma cabeca acrescentada num ficheiro nao aparece no outro e nada
+ *  o denuncia. Extrair para um modulo comum e trabalho proprio, e fica dito aqui em vez de
+ *  ficar por dizer. As divergencias sao deliberadas, porque a POSTURA dos dois e oposta. Ali, um consumo a mais faz
+ *  `continue` e o segmento e ignorado: fail-open limitado, porque aquele guard so se importa
+ *  com o `git`. Aqui a `LEITURA` e uma allowlist e **um token consumido a mais converte um
+ *  `deny` num `allow`**.
+ *
+ *  1. As cabecas OPACAS (`eval`, `xargs`, `sh -c` e irmas) NAO entram. Sao tratadas pelo
+ *     `OPACO`, e consumi-las faria julgar o verbo errado: em `ls <fronteira> | xargs rm`, quem
+ *     apaga e o `xargs`, que nao tem o caminho escrito.
+ *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`. */
+const CABECAS = new Set([
+  "sudo", "doas", "env", "command", "builtin", "time", "timeout", "nohup", "setsid", "stdbuf",
+  "nice", "ionice", "unbuffer",
+]);
+
+/** Palavras de shell que nunca sao o comando. O `do`/`then` ja saem no `split`; `for`/`while`
+ *  NAO entram, e e deliberado: o corpo do ciclo vive noutros segmentos, e julgar "o verbo do
+ *  segmento seguinte" permitia `for f in <F>; do cat $f; rm $f; done` — o `cat` desarmava o
+ *  `rm`. E a classe do ciclo, e tem slice propria. */
+const PALAVRAS_SHELL = new Set(["if", "else", "elif", "!"]);
+
+/** Valor de uma cabeca: `timeout 5`, `timeout 60`. A cicatriz esta escrita no guard vizinho —
+ *  sem isto, o `5` de `timeout 5 git rm` parava o consumo e o verbo real nao era alcancado. */
+const VALOR_DE_CABECA = /^\d+[smhd]?$/;
+
+/** Flags que consomem o argumento SEGUINTE, **por cabeca**.
+ *
+ *  Nomeadas, e nao "toda a flag consome um valor": essa foi a primeira versao e **comia o verbo
+ *  real** — `stdbuf -o0 tee <alvo>` engolia o `tee` e o alvo passava a ser lido como verbo.
+ *
+ *  Uma flag que nao esteja aqui consome ZERO tokens. O seguinte passa a ser julgado como verbo
+ *  e, se for um valor (`KILL`), nao esta na `LEITURA` e nega. **O erro cai para o lado fechado**,
+ *  que e a unica direccao aceitavel num allowlist. */
+const FLAGS_COM_VALOR = {
+  timeout: new Set(["-s", "--signal", "-k", "--kill-after"]),
+  nice: new Set(["-n"]),
+  ionice: new Set(["-c", "-n", "-p"]),
+  sudo: new Set(["-u", "-g", "-p", "-C", "-U", "-h", "-r", "-t"]),
+  doas: new Set(["-u", "-C"]),
+  env: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]),
+  stdbuf: new Set(["-i", "-o", "-e"]),
+  time: new Set(["-o", "-f"]),
+  // As cabecas SEM flags-com-valor nao tem entrada: o `?.` abaixo ja trata o `undefined`, e
+  // cinco `new Set([])` eram cinco ramos que nenhuma mutacao matava (`TP7`).
+};
+
+/** O segmento sem as cabecas inertes — os tokens a partir do VERBO REAL.
+ *
+ *  @param {string} segmento um segmento que toca a fronteira
+ *  @returns {string[]} os tokens restantes; `[]` se o segmento era so cabecas */
+function resto(segmento) {
+  let toks = segmento.trim().split(/\s+/).filter(Boolean);
+  let cabeca = null;
+  for (;;) {
+    if (toks.length === 0) return [];
+    const t = toks[0];
+    const base = t.replace(/^.*\//, "");
+    if (PALAVRAS_SHELL.has(t)) {
+      toks = toks.slice(1);
+      continue;
+    }
+    // Um token com `=` NUNCA e cabeca. Sem esta guarda, `LD_PRELOAD=/tmp/x/env cat <alvo>` era
+    // consumido como se fosse `env`, porque o **basename do VALOR** acaba no nome de uma cabeca
+    // — e o comando passava. Hoje as atribuicoes falham FECHADO para todos os nomes, por
+    // acidente do `basename`, e este ticket nao compra esse acidente por uma lista de nomes:
+    // medido que `PATH=`, `NODE_PATH=`, `LESSOPEN=` e `AWKPATH=` ficariam de fora dela.
+    // ... e so pelo NOME NU ou de um caminho de sistema. `basename` sozinho aceitava
+    // `/tmp/evil/env cat <alvo>` como se fosse o `env`: qualquer binario que alguem ponha num
+    // caminho seu passava a ser uma cabeca inerte. E a MESMA causa que a guarda do `=` acima
+    // trata, e ficou sem guarda nenhuma — apanhada pelo leitor independente (Fase 4).
+    const caminhoDeSistema = !t.includes("/") || /^\/(?:usr\/)?(?:local\/)?s?bin\//.test(t);
+    if (!t.includes("=") && caminhoDeSistema && CABECAS.has(base)) {
+      cabeca = base;
+      toks = toks.slice(1);
+      continue;
+    }
+    if (cabeca && /^-/.test(t)) {
+      // Consome-se UM token de valor, nunca uma cadeia — e **nunca um que toque a fronteira**:
+      // `env -u <alvo> cat /tmp/y` fazia o `-u` engolir o alvo, e o que sobrava (`cat /tmp/y`)
+      // era uma leitura inocente de outro ficheiro.
+      const leva =
+        FLAGS_COM_VALOR[cabeca]?.has(t) && toks.length > 1 && !FRONTEIRA.test(` ${toks[1]}`);
+      toks = toks.slice(leva ? 2 : 1);
+      continue;
+    }
+    if (cabeca && VALOR_DE_CABECA.test(t)) {
+      toks = toks.slice(1);
+      continue;
+    }
+    return toks;
+  }
+}
+
 /** Marca um sitio de RECUSA. Devolve o rotulo tal e qual — nao faz nada.
  *
  *  PORQUE EXISTE, e nao e arrumacao: a varredura de mutacao desliga um sitio de recusa de cada
@@ -108,7 +206,7 @@ const nega = (rotulo) => rotulo;
  * PORQUE e que este comando seria negado — o mesmo veredicto de `alteraFronteira()`, com o
  * nome da condicao que o produziu.
  *
- * PORQUE EXISTE: a decisao combina SETE condicoes com alcances diferentes (umas por segmento,
+ * PORQUE EXISTE: a decisao combina OITO condicoes com alcances diferentes (umas por segmento,
  * outras sobre o comando inteiro), e bastava uma disparar para o comando ser negado com uma
  * razao generica. Quem levava com a negacao nao sabia qual — e das quatro negacoes de LEITURA
  * medidas numa sessao real, duas ficaram por explicar por nao haver forma de as diagnosticar.
@@ -145,7 +243,18 @@ export function porqueAltera(texto) {
   if (tocam.length === 0) return null;
 
   const alvo = tocam.join("\n");
-  const primeiro = tocam[0].trim().split(/\s+/)[0].replace(/^.*\//, "");
+
+  // UMA SO NORMALIZACAO, e este e o ponto do ticket. Com duas — `basename` no verbo, texto cru
+  // nas regex ancoradas — `sudo /usr/bin/git rm <alvo>` passava: o verbo era `git` (que esta na
+  // LEITURA) e o `^git` via `/usr/bin/git`. Um corpus GERADO contou **270** comandos assim, e
+  // sao UM defeito multiplicado por {cabecas consumidas} x {formas de invocar por caminho}.
+  // O corpus escrito a mao contara 5, porque tinha as duas metades em grupos separados e nunca
+  // o produto das duas.
+  const semCabeca = tocam.map((s) => resto(s));
+  const normaliza = (toks) =>
+    toks.length === 0 ? "" : [toks[0].replace(/^.*\//, ""), ...toks.slice(1)].join(" ");
+  const restoTexto = semCabeca.map(normaliza).join("\n");
+  const primeiro = (semCabeca[0][0] ?? "").replace(/^.*\//, "");
   const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
   // O `inline` avalia-se sobre os segmentos que TOCAM a fronteira, e nao sobre o comando
   // inteiro. Duas leituras legitimas eram negadas por causa do alcance largo, as duas medidas
@@ -166,7 +275,40 @@ export function porqueAltera(texto) {
   // Uma allowlist por BINARIO e grossa quando o binario tem sub-verbos que apagam: `git rm`,
   // `git restore` e `git checkout --` passavam por `git` estar na lista. Medido ao remover um
   // hook obsoleto, minutos depois de escrever esta verificacao.
-  const gitQueEscreve = /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/.test(alvo.trim());
+  // Contra o `restoTexto` e nao contra o `alvo`: a ancora `^git` tem de ver o verbo, nao a
+  // cabeca. E com `/m`, porque o `restoTexto` junta TODOS os segmentos que tocam — o que fecha,
+  // de caminho, `cat .claude/settings.json && git rm <alvo>`, onde uma leitura a frente
+  // desarmava o verbo.
+  const gitQueEscreve = /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/m.test(restoTexto.trim());
+  // O `find` esta na LEITURA e destroi — e, ao contrario do `git`, nao tinha verificacao de
+  // sub-verbo nenhuma. O espelho correcto NAO e "`-exec` nega": isso negava
+  // `find <f> -name '*.mjs' -exec grep -l X {} +`, que e leitura pura e trabalho normal, e um
+  // guard que nega trabalho normal e contornado. O sub-verbo julga-se contra a MESMA `LEITURA`.
+  //
+  // Linha a linha, e nao um `/gm` ancorado: com `^find` e `g`, so o PRIMEIRO `-exec` de cada
+  // linha era capturado, e `find <alvo> -exec grep -l X {} + -exec rm {} +` passava. E o mesmo
+  // anti-padrao que a linha acima fecha para o `git` — uma leitura a frente a desarmar a
+  // escrita — e reintroduzi-lo aqui no mesmo commit seria comico.
+  //
+  // E sobre o comando VISIVEL inteiro, nao sobre os segmentos: o `;` e separador no `split`,
+  // logo `find <alvo> -exec grep -l X {} \; -exec rm {} \;` ficava com o segundo `-exec` fora
+  // do `restoTexto` e passava. A forma `\;` e a mais portavel das duas, e reabria exactamente o
+  // padrao — uma leitura a frente a desarmar a escrita — que a linha acima fecha para o `git`.
+  // Apanhado pelo leitor independente (Fase 4) depois de eu escrever no comentario que
+  // reintroduzi-lo "seria comico".
+  const findQueEscreve =
+    semCabeca.some((toks) => toks[0]?.replace(/^.*\//, "") === "find") &&
+    (/\s-(?:delete|fprint[f0]?|fls)\b/.test(visivel) ||
+      [...visivel.matchAll(/\s-(?:exec|execdir|ok|okdir)\s+(\S+)/g)].some((m) => {
+        const sub = m[1].replace(/^.*\//, "");
+        // O sub-verbo julga-se pela MESMA allowlist — mas `git` e `node` estao nela e escrevem
+        // com sub-verbo proprio. `find <alvo> -exec git rm {} +` passava por `git` ser leitura.
+        if (!LEITURA.has(sub)) return true;
+        const resto = m.input.slice(m.index + m[0].length);
+        return sub === "git"
+          ? /^\s*(?:rm|mv|restore|checkout|clean|stash|config|apply|reset)\b/.test(resto)
+          : sub === "node" && /^\s*(?:-e|-p|--eval|--print|-r|--require)\b/.test(resto);
+      }));
   const redireciona = /(?:^|[^>\d])>{1,2}\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
 
   // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
@@ -178,6 +320,7 @@ export function porqueAltera(texto) {
   if (opaco) return nega("wrapper-opaco");
   if (redireciona) return nega("redireciona");
   if (gitQueEscreve) return nega("git-que-escreve");
+  if (findQueEscreve) return nega("find-que-escreve");
   return null;
 }
 
