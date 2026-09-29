@@ -23,8 +23,19 @@
  *   node .agent/scripts/tests/test-mutation-sweep.mjs
  */
 
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
+import { alvosNoDisco } from "../lib/alvos-no-disco.mjs";
 import { join } from "path";
+
+/** O mesmo `listarDir` que o varredor usa, ancorado a raiz REAL do repo. */
+const RAIZ = new URL("../../..", import.meta.url).pathname;
+const listarDirDoRepo = (rel) => {
+  try {
+    return readdirSync(join(RAIZ, rel), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
+  } catch {
+    return [];
+  }
+};
 import { test, avaliar, registarResultado, resumo } from "./harness/test-sweep-harness.mjs";
 // O verificador falso, a suite falsa, o `sandbox()` e os contadores vivem no harness: a suite
 // passou as 500 linhas e a catraca do Guard 17 exige dividir antes de acrescentar. O que fica
@@ -357,5 +368,39 @@ registarResultado(
     (p) => `nao devia ter apontado nada; apontou "${p}"`
   )
 );
+
+// --- A lista de pastas que a descoberta varre -------------------------------------------
+// `alvosNoDisco` decide QUEM tem de ter par. Uma pasta que lhe falte nao produz erro nenhum:
+// produz SILENCIO — os ficheiros la dentro deixam de ser exigidos e ninguem repara. Foi
+// exactamente assim que `.claude/hooks/lib/` esteve fora, com a `fronteira.mjs` (que decide o
+// que um agente pode escrever) sem um unico sitio mutado, enquanto `.agent/scripts/lib/`
+// estava dentro doze linhas acima na mesma lista (#136).
+//
+// Por isso o teste afirma as pastas, e nao a contagem: um numero envelhece a cada modulo novo,
+// uma pasta em falta e sempre um buraco.
+{
+  const lista = alvosNoDisco(listarDirDoRepo);
+  const PASTAS_EXIGIDAS = [
+    ".agent/scripts/guards/",
+    ".agent/scripts/lib/",
+    ".agent/scripts/tests/harness/",
+    ".claude/hooks/",
+    ".claude/hooks/lib/",
+    ".githooks/",
+  ];
+  registarResultado(
+    "descoberta: a lista cobre todas as pastas com sitios de recusa",
+    PASTAS_EXIGIDAS.filter((pre) => !lista.some((f) => f.startsWith(pre))).map(
+      (pre) => `nenhum ficheiro de "${pre}" na lista — quem la vive deixa de precisar de par, em silencio`
+    )
+  );
+  // O contra-caso: sem ele, uma `alvosNoDisco` que devolvesse o repo inteiro passava o de cima.
+  registarResultado(
+    "descoberta: a lista NAO varre o que nao tem sitios de recusa",
+    lista.filter((f) => f.startsWith(".agent/context/") || f.startsWith(".agent/rules/")).map(
+      (f) => `"${f}" nao e maquinaria e nao devia estar na lista`
+    )
+  );
+}
 
 resumo();
