@@ -77,6 +77,33 @@ export const CABECALHO_AP = /^#{2,3}\s+((?:AP|TP)\d+)\b/;
  *  cego, que e o pior dos dois. */
 const CITACAO_AP = /\b(?:AP|TP)\d+\b/g;
 
+/**
+ * Ficheiros que CONSTROEM repos falsos, e cujos IDs pertencem a esses repos e nao a este.
+ *
+ * Sao strings a montar a fixture de um projeto DERIVADO (que usa o outro prefixo) para testar
+ * os proprios guards — cabecalhos de anti-padrao e frases sobre o ultimo ID definido.
+ * Verifica-las
+ * contra o catalogo deste repo e um erro de categoria, e produzia **24 avisos permanentes** no
+ * momento em que a pasta `tests/` entrou no alcance. Um aviso sempre aceso ensina a ignorar o
+ * painel.
+ *
+ * **Uma lista de ficheiros e nao uma regra de sintaxe**, e a escolha foi medida: tirar os
+ * literais antes de procurar abria um vao onde uma citacao morta se esconde — e o comentario
+ * do `semHtml`, abaixo, ja regista exactamente esse acidente com `.mjs`. Duas entradas
+ * auditaveis valem mais do que uma regra esperta que pode cegar o guard.
+ *
+ * O `tests-alcance.mjs` exige que cada entrada aqui seja **necessaria**: uma isencao que ja
+ * nao isenta nada e um ponto cego a espera do ficheiro seguinte.
+ *
+ * NOTA PARA QUEM EDITAR ESTE COMENTARIO: nao escrever IDs literais aqui. Este ficheiro esta no
+ * alcance do proprio guard, logo um ID inventado num exemplo conta como citacao morta. Aconteceu
+ * tres vezes no dia em que a pasta `tests/` entrou no alcance — duas delas neste bloco.
+ */
+export const FIXTURES_DE_OUTRO_REPO = new Set([
+  ".agent/scripts/tests/tests-derived-counts.mjs",
+  ".agent/scripts/tests/test-derivado-maduro.mjs",
+]);
+
 /** Onde vive CODIGO em vez de documentacao. A distincao nao e cosmetica: decide o ramo do
  *  "ninguem cita" la baixo. */
 const ehCodigo = (rel) => rel.startsWith(".agent/scripts/") || rel.startsWith(".claude/");
@@ -86,7 +113,7 @@ const ehCodigo = (rel) => rel.startsWith(".agent/scripts/") || rel.startsWith(".
  *  maioria das citacoes em vez de todas — a lacuna silenciosa que este guard existe para nao
  *  ter. O `README.md` entra por medicao: tinha uma citacao fora do alcance da primeira versao
  *  desta lista, e e o ficheiro mais lido do repo. */
-function alvosDe(listDir) {
+export function alvosDe(listDir) {
   return [
     ...(listDir(".agent/rules", ".md") ?? []).map((n) => `.agent/rules/${n}.md`),
     ...(listDir(".agent/workflows", ".md") ?? []).map((n) => `.agent/workflows/${n}.md`),
@@ -97,6 +124,12 @@ function alvosDe(listDir) {
     // ficheiro para `lib/alvos-no-disco.mjs`, a contagem do proprio guard DESCEU de 136 para
     // 135. Mover codigo para `lib/` tirava-o da rede, e nada dizia nada.
     ...(listDir(".agent/scripts/lib", ".mjs") ?? []).map((n) => `.agent/scripts/lib/${n}.mjs`),
+    ...(listDir(".agent/scripts/tests", ".mjs") ?? []).map((n) => `.agent/scripts/tests/${n}.mjs`),
+    ...(listDir(".agent/scripts/tests/harness", ".mjs") ?? []).map((n) => `.agent/scripts/tests/harness/${n}.mjs`),
+    ...(listDir(".agent/scripts/config", ".mjs") ?? []).map((n) => `.agent/scripts/config/${n}.mjs`),
+    // Os pipelines: o `ci.yml` cita anti-padroes nos comentarios que explicam porque um passo
+    // existe, e `.github/` estava inteiramente fora deste guard.
+    ...(listDir(".github/workflows", ".yml") ?? []).map((n) => `.github/workflows/${n}.yml`),
     ...(listDir(".agent/context", ".md") ?? []).map((n) => `.agent/context/${n}.md`),
     ...(listDir("src/docs", ".md") ?? []).map((n) => `src/docs/${n}.md`),
     ...(listDir(".claude/agents", ".md") ?? []).map((n) => `.claude/agents/${n}.md`),
@@ -197,6 +230,7 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
       // so neste: cada definicao contribuia com a sua propria linha para a contagem, logo
       // `citacoes >= existentes.size` sempre.
       if (AP_FILES.includes(alvo) && CABECALHO_AP.test(linha)) return;
+      if (FIXTURES_DE_OUTRO_REPO.has(alvo)) return;
       for (const m of linha.matchAll(CITACAO_AP)) {
         citacoes++;
         if (!ehCodigo(alvo)) citacoesDoc++;
