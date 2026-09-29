@@ -333,6 +333,15 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
    *  O CABECALHO E MINIMO de proposito. A primeira versao somava ~46 bytes ao catalogo, que vive
    *  a menos de 30 do tecto do Guard 1e: o teste corria com um aviso de orcamento por cima, e
    *  quem o fosse depurar via ruido que nada tinha a ver com o que ele afirma. */
+  /** O ultimo `TPn` definido NA FIXTURE. Derivado, e nao um numero escrito aqui: os tres casos
+   *  abaixo fixavam o 9 e o 10, e no dia em que o catalogo real ganhou o `TP10` partiram-se os
+   *  tres de uma vez — `TP3` textual, dentro da suite do guard que verifica intervalos. */
+  const ultimoTP = (dir) =>
+    Math.max(
+      0,
+      ...[...readF(dir, ".agent/rules/anti-patterns-template.md").matchAll(/^#{2,3}\s+TP(\d+)\b/gm)].map((m) => +m[1])
+    );
+
   const acrescentaTP = (dir, n) => {
     const cab = `\n## TP${n} — x\n`;
     writeF(dir, ".agent/rules/anti-patterns-template.md", readF(dir, ".agent/rules/anti-patterns-template.md") + cab);
@@ -360,14 +369,15 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // acrescentar uma entrada **sem tocar em nenhum dos quatro textos** tem de acusar os quatro.
   // Sem ele, um guard que nunca avisasse passava em tudo o resto.
   test("G12g: um TP novo sem actualizar a prosa acusa TODOS os sitios", (dir) => {
-    acrescentaTP(dir, 10);
+    const novo = ultimoTP(dir) + 1;
+    acrescentaTP(dir, novo);
     return {
       includes: [
         ".agent/rules/anti-patterns.md:",
         ".agent/rules/anti-patterns-template.md:",
         ".agent/workflows/review.md:",
         "README.md:",
-        "o ultimo TP definido e o TP10",
+        `o ultimo TP definido e o TP${novo}`,
       ],
       // A ARMADILHA, e esta escrita em disco: o `upgrade-why.md` diz "num projeto com oito
       // anti-padroes proprios", medicao correcta sobre OUTRO projeto. Um guard que lesse
@@ -380,8 +390,9 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // A decisao de desenho, e sem este caso ela era so um comentario: valida-se o extremo
   // SUPERIOR, logo um intervalo parcial que acabe no ultimo definido e legitimo e passa.
   test("G12g: intervalo parcial que acaba no ultimo definido NAO avisa", (dir) => {
-    writeF(dir, ".agent/rules/exemplo-intervalo.md", "# Exemplo\n\nOs dois mais recentes (`TP8`-`TP9`) sao sobre isto.\n");
-    return { excludes: ["acaba em 9"] };
+    const fim = ultimoTP(dir);
+    writeF(dir, ".agent/rules/exemplo-intervalo.md", `# Exemplo\n\nOs dois mais recentes (\`TP${fim - 1}\`-\`TP${fim}\`) sao sobre isto.\n`);
+    return { excludes: [`acaba em ${fim}`] };
   }, { code: 0 });
 
   test("G12g: intervalo que mistura prefixos avisa", (dir) => {
@@ -423,7 +434,11 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
   // linhas abaixo de outra que este ticket ja tinha corrigido, no mesmo ficheiro.
   test("G12g: o separador `..` tambem declara um intervalo", (dir) => {
     writeF(dir, ".agent/rules/exemplo-intervalo.md", "# Exemplo\n\nOs `TP1`..`TP7` vivem la.\n");
-  }, { code: 1, includes: ["o ultimo TP definido e o TP9"] });
+    // Derivado, como os dois casos acima: este fixava o 9 e partiu-se no dia em que o catalogo
+    // ganhou uma entrada. O que o caso afirma e que o separador `..` conta como intervalo — nao
+    // qual e o ultimo numero do repo.
+    return { includes: [`o ultimo TP definido e o TP${ultimoTP(dir)}`] };
+  }, { code: 1 });
 
   // O `continue` do prefixo sem definicoes, que nao tinha teste nenhum — a leitura independente
   // trocou-o por um `warn` e a suite ficou verde na mesma. E alcancavel e barato: um derivado

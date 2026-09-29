@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP9) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP10) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -108,12 +108,6 @@
   `.claude/hooks/tests/tests-bypasses.mjs`: cada forma conhecida e um caso, e cresce quando
   aparece outra. O tamanho nao se cita em prosa; esta a um `grep -c` de distancia.
 
-> Esta entrada vem do template, como as outras. **Nao a substituas por uma tua**: os ficheiros
-> do template citam estes IDs (rules, workflows, `.agent/scripts/`, `.claude/hooks/`), e apagar
-> uma entrada deixa essas citacoes penduradas — o Guard 15 reprova, e diz quais. Os teus vao
-> para o `anti-patterns.md`, no prefixo `AP`. Se um dia deixares de ter verificadores proprios,
-> apaga a entrada **e** as citacoes dela na mesma passagem.
-
 ## TP7 — Ramo inalcancavel, justificado por prosa em vez de medido
 
 - **Origem**: o ramo "ninguem cita" do Guard 15 (`guards/anti-patterns.mjs`).
@@ -162,3 +156,12 @@
 - **Detecao em review**: `git grep -nE '"\.(agent|claude)/[^"]+\.mjs"' -- '*/tests/*'` — caminho
   literal num teste: legitimo se o MONTA, suspeito se o INTERROGA. Controlo negativo: **mover a
   pasta**, a suite fica vermelha.
+
+## TP10 — Backtick numa string de shell com aspas duplas
+
+- **Origem**: uma mensagem de `git tag -m` que citava caminhos. Apagou o repositorio.
+- **Anti-padrao**: backticks num `-m`/`--body`/`echo` entre aspas duplas — o shell executa o
+  que esta entre eles. Como a convencao daqui poe comandos em backticks, a mensagem de um
+  ticket sobre `rm` **e** esse comando. Fica latente enquanto o conteudo for inofensivo.
+- **Correto**: por FICHEIRO (`-F`, `--body-file`) ou heredoc com delimitador entre plicas.
+- **Detecao em review**: `git grep -nE '(-m|--message|--body) "[^"]*\`'`.

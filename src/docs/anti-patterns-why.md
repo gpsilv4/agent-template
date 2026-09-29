@@ -15,6 +15,12 @@
 
 ---
 
+## Se um dia deixares de ter verificadores proprios
+
+Apagar uma entrada do catalogo do template deixa as citacoes dela penduradas, e o Guard 15
+reprova a dizer quais. Se um projeto derivado deixar de ter a maquinaria a que uma entrada se
+refere, apaga-se a entrada **e as citacoes dela na mesma passagem** — nunca so uma das duas.
+
 ## Porque o catalogo do template vive num ficheiro separado
 
 Estas entradas vieram do template e sao sobre a maquinaria DELE: o `TP5` e sobre `.trim()` num
@@ -404,3 +410,35 @@ O padrao "varrer por padrao em vez de por lista" ja tinha entrado no repo (v0.17
 apanhou isto, porque a migracao e mais antiga do que a regra. Uma regra nova nao audita o
 passado: so o que lhe passa pelas maos a partir do dia em que existe. O que auditou o passado foi
 correr contra um consumidor real.
+
+## TP10 — Backtick numa string de shell com aspas duplas
+
+**Origem**: a mensagem de uma `git tag -m`. **Apagou o repositorio, `.git` incluido.**
+
+O ticket era sobre a fronteira de escrita, logo a mensagem citava as formas que ele fecha — e a
+convencao deste repo poe caminhos e comandos entre backticks. Numa string de aspas duplas o
+shell trata backticks como **substituicao de comando**. Executou o que estava la:
+
+```
+`find -delete`   `git rm`   `find -exec rm`
+```
+
+**Porque nao foi apanhado antes.** A mesma sessao criou seis tags, todas com backticks na
+mensagem. Nas anteriores o conteudo era inofensivo — um numero de versao da "command not found"
+e o git grava a mensagem com a substituicao vazia. **O defeito estava la desde a primeira**, e
+so apareceu quando o conteudo passou a ser comandos destrutivos reais. E a forma mais cara do
+`TP7`: um ramo que ninguem exercita ate ao dia em que o exercita a serio.
+
+**O que salvou, e nao foi rede nenhuma.** O `main` estava no remoto porque um merge tinha
+acabado de correr. E a **varredura de mutacao estava a correr** — ela copia o repo para
+`tmpdir` por worker, e as oito copias tinham o trabalho nao commitado. Foi preciso mata-la e
+resgatar uma antes de serem limpas.
+
+O resgate trouxe um ficheiro a mais: um guard com uma **mutacao congelada** (`warn(` trocado por
+um no-op), do ficheiro que estava a ser mutado no instante em que a varredura morreu.
+Identificado por `diff` contra o `main` limpo, e descartado. **Uma copia resgatada de uma
+varredura a meio nao e de confianca sem essa comparacao.**
+
+**A licao de segunda ordem**: nada no repo detecta isto. Os hooks cobrem a fronteira de
+ficheiros, nao a forma como uma string chega ao shell. A deteccao e um `grep` no `/review`, e um
+habito: **se a string leva backticks, nao vai num `-m`**.
