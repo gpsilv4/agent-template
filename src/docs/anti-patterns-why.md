@@ -15,6 +15,15 @@
 
 ---
 
+## Porque o catalogo do template vive num ficheiro separado
+
+Estas entradas vieram do template e sao sobre a maquinaria DELE: o `TP5` e sobre `.trim()` num
+`git status --porcelain`, o `TP6` sobre uma blocklist num hook `.mjs`.
+
+Um projeto Python pagava **9,6 KB em todas as sessoes, para sempre**, para transportar licoes
+sobre ficheiros Node que nao tem — **24% do orcamento sempre-carregado**, sem uma unica entrada
+sobre o seu proprio dominio.
+
 ## Porque o prefixo do template e `TP` e nao `AP`
 
 As entradas do template nasceram no prefixo `AP` — o mesmo que um projeto derivado usa para as suas.

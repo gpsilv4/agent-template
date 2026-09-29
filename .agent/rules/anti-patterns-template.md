@@ -4,11 +4,8 @@
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
 > uma citacao concreta.
 >
-> **Porque vive aqui e nao no `anti-patterns.md`.** Estas entradas vieram do template e
-> sao sobre a maquinaria DELE: `TP5` e sobre `.trim()` num `git status --porcelain`, `TP6`
-> sobre uma blocklist num hook `.mjs`. Um projeto Python pagava 9,6 KB **em todas as sessoes,
-> para sempre**, para transportar licoes sobre ficheiros Node que nao tem — 24% do orcamento
-> sempre-carregado, sem uma unica entrada sobre o seu proprio dominio.
+> **Porque vive aqui e nao no `anti-patterns.md`**: sao licoes sobre a maquinaria do TEMPLATE,
+> e um projeto que nao a use pagava-as em todas as sessoes. A medicao esta no `-why`.
 >
 > **Continuam a ser citaveis e citadas.** Dezenas de ficheiros do template (`.agent/scripts/`,
 > `.claude/hooks/`, as rules e os workflows) referem os `TPn`, e o Guard 15 varre os DOIS
@@ -140,9 +137,7 @@
   ficheiro, e contar com que as duas se mantenham iguais. A copia **nao falha onde esta
   testada** — falha na copia que ninguem sabe que e uma copia, e costuma so aparecer numa
   **fronteira**, meses depois, com a mensagem a apontar para o sintoma e nao para a causa.
-  Formas: contagem de linhas reimplementada ao lado do guard que a define; lista de nomes a
-  preservar escrita a mao ao lado da lista que o motor usa; um par `(ficheiro, constante)`
-  repetido no codigo e no teste; uma isencao por **caminho** onde o que decide e o conteudo.
+  (As seis formas medidas estao tabeladas no `-why`.)
 - **Correto**: **derivar, nao duplicar.** Quem define a regra exporta-a; quem precisa dela
   importa-a. Quando o import nao pode ser estatico (o ficheiro pode legitimamente faltar, e a
   ausencia e para reportar), import dinamico **depois** do guarda de existencia. Em testes, a
