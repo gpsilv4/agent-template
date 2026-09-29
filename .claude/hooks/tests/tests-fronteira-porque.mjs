@@ -3,7 +3,7 @@
  *
  * NAO e um entry point: o `test-hooks.mjs` descobre este modulo e chama `registar()`.
  *
- * PORQUE EXISTE: a decisao de `lib/fronteira.mjs` combina SETE condicoes com alcances
+ * PORQUE EXISTE: a decisao de `lib/fronteira.mjs` combina OITO condicoes com alcances
  * diferentes — umas por segmento, outras sobre o comando inteiro — e bastava uma disparar para
  * o comando ser negado com uma razao generica. Quem levava com a negacao nao sabia qual.
  *
@@ -37,7 +37,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-hooks.mjs";
 
-/** Um comando por condicao, e o rotulo que ele tem de produzir. Sao SETE porque sao sete os
+/** Um comando por condicao, e o rotulo que ele tem de produzir. Sao OITO porque sao oito os
  *  ramos da decisao — um caso a menos e um ramo que ninguem exercita, e um rotulo que pode
  *  estar errado sem nada o denunciar. */
 const CONDICOES = [
@@ -63,6 +63,10 @@ const CONDICOES = [
   // `git` esta na lista de leitura, e tem sub-verbos que apagam. Foi medido a remover um hook
   // obsoleto, minutos depois de a verificacao ser escrita.
   ["git que escreve", "git rm .claude/hooks/stop-verify.mjs", "git-que-escreve"],
+  // O oitavo, do #101: o `find` esta na LEITURA e destroi. Sem este caso, o ramo novo
+  // nascia sem ninguem a exercita-lo — que e exactamente o que este ficheiro existe para
+  // nao deixar acontecer.
+  ["find que escreve", "find .claude/hooks/ -delete", "find-que-escreve"],
   // A fronteira so aparece dentro de aspas — e texto — MAS o comando executa esse texto.
   ["citado mas executado", 'sh -c "cat .claude/settings.json > /tmp/x"', "citado-mas-executado"],
 ];

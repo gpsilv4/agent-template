@@ -480,7 +480,7 @@ try {
   );
 
   // A fronteira nao se reescreve a si propria. A logica vive em `lib/fronteira.mjs`, que agora
-  // diz QUAL das sete condicoes negou — reconstruir o comando depois nao chega (#101).
+  // diz QUAL das oito condicoes negou — reconstruir o comando depois nao chega (#101).
   { const porque = porqueAltera(texto); if (porque) negar(`${RAZAO_FRONTEIRA}\n\n(condicao: ${porque})`); }
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];

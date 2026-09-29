@@ -70,6 +70,9 @@ export const CABECAS = [
   "sudo env ", "timeout 5 sudo ",
   "FOO=1 ", "PATH=/tmp/evil ", "LD_PRELOAD=/tmp/x/env ",
   "NODE_OPTIONS=--require=/tmp/evil/env ",
+  // Cabeca invocada por um caminho ARBITRARIO. O `basename` sozinho aceitava-a, logo qualquer
+  // binario posto numa pasta propria passava a ser uma cabeca inerte. Medido pela Fase 4.
+  "/tmp/evil/env ",
 ];
 
 /** Como o verbo e invocado. A terceira e a segunda existem porque a combinacao
@@ -94,6 +97,22 @@ export const ESCREVEM = [
   ["find", (b, a) => `${b} ${a} -exec rm {} +`],
   ["find", (b, a) => `${b} ${a} -exec grep -l X {} + -exec rm {} +`],
   ["find", (b, a) => `${b} ${a} -execdir mv {} /tmp ;`],
+  // --- Formas que o corpus NAO gerava, e por isso nao via -------------------------------
+  // Acrescentadas depois de um leitor independente medir 168 conversoes `deny -> allow` que
+  // este ficheiro dava como zero. **O corpus era cego a elas**, e um corpus cego a uma forma
+  // afirma sobre ela exactamente o mesmo que nao afirmar nada.
+  //
+  // E a licao do proprio cabecalho, uma volta acima: gerar o produto mata o ponto cego de quem
+  // escreve a LISTA, nao o de quem escreve as DIMENSOES. Cada forma abaixo custou uma medicao
+  // de outra pessoa.
+  ["find", (b, a) => `${b} ${a} -type f -exec grep -l X {} \\; -exec rm {} \\;`],
+  ["find", (b, a) => `${b} ${a} -exec git rm {} +`],
+  ["find", (b, a) => `${b} ${a} -exec node /tmp/evil.js {} +`],
+  ["git", (b, a) => `${b} config -f ${a} sec.key val`],
+  ["git", (b, a) => `${b} apply /tmp/p.patch ${a}`],
+  ["git", (b, a) => `${b} reset --hard ${a}`],
+  ["node", (b, a) => `${b} -r /tmp/evil.js ${a}`],
+  ["awk", (b, a) => `${b} -i inplace '{print}' ${a}`],
 ];
 
 /** Verbos que so LEEM. Negar qualquer um destes e um falso positivo. */
@@ -122,21 +141,44 @@ export function gerar() {
 }
 
 /**
- * As excepcoes a invariante, por CLASSE e com a razao. Nao sao comandos soltos: um comando
- * solto nao diz o que representa, e ao ser fechado deixa a classe inteira sem afirmacao.
+ * Formas de ESCRITA que passam **hoje**, e que a invariante nao conta como falha porque estao
+ * DECLARADAS. Nao sao desculpas: cada uma passa TAMBEM com a cabeca vazia — sao buracos
+ * pre-existentes, e o que as negava com cabeca era o acidente que o #101 removeu.
  *
- * Cada uma afirma **duas** coisas: que os seus membros passam hoje, e que **nao esta vazia**.
- * A segunda e a que importa — uma classe que se esvazia foi fechada por alguem, e isso tem de
- * ficar vermelho para ser promovido a FECHADO, em vez de desaparecer sem sinal.
- *
- * **Cada classe e a forma NUA (`cabeca === ""`), e isso e deliberado.** Com uma cabeca a
- * frente, `sudo /usr/bin/git rm <alvo>` e negado hoje — pelo `sudo`, por acidente, e nao pelo
- * buraco deixar de existir. Definir a classe sobre a forma nua poe as 270 combinacoes
- * `{cabeca} x {verbo por caminho}` a cargo da **invariante**: hoje nao escapam porque a
- * cabeca as nega; no dia em que o #101 consumir a cabeca, escapam, e a invariante fica
- * VERMELHA. E a armadilha, e esta e a sua forma exacta.
+ * O acidente nao era proteccao — e o proprio inventario que o escreve — mas a sua remocao tem de
+ * ser DITA, e nao descoberta por alguem daqui a seis meses. Cada entrada e um buraco por fechar,
+ * com o seu ticket.
  */
-export const ABERTO = [
+const DECLARADO = [
+  // `git` com sub-verbos fora da lista do `gitQueEscreve` (`config -f`, `apply`, `reset --hard`).
+  // A lista e uma blocklist de sub-verbos — o `TP6` que o resto do ficheiro evita — e fecha-la
+  // e trabalho proprio: exige inverter para allowlist de sub-verbos de LEITURA.
+  // O `(?:\S*\/)?` tolera o caminho: `/usr/bin/git config` e a mesma forma que `git config`,
+  // e a primeira versao deste predicado nao o via — o corpus apanhou-o de imediato.
+  (k) => /(?:^|\s)(?:\S*\/)?git\s+(?:config|apply|reset|am|cherry-pick|revert|filter-branch)\b/.test(k.cmd),
+  // `node -r` / `--require`: carrega codigo antes do ficheiro. O `CODIGO_INLINE` cobre `-e`/`-p`
+  // e nao esta forma. Mesma familia do `NODE_OPTIONS=--require` que o inventario ja regista.
+  (k) => /\bnode\b[^\n]*\s(?:-r|--require)\b/.test(k.cmd),
+  // `awk -i inplace`: o `editaNoSitio` cobre `sed|perl|ruby|python` e nao o `awk`.
+  (k) => /\bawk\b[^\n]*\s-i\s+inplace\b/.test(k.cmd),
+  // `node <ficheiro>` a correr um script arbitrario com o alvo como argumento — por `-exec` ou
+  // nu. NAO se fecha aqui de proposito, e a razao e de desenho: `node` esta na `LEITURA` porque
+  // correr um FICHEIRO e leitura, e e assim que se corre a suite dos hooks. Decidir que
+  // `node <script> <fronteira>` e escrita negava `node .claude/hooks/tests/test-hooks.mjs`, que
+  // e trabalho normal. Fechar isto exige distinguir o script do repo de um script de fora — e
+  // decisao propria, nao um remendo no fim de outro ticket.
+  (k) => /\bnode\b\s+\/(?!Users)[^\s]*\.js\b/.test(k.cmd),
+];
+
+/**
+ * CLASSES FECHADAS. Nasceram todas em `ABERTO` — o que este ficheiro registava como escapando —
+ * e fecharam no #101. **Nao se apagaram**: a assercao inverteu-se, e agora exigem NEGACAO.
+ *
+ * Apagar uma classe fechada era o `TP4`: a forma deixava de ser afirmada por coisa nenhuma, e
+ * uma regressao que a reabrisse passava com a suite verde. O cabecalho deste ficheiro ja dizia
+ * "mover para uma afirmacao de NEGACAO, nao apagar" — isto e o cumprimento dessa instrucao.
+ */
+export const FECHADO_CLASSE = [
   {
     nome: "verbo invocado por caminho",
     porque:
@@ -164,28 +206,48 @@ export const ABERTO = [
 ];
 
 /**
- * As cabecas cujas leituras sao TODAS negadas hoje. Sao falsos positivos: o verbo real le.
+ * As cabecas CORRIGIDAS pelo #101: as suas leituras passam todas.
  *
- * Nao ha aqui contagens escritas em prosa (`TP1`) — a afirmacao e "todas", derivada do
- * proprio produto. Quando o #101 corrigir uma cabeca, o seu teste fica VERMELHO e a entrada
- * muda de `FALSO_POSITIVO_CABECA` para `CORRIGIDO_CABECA`. Nao se "corrige o teste".
+ * Uma cabeca que NAO esteja nesta lista e um falso positivo ainda por corrigir, e o ramo
+ * `else` do registo exige que ela negue TODAS — a afirmacao e derivada do produto, nunca uma
+ * contagem em prosa (`TP1`). Se uma delas for corrigida, o seu teste fica VERMELHO e a entrada
+ * migra para aqui. Nao se "corrige o teste".
  */
-export const CORRIGIDO_CABECA = [];
+export const CORRIGIDO_CABECA = [
+  // As CABECAS INERTES, corrigidas pelo #101. Cada uma negava 81 de 81 leituras geradas; o
+  // total sai desta lista, e nao de um numero escrito a mao (`TP1`):
+  //     CORRIGIDO_CABECA.length * INVOCA.length * LEEM.length * ALVOS.length
+  // A primeira versao deste comentario dizia 2268 — contava as 28 cabecas, incluindo as 4
+  // atribuicoes que o comentario a seguir diz estarem FORA. Apanhado pela Fase 4.
+  //
+  // NAO se apagaram as entradas ao corrigi-las. Uma entrada apagada deixa de ser afirmada por
+  // coisa nenhuma, e amanha uma regressao repoe a negacao com a suite verde (`TP4`). Migram, e
+  // a assercao inverte-se: aqui exige-se que TODAS passem.
+  "sudo ", "env ", "command ", "time ", "timeout 5 ", "nohup ", "nice -n 0 ", "setsid ",
+  "stdbuf -o0 ", "doas ", "builtin ", "ionice -c 2 ", "unbuffer ",
+  "sudo -u me ", "env -i ", "env -u FOO ", "timeout -s KILL 5 ", "stdbuf -o 0 ",
+  "time -o /tmp/t ",
+  "if ", "! ", "if ! ",
+  "sudo env ", "timeout 5 sudo ",
+  // FORA, e continuam em `FALSO_POSITIVO` por desenho: as QUATRO atribuicoes. Hoje falham
+  // FECHADO para todos os nomes, por acidente do `basename`; saltar atribuicoes compraria esse
+  // acidente por uma lista de nomes que fica sempre curta — medido que `PATH=`, `NODE_PATH=`,
+  // `LESSOPEN=` e `AWKPATH=` ficariam de fora dela. Tem slice propria.
+];
 
 export function registar({ test, eq }) {
   const casos = gerar();
-  const aberto = (k) => ABERTO.find((cl) => cl.casa(k));
 
   // --- A invariante -----------------------------------------------------------------------
-  test("gerado: todo o verbo que ESCREVE e negado, excepto as classes abertas", () => {
+  test("gerado: todo o verbo que ESCREVE e negado, excepto o que esta DECLARADO", () => {
     const escapam = casos
-      .filter((k) => k.familia === "escreve" && porqueAltera(k.cmd) === null && !aberto(k))
+      .filter((k) => k.familia === "escreve" && porqueAltera(k.cmd) === null && !DECLARADO.some((d) => d(k)))
       .map((k) => k.cmd);
     eq(
       escapam.length,
       0,
-      `${escapam.length} comando(s) que ESCREVEM passam sem estar numa classe de ABERTO. ` +
-        `Se a forma e nova, acrescentar a classe com a razao; se e regressao, corrigir o ` +
+      `${escapam.length} comando(s) que ESCREVEM passam sem estar DECLARADOS. ` +
+        `Se a forma e nova, acrescentar a DECLARADO com a razao; se e regressao, corrigir o ` +
         `codigo (#101). Primeiros: ${escapam.slice(0, 5).join(" | ")}`
     );
   });
@@ -200,9 +262,9 @@ export function registar({ test, eq }) {
     );
   });
 
-  // --- As classes abertas -----------------------------------------------------------------
-  for (const classe of ABERTO) {
-    test(`gerado/aberto: ${classe.nome} — ainda escapa`, () => {
+  // --- As classes que FECHARAM --------------------------------------------------------------
+  for (const classe of FECHADO_CLASSE) {
+    test(`gerado/fechado: ${classe.nome} — ja NAO escapa`, () => {
       const membros = casos.filter((k) => k.familia === "escreve" && classe.casa(k));
       eq(
         membros.length > 0,
@@ -210,12 +272,16 @@ export function registar({ test, eq }) {
         `a classe "${classe.nome}" ficou VAZIA: o gerador deixou de a produzir. Sem membros ` +
           `nao afirma nada — corrigir as dimensoes ou remover a classe com a razao`
       );
-      const fechados = membros.filter((k) => porqueAltera(k.cmd) !== null).map((k) => k.cmd);
+      // Um membro que esteja DECLARADO como aberto por outra razao nao conta: a classe afirma
+      // o que ELA fechou, e nao que o comando inteiro seja negado por todos os motivos.
+      const escapam = membros
+        .filter((k) => porqueAltera(k.cmd) === null && !DECLARADO.some((d) => d(k)))
+        .map((k) => k.cmd);
       eq(
-        fechados.length,
+        escapam.length,
         0,
-        `${fechados.length} de ${membros.length} ja NAO passam — BOA NOTICIA, alguem fechou ` +
-          `esta classe. Mover para uma afirmacao de NEGACAO, nao apagar. Primeiro: ${fechados[0]}`
+        `${escapam.length} de ${membros.length} voltaram a passar — esta classe estava FECHADA ` +
+          `e reabriu. Nao mexer na assercao: corrigir o codigo (#101). Primeiro: ${escapam[0]}`
       );
     });
   }
