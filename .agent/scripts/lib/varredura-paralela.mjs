@@ -49,13 +49,26 @@ export function quantosWorkers(pedido) {
   return Math.max(1, Math.min(8, Number.isFinite(n) && n > 0 ? n : cpus().length || 1));
 }
 
-/** Corre uma suite e diz se passou. Nunca lanca: "falhou" e um resultado, nao um acidente. */
-const passa = (suiteCopia, cwd) =>
+/** Corre uma suite e diz se passou. Nunca lanca: "falhou" e um resultado, nao um acidente.
+ *
+ *  O `extraEnv` existe para o MODO FAIL-FAST, e e por isso que e um parametro e nao uma
+ *  variavel deste modulo: tem de ser possivel liga-lo numa chamada e nao na outra. Na corrida
+ *  MUTADA o veredicto e binario ("algum teste apanhou isto?") e a suite pode sair ao primeiro
+ *  `FAIL`; na BASELINE nao pode, porque ali o verde so significa alguma coisa se for sobre a
+ *  suite inteira executada. */
+const passa = (suiteCopia, cwd, extraEnv) =>
   new Promise((resolve) => {
-    execFile("node", [suiteCopia], { cwd }, (err, stdout, stderr) =>
+    const opts = extraEnv ? { cwd, env: { ...process.env, ...extraEnv } } : { cwd };
+    execFile("node", [suiteCopia], opts, (err, stdout, stderr) =>
       resolve({ ok: !err, out: (stdout ?? "") + (stderr ?? "") })
     );
   });
+
+/** O que se passa a corrida mutada. Uma constante, e nao a string escrita nas duas pontas: o
+ *  harness le `SWEEP_FAIL_FAST` e o motor escreve-o, e duas copias a concordar a mao eram um
+ *  `TP8` que ninguem veria — o modo simplesmente nao agiria, e a varredura ficava correcta e
+ *  lenta, que e o defeito mais dificil de notar. O `tests-fail-fast.mjs` prende as duas. */
+export const FAIL_FAST_ENV = { SWEEP_FAIL_FAST: "1" };
 
 /** A PROVA de que a suite ficou vermelha porque um TESTE apanhou a mutacao, e nao porque
  *  rebentou. As treze suites deste repo imprimem a mesma forma — medido, nao assumido. */
@@ -136,7 +149,7 @@ export async function medeCobertura({ medir, copias }) {
     const match = m.visiveis[i].match(m.sinal);
     mut[i] = m.linhas[i].slice(0, match.index) + m.neutro + m.linhas[i].slice(match.index + match[0].length);
     writeFileSync(alvoCopia, mut.join("\n"));
-    const r = await passa(join(copias[w], m.suite), copias[w]);
+    const r = await passa(join(copias[w], m.suite), copias[w], FAIL_FAST_ENV);
     const ficouVermelha = !r.ok;
     // Repor ANTES de o worker pegar no item seguinte: o proximo item pode ser de outro alvo, e
     // uma copia deixada suja envenenava-o.
