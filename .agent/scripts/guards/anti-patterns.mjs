@@ -92,10 +92,20 @@ function alvosDe(listDir) {
     ...(listDir(".agent/workflows", ".md") ?? []).map((n) => `.agent/workflows/${n}.md`),
     ...(listDir(".agent/scripts", ".mjs") ?? []).map((n) => `.agent/scripts/${n}.mjs`),
     ...(listDir(".agent/scripts/guards", ".mjs") ?? []).map((n) => `.agent/scripts/guards/${n}.mjs`),
+    // O `lib/` dos scripts faltava, e era a MAIOR das lacunas: 15 modulos com ~39 citacoes
+    // fora de alcance. Apareceu de forma que nao deixa duvida — ao extrair uma lista deste
+    // ficheiro para `lib/alvos-no-disco.mjs`, a contagem do proprio guard DESCEU de 136 para
+    // 135. Mover codigo para `lib/` tirava-o da rede, e nada dizia nada.
+    ...(listDir(".agent/scripts/lib", ".mjs") ?? []).map((n) => `.agent/scripts/lib/${n}.mjs`),
     ...(listDir(".agent/context", ".md") ?? []).map((n) => `.agent/context/${n}.md`),
     ...(listDir("src/docs", ".md") ?? []).map((n) => `src/docs/${n}.md`),
     ...(listDir(".claude/agents", ".md") ?? []).map((n) => `.claude/agents/${n}.md`),
     ...(listDir(".claude/hooks", ".mjs") ?? []).map((n) => `.claude/hooks/${n}.mjs`),
+    // O `lib/` dos hooks faltava, e nao por ser marginal: tem TRES citacoes de anti-padroes
+    // (`TP6` em ambos os modulos, `TP8` na `fronteira.mjs`). Renumerar um `TP` deixava-as
+    // penduradas sem um aviso. Mesma pasta, mesma causa e mesmo ticket que a lacuna da
+    // varredura de mutacao (#136): uma lista de alcance escrita a mao que nao inclui tudo.
+    ...(listDir(".claude/hooks/lib", ".mjs") ?? []).map((n) => `.claude/hooks/lib/${n}.mjs`),
     ...(listDir(".claude/hooks/tests", ".mjs") ?? []).map((n) => `.claude/hooks/tests/${n}.mjs`),
     "CLAUDE.md",
     "GEMINI.md",

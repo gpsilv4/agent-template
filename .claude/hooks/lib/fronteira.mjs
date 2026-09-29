@@ -87,6 +87,23 @@ const OPACO = /\b(?:eval|xargs)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
 
+/** Marca um sitio de RECUSA. Devolve o rotulo tal e qual — nao faz nada.
+ *
+ *  PORQUE EXISTE, e nao e arrumacao: a varredura de mutacao desliga um sitio de recusa de cada
+ *  vez e exige que a suite fique vermelha. Ela sabe fazer isso a **chamadas** (11 dos 13 sinais
+ *  do `pares.mjs` sao chamadas; um e uma atribuicao), e as recusas deste ficheiro eram sete
+ *  `return` em tres sintaxes diferentes — string literal, template literal e um ternario. Um
+ *  regex que apanhasse as tres sem apanhar o `return null` era fragil, e uma lista de rotulos
+ *  escrita a mao ao lado do codigo seria um `TP8` a espera de acontecer.
+ *
+ *  Com esta funcao, o sinal e `nega(` — a mesma forma que a ferramenta ja entende. O ficheiro
+ *  passa a ter a forma que ela le, em vez de lhe ensinarmos sintaxe nova.
+ *
+ *  Ha precedente escrito no repo: a `avaliar()` do `test-harness.mjs` foi extraida como funcao
+ *  pura **precisamente** para a varredura a poder cobrir, depois de medir 0/9 nesse ficheiro.
+ *  O cabecalho dela di-lo. Esta e a mesma troca: uma linha de producao por uma rede. */
+const nega = (rotulo) => rotulo;
+
 /**
  * PORQUE e que este comando seria negado — o mesmo veredicto de `alteraFronteira()`, com o
  * nome da condicao que o produziu.
@@ -118,7 +135,7 @@ export function porqueAltera(texto) {
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
   if (!FRONTEIRA.test(visivel)) {
     if (!FRONTEIRA.test(texto)) return null;
-    return opaco || inline ? "citado-mas-executado" : null;
+    return opaco || inline ? nega("citado-mas-executado") : null;
   }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
@@ -155,12 +172,12 @@ export function porqueAltera(texto) {
   // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
   // porque e essa a condicao a relaxar se a negacao for indevida. Varias podem ser verdade ao
   // mesmo tempo, e reporta-las todas dava uma lista sem accao.
-  if (!LEITURA.has(primeiro)) return `verbo-nao-e-leitura:${primeiro}`;
-  if (editaNoSitio) return "edita-no-sitio";
-  if (inlineNoAlvo) return "codigo-inline";
-  if (opaco) return "wrapper-opaco";
-  if (redireciona) return "redireciona";
-  if (gitQueEscreve) return "git-que-escreve";
+  if (!LEITURA.has(primeiro)) return nega(`verbo-nao-e-leitura:${primeiro}`);
+  if (editaNoSitio) return nega("edita-no-sitio");
+  if (inlineNoAlvo) return nega("codigo-inline");
+  if (opaco) return nega("wrapper-opaco");
+  if (redireciona) return nega("redireciona");
+  if (gitQueEscreve) return nega("git-que-escreve");
   return null;
 }
 

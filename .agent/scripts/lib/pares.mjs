@@ -317,6 +317,30 @@ export const PARES = [
   {
     // O sinal de um guard-hook e a negacao. Mutar `negar(` deixa o hook a permitir tudo em
     // silencio, que e exatamente a falha que uma suite tem de apanhar.
+    alvo: ".claude/hooks/lib/fronteira.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    // As sete condicoes da decisao, marcadas com `nega(` para terem a forma que a varredura ja
+    // le. Sem o marcador, o sinal teria de casar tres sintaxes de `return` — string literal,
+    // template literal e um ternario — sem casar o `return null`, e isso e fragil ao ponto de
+    // ser o proximo `TP8`. O neutro devolve `null`, que e a forma de PERMITIR deste ficheiro:
+    // mutar um sitio deixa a fronteira a autorizar exactamente uma classe de escrita.
+    //
+    // `(?<!const\s)` pela mesma razao que o `(?<!function\s)` do vizinho: mutar a DEFINICAO da
+    // erro de sintaxe, a suite fica vermelha pela razao errada, e a varredura conta-o como
+    // cobertura. Aqui a definicao e uma arrow atribuida a `const`.
+    sinal: /(?<![\w.$])(?<!const\s)nega\(/,
+    neutro: "((x) => null)(",
+  },
+  {
+    // A outra metade de `hooks/lib/`: o que conta como invocacao DESTRUTIVA de git. A recusa
+    // aqui e `return true` — o ficheiro responde a "isto e perigoso?", logo o `true` e que nega.
+    // O neutro e `return false`: cada mutacao deixa passar uma forma insegura de cada vez.
+    alvo: ".claude/hooks/lib/verbos-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=^\s*(?:if \(.*\) )?)return true(?=;)/,
+    neutro: "return false",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e

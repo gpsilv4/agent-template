@@ -85,6 +85,9 @@ function listarDir(rel) {
 }
 
 import { PARES } from "./lib/pares.mjs";
+// A lista de pastas vive a parte: e a que nao para de crescer, e este ficheiro estava em
+// exactamente 500 linhas contra um limite de 500 (ver o cabecalho dela).
+import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
 import { medeCobertura, quantosWorkers } from "./lib/varredura-paralela.mjs";
 
@@ -135,32 +138,7 @@ let sitiosMedidos = 0;
 // exige que alguem a tenha acrescentado. Isto varre o disco e reprova o que nao esta na lista.
 // E o mesmo raciocinio do `ALVO AUSENTE`, na direcao inversa.
 if (!only) {
-  const noDisco = [
-    // A convencao do repo: verificadores sao `check-*.mjs` e os seus modulos vivem em
-    // `guards/`. Este ficheiro nao entra na descoberta — ja esta em `PARES`, e incluir-se
-    // fazia a sua propria fixture de teste (que substitui `PARES`) reprovar.
-    ...listarDir(".agent/scripts").filter((f) => /^check-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
-    ...listarDir(".agent/scripts/guards").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/guards/${f}`),
-    // `lib/`: modulos partilhados com sitios de recusa proprios (hoje, o registo de suites
-    // por descoberta). Sem esta linha um modulo novo ali entrava sem par e sem suite.
-    ...listarDir(".agent/scripts/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/lib/${f}`),
-    // Os harnesses: decidem o veredicto de todas as suites e estavam fora da descoberta.
-    ...listarDir(".agent/scripts/tests/harness").filter((f) => f.endsWith(".mjs")).map((f) => `.agent/scripts/tests/harness/${f}`),
-    // O `simulate-derived.mjs` nao e um `check-*` nem um harness, mas TEM sitios de recusa
-    // (8 `fatal()`) — e escapava a descoberta pelo NOME. A convencao e util mas nao e a
-    // verdade: o que faz de um ficheiro um verificador e ter sitios de recusa, nao o prefixo.
-    ...listarDir(".agent/scripts").filter((f) => /^simulate-.*\.mjs$/.test(f)).map((f) => `.agent/scripts/${f}`),
-    // Os hooks tambem: sao codigo de enforcement com sitios de decisao, e estavam fora da
-    // regra que o template impoe a todos os verificadores ("cada um com a sua suite"). Um
-    // hook novo sem testes passava sem ninguem notar — e um hook errado e pior que um guard
-    // errado, porque corre ANTES de cada ferramenta.
-    ...listarDir(".claude/hooks").filter((f) => f.endsWith(".mjs")).map((f) => `.claude/hooks/${f}`),
-    // E o `.githooks/`, pela mesma razao: codigo de enforcement que corre antes de um commit
-    // ficar escrito. Sem esta linha, um hook novo ali entrava sem par e sem suite — que e o
-    // buraco que esta descoberta existe para nao ter. Os ficheiros nao tem extensao (o git
-    // exige o nome exacto do evento), logo nao ha filtro por sufixo.
-    ...listarDir(".githooks").map((f) => `.githooks/${f}`),
-  ];
+  const noDisco = alvosNoDisco(listarDir);
   const registados = new Set(PARES.map((p) => p.alvo));
   // Um modulo so de DADOS (uma tabela exportada, sem uma unica chamada de recusa) nao tem
   // nada que se desligue: exigir-lhe um par seria pedir um teste de mutacao para um literal.
