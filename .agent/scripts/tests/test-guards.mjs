@@ -17,6 +17,10 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
 import { join } from "path";
 import { test, syntheticSandbox, runGuard, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
+// Esta suite tambem e o entry point de modulos que NAO importa directamente — descobre-os em
+// disco. O `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
+// nesse modulo corre ESTE comando. Fica escrito porque o mapa de suites exige que a suite
+// **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 // A TERCEIRA copia da receita do "bootstrap concluido" vivia aqui, a concordar a mao com as das
 // duas suites. Uma delas ja divergiu uma vez (o `.mdc` em falta) — `TP8`.
 import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";

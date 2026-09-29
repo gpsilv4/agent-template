@@ -73,6 +73,11 @@ export const SUITES = [
   // tambem quem implementa o MODO FAIL-FAST. Mexer nele sem correr o `test-guards.mjs` era
   // exactamente o buraco que este mapa existe para fechar.
   { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|relatorio|recongelar-contexto|projeto-derivado)\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // O `lib/alcance.mjs` deriva do git que pastas e ficheiros cada guard tem de varrer, e o
+  // `tests-alcance.mjs` (que corre no `test-guards.mjs`) e quem o exercita. Sem esta regra,
+  // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir
+  // que uma lacuna de alcance passe em silencio.
+  { re: /^\.agent\/scripts\/lib\/alcance\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.

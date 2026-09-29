@@ -36,13 +36,13 @@ const PLACEHOLDER = /\{\{([A-Z_]+)\}\}/g;
 /**
  * @returns {number} guards executados
  */
-export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado }) {
-  if (!ehDerivado()) {
-    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version)");
-    return 0;
-  }
-
-  const alvos = [
+/** O ALCANCE deste guard, exportado para o `tests-alcance.mjs` poder perguntar em vez de
+ *  adivinhar. A primeira versao desse teste lia as chamadas `listDir` do CODIGO — e a
+ *  `FIXTURES_DE_OUTRO_REPO` do guard vizinho, que contem caminhos, contava como prova de
+ *  cobertura. O controlo negativo ficou VERDE ao tirar uma pasta do alcance: `TP1` puro.
+ *  Perguntar a fonte nao tem esse modo de falha. */
+export function alvosPlaceholders(listDir) {
+  return [
     "CLAUDE.md",
     "GEMINI.md",
     "AGENTS.md",
@@ -63,10 +63,16 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     ".github/copilot-instructions.md",
     ...(listDir(".cursor/rules", ".mdc") || []).map((f) => `.cursor/rules/${f}.mdc`),
     ".github/dependabot.yml",
+    // O `CODEOWNERS` tem `{{ }}` e nao estava nomeado — um derivado podia publicar o ficheiro
+    // que decide quem revê o quê com um placeholder por substituir. Apanhado pelo
+    // `tests-alcance.mjs` na primeira corrida.
+    ".github/CODEOWNERS",
     ".github/workflows/ci.yml",
     ".github/workflows/e2e.yml",
-    "src/docs/agent-guide.md",
-    "src/docs/CHANGELOG.md",
+    // `src/docs` INTEIRO, e nao dois ficheiros nomeados: os quatro `-why` tem `{{ }}` e
+    // estavam fora da unica rede contra um placeholder esquecido. Enumerar ficheiros dentro de
+    // uma pasta que cresce e a mesma lista a mao que este ticket veio fechar.
+    ...(listDir("src/docs", ".md") || []).map((f) => `src/docs/${f}.md`),
     ...(listDir(".agent/rules", ".md") || []).map((f) => `.agent/rules/${f}.md`),
     ...(listDir(".agent/workflows", ".md") || []).map((f) => `.agent/workflows/${f}.md`),
     ...(listDir(".agent/context", ".md") || []).map((f) => `.agent/context/${f}.md`),
@@ -75,6 +81,11 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     // `lib/` e um nivel abaixo, logo o `listDir` de `.agent/scripts/` nao o alcanca — e os
     // modulos partilhados tem `{{ PROJECT_NAME }}` no cabecalho como todos os outros.
     ...(listDir(".agent/scripts/lib", ".mjs") || []).map((f) => `.agent/scripts/lib/${f}.mjs`),
+    // A `config/`. Faltava, e os DOIS ficheiros la dentro tem placeholders — ou seja, este guard
+    // (a UNICA rede contra um placeholder esquecido depois do bootstrap) nao os via. E a QUARTA
+    // vez que esta lista deixa uma pasta de fora; o `tests-alcance.mjs` existe para nao haver
+    // quinta.
+    ...(listDir(".agent/scripts/config", ".mjs") || []).map((f) => `.agent/scripts/config/${f}.mjs`),
     // As SUITES e os seus construtores de fixture. Faltavam — 33 ficheiros com placeholder fora
     // da rede — e a assimetria denunciava o lapso: o `.claude/hooks/tests/` abaixo ja ca estava,
     // o equivalente dos scripts nao. O sweep do bootstrap substitui por EXTENSAO, logo na pratica
@@ -99,6 +110,15 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     // ela propria substitui.
     ...(listDir(".githooks", "") || []).map((f) => `.githooks/${f}`),
   ];
+}
+
+export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado }) {
+  if (!ehDerivado()) {
+    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version)");
+    return 0;
+  }
+
+  const alvos = alvosPlaceholders(listDir);
 
   let ficheirosComSobras = 0;
   let lidos = 0; // >= 1 garantido: ver a nota no fim
