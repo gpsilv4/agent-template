@@ -29,6 +29,9 @@ import { TETOS } from "../../guards/sizes.mjs";
 // Re-exportado para as suites nao terem de conhecer dois caminhos: quem monta uma fixture
 // importa tudo do harness.
 import { recongelarContexto } from "./recongelar-contexto.mjs";
+// Contadores e relatorio: sairam daqui quando o ficheiro passou as 510 linhas e o Guard 17
+// poe o limite em 500. `TETOS` e catraca, nao isencao.
+import { falhou, passou, registarResultado, contagem, resumo, FAIL_FAST } from "./relatorio.mjs";
 export { recongelarContexto };
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
@@ -96,9 +99,6 @@ const FIXTURE_PATHS = [
   "src/docs/scripts-guide-why.md",
   "src/docs/review-why.md",
 ];
-
-let passed = 0;
-const failures = [];
 
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "guard-test-"));
@@ -239,21 +239,16 @@ function test(name, mutate, expect) {
       try {
         extra = mutate(dir) ?? {};
       } catch (err) {
-        failures.push({ name, problems: [`setup rebentou: ${err.message}`], out: "" });
-        console.log(`  FAIL  ${name}`);
-        console.log(`          setup rebentou: ${err.message}`);
+        falhou(name, [`setup rebentou: ${err.message}`], "");
         return;
       }
     }
     const { code, out } = runGuard(dir, expect.cwd);
     const problems = avaliar({ code, out, expect, extra, base });
     if (problems.length) {
-      failures.push({ name, problems, out });
-      console.log(`  FAIL  ${name}`);
-      for (const p of problems) console.log(`          ${p}`);
+      falhou(name, problems, out);
     } else {
-      passed++;
-      console.log(`  PASS  ${name}`);
+      passou(name);
     }
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -440,45 +435,9 @@ let syntheticBaselineWarns;
 }
 
 
-/** Registar um resultado sem passar pelo `test()` — para os blocos da baseline, que
- *  montam a fixture a mao. Os contadores sao deste modulo: exportá-los daria bindings
- *  so-leitura e quem incrementasse de fora rebentava com `passed is not defined`. */
-export function registarResultado(name, problems, out) {
-  if (problems.length) {
-    failures.push({ name, problems, out });
-    console.log(`  FAIL  ${name}`);
-    for (const p of problems) console.log(`          ${p}`);
-  } else {
-    passed++;
-    console.log(`  PASS  ${name}`);
-  }
-}
-
-/** Total de testes ja corridos (passados + falhados). E como o registo por descoberta
- *  mede o contributo de cada modulo: um `tests-*.mjs` que nao mova este numero nao
- *  registou nada e reprova, em vez de passar por registado. */
-export const contagem = () => passed + failures.length;
+// Reexportado, e nao movido para o importador: o `test-guards.mjs` pede estes tres a este
+// modulo desde sempre, e a divisao do ficheiro nao e razao para lhe mudar os imports.
+export { registarResultado, contagem, resumo, FAIL_FAST };
 
 export { test, sandbox, syntheticSandbox, runGuard, file, readF, writeF, patchSettings,
          listWorkflowRows, dropLinesContaining, GUARD, GUARD_MODULES, ROOT };
-
-/** Imprime o resumo e sai. Vive aqui porque `passed`/`failures` sao deste modulo — exportar
- *  contadores mutaveis daria bindings so-leitura e o resumo ficaria sempre a zero. */
-export function resumo() {
-// --- Resumo ------------------------------------------------------------------
-console.log("");
-console.log(`  ${passed} passaram, ${failures.length} falharam.`);
-if (failures.length) {
-  console.log("\n--- Detalhe das falhas ---");
-  for (const f of failures) {
-    console.log(`\n[${f.name}]`);
-    for (const p of f.problems) console.log(`  ${p}`);
-    console.log(f.out.split("\n").map((l) => `    | ${l}`).join("\n"));
-  }
-  console.log("");
-  process.exit(1);
-}
-console.log("\nTodos os testes dos guards passaram.\n");
-process.exit(0);
-
-}

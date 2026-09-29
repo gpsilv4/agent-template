@@ -108,6 +108,14 @@ export const PREFIXOS_DE_TESTE = [
   // `naorepo-` e composto e nao ambiguo: as fixtures que montam uma pasta que NAO e um repo git.
   "hook-test-",
   "naorepo-",
+  // Da suite do MODO FAIL-FAST, que monta uma suite falsa em tmpdir para medir a saida
+  // antecipada. Entrou aqui pela mesma razao que o `derivado-maduro-teste-` acima, e pela mesma
+  // ordem de acontecimentos: eu criei a fixture, nao corri esta suite, e foi a **simulacao de
+  // derivado** a dize-lo — por correr todas. A licao ja estava escrita seis linhas acima, e
+  // mesmo assim voltou a morder; e o que esta lista custa por ser mantida a mao (`TP8`).
+  //
+  // Composto, como os irmaos: `fail-fast-` sozinho ainda e generico para uma pasta em `tmpdir`.
+  "fail-fast-test-",
   "backlog-test-",
   "t-limpo-",
   "sim-test-",

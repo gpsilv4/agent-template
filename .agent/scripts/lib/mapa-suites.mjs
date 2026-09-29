@@ -68,7 +68,11 @@ export const SUITES = [
   // nao casa a convencao `test-*` (nao e uma suite, e um construtor), logo precisa de nome
   // proprio aqui — sem ele, mexer-lhe nao gerava obrigacao nenhuma e ele DECIDE se uma fixture
   // esta bem montada.
-  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado)\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // O `relatorio.mjs` entrou quando o `test-harness.mjs` chegou as 510 linhas contra um limite
+  // de 500 — e nao e um mero anexo dele: e quem **decide o exit code** de toda a suite, e agora
+  // tambem quem implementa o MODO FAIL-FAST. Mexer nele sem correr o `test-guards.mjs` era
+  // exactamente o buraco que este mapa existe para fechar.
+  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|relatorio|recongelar-contexto|projeto-derivado)\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
