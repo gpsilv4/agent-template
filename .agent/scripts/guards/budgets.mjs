@@ -94,6 +94,32 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
   // a gente tem na cabeca e os 12k das rules carregadas; uma referencia que precise de mais do
   // que isso nao esta grande — esta a misturar instrucao com evidencia, e a evidencia tem
   // casa propria em `src/docs/*-why.md`. O NOTE 500 bytes antes do gate da aviso a tempo.
+  //
+  // ## A PERGUNTA QUE ESTE NUMERO DEIXA EM ABERTO, e porque fica aqui e nao num issue
+  //
+  // O mesmo 12 000 cobre **cinco tipos de ficheiro com custos de ordens diferentes**:
+  //
+  //   rule CARREGADA          paga em todas as sessoes de todos os derivados
+  //   rule de DOMINIO         idem (gerada no bootstrap; nao existe no template nu)
+  //   referencia              zero por sessao — lida quando um ticket a abre
+  //   catalogo de definicoes  zero — nao carregado, lido pelo Guard 15
+  //   workflow                zero — lido quando o comando e invocado
+  //
+  // **Tres dos cinco nao custam nada por sessao** e levam o mesmo limite do que custa a todos.
+  //
+  // A uniformidade NAO e descuido: esta escrita acima, e custou uma discordancia real entre a
+  // pessoa e o guard. Mas tambem nao foi decidida tipo a tipo.
+  //
+  // Medido (2026-09-30), para quem pegar nisto: o sempre-carregado sao 32 312 bytes, ~9 200
+  // tokens — **4,6% de um contexto de 200k**, 0,9% de 1M. Nao e uma emergencia. E a saida que o
+  // aviso deste guard sugere ("mover detalhe para src/docs/") nao existe para as duas rules
+  // carregadas: a `core-rules.md` e a `process-rules.md` nao tem `-why`, e medir mostrou porque
+  // — tem **607 bytes** de evidencia narrativa entre as duas. Nao ha o que mover; sao instrucao
+  // densa, nao historia de guerra. Criar-lhes `-why` seria mais infraestrutura do que conteudo.
+  //
+  // Por isso isto vive aqui e nao numa lista de trabalho: e uma propriedade do desenho, medida,
+  // sem evento que a force. Quem a quiser mudar tem de manter o que a uniformidade protegia —
+  // **um numero que a pessoa e o guard consigam ter os dois na cabeca**.
   const REF_NOTE_BYTES = 11500;
   const REF_MAX_BYTES = 12000;
   const REF_ABANDONO_BYTES = 20000;
