@@ -94,8 +94,7 @@
 
 ## TP6 — Blocklist de formas perigosas onde era preciso um allowlist
 
-- **Origem**: o hook `guard-protected-branch` deste template. **32 defeitos** na primeira
-  leitura; a segunda encontrou mais 22 no resultado da correcao.
+- **Origem**: o hook `guard-protected-branch` deste template — **32 defeitos** na primeira leitura.
 - **Anti-padrao**: enumerar o que e **perigoso**. As formas de escrever a mesma coisa numa
   shell nao tem fim (`eval`, `sh -c`, backticks, `$(...)`, caminho absoluto, `xargs`, `sudo`,
   `env`, `{ }`, aspas pelo meio), logo a lista **falha aberta**. Pior: cada correcao cria
@@ -145,9 +144,7 @@
 
 ## TP9 — Teste que pergunta por um caminho fixo que mudou de sitio
 
-- **Origem**: ronda 6 — apos a migracao para `tests/`, **28 de 32** ficheiros sem regra em
-  `lib/mapa-suites.mjs` e a suite verde: as regras apontavam para os caminhos de antes e o teste
-  perguntava pelos mesmos (`anti-patterns-why.md`).
+- **Origem**: a migracao para `tests/` — **28 de 32** ficheiros sem regra, com a suite verde.
 - **Anti-padrao**: escrever a mao, no teste, o **input** que ele pergunta ao codigo — tabela e
   teste envelhecem juntos e continuam de acordo.
 - **Correto**: listar o **disco** e perguntar pelo que se listou (`TP8` aplicado ao input), e um
