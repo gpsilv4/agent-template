@@ -13,6 +13,22 @@
  * AS DUAS COISAS ANDAM JUNTAS, e e o ponto todo da funcao: escrever o marcador sozinho liga o
  * Guard 13 numa fixture que ainda tem `{{ ... }}` por todo o lado, e o teste falha por avisos de
  * placeholders que nada tem a ver com o que afirma. Um derivado a serio ja os substituiu.
+ *
+ * ## O QUE ESTA FIXTURE **NAO** MONTA, e vale saber antes de confiar nela
+ *
+ * As duas rules que o bootstrap **gera** — `business-logic.md` e `pages-architecture.md` — ficam
+ * **ausentes**. A Fase 2 do `BOOTSTRAP.md` escreve-as a partir das respostas do projeto, e isso
+ * exigia inventar conteudo de dominio; aqui so se substituem placeholders no que ja existe.
+ *
+ * A consequencia e concreta e ja mordeu uma medicao: o orcamento de contexto de um projeto
+ * derivado **nao se pode medir por aqui**. Medido com esta fixture da 32 028 bytes — MENOS do
+ * que o template nu (32 312), porque os placeholders encolhem ao ser substituidos — e o numero
+ * parece tranquilizador exactamente por lhe faltarem as duas rules que o inflam. As duas passam
+ * pelo mesmo tecto de 12 000 das rules obrigatorias (`guards/budgets.mjs`), logo o pior caso
+ * conforme de um derivado sao ~56 KB por sessao, e nao 32.
+ *
+ * Fica escrito aqui, e nao so no issue, porque quem usar esta fixture para medir orcamento vai
+ * obter um numero que parece uma resposta.
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join, dirname } from "path";
