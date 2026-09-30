@@ -88,6 +88,22 @@ function soCodigo(src) {
   // Por linha, uma aspa solta estraga **essa** linha e mais nenhuma. O dano fica contido, e o
   // modo de falha passa a ser sub-reportar um uso (falso positivo isolado) em vez de apagar
   // blocos inteiros.
+  //
+  // ## O QUE ISTO NAO TIRA, e e uma limitacao ASSUMIDA: os REGEX LITERAIS
+  //
+  // Um nome que so apareca dentro de `/.../` conta como uso, e o import fica dado por vivo.
+  // Medido com uma fixture de dois imports, um real e outro so dentro de um regex: o detector
+  // diz "nenhum import por usar" e sai `0`.
+  //
+  // **Nao se corrige, e a razao e a direccao do erro.** Tirar mais texto antes de contar so
+  // pode BAIXAR a contagem de usos — logo o erro de um stripper mal feito e acusar `MORTO` em
+  // codigo VIVO, que e o modo de falha caro. E distinguir um regex de uma divisao com um
+  // `replace` linha-a-linha e a mesma aposta que ja custou os 92% acima.
+  //
+  // Fica escrito aqui e nao numa lista de trabalho pendente: e uma limitacao conhecida, nao um
+  // defeito por corrigir. Quem a quiser fechar precisa de um leitor com nocao de contexto e de
+  // uma suite nas DUAS direccoes — que apanhe o import escondido, **e** que nao invente nenhum
+  // morto nos ficheiros actuais. O segundo lado e o caro.
   return src
     .split("\n")
     .map((l) => {
