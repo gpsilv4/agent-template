@@ -11,6 +11,9 @@ import { readdirSync, rmSync, existsSync } from "fs";
 import { join, sep } from "path";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF } from "./harness/test-harness.mjs";
+// A receita do "bootstrap concluido" e uma so, no harness (`TP8`): a terceira copia vivia no
+// `test-guards.mjs` e ja tinha divergido uma vez (o `.mdc` em falta).
+import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -479,5 +482,17 @@ test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
     return { includes: ["nenhuma prosa cita um intervalo"] };
   }, { code: 0 });
 
-}
+  // Os SKIP do Guard 12 num projeto DERIVADO: vieram do `test-guards.mjs` no #171.
+  test("G12d: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
+    // O oposto do teste irmao: com o marcador de bootstrap presente, nao ter citacao do numero
+    // de guards e normal — era este ramo que punha o CI de todos os consumidores vermelho.
+    derivado(dir);
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem citacoes de contagens.\n");
+  }, { synthetic: true, code: 0, includes: ["SKIP  Guard 12d"] });
 
+  test("G12e: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
+    derivado(dir);
+    writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem contagens.\n");
+    writeF(dir, "README.md", "# Projeto\n\nSem contagens.\n");
+  }, { synthetic: true, code: 0, includes: ["SKIP  Guard 12e"] });
+}

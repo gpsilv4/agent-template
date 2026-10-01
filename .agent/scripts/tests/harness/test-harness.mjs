@@ -149,7 +149,7 @@ function runGuard(dir, cwd) {
  * unico sem rede, e estar em `PARES` nao chegava: nao havia nada que uma mutacao partisse.
  *
  * Isolada e pura, esta funcao pode ser chamada com entradas fabricadas — e e o que o
- * `tests-harness-self.mjs` faz: cada `problems.push` aqui tem um caso que o exige. Desligue-se
+ * `tests-test-harness.mjs` faz: cada `problems.push` aqui tem um caso que o exige. Desligue-se
  * um, e essa suite fica vermelha.
  */
 export function avaliar({ code, out, expect, extra = {}, base }) {

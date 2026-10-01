@@ -7,7 +7,7 @@
  * PORQUE EXISTE: a varredura de mutacao mediu **0 de 3** sitios no harness da superficie.
  * Desligar qualquer uma das suas assercoes so torna os 66 testes mais permissivos — nenhum
  * fica vermelho, e o ecra continua a dizer "todos passaram". E o mesmo buraco que o
- * `tests-harness-self.mjs` fecha do outro lado, e fecha-se da mesma maneira: o veredicto foi
+ * `tests-test-harness.mjs` fecha do outro lado, e fecha-se da mesma maneira: o veredicto foi
  * isolado como funcao pura, e aqui chama-se com entradas fabricadas, uma por assercao.
  */
 import { pathToFileURL } from "url";

@@ -106,4 +106,46 @@ export function registar() {
     writeF(dir, "package.json", JSON.stringify({ name: "x", version: "2.0.0" }));
     writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.0.0] - Velha\n\n## [v2.0.0] - Nova\n");
   }, { code: 1, includes: ["ordenar por versao decrescente"] });
+
+  // --- Guard 3: precedencia SemVer — tambem inline no `test-guards.mjs` ate ao #171 (o #156
+  // moveu so a primeira secao do Guard 3 e deixou esta para tras).
+  const withPkg = (dir, version, changelog) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version }));
+    writeF(dir, "src/docs/CHANGELOG.md", changelog);
+  };
+
+  test("G3: `version` vazia nao desliga o guard em silencio", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "" }));
+  }, { code: 1, includes: ['sem campo "version" utilizavel'] });
+
+  test("G3: beta.10 > beta.9 (numerico, nao string)", (dir) => {
+    withPkg(dir, "1.2.3-beta.10", "# CL\n\n## [v1.2.3-beta.10] - Nova\n\n## [v1.2.3-beta.9] - Velha\n");
+  }, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+  test("G3: build metadata nao conta para precedencia", (dir) => {
+    withPkg(dir, "1.2.3", "# CL\n\n## [v1.2.3+build.5] - Atual\n\n## [v1.2.2] - Velha\n");
+  }, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+  test("G3: pre-release com hifen no identificador nao empata", (dir) => {
+    withPkg(dir, "1.2.3-beta-9", "# CL\n\n## [v1.2.3-beta-9] - Nova\n\n## [v1.2.3-beta-2] - Velha\n");
+  }, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+  test("G3: build metadata nao torna a ordenacao invalida", (dir) => {
+    // O topo e a entrada seguinte sao a MESMA versao por precedencia (spec §10) e
+    // diferentes por string. A verificacao de ordenacao comparava strings e avisava.
+    withPkg(dir, "1.2.3", "# CL\n\n## [v1.2.3] - Atual\n\n## [v1.2.3+build.5] - Rebuild\n");
+  }, { code: 0, excludes: ["ordenar por versao decrescente"] });
+
+  test("G3: ordem ERRADA em pre-releases numericos e apanhada", (dir) => {
+    withPkg(dir, "1.2.3-rc.10", "# CL\n\n## [v1.2.3-rc.2] - Topo errado\n\n## [v1.2.3-rc.10] - Maior\n");
+  }, { code: 1, includes: ["ordenar por versao decrescente"] });
+
+  // A NOTE do Guard 3 (CHANGELOG sem entrada de versao): veio do `test-guards.mjs` no #171.
+  test("G3: CHANGELOG sem entrada de versao da NOTE visivel", (dir) => {
+    // O Guard 3 so chega a este ramo com um `package.json` (senao salta antes, com outra
+    // mensagem). O CHANGELOG fica sem nenhum `## [vX.Y.Z]` — que e o estado do template, e o
+    // guard tem de DIZER que nao tinha nada a comparar, em vez de passar calado.
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.0.0" }, null, 2) + "\n");
+    writeF(dir, "src/docs/CHANGELOG.md", "# Changelog\n\nSem entradas ainda.\n");
+  }, { code: 0, includes: ["ainda sem entrada de versao"] });
 }
