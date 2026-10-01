@@ -442,3 +442,36 @@ varredura a meio nao e de confianca sem essa comparacao.**
 **A licao de segunda ordem**: nada no repo detecta isto. Os hooks cobrem a fronteira de
 ficheiros, nao a forma como uma string chega ao shell. A deteccao e um `grep` no `/review`, e um
 habito: **se a string leva backticks, nao vai num `-m`**.
+
+## TP11 — `cmd | grep -q` num `if`, com `pipefail`
+
+**Origem**: a analise do tempo de CI (`#161`) leu o gatilho da varredura de mutacao a procura de
+filtros a mais, e encontrou um que falhava **aberto**:
+
+```bash
+set -euo pipefail
+if git diff --name-only "$base..HEAD" | grep -qE '^(\.agent/scripts/|...)'; then
+  node .agent/scripts/mutation-sweep.mjs
+else
+  echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
+fi
+```
+
+**Medido** (o step extraido do `ci.yml`, com um `git` falso):
+
+| cenario | antes | depois |
+|---|---|---|
+| `git diff` falha (128) | "nao aplicavel", exit 0 | exit 128 |
+| match na 1.a de 200 000 linhas | "nao aplicavel", exit 0 | corre |
+| match, diff pequeno | corre | corre |
+| sem match / diff vazio | "nao aplicavel" | "nao aplicavel" |
+
+**Porque nada ficou vermelho.** Os dois casos maus nao acontecem num PR normal: o diff de nomes
+cabe no buffer do pipe (~64 KB) e o `git diff` acaba de escrever antes de o `grep` sair. O
+defeito esta la, dormente, ate um PR com milhares de ficheiros — um rename de pasta, uma
+migracao — que e exactamente o PR onde a varredura mais importa.
+
+**O erro de leitura que isto me apanhou a mim.** A primeira correcao foi `x="$(git diff)"` e
+depois `printf '%s\n' "$x" | grep -q`, com o comentario "o `printf` e builtin". Correr a
+correcao antes de confiar no comentario mostrou o mesmo "nao aplicavel": num pipe o builtin
+corre num **subshell** e leva o SIGPIPE como qualquer processo. O here-string tira o pipe.

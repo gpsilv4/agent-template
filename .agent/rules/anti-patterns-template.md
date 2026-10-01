@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP10) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP11) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -162,3 +162,12 @@
   ticket sobre `rm` **e** esse comando. Fica latente enquanto o conteudo for inofensivo.
 - **Correto**: por FICHEIRO (`-F`, `--body-file`) ou heredoc com delimitador entre plicas.
 - **Detecao em review**: `git grep -nE '(-m|--message|--body) "[^"]*\`'`.
+
+## TP11 — `cmd | grep -q` num `if`, com `pipefail`
+
+- **Origem**: `#155`, o gatilho da varredura no `ci.yml`.
+- **Anti-padrao**: `if cmd | grep -q X; then ... else "nao aplicavel"`. Com `pipefail` o `else`
+  apanha `cmd` a falhar e o SIGPIPE de `cmd` quando `grep -q` sai no match (`TP2`).
+- **Correto**: `x="$(cmd)"`, depois `grep -q X <<<"$x" || rc=$?` (1 = sem match, 2 = erro).
+  `printf "$x" |` nao resolve: o builtin leva o mesmo SIGPIPE.
+- **Detecao em review**: `git grep -nE '\|\s*grep\s+-[a-zA-Z]*q' -- '*.yml' '*.sh' '*.mjs'`.
