@@ -27,6 +27,17 @@ import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
+// TP4: modulos DESCOBERTOS em disco. No TOPO (#156): o dono do alvo corre antes da baseline.
+const descoberta = await registaDescobertos({
+  dir: dirname(fileURLToPath(import.meta.url)),
+  entryPoint: "test-guards.mjs",
+  contagem,
+  // A lista vive em `lib/registo.mjs`: tinha tres copias a concordar a mao (`TP8`).
+  conhecidos: ENTRY_POINTS,
+  aoFimDoDono: resumo,
+});
+console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
+
 // --- Baseline -----------------------------------------------------------------
 // Estes dois nao usam `test()`: correm contra a fixture sintetica, nao contra o repo.
 {
@@ -125,44 +136,7 @@ test("G2: par incompleto avisa", (dir) => {
   rmSync(file(dir, "GEMINI.md"));
 }, { code: 1, includes: ["nao o par"] });
 
-// --- Guard 3: versoes ---------------------------------------------------------
-test("G3: sem package.json da SKIP visivel", null, {
-  code: 0,
-  includes: ["SKIP  Guard 3"],
-});
-
-test("G3: versao divergente avisa", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
-  writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.0.0] - Antiga\n");
-}, { code: 1, includes: ["!= maior versao do CHANGELOG"] });
-
-test("G3: CHANGELOG ausente com package.json presente avisa", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
-  rmSync(file(dir, "src/docs/CHANGELOG.md"));
-}, { code: 1, includes: ["CHANGELOG.md nao encontrado"] });
-
-test("G3: package.json sem campo version avisa", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x" }));
-}, { code: 1, includes: ['sem campo "version"'] });
-
-test("G3: package.json invalido avisa", (dir) => {
-  writeF(dir, "package.json", "{ not json,, }");
-}, { code: 1, includes: ["package.json invalido"] });
-
-test("G3: heading sem brackets e aceito (## v1.2.3)", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
-  writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## v1.2.3 - Atual\n");
-}, { code: 0, includes: ["=== package.json"] });
-
-test("G3: headings sem nenhuma versao valida avisa formato", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
-  writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## Release de Marco\n\n## Outra\n");
-}, { code: 1, includes: ["formato invalido"] });
-
-test("G3: CHANGELOG em ordem ascendente avisa ordenacao", (dir) => {
-  writeF(dir, "package.json", JSON.stringify({ name: "x", version: "2.0.0" }));
-  writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.0.0] - Velha\n\n## [v2.0.0] - Nova\n");
-}, { code: 1, includes: ["ordenar por versao decrescente"] });
+// --- Guard 3: versoes --- no `tests-versions.mjs`, o modulo DONO do guard (#156).
 
 // --- Guard 4: termos banidos (o bug do lastIndex) -----------------------------
 // Injeta uma entrada em BANNED com um termo presente em CLAUDE.md E GEMINI.md.
@@ -484,15 +458,5 @@ test("G12e: num projeto DERIVADO a citacao ausente e SKIP, nao WARN", (dir) => {
   writeF(dir, ".agent/BOOTSTRAP.md", "# Bootstrap\n\nSem contagens.\n");
   writeF(dir, "README.md", "# Projeto\n\nSem contagens.\n");
 }, { synthetic: true, code: 0, includes: ["SKIP  Guard 12e"] });
-
-// TP4: os modulos sao DESCOBERTOS em disco, nao chamados a mao. Ver `lib/registo.mjs`.
-const descoberta = await registaDescobertos({
-  dir: dirname(fileURLToPath(import.meta.url)),
-  entryPoint: "test-guards.mjs",
-  contagem,
-  // A lista vive em `lib/registo.mjs`: tinha tres copias a concordar a mao (`TP8`).
-  conhecidos: ENTRY_POINTS,
-});
-console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
 
 resumo();

@@ -19,6 +19,9 @@ import { dirname, resolve, join } from "path";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const REGISTO = resolve(AQUI, "..", "lib", "registo.mjs");
+const RELATORIO = resolve(AQUI, "harness", "relatorio.mjs");
+// As chaves e a marca importam-se da fonte, nao se reescrevem aqui (`TP8`).
+const { ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO } = await import(resolve(AQUI, "..", "lib", "ordem-por-alvo.mjs"));
 
 let passed = 0;
 const falhas = [];
@@ -120,7 +123,89 @@ function test(nome, cenario, esperado) {
   }
 }
 
+/** A ORDEM POR ALVO (#156). Entry point sintetico que usa o `relatorio.mjs` REAL — o
+ *  `aoFimDoDono` e o `resumo()` de verdade, nao um stub: e o exit code dele que a prova do
+ *  prefixo le, e um stub mediria outra coisa. Cada modulo imprime `CORREU:<nome>`. */
+function correOrdem({ modulos, env = {}, entryPoint = "test-guards.mjs", aoFimDoDono = "resumo" }) {
+  const dir = mkdtempSync(join(tmpdir(), "registo-test-ordem-"));
+  try {
+    for (const [nome, conteudo] of Object.entries(modulos)) writeFileSync(join(dir, nome), conteudo);
+    writeFileSync(join(dir, "test-guards.mjs"), "// entry point vizinho\n");
+    writeFileSync(
+      join(dir, "entry.mjs"),
+      `import { registaDescobertos } from ${JSON.stringify(REGISTO)};\n` +
+        `import { contagem, resumo } from ${JSON.stringify(RELATORIO)};\n` +
+        `const r = await registaDescobertos({ dir: ${JSON.stringify(dir)}, entryPoint: ${JSON.stringify(entryPoint)},\n` +
+        `  conhecidos: ["test-guards.mjs", "entry.mjs"], contagem${aoFimDoDono ? `, aoFimDoDono: ${aoFimDoDono}` : ""} });\n` +
+        `console.log("REGISTADOS:" + r.registados.join(","));\nresumo();\n`
+    );
+    const base = { ...process.env };
+    for (const k of [ENV_ALVO, ENV_SO_DONO, "SWEEP_FAIL_FAST"]) delete base[k];
+    try {
+      return { code: 0, out: execFileSync(process.execPath, [join(dir, "entry.mjs")], { encoding: "utf8", env: { ...base, ...env } }) };
+    } catch (err) {
+      return { code: err.status ?? -1, out: (err.stdout || "") + (err.stderr || "") };
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+function testOrdem(nome, cenario, esperado) {
+  const { code, out } = correOrdem(cenario);
+  const problemas = [];
+  if (code !== esperado.code) problemas.push(`exit ${code}, esperado ${esperado.code}`);
+  for (const s of esperado.includes ?? []) if (!out.includes(s)) problemas.push(`output devia conter ${JSON.stringify(s)}`);
+  for (const s of esperado.excludes ?? []) if (out.includes(s)) problemas.push(`output NAO devia conter ${JSON.stringify(s)}`);
+  if (esperado.antes && !(out.indexOf(esperado.antes[0]) > -1 && out.indexOf(esperado.antes[0]) < out.indexOf(esperado.antes[1]))) {
+    problemas.push(`${JSON.stringify(esperado.antes[0])} devia aparecer antes de ${JSON.stringify(esperado.antes[1])}`);
+  }
+  if (problemas.length) {
+    falhas.push({ nome, problemas, out });
+    console.log(`  FAIL  ${nome}`);
+    for (const p of problemas) console.log(`          ${p}`);
+  } else {
+    passed++;
+    console.log(`  PASS  ${nome}`);
+  }
+}
+/** Modulo de teste que usa o relatorio real: `falha` decide se o seu unico teste falha. */
+const MOD = (nome, { ep = "test-guards.mjs", falha = false, vazio = false } = {}) =>
+  `import { passou, falhou } from ${JSON.stringify(RELATORIO)};\nexport const entryPoint = ${JSON.stringify(ep)};\n` +
+  `export function registar() { console.log("CORREU:${nome}");${vazio ? "" : falha ? ` falhou("t-${nome}", ["x"], "");` : ` passou("t-${nome}");`} }\n`;
+
 console.log("\n=== Registo por descoberta — testes negativos ===\n");
+
+// --- Ordem por alvo (#156) -----------------------------------------------------
+const AB = { "tests-a.mjs": MOD("a"), "tests-b.mjs": MOD("b") };
+testOrdem("ordem por alvo: sem ENV_ALVO, ordem alfabetica e sem marca", { modulos: AB },
+  { code: 0, includes: ["REGISTADOS:tests-a.mjs,tests-b.mjs"], excludes: [MARCA_FIM_DO_DONO] });
+testOrdem("ordem por alvo: o dono corre PRIMEIRO, uma vez, e a marca vem logo depois dele", { modulos: AB, env: { [ENV_ALVO]: ".agent/x/b.mjs" } },
+  { code: 0, includes: ["REGISTADOS:tests-b.mjs,tests-a.mjs", "2 passaram"], antes: ["CORREU:b", MARCA_FIM_DO_DONO] });
+testOrdem("ordem por alvo: a marca vem ANTES dos outros modulos", { modulos: AB, env: { [ENV_ALVO]: ".agent/x/b.mjs" } },
+  { code: 0, antes: [MARCA_FIM_DO_DONO, "CORREU:a"] });
+testOrdem("ordem por alvo: entry point fora de ORDENA_POR_ALVO ignora o ENV_ALVO",
+  { modulos: { "tests-a.mjs": MOD("a", { ep: "entry.mjs" }), "tests-b.mjs": MOD("b", { ep: "entry.mjs" }) }, entryPoint: "entry.mjs", env: { [ENV_ALVO]: ".agent/x/b.mjs" } },
+  { code: 0, includes: ["REGISTADOS:tests-a.mjs,tests-b.mjs"], excludes: [MARCA_FIM_DO_DONO] });
+testOrdem("ordem por alvo: nome PARECIDO nao e dono (tests-bb para b.mjs)", { modulos: { "tests-a.mjs": MOD("a"), "tests-bb.mjs": MOD("bb") }, env: { [ENV_ALVO]: ".agent/x/b.mjs" } },
+  { code: 0, includes: ["REGISTADOS:tests-a.mjs,tests-bb.mjs"], excludes: [MARCA_FIM_DO_DONO] });
+testOrdem("ordem por alvo: modulo com o nome do dono mas de OUTRO entry point nao e dono",
+  { modulos: { "tests-a.mjs": MOD("a"), "tests-b.mjs": MOD("b", { ep: "entry.mjs" }) }, env: { [ENV_ALVO]: ".agent/x/b.mjs" } },
+  { code: 0, excludes: [MARCA_FIM_DO_DONO, "CORREU:b"] });
+testOrdem("SO_DONO: corre so o dono e sai pelo aoFimDoDono (exit 0, os outros nao correm)", { modulos: AB, env: { [ENV_ALVO]: ".agent/x/b.mjs", [ENV_SO_DONO]: "1" } },
+  { code: 0, includes: ["CORREU:b", MARCA_FIM_DO_DONO, "1 passaram"], excludes: ["CORREU:a", "REGISTADOS:"] });
+// O controlo do bloqueante 3 do plan-auditor: SEM fail-fast, um FAIL do dono tem de sair 1 — o
+// registo nao sabe das falhas, quem decide e o resumo() real.
+testOrdem("SO_DONO: um FAIL do dono sai 1, mesmo sem fail-fast",
+  { modulos: { "tests-a.mjs": MOD("a"), "tests-b.mjs": MOD("b", { falha: true }) }, env: { [ENV_ALVO]: ".agent/x/b.mjs", [ENV_SO_DONO]: "1" } },
+  { code: 1, includes: ["FAIL  t-b", MARCA_FIM_DO_DONO], excludes: ["CORREU:a"] });
+testOrdem("SO_DONO sem aoFimDoDono reprova — o registo nao decide exit codes", { modulos: AB, aoFimDoDono: null, env: { [ENV_ALVO]: ".agent/x/b.mjs", [ENV_SO_DONO]: "1" } },
+  { code: 1, includes: ["nao passou `aoFimDoDono`"], excludes: ["CORREU:"] });
+testOrdem("SO_DONO com um aoFimDoDono que VOLTA reprova", { modulos: AB, aoFimDoDono: "() => {}", env: { [ENV_ALVO]: ".agent/x/b.mjs", [ENV_SO_DONO]: "1" } },
+  { code: 1, includes: ["voltou sem sair"], excludes: ["CORREU:a"] });
+testOrdem("dono que nao regista nenhum teste reprova ANTES da marca",
+  { modulos: { "tests-a.mjs": MOD("a"), "tests-b.mjs": MOD("b", { vazio: true }) }, env: { [ENV_ALVO]: ".agent/x/b.mjs", [ENV_SO_DONO]: "1" } },
+  { code: 1, includes: ["nao registou nenhum teste"], excludes: [MARCA_FIM_DO_DONO] });
+
 
 // Um modulo valido: declara o entry point e regista um "teste".
 const OK = (ep = "entry.mjs") =>

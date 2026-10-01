@@ -52,6 +52,9 @@ copia do repo** — a copia por worker nao e detalhe. `--workers=1` devolve o se
 comparar sem mudar mais nada. Ganho medido e o custo da copia partilhada: `scripts-guide-why.md`.
 Cada corrida mutada tem **timeout** (5x a baseline da suite, piso 60 s): um timeout e **nao
 medido**, nomeia o sitio no momento e reprova (`#154`, porque em `lib/varredura-paralela.mjs`).
+No `test-guards`, o modulo **dono** do alvo (o de `guards/settings.mjs` e o `tests-settings.mjs`) corre **primeiro**:
+provado verde sozinho antes, e qualquer vermelho de fora dele confirmado na ordem normal (`#156`,
+`lib/ordem-por-alvo.mjs`). Os testes de um guard vivem no dono dele, ou nao ganham nada.
 
 **Os tempos nao se escrevem aqui.** Vivem no cabecalho do `mutation-sweep.mjs`, que e codigo e
 nao tem orcamento, com a visibilidade do repo ao lado (publico/privado duplica); a evidencia esta

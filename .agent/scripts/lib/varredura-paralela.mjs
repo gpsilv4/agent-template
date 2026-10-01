@@ -31,10 +31,11 @@
  * a ser o **Guard 19** (`guards/isolamento.mjs`).
  */
 
-import { writeFileSync } from "fs";
+import { writeFileSync, readFileSync, readdirSync } from "fs";
 import { spawn } from "child_process";
 import { cpus } from "os";
-import { join } from "path";
+import { join, dirname, basename } from "path";
+import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE_TESTE, donoDe } from "./ordem-por-alvo.mjs";
 
 /** Quantos processos em paralelo, a partir do que o utilizador pediu.
  *
@@ -66,7 +67,13 @@ const passa = (suiteCopia, cwd, extraEnv, limiteMs = TETO_BASELINE_MS) =>
     // `spawn` e nao `execFile`: o `execFile` **nao passa o `detached` ao `spawn`** — medido, a
     // suite ficava no grupo do pai, o `kill(-pid)` dava `ESRCH` e o neto sobrevivia. O teste do
     // mutante pendurado apanhou-o pendurando ele proprio.
-    const opts = { cwd, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], ...(extraEnv ? { env: { ...process.env, ...extraEnv } } : {}) };
+    // O ambiente HERDADO perde as chaves da propria varredura antes de levar as desta corrida
+    // (leitor independente do #156): com um `SWEEP_ALVO`/`SWEEP_SO_DONO` exportado a mao, a
+    // BASELINE corria so o dono e saia 0 — verde sobre uma suite parcial, falha aberta. E a mesma
+    // defesa do `tests-fail-fast.mjs`, aplicada no unico sitio por onde as suites sao lancadas.
+    const env = { ...process.env };
+    for (const k of [...Object.keys(FAIL_FAST_ENV), ENV_ALVO, ENV_SO_DONO]) delete env[k];
+    const opts = { cwd, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], env: { ...env, ...(extraEnv ?? {}) } };
     const t0 = Date.now();
     let estourou = false;
     // stdout e stderr acumulados EM SEPARADO e juntos so no fim, como o `execFile` fazia:
@@ -112,7 +119,7 @@ const passa = (suiteCopia, cwd, extraEnv, limiteMs = TETO_BASELINE_MS) =>
     filho.on("error", (err) => {
       if (resolvido) return;
       resolvido = true;
-      out += String(err);
+      saida.stderr += String(err);
       fim(-1);
     });
     filho.on("close", (codigo) => {
@@ -181,6 +188,9 @@ export const FAIL_FAST_ENV = { SWEEP_FAIL_FAST: "1" };
  *  rebentou. As treze suites deste repo imprimem a mesma forma — medido, nao assumido. */
 const PROVA_DE_FALHA = /^\s*FAIL\s/m;
 
+/** O veredicto de UMA corrida mutada, para comparar a ordem nova com a normal (#156). */
+const veredicto = (r) => (r.timeout ? "timeout" : r.ok ? "verde" : PROVA_DE_FALHA.test(r.out) ? "coberto" : "rebentou");
+
 /** N tarefas de cada vez, cada worker com um indice FIXO — e o indice e que lhe da a copia.
  *  Sem indice fixo, duas tarefas concorrentes podiam cair na mesma arvore, que e precisamente a
  *  contaminacao que este desenho existe para evitar. */
@@ -200,7 +210,8 @@ export async function emParalelo(lista, n, fn) {
  *                Tudo o que se decide SEM correr nada (alvo ausente, sinal errado, sem suite,
  *                linha ambigua) ja foi decidido por quem chama — aqui so entra o que e para medir.
  * @param copias  uma copia do repo por worker. `copias.length` **e** o grau de paralelismo.
- * @returns {Promise<{baselinesVermelhas: Array<{suite, falhas: string[]}>, resultados: Array<{alvo, suite, total, naoCobertos}>}>}
+ * @returns {Promise<{baselinesVermelhas: Array<{suite, falhas: string[]}>, ordemDependente: string[],
+ *          resultados: Array<{alvo, suite, total, naoCobertos, ordemLigada, confirmacoes, divergencias}>}>}
  *          `resultados` vem na ordem de `medir` — nunca na ordem por que os workers acabaram.
  */
 export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS }) {
@@ -242,12 +253,66 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
         : (baseline.get(suite).out ?? "").split("\n").filter((l) => PROVA_DE_FALHA.test(l)).slice(0, 5).map((l) => l.trim()),
     }));
   const medidos = medir.filter((m) => baseline.get(m.suite).ok);
+  const limiteDe = (m) => Math.max(pisoMs, FATOR_TIMEOUT * baseline.get(m.suite).ms);
+
+  // --- 1b. Ordem por alvo: a PROVA DO PREFIXO (#156) ---------------------------
+  // Para os alvos cuja suite honra a ordem (`ORDENA_POR_ALVO`) e que tem dono, o dono corre
+  // primeiro nos mutantes. Antes disso prova-se que ele fica VERDE a correr primeiro e sozinho,
+  // sem mutacao — senao um vermelho do dono podia vir de faltar preparacao e nao da mutacao, e
+  // seria cobertura que nao existe.
+  //
+  // O dono e calculado SEM correr nada: os modulos da pasta da suite, filtrados pelo
+  // `entryPoint` lido como TEXTO. Importa-los correria o topo do harness (guards, `process.exit`).
+  // Se esta leitura divergir da do registo, a marca nao aparece e o alvo cai em ORDEM DEPENDENTE:
+  // a falha e para o lado fechado.
+  const modulosDe = new Map();
+  const donoDoAlvo = (m) => {
+    const suite = basename(m.suite);
+    if (!ORDENA_POR_ALVO.includes(suite)) return null;
+    if (!modulosDe.has(suite)) {
+      const pasta = join(copias[0], dirname(m.suite));
+      const declara = (n) => {
+        try {
+          return readFileSync(join(pasta, n), "utf8").match(/export const entryPoint = ["\x27`]([^"\x27`]+)/)?.[1];
+        } catch {
+          return undefined; // ilegivel: nao e dono — o lado lento
+        }
+      };
+      // Sem o `fatal` do registo: uma pasta ilegivel aqui so significa "sem dono" — ordem normal,
+      // o lado lento e nunca o errado.
+      let nomes = [];
+      try {
+        nomes = readdirSync(pasta, { withFileTypes: true }).filter((e) => e.isFile() && EH_MODULO_DE_TESTE.test(e.name)).map((e) => e.name).sort();
+      } catch {
+        nomes = [];
+      }
+      modulosDe.set(suite, nomes.filter((n) => declara(n) === suite));
+    }
+    return donoDe(m.alvo, modulosDe.get(suite));
+  };
+  const comDono = medidos.filter((m) => donoDoAlvo(m));
+  const ligada = new Set();
+  const ordemDependente = [];
+  await emParalelo(comDono, workers, async (m, w) => {
+    const r = await passa(join(copias[w], m.suite), copias[w], { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo, [ENV_SO_DONO]: "1" }, limiteDe(m));
+    if (r.ok && r.out.includes(MARCA_FIM_DO_DONO)) return void ligada.add(m.alvo);
+    // Reprova (quem chama decide o exit): um dono que nao fica verde sozinho e um defeito de
+    // isolamento real, e sem reprovar o ganho desaparecia em silencio, alvo a alvo. O veredicto
+    // deste alvo continua correcto — mede-se na ordem normal.
+    // As tres causas dizem-se em separado: "verde mas sem marca" e o motor e o registo a
+    // discordarem de quem e o dono, nao um dono que depende de outro modulo.
+    const porque = r.timeout ? "nao terminou (timeout)" : r.ok ? "ficou verde mas sem a marca — o registo nao o reconheceu como dono" : "nao fica verde a correr primeiro e sozinho";
+    console.log(`  ORDEM DEPENDENTE  ${m.alvo}: o dono (${donoDoAlvo(m)}) ${porque}`);
+    ordemDependente.push(m.alvo);
+  });
 
   // --- 2. A fila de (alvo, sitio) --------------------------------------------
   // Por ITEM e nao por alvo: por alvo, o maior sozinho (`guards/settings.mjs`, 22 sitios) fixava um
   // tecto de ~11 minutos que nenhum outro worker podia ajudar a baixar.
   const itens = medidos.flatMap((m, t) => m.sitios.map((i) => ({ t, i })));
   const naoCobertos = medidos.map(() => []);
+  const confirmacoes = medidos.map(() => 0);
+  const divergencias = medidos.map(() => 0);
 
   await emParalelo(itens, workers, async ({ t, i }, w) => {
     const m = medidos[t];
@@ -258,11 +323,31 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
     const match = m.visiveis[i].match(m.sinal);
     mut[i] = m.linhas[i].slice(0, match.index) + m.neutro + m.linhas[i].slice(match.index + match[0].length);
     writeFileSync(alvoCopia, mut.join("\n"));
-    const limite = Math.max(pisoMs, FATOR_TIMEOUT * baseline.get(m.suite).ms);
-    const r = await passa(join(copias[w], m.suite), copias[w], FAIL_FAST_ENV, limite);
+    const limite = limiteDe(m);
+    const suite = join(copias[w], m.suite);
+    let r;
+    if (ligada.has(m.alvo)) {
+      r = await passa(suite, copias[w], { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo }, limite);
+      // So conta SEM confirmacao um `FAIL` do DONO: o fail-fast sai no primeiro `FAIL`, antes de a
+      // marca ser impressa, logo "FAIL e marca ausente" = apanhado dentro do dono, sobre um
+      // prefixo provado verde. QUALQUER outra coisa (FAIL de fora, verde, rebentou, timeout)
+      // repete-se na ordem normal, e vale essa: nenhum veredicto da ordem nova fica por medir.
+      const doDono = !r.ok && !r.timeout && PROVA_DE_FALHA.test(r.out) && !r.out.includes(MARCA_FIM_DO_DONO);
+      if (!doDono) {
+        const normal = await passa(suite, copias[w], FAIL_FAST_ENV, limite);
+        confirmacoes[t]++;
+        if (veredicto(normal) !== veredicto(r)) {
+          console.log(`  ORDEM MUDOU O VEREDICTO  ${m.alvo}:${i + 1} — vale o da ordem normal (${veredicto(normal)}, nao ${veredicto(r)})`);
+          divergencias[t]++;
+        }
+        r = normal;
+      }
+    } else {
+      r = await passa(suite, copias[w], FAIL_FAST_ENV, limite);
+    }
     const ficouVermelha = !r.ok;
-    // Repor ANTES de o worker pegar no item seguinte: o proximo item pode ser de outro alvo, e
-    // uma copia deixada suja envenenava-o.
+    // Repor ANTES de o worker pegar no item seguinte (e DEPOIS da confirmacao, que tem de ver a
+    // mesma mutacao): o proximo item pode ser de outro alvo, e uma copia suja envenenava-o.
     writeFileSync(alvoCopia, m.src);
     const entrada = { ln: i + 1, txt: m.linhas[i].trim().slice(0, 90) };
     if (r.timeout) {
@@ -281,10 +366,14 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
 
   return {
     baselinesVermelhas,
+    ordemDependente,
     resultados: medidos.map((m, t) => ({
       alvo: m.alvo,
       suite: m.suite,
       total: m.sitios.length,
+      ordemLigada: ligada.has(m.alvo),
+      confirmacoes: confirmacoes[t],
+      divergencias: divergencias[t],
       // Ordenado por linha: a ordem de conclusao dos workers nao pode aparecer no relatorio, senao
       // duas corridas da mesma arvore deixam de se poder comparar com um `diff`.
       naoCobertos: naoCobertos[t].sort((a, b) => a.ln - b.ln),

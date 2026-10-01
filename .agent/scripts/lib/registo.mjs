@@ -21,6 +21,7 @@
 import { readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
+import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE_TESTE, donoDe } from "./ordem-por-alvo.mjs";
 
 /** Recusa com a razao e o que fazer. Nunca "passa por nao ter conseguido medir". */
 function fatal(msg) {
@@ -40,7 +41,7 @@ export function descobreModulos(dir) {
     fatal(`nao consegui ler ${dir}: ${err.message}`);
   }
   return entradas
-    .filter((e) => e.isFile() && /^tests-.*\.mjs$/.test(e.name))
+    .filter((e) => e.isFile() && EH_MODULO_DE_TESTE.test(e.name))
     .map((e) => e.name)
     .sort();
 }
@@ -73,7 +74,8 @@ export const ENTRY_POINTS = [
   "test-simulate-upgrade.mjs",
 ];
 
-export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, conhecidos }) {
+// A ordem por alvo (#156) vive em `./ordem-por-alvo.mjs`, partilhada com o motor da varredura.
+export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, conhecidos, aoFimDoDono }) {
   if (typeof contagem !== "function") fatal("registaDescobertos precisa de `contagem()` para medir o contributo de cada modulo");
   if (!entryPoint) fatal("registaDescobertos precisa de `entryPoint` — sem ele nao sabe que modulos sao seus");
   // `conhecidos` era OPCIONAL (`if (conhecidos && ...)`), logo um entry point que o
@@ -95,6 +97,10 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
 
   const registados = [];
   const deOutros = [];
+  // DUAS passagens: importar e validar todos primeiro (as mesmas recusas de sempre), e so depois
+  // registar. Sem isto nao se sabe qual e o dono antes de o registar — o `entryPoint` vive
+  // dentro de cada modulo.
+  const meus = [];
   for (const nome of nomes) {
     let mod;
     try {
@@ -144,7 +150,18 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
     if (typeof mod.registar !== "function") {
       fatal(`${nome} nao exporta \`registar()\` — todo o modulo \`tests-*.mjs\` tem de o exportar`);
     }
+    meus.push({ nome, mod });
+  }
 
+  const ordena = ORDENA_POR_ALVO.includes(entryPoint) && Boolean(process.env[ENV_ALVO]);
+  const dono = ordena ? donoDe(process.env[ENV_ALVO], meus.map((m) => m.nome)) : null;
+  const soDono = ordena && process.env[ENV_SO_DONO] === "1";
+  if (soDono && typeof aoFimDoDono !== "function") {
+    fatal(`${ENV_SO_DONO} pedido, mas ${entryPoint} nao passou \`aoFimDoDono\` — sem ele o registo teria de decidir o exit code, e nao sabe das falhas`);
+  }
+  if (dono) meus.sort((a, b) => (a.nome === dono ? -1 : b.nome === dono ? 1 : 0));
+
+  for (const { nome, mod } of meus) {
     const antes = contagem();
     mod.registar(ctx);
     const depois = contagem();
@@ -156,6 +173,15 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
       );
     }
     registados.push(nome);
+    // Por ESTA ordem (2.a passagem do `plan-auditor`): a contribuicao ja foi conferida acima (um
+    // dono com 0 testes reprova antes de haver marca), depois a marca, depois o fim.
+    if (nome === dono) {
+      console.log(MARCA_FIM_DO_DONO);
+      if (soDono) {
+        aoFimDoDono();
+        fatal(`\`aoFimDoDono\` voltou sem sair — a prova do prefixo continuaria a registar modulos`);
+      }
+    }
   }
 
   if (registados.length === 0) {

@@ -91,7 +91,7 @@ export const SUITES = [
   // suite dela e a unica que exercita o contra-caso (o processo vivo que nao se toca).
   { re: /^\.agent\/scripts\/(lib\/tmp-limpo|tests\/test-tmp-limpo)\.mjs$/, verifica: [S("test-tmp-limpo.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
-  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/test-sweep-harness\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/(test-sweep-harness|fixture-ordem)\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
   { re: /^\.agent\/scripts\/(lib\/mapa-suites|tests\/test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
@@ -132,6 +132,8 @@ export const SUITES = [
   // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A
   // regra vem ANTES da geral de `lib/` porque o mapa decide pela primeira que casa.
   { re: /^\.agent\/scripts\/lib\/derivado-maduro\.mjs$/, verifica: [S("test-derivado-maduro.mjs"), S("test-simulate-derived.mjs")] },
+  // A ordem por alvo (#156) e lida pelo REGISTO e pelo MOTOR da varredura: as duas suites.
+  { re: /^\.agent\/scripts\/lib\/ordem-por-alvo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },

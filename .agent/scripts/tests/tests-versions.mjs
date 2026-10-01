@@ -14,7 +14,8 @@
  * para isso que existe. Um teste que assuma a lista vazia esta a afirmar sobre o estado do
  * repo e nao sobre o guard, e fica vermelho no consumidor sem nada estar partido (`TP3`).
  */
-import { test, readF, writeF } from "./harness/test-harness.mjs";
+import { rmSync } from "fs";
+import { test, readF, writeF, file } from "./harness/test-harness.mjs";
 import { aplica } from "../lib/patch.mjs";
 import { pathToFileURL } from "url";
 
@@ -62,4 +63,47 @@ export function registar() {
       LISTA,
       'const CHECKS = [{ name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+)/g, files: [".agent/rules/core-rules.md"] },\n];'));
   }, { code: 0, includes: ["SKIP  Guards de versoes de dependencias — sem package.json"] });
+
+  // --- Guard 3 (versao do package.json vs CHANGELOG) ------------------------------
+  // Viviam INLINE no `test-guards.mjs`. A varredura poe o modulo dono do alvo a correr primeiro
+  // (#156), e o dono do `guards/versions.mjs` e ESTE modulo pela convencao — mas so tinha os dois
+  // testes das deps acima. Os 7 sitios do Guard 3 eram mortos de fora do dono, e cada mutante
+  // pagava duas corridas completas (medido: 7 de 10 confirmacoes nos alvos `guards/`).
+  test("G3: sem package.json da SKIP visivel", null, {
+    code: 0,
+    includes: ["SKIP  Guard 3"],
+  });
+
+  test("G3: versao divergente avisa", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.0.0] - Antiga\n");
+  }, { code: 1, includes: ["!= maior versao do CHANGELOG"] });
+
+  test("G3: CHANGELOG ausente com package.json presente avisa", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
+    rmSync(file(dir, "src/docs/CHANGELOG.md"));
+  }, { code: 1, includes: ["CHANGELOG.md nao encontrado"] });
+
+  test("G3: package.json sem campo version avisa", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x" }));
+  }, { code: 1, includes: ['sem campo "version"'] });
+
+  test("G3: package.json invalido avisa", (dir) => {
+    writeF(dir, "package.json", "{ not json,, }");
+  }, { code: 1, includes: ["package.json invalido"] });
+
+  test("G3: heading sem brackets e aceito (## v1.2.3)", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## v1.2.3 - Atual\n");
+  }, { code: 0, includes: ["=== package.json"] });
+
+  test("G3: headings sem nenhuma versao valida avisa formato", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## Release de Marco\n\n## Outra\n");
+  }, { code: 1, includes: ["formato invalido"] });
+
+  test("G3: CHANGELOG em ordem ascendente avisa ordenacao", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "2.0.0" }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.0.0] - Velha\n\n## [v2.0.0] - Nova\n");
+  }, { code: 1, includes: ["ordenar por versao decrescente"] });
 }
