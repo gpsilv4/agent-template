@@ -362,10 +362,23 @@ jobs:
             echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
             exit 0
           fi
-          if git diff --name-only "$base..HEAD" | grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)'; then
+          # SEM PIPE, e de proposito. Com `pipefail`, `git diff | grep -q` caia no `else` em
+          # VERDE por dois caminhos: um `git diff` que falha, e o SIGPIPE que o `grep -q` provoca
+          # ao sair no primeiro match com o escritor ainda a escrever — "nao aplicavel"
+          # precisamente quando havia match (TP11). Trocar o `git diff` por `printf "$x" |` NAO
+          # resolve: o builtin corre num subshell do pipe e leva o mesmo SIGPIPE (medido, #155).
+          # Capturar isola a falha do `git diff` (`set -e` mata o step); o here-string tira o
+          # pipe; e o exit 2 do `grep` (erro) deixa de se confundir com o 1 (sem match).
+          tocados="$(git diff --name-only "$base..HEAD")"
+          rc=0
+          grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
+          if [ "$rc" -eq 0 ]; then
             node .agent/scripts/mutation-sweep.mjs
-          else
+          elif [ "$rc" -eq 1 ]; then
             echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
+          else
+            echo "::error::grep saiu $rc a decidir se a varredura se aplica — nao consegui decidir."
+            exit 1
           fi
 
   # Runs on every push/PR, including the bare template (no package.json guard):
