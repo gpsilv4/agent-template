@@ -38,9 +38,10 @@
  * e o GitHub da 4 cores a repos publicos e 2 a privados (Free/Pro) — logo a VISIBILIDADE do repo
  * duplica o tempo:
  *
- *   portatil (10 cores, 8 workers)      14m04s   (58 min em serie, 4,1x)
- *   ubuntu-latest, repo publico  (4/4)  25-38 min (n=8; ver scripts-guide-why.md)
- *   ubuntu-latest, repo privado  (2/2)  ~48 min
+ *   portatil (10 cores, 8 workers)      13m37s    (n=1, 2026-10-01, 235 sitios)
+ *   ubuntu-latest, repo publico  (4/4)  12-20 min (n=10, 2026-09-29..10-01, depois do fail-fast)
+ *   ubuntu-latest, repo privado  (2/2)  ~51 min   (n=2, 2026-09-18, 208 sitios — ANTES do
+ *                                                  fail-fast; por medir de novo)
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
  * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.

@@ -33,6 +33,8 @@ jobs:
       has_pkg: ${{ steps.check.outputs.has_pkg }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - id: check
         run: |
           # `-f package.json` so olhava para a RAIZ. Num monorepo (apps/web, packages/*,
@@ -69,6 +71,8 @@ jobs:
     if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -122,6 +126,8 @@ jobs:
     if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -155,6 +161,8 @@ jobs:
     if: needs.detect.outputs.has_pkg == 'true'
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v7
         with:
@@ -202,15 +210,18 @@ jobs:
     # PR ficou bloqueado por **falta de tempo**, nao por defeito. E o pior modo de falha
     # possivel — parece um erro e nao e.
     #
-    # 75 nao e generosidade: e ~85% de folga sobre a ultima medicao completa, porque a
-    # varredura cresce com o produto (sitios x tamanho das suites) e cada teste novo no
-    # `test-guards` multiplica por ~90.
+    # 75 nao e generosidade: a varredura cresce com o produto (sitios x tamanho das suites), e
+    # cada teste novo no `test-guards` multiplica-se pelos sitios dele. A margem que conta e a
+    # de um derivado PRIVADO (2 vCPU, metade do runner deste repo). Os tempos atuais, por
+    # visibilidade e com o `n`, vivem SO no cabecalho do `mutation-sweep.mjs` (`TP8`: um numero
+    # medido escrito em dois sitios envelhece num deles — este comentario ja o provou).
     #
-    # A alternativa estrutural — derivar um `--only` do diff, para varrer so os alvos
-    # tocados — esta na issue do repo com a analise feita. Enquanto nao existir, o tecto e
-    # que segura isto, e um tecto apertado transforma crescimento legitimo em CI vermelho.
+    # O `--diff` (varrer so os alvos tocados) existe, mas e so LOCAL, por decisao (#57): o CI e
+    # o portao e varre tudo. O que encurta o portao sem medir menos esta no plano do #161; ate
+    # la, o tecto e que segura isto, e um tecto apertado transforma crescimento em CI vermelho.
     #
-    # Quando o PR NAO toca nos verificadores a varredura salta e o job leva ~1m10s.
+    # Quando o PR NAO toca nos verificadores a varredura salta, e o job fica nas suites e nos
+    # dois simuladores: minutos, nao segundos (os simuladores correm sempre em `pull_request`).
     timeout-minutes: 75
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
@@ -219,6 +230,9 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # O token nao fica em `.git/config` enquanto corre codigo do PR (a varredura, os
+          # simuladores). E so `contents: read`, mas nenhum step deste job o usa: custo zero.
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -317,7 +331,7 @@ jobs:
             exit 1
           fi
       # A verificacao que testa a promessa do template: montar um projeto derivado e correr la
-      # tudo. Custa ~50s (copia o repo e recorre as suites), logo fica so em `pull_request` —
+      # tudo. Custa cerca de um minuto (copia o repo e recorre as suites), logo fica so em `pull_request` —
       # e onde vale a pena e onde alguem le o resultado. Sem isto, a unica forma de saber que
       # o template funciona num derivado era alguem lembrar-se de o experimentar.
       - name: Projeto derivado — o template funciona depois do bootstrap
@@ -344,7 +358,7 @@ jobs:
         # base exata desse merge. Com `base.sha` (que pode estar atras da ponta do base) um
         # PR que nao tocou em testes ficava vermelho por causa de um merge feito noutro PR.
         run: node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD^1)"
-      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (~117 sitios),
+      # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (quantos: `--list`),
       # logo custa minutos, nao segundos. Estava COMENTADA — o instrumento que prova que as
       # suites afirmam algo era o unico verificador que nao corria automaticamente em lado
       # nenhum, e a regra "cada verificador tem a sua suite" ficava em "corre se te lembrares".
@@ -353,11 +367,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
-          # inicial, que nao tem pai — `git rev-parse HEAD^1` sai 128 e, com `set -e`, mata o
-          # step. Resultado: o PRIMEIRO CI de cada projeto derivado nascia vermelho, por um
-          # motivo que nao e culpa de quem clona. Isto nao e o TP2: nao e "nao consegui ler",
-          # e "provei que nao ha intervalo".
+          # Commit-RAIZ. AQUI, com o `if: pull_request` acima, este ramo nao corre (o merge ref
+          # de um PR tem sempre pai) — e fica de proposito, nao por copia: um derivado que tire o
+          # `if:` para varrer tambem em `push` corre-o no commit inicial do repo. Medido: o
+          # `referee-exam-study` fez exatamente isso. Sem o ramo, `git rev-parse HEAD^1` sai 128,
+          # o `set -e` mata o step e o PRIMEIRO CI desse derivado nasce vermelho. Nao e o `TP2`:
+          # e "provei que nao ha intervalo", nao "nao consegui ler".
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
             echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
             exit 0

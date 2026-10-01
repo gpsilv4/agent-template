@@ -87,6 +87,11 @@ nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
 | `ubuntu-latest`, template | **publico** | 4 | 4 | **25-38 min** (n=8, ver abaixo) |
 | `ubuntu-latest`, derivado | **privado** | 2 | 2 | **~48 min** |
 
+> **Atualizado em 2026-10-01 (#160)**, depois do fail-fast (#140): no runner publico, **12-20 min**
+> (n=10, 724-1183 s, 2026-09-29..10-01); no portatil, **13m37s** (n=1, 235 sitios). O privado so
+> tem medicoes **anteriores** ao fail-fast: **51m28s** duas vezes (`referee-exam-study`,
+> 2026-09-18, 208 sitios), por medir de novo. A tabela acima fica como historico.
+
 **O GitHub da runners de 4 cores a repos publicos e 2 a privados** nos planos Free/Pro, e
 `quantosWorkers()` sai de `cpus().length` — logo a visibilidade do repo duplica o tempo. A conta
 fecha: 22 x 2 = 44, contra ~48 observados.
