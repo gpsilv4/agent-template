@@ -377,7 +377,8 @@ jobs:
   # Os dois SIMULADORES num job proprio (#158), em paralelo com o `guard-tests`: ~4 min que
   # corriam em serie ANTES da varredura, e nao dependem dela nem ela deles. Sao so do template —
   # num projeto derivado dao `SKIP` em segundos —, logo um derivado que os tenha ainda no seu
-  # `guard-tests` paga segundos, nao minutos (o `upgrade.md` manda tira-los de la). A varredura
+  # `guard-tests` paga segundos, nao minutos (o `upgrade.md` manda tira-los de la, e o
+  # `BOOTSTRAP.md` remove ESTE job num derivado novo — la ficava verde sem medir). A varredura
   # ficou no `guard-tests` de proposito: move-la poria a correr DUAS vezes num derivado que ja a
   # tem, ~30 min num privado (Fase 0 do #158).
   simulators:
