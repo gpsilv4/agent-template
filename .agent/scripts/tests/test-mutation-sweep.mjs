@@ -23,7 +23,8 @@
  *   node .agent/scripts/tests/test-mutation-sweep.mjs
  */
 
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync, readdirSync, mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import { alvosNoDisco } from "../lib/alvos-no-disco.mjs";
 import { join } from "path";
 
@@ -131,6 +132,27 @@ test("ordem por alvo: vermelho que so existe na ordem nova -> ORDEM MUDOU O VERE
   includes: ["ORDEM MUDOU O VEREDICTO  .agent/scripts/fake-check.mjs:", "vale o da ordem normal (verde, nao coberto)", "INCOMPLETA", "1/2 sitios cobertos"],
   excludes: ["Cobertura de mutacao completa"],
 });
+
+// --- Um TMPDIR por worker (#170) -----------------------------------------------
+// As duas varreduras correm num tmpdir ISOLADO (o do sistema e partilhado — o achado do #157).
+{
+  const iso = mkdtempSync(join(tmpdir(), "sweep-test-tmp-"));
+  test("cada corrida da suite usa o tmpdir do SEU worker, dentro da base da varredura", { segundoSitio: false, tmpIsolado: iso,
+    env: { TMPDIR: iso, TEMP: iso, TMP: iso } }, [], { code: 0, includes: ["fake-check.mjs: 1/1 sitios", "Cobertura de mutacao completa"],
+    excludes: ["tmpdir partilhado", "BASELINE VERMELHA"], extra: () => (rmSync(iso, { recursive: true, force: true }), []) });
+  // O mutante cria uma fixture e PENDURA: o timeout mata-o e a fixture so sai porque estava no worker.
+  const base = mkdtempSync(join(tmpdir(), "sweep-test-tmp-"));
+  test("fixture de uma suite morta pelo timeout nao fica para tras", { segundoSitio: false, mutacaoPendura: true,
+    env: { TMPDIR: base, TEMP: base, TMP: base } }, ["--timeout-piso=2000"], {
+    code: 1,
+    includes: ["TIMEOUT", "(nao medido: timeout)"],
+    extra: () => {
+      const restos = readdirSync(base);
+      rmSync(base, { recursive: true, force: true });
+      return restos.length ? [`ficou no tmpdir da corrida: ${restos.join(", ")}`] : [];
+    },
+  });
+}
 
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {
   code: 0,
