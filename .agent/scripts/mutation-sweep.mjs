@@ -28,6 +28,7 @@
  *   node .agent/scripts/mutation-sweep.mjs --only=backlog     # so um (ao mexer nele)
  *   node .agent/scripts/mutation-sweep.mjs --list             # so contar, sem correr
  *   node .agent/scripts/mutation-sweep.mjs --workers=1        # sequencial (para comparar)
+ *   node .agent/scripts/mutation-sweep.mjs --timeout-piso=2000 # piso do timeout por mutante (testes)
  *
  * CUSTO: recorre a suite inteira por sitio. Corre em ate 8 processos, cada um com a SUA copia do
  * repo. Correr apos mexer num verificador, nao a cada commit. Condicional no CI (so quando o
@@ -323,12 +324,20 @@ const medir = [];
  *  quem precise de comparar um resultado sem mudar mais nada. */
 const argWorkers = process.argv.find((a) => a.startsWith("--workers="));
 const WORKERS = quantosWorkers(argWorkers?.slice("--workers=".length));
+/** O piso do timeout por mutante (#154, ver `lib/varredura-paralela.mjs`). So existe para as
+ *  suites poderem provar o timeout sem esperar um minuto; ninguem o devia baixar no CI. */
+const argPiso = process.argv.find((a) => a.startsWith("--timeout-piso="));
+// Um valor invalido cai no piso por omissao e NAO em `NaN`: `setTimeout(NaN)` dispara ja, e
+// todos os mutantes passavam a "nao medido". O piso por omissao e o lado seguro.
+// E acima de 2^31-1 o `setTimeout` tambem dispara ja (`Infinity` passava um `> 0`).
+const pisoPedido = Number(argPiso?.slice("--timeout-piso=".length));
+const pisoMs = Number.isFinite(pisoPedido) && pisoPedido > 0 && pisoPedido <= 2 ** 31 - 1 ? pisoPedido : undefined;
 
 /** Mede o que ficou em `medir` e IMPRIME o veredicto. A medicao vive em `lib/`; a decisao sobre
  *  o que cada numero significa fica aqui, que e onde vive o exit code. */
 async function mede() {
   if (listarSo || medir.length === 0) return;
-  const { baselinesVermelhas, resultados } = await medeCobertura({ medir, copias });
+  const { baselinesVermelhas, resultados } = await medeCobertura({ medir, copias, pisoMs });
 
   for (const { suite, falhas } of baselinesVermelhas) {
     console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer` + falhas.map((l) => `\n                     ${l}`).join(""));
@@ -338,7 +347,10 @@ async function mede() {
   for (const { alvo, total, naoCobertos } of resultados) {
     if (naoCobertos.length) {
       console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos`);
-      for (const { ln, txt } of naoCobertos) console.log(`              L${ln}: ${txt}`);
+      // O MOTIVO, quando o ha: um sitio em timeout nao e "sem teste", e "nao medido" — e quem le
+      // so o relatorio final (e nao a linha impressa no momento) tem de o poder distinguir.
+      const porque = { timeout: " (nao medido: timeout)", rebentou: " (rebentou: sem FAIL)" };
+      for (const { ln, txt, motivo } of naoCobertos) console.log(`              L${ln}: ${txt}${porque[motivo] ?? ""}`);
       falhou = true;
     } else {
       console.log(`  OK  ${alvo}: ${total}/${total} sitios — cada aviso fica vermelho`);

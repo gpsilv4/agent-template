@@ -50,6 +50,8 @@
 A varredura corre em **8 processos** (ou o numero de cores, o que for menor), cada um com a **sua
 copia do repo** — a copia por worker nao e detalhe. `--workers=1` devolve o sequencial, para
 comparar sem mudar mais nada. Ganho medido e o custo da copia partilhada: `scripts-guide-why.md`.
+Cada corrida mutada tem **timeout** (5x a baseline da suite, piso 60 s): um timeout e **nao
+medido**, nomeia o sitio no momento e reprova (`#154`, porque em `lib/varredura-paralela.mjs`).
 
 **Os tempos nao se escrevem aqui.** Vivem no cabecalho do `mutation-sweep.mjs`, que e codigo e
 nao tem orcamento, com a visibilidade do repo ao lado (publico/privado duplica); a evidencia esta

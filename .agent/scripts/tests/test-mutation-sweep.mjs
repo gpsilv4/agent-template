@@ -56,10 +56,50 @@ test("deteta um sitio de aviso que nenhum teste exercita", {}, [], {
 // (`:260`, `:279`) e que la foi remendado a mao, com um lookbehind de cada vez.
 test("suite que REBENTA nao conta como cobertura", { mutacaoRebenta: true }, [], {
   code: 1,
-  includes: ["REBENTOU", "sem nenhum FAIL", "INCOMPLETA", "VARREDURA NAO CONCLUSIVA"],
+  includes: ["REBENTOU", "sem nenhum FAIL", "INCOMPLETA", "(rebentou: sem FAIL)", "VARREDURA NAO CONCLUSIVA"],
   // A prova de que isto mede o que diz: sem a exigencia de `FAIL`, este mesmo cenario dava
   // `Cobertura de mutacao completa`. E o unico sitio do repo onde os dois se distinguem.
   excludes: ["Cobertura de mutacao completa"],
+});
+
+// --- Uma suite que PENDURA nao e cobertura, e nao pode pendurar a varredura (#154) ---
+// O mutante faz a suite lancar um neto eterno e ficar parada. Sem timeout por mutante, isto
+// gastava o `timeout-minutes` do job e morria sem nomear o sitio. `--timeout-piso=2000` so para o
+// teste nao esperar o piso real de 60 s; a baseline da suite falsa leva milissegundos, logo o
+// limite efectivo e o piso.
+test("mutante que PENDURA: timeout, sitio nomeado, nao medido, e nenhum neto vivo", { segundoSitio: false, mutacaoPendura: true }, ["--timeout-piso=2000"], {
+  code: 1,
+  // "nao terminou em" e nao "em 2s": o limite e max(piso, 5x a baseline), e num runner carregado a
+  // baseline da suite falsa pode passar de 400 ms — o numero muda, o comportamento nao.
+  includes: ["TIMEOUT", "fake-check.mjs:", "nao terminou em", "(nao medido: timeout)", "INCOMPLETA", "VARREDURA NAO CONCLUSIVA"],
+  excludes: ["Cobertura de mutacao completa"],
+  // Matar so o filho deixava o neto vivo — e, por herdar o stdout, o `execFile` esperava por ele
+  // e o timeout nao desbloqueava nada. O pid foi gravado pela propria suite pendurada.
+  extra: (dir) => {
+    let pid;
+    try {
+      pid = Number(readFileSync(join(dir, "neto.pid"), "utf8"));
+    } catch {
+      return ["a suite pendurada nao gravou o pid do neto — a fixture nao correu o caminho que mede"];
+    }
+    // Repetido durante ~1 s: um neto ja morto pode ainda ser um ZOMBIE por recolher, e um zombie
+    // responde a `kill(pid, 0)`. Uma so leitura dava um falso "sobreviveu".
+    const vivo = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    for (let k = 0; k < 10 && vivo(); k++) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    if (!vivo()) return [];
+    process.kill(pid, "SIGKILL"); // nao deixar o lixo que o teste acabou de provar
+    return [`o neto ${pid} sobreviveu ao timeout`];
+  },
+});
+
+// O TECTO de saida (#154): o `execFile` antigo matava a 1 MB; o `spawn` nao tem limite. Sem
+// tecto, uma suite mutada que imprime em ciclo crescia ate ao maximo de uma string do V8 e a
+// varredura morria sem relatorio. Sem `--timeout-piso`: o piso e o de 60 s, e o que se exige e
+// que o tecto a corte MUITO antes (o `run()` do harness estoura aos 120 s) e sem `TIMEOUT`.
+test("mutante que IMPRIME sem parar: o tecto de saida corta-o, e e rebentou", { segundoSitio: false, mutacaoTransborda: true }, [], {
+  code: 1,
+  includes: ["REBENTOU", "(rebentou: sem FAIL)", "INCOMPLETA"],
+  excludes: ["TIMEOUT", "Cobertura de mutacao completa"],
 });
 
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {

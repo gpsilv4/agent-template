@@ -32,7 +32,7 @@
  */
 
 import { writeFileSync } from "fs";
-import { execFile } from "child_process";
+import { spawn } from "child_process";
 import { cpus } from "os";
 import { join } from "path";
 
@@ -56,13 +56,120 @@ export function quantosWorkers(pedido) {
  *  MUTADA o veredicto e binario ("algum teste apanhou isto?") e a suite pode sair ao primeiro
  *  `FAIL`; na BASELINE nao pode, porque ali o verde so significa alguma coisa se for sobre a
  *  suite inteira executada. */
-const passa = (suiteCopia, cwd, extraEnv) =>
+const passa = (suiteCopia, cwd, extraEnv, limiteMs = TETO_BASELINE_MS) =>
   new Promise((resolve) => {
-    const opts = extraEnv ? { cwd, env: { ...process.env, ...extraEnv } } : { cwd };
-    execFile("node", [suiteCopia], opts, (err, stdout, stderr) =>
-      resolve({ ok: !err, out: (stdout ?? "") + (stderr ?? "") })
-    );
+    ligaLimpeza();
+    // `detached`: a suite fica num GRUPO de processos proprio, e e o grupo que se mata no
+    // timeout. Matar so o filho deixava os netos (`git`, outro `node`) vivos — e, por herdarem o
+    // stdout, o `close` esperava por eles e o timeout nao desbloqueava nada.
+    //
+    // `spawn` e nao `execFile`: o `execFile` **nao passa o `detached` ao `spawn`** — medido, a
+    // suite ficava no grupo do pai, o `kill(-pid)` dava `ESRCH` e o neto sobrevivia. O teste do
+    // mutante pendurado apanhou-o pendurando ele proprio.
+    const opts = { cwd, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], ...(extraEnv ? { env: { ...process.env, ...extraEnv } } : {}) };
+    const t0 = Date.now();
+    let estourou = false;
+    // stdout e stderr acumulados EM SEPARADO e juntos so no fim, como o `execFile` fazia:
+    // intercalados, um pedaco de stderr sem `\n` antes de um `  FAIL` partia o `^` do
+    // `PROVA_DE_FALHA` e um vermelho legitimo passava a "rebentou".
+    const saida = { stdout: "", stderr: "" };
+    let transbordou = false;
+    const filho = spawn("node", [suiteCopia], opts);
+    vivos.add(filho);
+    const corta = () => {
+      mataGrupo(filho);
+      // Sem isto, num sistema sem grupos (Windows) um neto a segurar o pipe adiava o `close` —
+      // e o timeout voltava a nao desbloquear nada.
+      filho.stdout.destroy();
+      filho.stderr.destroy();
+    };
+    const relogio = setTimeout(() => {
+      estourou = true;
+      corta();
+    }, limiteMs);
+    for (const k of ["stdout", "stderr"]) {
+      filho[k].setEncoding("utf8");
+      filho[k].on("data", (d) => {
+        // TECTO de memoria: o `execFile` matava a 1 MB (`maxBuffer`); sem tecto, um mutante que
+        // imprime em ciclo durante 5x a baseline chegava ao maximo de uma string do V8 e a
+        // varredura morria sem relatorio. Acima do tecto mata-se, e a corrida conta vermelha —
+        // o que o `execFile` ja fazia — sem linha de aviso nova.
+        if (transbordou) return;
+        saida[k] += d;
+        if (saida.stdout.length + saida.stderr.length > TETO_SAIDA) {
+          transbordou = true;
+          corta();
+        }
+      });
+    }
+    const fim = (codigo) => {
+      clearTimeout(relogio);
+      vivos.delete(filho);
+      resolve({ ok: codigo === 0 && !estourou && !transbordou, out: saida.stdout + saida.stderr, ms: Date.now() - t0, timeout: estourou });
+    };
+    // `error` (o `node` nao arrancou) e `close` podem chegar os dois; so o primeiro conta.
+    let resolvido = false;
+    filho.on("error", (err) => {
+      if (resolvido) return;
+      resolvido = true;
+      out += String(err);
+      fim(-1);
+    });
+    filho.on("close", (codigo) => {
+      if (resolvido) return;
+      resolvido = true;
+      fim(codigo);
+    });
   });
+
+/** O TIMEOUT de cada corrida (#154). Sem ele, um mutante que produz um ciclo infinito — desligar
+ *  a condicao de saida de um loop e um mutante plausivel — ou uma suite pendurada gastavam o
+ *  `timeout-minutes` do job inteiro, e o job morria **sem dizer qual foi o sitio**: o relatorio
+ *  so sai no fim.
+ *
+ *  DERIVADO DA BASELINE da propria suite, e nao um numero fixo: o `test-guards` leva ~40 s e o
+ *  `test-backlog` ~1 s, e um so numero ou era curto para um ou inutil para o outro. A baseline
+ *  corre com os mesmos workers em paralelo, logo ja traz a carga da maquina consigo; o `FATOR`
+ *  e a margem sobre isso, e o `PISO` protege as suites de um segundo contra o ruido.
+ *
+ *  Um timeout conta como **NAO MEDIDO**, nao como "morto" (a convencao do Stryker e do PIT). E a
+ *  mesma escolha do `PROVA_DE_FALHA` (#102): um vermelho so e cobertura se um TESTE o produziu,
+ *  e "nao terminou" nao e isso — e o `TP2` ("nao consegui medir" != "esta coberto"). Custa um
+ *  vermelho quando um mutante pendura de facto, e esse vermelho e informacao: falta um teste
+ *  que termine esse caminho. */
+export const FATOR_TIMEOUT = 5;
+export const PISO_TIMEOUT_MS = 60_000;
+/** A baseline tambem precisa de tecto, pela mesma razao — mas nao ha nada de onde o derivar. */
+export const TETO_BASELINE_MS = 20 * 60_000;
+/** O tecto do que se guarda do output de uma corrida (ver o `data` em `passa()`). */
+export const TETO_SAIDA = 8 * 1024 * 1024;
+
+/** Os grupos ainda vivos. Com `detached`, um Ctrl-C no terminal deixou de lhes chegar (o sinal
+ *  vai para o grupo do terminal, e eles ja nao estao nele) — logo quem os mata a saida e isto. */
+const vivos = new Set();
+let limpezaLigada = false;
+function mataGrupo(filho) {
+  try {
+    process.kill(-filho.pid, "SIGKILL");
+  } catch {
+    try {
+      filho.kill("SIGKILL");
+    } catch {
+      // ja morreu
+    }
+  }
+}
+function ligaLimpeza() {
+  if (limpezaLigada) return;
+  limpezaLigada = true;
+  process.on("exit", () => vivos.forEach(mataGrupo));
+  for (const [sinal, codigo] of [["SIGINT", 130], ["SIGTERM", 143]]) {
+    process.once(sinal, () => {
+      vivos.forEach(mataGrupo);
+      process.exit(codigo);
+    });
+  }
+}
 
 /** O que se passa a corrida mutada. Uma constante, e nao a string escrita nas duas pontas: o
  *  harness le `SWEEP_FAIL_FAST` e o motor escreve-o, e duas copias a concordar a mao eram um
@@ -96,7 +203,7 @@ export async function emParalelo(lista, n, fn) {
  * @returns {Promise<{baselinesVermelhas: Array<{suite, falhas: string[]}>, resultados: Array<{alvo, suite, total, naoCobertos}>}>}
  *          `resultados` vem na ordem de `medir` — nunca na ordem por que os workers acabaram.
  */
-export async function medeCobertura({ medir, copias }) {
+export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS }) {
   const workers = copias.length;
 
   // --- 1. Baselines, uma por SUITE -------------------------------------------
@@ -130,7 +237,9 @@ export async function medeCobertura({ medir, copias }) {
     .filter((s) => !baseline.get(s).ok)
     .map((suite) => ({
       suite,
-      falhas: (baseline.get(suite).out ?? "").split("\n").filter((l) => PROVA_DE_FALHA.test(l)).slice(0, 5).map((l) => l.trim()),
+      falhas: baseline.get(suite).timeout
+        ? [`nao terminou em ${TETO_BASELINE_MS / 60_000} min — a suite pendura sem mutacao nenhuma`]
+        : (baseline.get(suite).out ?? "").split("\n").filter((l) => PROVA_DE_FALHA.test(l)).slice(0, 5).map((l) => l.trim()),
     }));
   const medidos = medir.filter((m) => baseline.get(m.suite).ok);
 
@@ -149,13 +258,19 @@ export async function medeCobertura({ medir, copias }) {
     const match = m.visiveis[i].match(m.sinal);
     mut[i] = m.linhas[i].slice(0, match.index) + m.neutro + m.linhas[i].slice(match.index + match[0].length);
     writeFileSync(alvoCopia, mut.join("\n"));
-    const r = await passa(join(copias[w], m.suite), copias[w], FAIL_FAST_ENV);
+    const limite = Math.max(pisoMs, FATOR_TIMEOUT * baseline.get(m.suite).ms);
+    const r = await passa(join(copias[w], m.suite), copias[w], FAIL_FAST_ENV, limite);
     const ficouVermelha = !r.ok;
     // Repor ANTES de o worker pegar no item seguinte: o proximo item pode ser de outro alvo, e
     // uma copia deixada suja envenenava-o.
     writeFileSync(alvoCopia, m.src);
     const entrada = { ln: i + 1, txt: m.linhas[i].trim().slice(0, 90) };
-    if (!ficouVermelha) naoCobertos[t].push(entrada);
+    if (r.timeout) {
+      // Impresso NO MOMENTO e nao so no relatorio final: se o job morrer a seguir no tecto, esta
+      // linha ja esta no log — que era exatamente o que faltava.
+      console.log(`  TIMEOUT  ${m.alvo}:${i + 1} a suite nao terminou em ${Math.round(limite / 1000)}s — nao medido`);
+      naoCobertos[t].push({ ...entrada, motivo: "timeout" });
+    } else if (!ficouVermelha) naoCobertos[t].push(entrada);
     else if (!PROVA_DE_FALHA.test(r.out)) {
       // Vermelha SEM um unico `FAIL`: a suite rebentou, nao houve teste a apanhar nada. Contar
       // isto como cobertura e o defeito que o `pares.mjs` ja documentou duas vezes.
