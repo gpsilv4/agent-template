@@ -20,6 +20,7 @@
  * ja aconteceu, e e por isso que esta escrito.
  */
 import { pathToFileURL } from "url";
+import { FAIL_FAST_ENV } from "../../lib/varredura-paralela.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -46,7 +47,10 @@ const failures = [];
  *
  * `process.env` LIDO e explicitamente legitimo no Guard 19 — so a escrita e acusada.
  */
-export const FAIL_FAST = process.env.SWEEP_FAIL_FAST === "1";
+// DERIVADO do `FAIL_FAST_ENV` do motor, e nao a chave escrita outra vez (#157, `TP8`): eram duas
+// copias a concordar a mao, presas so pelo `tests-fail-fast.mjs`. As quatro suites que nao
+// usam este relatorio importam ESTA constante.
+export const FAIL_FAST = Object.entries(FAIL_FAST_ENV).every(([k, v]) => process.env[k] === v);
 
 /**
  * O UNICO sitio que regista uma falha.

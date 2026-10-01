@@ -20,6 +20,8 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico } from "../../lib/upgrade-mecanico.mjs";
+// O modo fail-fast lido do MESMO sitio que o motor escreve (#157, `TP8`).
+import { FAIL_FAST } from "./relatorio.mjs";
 
 // `AQUI` e agora `tests/harness/`; os ficheiros que este harness copia vivem na raiz de
 // `.agent/scripts/`. Resolver a partir da RAIZ e nao da pasta do ficheiro evita que a proxima
@@ -346,6 +348,9 @@ export function test(nome, fn) {
     falhas.push({ nome, problemas: [`rebentou: ${err.message}`] });
     console.log(`  FAIL  ${nome}\n          rebentou: ${err.message}`);
   }
+  // FAIL-FAST (#157): DEPOIS de a linha `FAIL` sair e de o `fn` ter limpo o que montou. O
+  // `resumo()` apaga as fixtures da suite antes de sair.
+  if (FAIL_FAST && falhas.length) resumo();
 }
 
 /** O veredicto da suite. SAI daqui, como o `resumo()` do `test-harness.mjs`: devolver um codigo

@@ -26,7 +26,7 @@
  * antecipada. Sem esse terceiro, "saiu cedo" e indistinguivel de "acabou".
  */
 import { execFileSync } from "child_process";
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, writeFileSync, rmSync, readFileSync, readdirSync, cpSync } from "fs";
 import { tmpdir } from "os";
 import { join, resolve, dirname } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -158,5 +158,93 @@ export function registar() {
         ? []
         : [`o harness nao reagiu a ${Object.keys(FAIL_FAST_ENV)[0]} — as duas pontas divergiram`]),
     ]);
+  }
+
+  // --- 6. As OUTRAS quatro suites (#157) ------------------------------------------------------
+  // Cada uma tem o seu `test()` e lia o modo de lado nenhum: corria inteira depois de o mutante
+  // ja estar morto. O mesmo contrato dos casos acima — o terceiro teste so corre se a suite nao
+  // saiu — e mais um: **nenhuma sandbox fica para tras** (sair dentro do `try` saltava o
+  // `finally` que a apaga). Conta-se o tmpdir ANTES e DEPOIS, como o `propagation.md` manda.
+  const H = (n) => JSON.stringify(pathToFileURL(resolve(AQUI, "harness", n)).href);
+  // Cada filha corre com o SEU tmpdir (\`TMPDIR\` apontado para uma pasta so dela) e tem de o
+  // deixar VAZIO. Contar no tmpdir do SISTEMA era o \`TP3\`: a varredura corre esta suite em 8
+  // workers ao mesmo tempo, todos a criar e apagar \`guard-test-*\`, e a contagem mexia por causa
+  // dos outros (leitor independente, reproduzido: "deixou -1"). Numa corrida mutada, esse vermelho
+  // falso contava como cobertura. Os \`tests-upgrade-motor\`/\`tests-medida-2b\` ja o tinham dito.
+  const executa = (ficheiro, failFast, base = null) => {
+    const env = { ...process.env };
+    for (const k of Object.keys(FAIL_FAST_ENV)) delete env[k];
+    if (failFast) Object.assign(env, FAIL_FAST_ENV);
+    if (base) Object.assign(env, { TMPDIR: base, TEMP: base, TMP: base });
+    try {
+      return { code: 0, out: execFileSync(process.execPath, [ficheiro], { encoding: "utf8", env, stdio: "pipe" }) };
+    } catch (err) {
+      return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
+    }
+  };
+  /** Corre `codigo` com um tmpdir proprio e devolve `{ r, restos }` — o que ficou la dentro. */
+  const isolado = (codigo) => {
+    const dir = mkdtempSync(join(tmpdir(), "fail-fast-test-"));
+    const base = mkdtempSync(join(tmpdir(), "fail-fast-test-base-"));
+    try {
+      writeFileSync(join(dir, "suite.mjs"), codigo);
+      return { r: executa(join(dir, "suite.mjs"), true, base), restos: readdirSync(base) };
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(base, { recursive: true, force: true });
+    }
+  };
+  // O CONTRA-CASO do detector: uma filha que deixa uma pasta tem de ser vista. Sem ele, um
+  // \`TMPDIR\` que a filha ignorasse daria "zero restos" para sempre (\`TP2\`).
+  {
+    const { restos } = isolado(`import { mkdtempSync } from "fs";\nimport { tmpdir } from "os";\nimport { join } from "path";\nmkdtempSync(join(tmpdir(), "fuga-"));\n`);
+    caso("fail-fast (#157): o detector de restos ve uma pasta deixada de proposito",
+      restos.length === 1 ? [] : [`esperava 1 resto, viu ${restos.length} — o TMPDIR da filha nao e o que se le`]);
+  }
+  const contrato = (nome, codigo) => {
+    const { r, restos } = isolado(codigo);
+    const p = [];
+    if (r.code === 0) p.push("tem de sair != 0");
+    if (!PROVA_DE_FALHA.test(r.out)) p.push("a linha `FAIL` tem de sair antes da saida antecipada");
+    if (r.out.includes("terceiro-so-corre-se-nao-saiu")) p.push("NAO saiu cedo: o terceiro teste ainda correu");
+    if (restos.length) p.push(`deixou ${restos.length} pasta(s) para tras: ${restos.slice(0, 3).join(", ")}`);
+    caso(`fail-fast (#157): ${nome}`, p);
+  };
+  // O harness dos guards ja tinha fail-fast; o que lhe faltava era a LIMPEZA: o `falhou()` sai
+  // dentro do `try` do `test()`, e so o registo de sandboxes vivas (apagadas no `exit`) a salva.
+  contrato("test-guards (harness) sai ao primeiro FAIL, sem deixar a sandbox",
+    `import { test, resumo } from ${H("test-harness.mjs")};\ntest("segundo", null, { code: 1 });\ntest("terceiro-so-corre-se-nao-saiu", null, { code: 0 });\nresumo();\n`);
+  contrato("test-simulate-upgrade sai ao primeiro FAIL",
+    `import { test, resumo } from ${H("test-upgrade-harness.mjs")};\ntest("primeiro", () => []);\ntest("segundo", () => ["x"]);\ntest("terceiro-so-corre-se-nao-saiu", () => []);\nresumo();\n`);
+  contrato("test-test-surface sai ao primeiro FAIL, sem deixar a sandbox",
+    `import { test, resumo } from ${H("test-surface-harness.mjs")};\ntest("segundo", null, { code: 1 });\ntest("terceiro-so-corre-se-nao-saiu", null, { code: 0 });\nresumo();\n`);
+  contrato("test-mutation-sweep sai ao primeiro FAIL, sem deixar a sandbox",
+    `import { test, resumo } from ${H("test-sweep-harness.mjs")};\ntest("segundo", {}, [], { code: 0 });\ntest("terceiro-so-corre-se-nao-saiu", {}, [], { code: 1 });\nresumo();\n`);
+
+  // O `test-hooks` e um entry point, nao um harness: corre-se o REAL numa copia com um hook
+  // partido (deixa de negar). So o modo fail-fast — a corrida inteira sem ele custa ~16 s, e
+  // esse caminho e o de todos os dias no CI.
+  {
+    const raiz = resolve(AQUI, "..", "..", "..");
+    const dir = mkdtempSync(join(tmpdir(), "fail-fast-test-"));
+    let r;
+    let partiu = false;
+    try {
+      for (const p of [".claude", ".agent/scripts"]) cpSync(join(raiz, p), join(dir, p), { recursive: true });
+      const hook = join(dir, ".claude", "hooks", "guard-protected-branch.mjs");
+      const src = readFileSync(hook, "utf8");
+      const partido = src.replace(`permissionDecision: "deny"`, `permissionDecision: "allow"`);
+      partiu = partido !== src;
+      writeFileSync(hook, partido);
+      r = executa(join(dir, ".claude", "hooks", "tests", "test-hooks.mjs"), true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const p = [];
+    if (!partiu) p.push("a fixture nao partiu o hook — o teste mediria o hook sao");
+    if (r.code === 0) p.push("tem de sair != 0");
+    if (!r.out.includes("MODO FAIL-FAST: saiu ao primeiro FAIL")) p.push("nao saiu ao primeiro FAIL (ou nao o anunciou)");
+    if ((r.out.match(/^\s*FAIL\s/gm) || []).length !== 1) p.push("tem de parar no PRIMEIRO FAIL — houve zero ou mais do que um");
+    caso("fail-fast (#157): test-hooks sai ao primeiro FAIL", p);
   }
 }

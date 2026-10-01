@@ -100,8 +100,17 @@ const FIXTURE_PATHS = [
   "src/docs/review-why.md",
 ];
 
+/** As sandboxes ainda por apagar, apagadas no `exit` (#157). O fail-fast sai no primeiro `FAIL`
+ *  DENTRO do `try` do `test()` — o `process.exit` salta o `finally`, e cada mutante apanhado
+ *  deixava uma pasta (627 numa tarde de varreduras). O `exit` e sincrono, logo o `rmSync` corre.
+ *  So cobre `process.exit` e o fim normal: um `SIGKILL` (o timeout da varredura) ou um sinal sem
+ *  handler nao passam por aqui — essas sobras varre-as a corrida SEGUINTE (`lib/tmp-limpo.mjs`). */
+const vivas = new Set();
+process.on("exit", () => vivas.forEach((d) => rmSync(d, { recursive: true, force: true })));
+
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "guard-test-"));
+  vivas.add(dir);
   for (const p of FIXTURE_PATHS) {
     const src = join(ROOT, p);
     if (!existsSync(src)) continue;
@@ -287,6 +296,7 @@ const dropLinesContaining = (dir, p, needle) =>
  *  falha sempre. Aqui sabemos que o veredicto correcto e exit 0, logo podemos exigi-lo. */
 function syntheticSandbox() {
   const dir = mkdtempSync(join(tmpdir(), "guard-synth-"));
+  vivas.add(dir);
   const w = (rel, body) => {
     const full = join(dir, rel);
     mkdirSync(dirname(full), { recursive: true });
