@@ -84,7 +84,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("  FAIL  o
 console.log("ok");
 `;
 
-export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
+export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, mutacaoPendura = false, mutacaoTransborda = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -192,6 +192,25 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
     // parte). Sem esta guarda, a escrita por omissao apagava-a e o cenario media outra coisa.
     mutacaoRebenta
       ? readFileSync(join(dir, ".agent/scripts/fake-test.mjs"), "utf8")
+      : mutacaoTransborda
+        // #154: com a mutacao, a suite IMPRIME sem parar e sem nunca dizer `FAIL`. O tecto de
+        // saida tem de a cortar muito antes do timeout, e o resultado e "rebentou", nao memoria
+        // a crescer ate a varredura morrer.
+        ? FAKE_TEST.replace(
+            `{ console.log("  FAIL  o verificador nao avisou"); process.exit(1); }`,
+            `{ const bloco = "x".repeat(1 << 20) + "\\n"; const um = () => process.stdout.write(bloco, um); um(); }`
+          )
+      : mutacaoPendura
+        // #154: com a mutacao, em vez de `FAIL` a suite lanca um NETO que nunca acaba (e grava o
+        // pid dele, para o teste confirmar que morreu) e PENDURA. Sem timeout por mutante, a
+        // varredura esperava para sempre; com ele, tem de dizer o sitio e nao deixar ninguem vivo.
+        ? FAKE_TEST.replace(
+            `{ console.log("  FAIL  o verificador nao avisou"); process.exit(1); }`,
+            `{ const { spawn } = await import("child_process"); const { writeFileSync } = await import("fs");\n` +
+              `  const neto = spawn("node", ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });\n` +
+              `  writeFileSync(${JSON.stringify(join(dir, "neto.pid"))}, String(neto.pid));\n` +
+              `  setInterval(() => {}, 1000); }`
+          )
       : baselineVermelha
         // Imprime uma linha `FAIL` porque e o que as 14 suites REAIS imprimem, e e dela que o
         // varredor extrai a razao da baseline vermelha (#123). A versao anterior dizia so
@@ -361,8 +380,11 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
 
 export function run(dir, args = []) {
   try {
+    // `timeout`: uma varredura de fixture leva segundos. Sem tecto, um timeout por mutante
+    // partido (#154) PENDURAVA a suite em vez de a pôr vermelha — o defeito que o teste existe
+    // para apanhar, a esconder-se atras do proprio teste.
     const out = execFileSync("node", [join(dir, ".agent/scripts/mutation-sweep.mjs"), ...args], {
-      cwd: dir, encoding: "utf8", stdio: "pipe",
+      cwd: dir, encoding: "utf8", stdio: "pipe", timeout: 120_000,
     });
     return { code: 0, out };
   } catch (err) {
