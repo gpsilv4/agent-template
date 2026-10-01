@@ -317,3 +317,28 @@ Sairam no #106 por serem historia de defeito e nao ajuda a decidir. Ficam medida
   aqui**, em *"Os tres defeitos que a simulacao encontrou"*, ponto 1 — nao se repete.
 - **`.claude/hooks/*`** — trazer os hooks sem `.claude/hooks/tests/` deixa um hook sem testes, e
   um hook errado **bloqueia trabalho legitimo em silencio**, antes de cada ferramenta.
+
+## Um passo que o template moveu de job sai do job antigo (#158)
+
+A tabela traz para um projeto **so os jobs em falta** — e e o certo: o CI do projeto tem passos
+proprios. Mas um passo que o template MOVEU de um job para outro aparece, no projeto, nos dois: no
+job novo (que estava em falta e foi trazido) e no velho (que o projeto ja tinha e ninguem tocou).
+
+O #158 tirou os dois simuladores do `guard-tests` para um job `simulators`. Num derivado isso custa
+segundos — os simuladores dao `SKIP` fora do template —, e foi por isso que a variante escolhida foi
+essa. A variante recusada mostra o custo do caso geral: mover a **varredura de mutacao** pu-la-ia a
+correr duas vezes em cada PR de um derivado que ja a tem no `guard-tests`, ~30 min a mais num repo
+privado, sem nada que o apanhasse.
+
+**Nao e mecanico, e fica dito**: o `lib/upgrade-mecanico.mjs` nao toca no `.github/` (os jobs em
+falta sao categoria de julgamento), logo o `simulate-upgrade` nao mede esta linha. E uma instrucao a
+quem corre o `/upgrade`.
+
+**O job `simulators` nao se traz** (leitor independente do #158): trazido, um derivado ficava com um
+job inteiro — checkout completo, setup, dois `SKIP` — **verde sem ter medido nada**, a forma mais
+suave do `TP2`. Num derivado basta tirar os dois passos do seu `guard-tests`; nao fica mais lento
+nem menos coberto, porque eles ja davam `SKIP` la.
+
+**E num repo com branch protection**: se o `Guard Tests` for required check, os simuladores deixam de
+bloquear o merge ate o `Simuladores` passar tambem a required. Neste template nao ha protecao
+configurada (#161); fica dito para quem a ligar.
