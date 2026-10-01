@@ -102,6 +102,36 @@ test("mutante que IMPRIME sem parar: o tecto de saida corta-o, e e rebentou", { 
   excludes: ["TIMEOUT", "Cobertura de mutacao completa"],
 });
 
+// --- Ordem por alvo (#156) ----------------------------------------------------
+// A suite falsa cumpre o protocolo (`tests/harness/fixture-ordem.mjs`). O que se afirma e o que
+// o MOTOR faz com o que ela devolve — em particular, que nenhum vermelho da ordem nova conta sem
+// ser provado: ou veio do dono sobre um prefixo verde, ou foi confirmado na ordem normal.
+test("ordem por alvo: sitio morto SO de fora do dono e confirmado e conta", { suite: ".agent/scripts/tests/test-guards.mjs", ordem: "foraDoDono" }, [], {
+  code: 0,
+  includes: ["fake-check.mjs: 2/2 sitios", "[dono primeiro: 1 confirmacao(oes) na ordem normal, 0 divergencia(s)]", "Cobertura de mutacao completa"],
+  excludes: ["ORDEM DEPENDENTE", "ORDEM MUDOU"],
+});
+// O ambiente de QUEM CORRE a varredura nao pode mudar o veredicto (leitor independente do #156):
+// com estas chaves exportadas a mao, a baseline corria so o dono e saia verde sobre uma suite
+// parcial, e a "confirmacao na ordem normal" deixava de ser normal. O motor apaga-as do
+// ambiente herdado; sem isso o `zzz` sai por cobrir.
+test("ordem por alvo: SWEEP_ALVO/SWEEP_SO_DONO herdados nao mudam o veredicto", { suite: ".agent/scripts/tests/test-guards.mjs", ordem: "foraDoDono",
+  env: { SWEEP_ALVO: ".agent/scripts/fake-check.mjs", SWEEP_SO_DONO: "1" } }, [], {
+  code: 0,
+  includes: ["fake-check.mjs: 2/2 sitios", "[dono primeiro: 1 confirmacao(oes) na ordem normal, 0 divergencia(s)]"],
+  excludes: ["INCOMPLETA", "ORDEM DEPENDENTE"],
+});
+test("ordem por alvo: dono que so fica verde com outro antes -> ORDEM DEPENDENTE, e reprova", { suite: ".agent/scripts/tests/test-guards.mjs", ordem: "dependente", segundoSitio: false }, [], {
+  code: 1,
+  includes: ["ORDEM DEPENDENTE  .agent/scripts/fake-check.mjs", "fake-check.mjs: 1/1 sitios", "VARREDURA NAO CONCLUSIVA"],
+  excludes: ["[dono primeiro:"],
+});
+test("ordem por alvo: vermelho que so existe na ordem nova -> ORDEM MUDOU O VEREDICTO, vale a normal", { suite: ".agent/scripts/tests/test-guards.mjs", ordem: "diverge" }, [], {
+  code: 1,
+  includes: ["ORDEM MUDOU O VEREDICTO  .agent/scripts/fake-check.mjs:", "vale o da ordem normal (verde, nao coberto)", "INCOMPLETA", "1/2 sitios cobertos"],
+  excludes: ["Cobertura de mutacao completa"],
+});
+
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {
   code: 0,
   // Sem o segundo sitio o verificador falso tem 1 — e a suite exercita-o.

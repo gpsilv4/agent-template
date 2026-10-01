@@ -251,3 +251,58 @@ deixou de depender de alguem se lembrar do lookbehind certo.
 **O contra-caso importa tanto como o caso**: partir o verificador que a suite **invoca** nao serve
 de controlo negativo, porque uma suite bem escrita deteta-o e reporta `FAIL` — que e o
 comportamento correcto. O cenario tem de partir um modulo **importado**.
+
+## O modulo dono primeiro (#156)
+
+**Porque**: com o fail-fast (#140) uma suite sai no primeiro `FAIL`, mas o teste que matava um
+mutante de `guards/settings.mjs` vivia no `tests-settings.mjs` — descoberto por ordem alfabetica e
+registado DEPOIS dos 64 testes inline. Nos sitios de `settings` o primeiro `FAIL` aparecia no
+teste ~245-305 de 323.
+
+**Medido** (alvos `scripts/guards/`, 84 sitios, portatil, 8 workers, n=1 cada, veredicto 84/84 em
+todas):
+
+| variante | tempo | confirmacoes |
+|---|---|---|
+| antes | 542 s | — |
+| so mover o bloco de registo para o topo | 478 s | — |
+| tecto: dono primeiro SEM prova nem confirmacao (prototipo) | 206 s | — |
+| implementacao, com os testes do Guard 3 ainda inline | 336 s | 10 de 84 |
+| **implementacao, com os testes do Guard 3 no dono** | **209 s** | **4 de 84** |
+
+**Repetido (n=2) e a 2 workers**, para separar o ganho do ruido e estimar o runner privado. A 2
+workers e uma **estimativa** — o portatil nao e um runner de 2 vCPU; o numero real vem do
+proximo `/upgrade` de um derivado privado.
+
+| alvos `guards/`, 84 sitios | antes (`main`) | depois | ganho |
+|---|---|---|---|
+| 8 workers | 542 s, 542 s | 209 s, 213 s | **-61%** |
+| 2 workers | 1022 s | 343 s | **-66%** |
+| varredura completa, 8 workers | — | 606 s (239 sitios) | (ordem normal na mesma maquina: 841 s, sem 4 alvos) |
+
+**Provas do veredicto.** (1) Na arvore real, com o `tests-settings.mjs` reduzido a um teste neutro
+(todos os sitios do `settings` passam a ser mortos de FORA do dono): as duas ordens dao **3/24, os
+mesmos 21 sitios por cobrir**, com 24 confirmacoes e 0 divergencias. Sem confirmacao, a ordem nova
+contaria cobertura que nao existe — e o mutante "sem confirmacao" fica vermelho na suite. (2) A
+varredura completa, com e sem a ordem: veredicto **identico** linha a linha em todos os alvos que
+as duas medem; a copia com `ORDENA_POR_ALVO = []` deixa de medir os 4 alvos cujas suites AFIRMAM a
+ordenacao (as baselines delas ficam vermelhas, como devem).
+
+**A linha do meio e a licao.** A convencao de dono (`guards/X.mjs` -> `tests-X.mjs`) estava certa;
+os testes e que estavam no sitio errado. Os oito testes do Guard 3 viviam inline no
+`test-guards.mjs`, e o `tests-versions.mjs` so tinha dois (os das deps). Cada mutante do
+`versions.mjs` era morto de fora do dono e pagava duas corridas completas — 7 das 10
+confirmacoes. Movidos, o tempo caiu para 3 s do tecto.
+
+**Porque a prova e assim, e nao uma baseline reordenada completa**: o risco de reordenar e um
+vermelho que vem de faltar preparacao e nao da mutacao — cobertura que nao existe, em silencio.
+Hoje nao ha por onde: cada teste monta a sua sandbox e so LE do repo, e a suite deu 323/323 em
+quatro ordens diferentes. A prova e para o teste FUTURO que introduza estado partilhado. Uma
+baseline reordenada completa por alvo custaria ~2,5 min em 4 vCPU e ~12 min (estimado) em 2 —
+mais de metade do ganho num derivado privado. A prova do prefixo custa ~9 s por alvo, e as
+confirmacoes so se pagam onde ha vermelho de fora do dono.
+
+**Porque `lib/ordem-por-alvo.mjs` e um modulo a parte**: as constantes viviam no `registo.mjs`, e o
+motor passou a importa-lo. Isso trouxe para a fixture do `test-mutation-sweep` um modulo com
+sitios de recusa que o `pares.mjs` sintetico nao declara: `SEM PAR`, catorze testes vermelhos de
+uma vez. Um modulo so de dados e isento de par por desenho.

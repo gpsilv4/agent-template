@@ -19,6 +19,7 @@ import { execFileSync } from "child_process";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
+import { montaOrdem } from "./fixture-ordem.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const SWEEP = join(ROOT, ".agent/scripts/mutation-sweep.mjs");
 
@@ -84,7 +85,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("  FAIL  o
 console.log("ok");
 `;
 
-export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, mutacaoPendura = false, mutacaoTransborda = false, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
+export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, mutacaoPendura = false, mutacaoTransborda = false, ordem = null, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -375,16 +376,18 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
       `];\n`);
   }
 
+  // A ordem por alvo (#156) vive noutro modulo: este estava a 481 linhas (Guard 17).
+  if (ordem) montaOrdem(dir, ordem);
   return dir;
 }
 
-export function run(dir, args = []) {
+export function run(dir, args = [], env = null) {
   try {
     // `timeout`: uma varredura de fixture leva segundos. Sem tecto, um timeout por mutante
     // partido (#154) PENDURAVA a suite em vez de a pôr vermelha — o defeito que o teste existe
     // para apanhar, a esconder-se atras do proprio teste.
     const out = execFileSync("node", [join(dir, ".agent/scripts/mutation-sweep.mjs"), ...args], {
-      cwd: dir, encoding: "utf8", stdio: "pipe", timeout: 120_000,
+      cwd: dir, encoding: "utf8", stdio: "pipe", timeout: 120_000, ...(env ? { env: { ...process.env, ...env } } : {}),
     });
     return { code: 0, out };
   } catch (err) {
@@ -443,7 +446,7 @@ export function registarResultado(name, problems, out = "") {
 export function test(name, opts, args, expect) {
   const dir = sandbox(opts);
   try {
-    const { code, out } = run(dir, args);
+    const { code, out } = run(dir, args, opts.env);
     const problems = avaliar({ code, out }, expect, dir);
     if (problems.length) {
       failures.push({ name, problems, out });

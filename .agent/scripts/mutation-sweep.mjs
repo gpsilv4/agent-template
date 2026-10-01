@@ -38,8 +38,9 @@
  * e o GitHub da 4 cores a repos publicos e 2 a privados (Free/Pro) — logo a VISIBILIDADE do repo
  * duplica o tempo:
  *
- *   portatil (10 cores, 8 workers)      13m37s    (n=1, 2026-10-01, 235 sitios)
- *   ubuntu-latest, repo publico  (4/4)  12-20 min (n=10, 2026-09-29..10-01, depois do fail-fast)
+ *   portatil (10 cores, 8 workers)      10m06s    (n=1, 2026-10-01, 239 sitios, dono primeiro)
+ *   ubuntu-latest, repo publico  (4/4)  12-20 min (n=10, 2026-09-29..10-01, ANTES do dono primeiro)
+ *   (o dono primeiro, #156: alvos `guards/` 542 -> 209-213 s a 8 workers, 1022 -> 343 s a 2)
  *   ubuntu-latest, repo privado  (2/2)  ~51 min   (n=2, 2026-09-18, 208 sitios — ANTES do
  *                                                  fail-fast; por medir de novo)
  *
@@ -338,23 +339,26 @@ const pisoMs = Number.isFinite(pisoPedido) && pisoPedido > 0 && pisoPedido <= 2 
  *  o que cada numero significa fica aqui, que e onde vive o exit code. */
 async function mede() {
   if (listarSo || medir.length === 0) return;
-  const { baselinesVermelhas, resultados } = await medeCobertura({ medir, copias, pisoMs });
+  const { baselinesVermelhas, ordemDependente, resultados } = await medeCobertura({ medir, copias, pisoMs });
+  // A linha ORDEM DEPENDENTE ja saiu do motor no momento; aqui so se decide que reprova (#156).
+  if (ordemDependente.length) falhou = true;
 
   for (const { suite, falhas } of baselinesVermelhas) {
     console.log(`  BASELINE VERMELHA  ${suite} ja falha sem mutacao — corrigir antes de varrer` + falhas.map((l) => `\n                     ${l}`).join(""));
     falhou = true;
   }
 
-  for (const { alvo, total, naoCobertos } of resultados) {
+  for (const { alvo, total, naoCobertos, ordemLigada, confirmacoes, divergencias } of resultados) {
+    const ordem = ordemLigada ? ` [dono primeiro: ${confirmacoes} confirmacao(oes) na ordem normal, ${divergencias} divergencia(s)]` : "";
     if (naoCobertos.length) {
-      console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos`);
+      console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos${ordem}`);
       // O MOTIVO, quando o ha: um sitio em timeout nao e "sem teste", e "nao medido" — e quem le
       // so o relatorio final (e nao a linha impressa no momento) tem de o poder distinguir.
       const porque = { timeout: " (nao medido: timeout)", rebentou: " (rebentou: sem FAIL)" };
       for (const { ln, txt, motivo } of naoCobertos) console.log(`              L${ln}: ${txt}${porque[motivo] ?? ""}`);
       falhou = true;
     } else {
-      console.log(`  OK  ${alvo}: ${total}/${total} sitios — cada aviso fica vermelho`);
+      console.log(`  OK  ${alvo}: ${total}/${total} sitios — cada aviso fica vermelho${ordem}`);
     }
     sitiosMedidos += total;
   }
