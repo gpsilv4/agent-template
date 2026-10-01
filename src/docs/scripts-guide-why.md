@@ -306,3 +306,27 @@ confirmacoes so se pagam onde ha vermelho de fora do dono.
 motor passou a importa-lo. Isso trouxe para a fixture do `test-mutation-sweep` um modulo com
 sitios de recusa que o `pares.mjs` sintetico nao declara: `SEM PAR`, catorze testes vermelhos de
 uma vez. Um modulo so de dados e isento de par por desenho.
+
+## Fail-fast nas outras quatro suites, e a fuga de sandboxes (#157)
+
+O fail-fast do #140 so era lido pelo harness dos guards. O `test-hooks`, o `test-simulate-upgrade`, o
+`test-test-surface` e o `test-mutation-sweep` tinham cada um o seu `test()` e corriam inteiros depois
+de o mutante ja estar morto. Os quatro leem agora o modo do `relatorio.mjs`, que por sua vez o
+DERIVA do `FAIL_FAST_ENV` do motor — antes eram duas copias da chave, presas so por um teste.
+
+**Sair depois de limpar, nunca dentro do `try`.** O `process.exit` dentro do `try` de um `test()`
+salta o `finally` que apaga a sandbox. Nos quatro harnesses novos a saida vem depois do `finally`;
+no harness dos guards, onde o `falhou()` sai a meio, as sandboxes vivas apagam-se no `exit`.
+
+**Medido** (portatil, 8 workers, n=1):
+
+| | antes | depois |
+|---|---|---|
+| varredura completa | 606 s (`main`, so com o #156) | **450 s** (-26%), 239/239 |
+| pastas de fixture deixadas pela varredura completa | uma tarde de varreduras: **627** | **0** (4 antes, 4 depois) — em saidas **normais**; um processo morto por `SIGKILL` ou por um sinal sem handler ainda deixa a sua, e a corrida seguinte varre-a |
+| pastas deixadas por uma corrida normal do `test-guards` | 2 | **0** |
+
+As duas do `test-guards` vinham do `tests-skips-congelados.mjs`: o `mede()` montava uma sandbox por
+estado e nunca a apagava, em TODAS as corridas. O ganho de tempo foi maior do que o estimado (~1 min).
+**Nao medido**, e fica dito: a hipotese e que a fuga tambem custava tempo (centenas de pastas no
+tmpdir a cada `mkdtemp`/`readdir`). n=1 dos dois lados; a separacao dos dois efeitos esta por fazer.

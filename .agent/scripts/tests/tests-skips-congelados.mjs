@@ -28,7 +28,7 @@
  * (bom, e a entrada sai da lista) ou a fixture mudou de forma (mau, e quer-se saber).
  */
 import { pathToFileURL } from "url";
-import { existsSync } from "fs";
+import { existsSync, rmSync } from "fs";
 import { join } from "path";
 import { sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
 import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
@@ -118,6 +118,10 @@ export function registar() {
     // 3. O CONTRA-CASO, e sem ele os dois de cima eram satisfeitos por um `out` vazio — o `TP2`
     //    a entrar pela porta do lado.
     afirma("a fixture produz de facto os skips que se medem", linhas.length > 0 ? [] : ["zero SKIP no output — o guard correu?"]);
+    // Faltava (#157): as duas chamadas deixavam uma sandbox cada, em TODAS as corridas — eram as
+    // duas `guard-test-*` que sobravam do `test-guards`. Uma saida a meio (o fail-fast) apanha-a
+    // o registo de sandboxes vivas do harness, no `exit`.
+    rmSync(dir, { recursive: true, force: true });
   };
 
   // OS DOIS ESTADOS, montados e nao herdados. Correr so um foi o defeito da primeira versao.

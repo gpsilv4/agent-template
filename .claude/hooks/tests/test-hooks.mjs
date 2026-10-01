@@ -20,6 +20,7 @@ import { dirname, resolve, join } from "path";
 // Fonte unica da descoberta de suites (TP4). O caminho atravessa arvores de proposito:
 // duplicar a logica aqui era exactamente o que o `sync-docs` proibe.
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
+import { FAIL_FAST } from "../../../.agent/scripts/tests/harness/relatorio.mjs"; // o modo, de uma so fonte (#157)
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".claude/hooks/guard-protected-branch.mjs");
@@ -75,6 +76,7 @@ function test(nome, fn) {
     falhas.push({ nome, err: err instanceof Error ? err.message : String(err) });
     console.log(`  FAIL  ${nome}`);
     console.log(`          ${err instanceof Error ? err.message : String(err)}`);
+    if (FAIL_FAST) process.exit(console.log("  MODO FAIL-FAST: saiu ao primeiro FAIL.") ?? 1); // #157: o `finally` do `fn` ja limpou
   }
 }
 const eq = (a, b, m) => {
@@ -660,9 +662,7 @@ test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
   }
 });
 
-console.log("");
-console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
-console.log("");
+console.log(`\n  ${passed} passaram, ${falhas.length} falharam.\n`);
 if (falhas.length) {
   console.log("  Ha testes dos hooks a falhar.\n");
   process.exit(1);

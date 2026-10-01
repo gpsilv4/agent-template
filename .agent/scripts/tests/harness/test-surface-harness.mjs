@@ -16,6 +16,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync, readFileSy
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
+// O modo fail-fast lido do MESMO sitio que o motor escreve (#157, `TP8`).
+import { FAIL_FAST } from "./relatorio.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
@@ -129,6 +131,7 @@ export function registarResultado(nome, problemas, out) {
     falhas.push({ nome, problemas, out });
     console.log(`  FAIL  ${nome}`);
     for (const p of problemas) console.log(`          ${p}`);
+    if (FAIL_FAST) resumo();
   } else {
     passed++;
     console.log(`  PASS  ${nome}`);
@@ -152,6 +155,8 @@ function test(nome, mutate, expect) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  // FAIL-FAST (#157): fora do `try`, DEPOIS do `finally` — sair la dentro deixava a sandbox.
+  if (FAIL_FAST && falhas.length) resumo();
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(

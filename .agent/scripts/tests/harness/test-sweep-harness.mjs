@@ -20,6 +20,8 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { montaOrdem } from "./fixture-ordem.mjs";
+// O modo fail-fast lido do MESMO sitio que o motor escreve (#157, `TP8`).
+import { FAIL_FAST } from "./relatorio.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const SWEEP = join(ROOT, ".agent/scripts/mutation-sweep.mjs");
 
@@ -437,6 +439,7 @@ export function registarResultado(name, problems, out = "") {
     failures.push({ name, problems, out });
     console.log(`  FAIL  ${name}`);
     for (const p of problems) console.log(`          ${p}`);
+    if (FAIL_FAST) resumo();
   } else {
     passed++;
     console.log(`  PASS  ${name}`);
@@ -459,6 +462,7 @@ export function test(name, opts, args, expect) {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  if (FAIL_FAST && failures.length) resumo(); // #157: depois do `finally`, nunca dentro
 }
 /** O veredicto da suite. Vive aqui porque os contadores vivem aqui: exporta-los em bruto punha
  *  duas copias do mesmo numero a ter de concordar a mao (`TP1`).
