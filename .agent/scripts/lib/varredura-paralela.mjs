@@ -174,7 +174,13 @@ function ligaLimpeza() {
   limpezaLigada = true;
   process.on("exit", () => {
     vivos.forEach(mataGrupo);
-    tmpsVivos.forEach((d) => rmSync(d, { recursive: true, force: true }));
+    tmpsVivos.forEach((d) => {
+      try {
+        rmSync(d, { recursive: true, force: true });
+      } catch {
+        // best-effort: a corrida seguinte varre-o
+      }
+    });
   });
   for (const [sinal, codigo] of [["SIGINT", 130], ["SIGTERM", 143]]) {
     process.once(sinal, () => {
@@ -231,7 +237,9 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
   // AO LADO das copias e nunca DENTRO: ha suites que copiam o repo, e copiariam o tmpdir com ele.
   // O prefixo `mutation-sweep-` ja e varrido pelo `limpaTmpsAntigos`, logo uma varredura morta a
   // meio fica coberta pela seguinte.
-  const tmps = copias.map(() => mkdtempSync(join(tmpdir(), "mutation-sweep-tmp-")));
+  // O PID no nome: o `limpaTmpsAntigos` so reconhece um dono VIVO pelo `<pid>-` a seguir ao prefixo;
+  // sem ele, a pasta de um worker de outra varredura viva era apagada pela idade (leitor do #170).
+  const tmps = copias.map(() => mkdtempSync(join(tmpdir(), `mutation-sweep-${process.pid}-tmp-`)));
   tmps.forEach((d) => tmpsVivos.add(d));
   const corre = (w, suite, extraEnv, limite) =>
     passa(suite, copias[w], { ...(extraEnv ?? {}), TMPDIR: tmps[w], TEMP: tmps[w], TMP: tmps[w] }, limite);
@@ -384,8 +392,14 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
   });
 
   // Antes de devolver: as pastas de fixture que nenhuma suite apagou (as mortas pelo timeout).
+  // Best-effort, como a limpeza das copias no `mutation-sweep.mjs`: uma falha a apagar (um neto
+  // ainda a segurar um ficheiro, no Windows) nao pode deitar fora o resultado da varredura inteira.
   tmps.forEach((d) => {
-    rmSync(d, { recursive: true, force: true });
+    try {
+      rmSync(d, { recursive: true, force: true, maxRetries: 3 });
+    } catch {
+      // fica para a corrida seguinte (`limpaTmpsAntigos`)
+    }
     tmpsVivos.delete(d);
   });
   return {

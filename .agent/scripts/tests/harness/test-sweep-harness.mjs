@@ -225,10 +225,12 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
         ? 'console.log("  FAIL  o cenario pediu uma baseline vermelha");\nconsole.log("  0 passaram, 1 falharam.");\nprocess.exit(1);\n'
         : FAKE_TEST
   );
-  // #170: a suite reprova se NAO estiver num tmpdir proprio do seu worker (a baseline fica vermelha).
+  // #170: a suite reprova se NAO correr num tmpdir de worker DENTRO da base que o teste deu a
+  // varredura (`tmpIsolado` e essa base) — a regex sozinha passava com o `TMPDIR` herdado de fora.
   if (tmpIsolado) {
     const f = join(dir, ".agent/scripts/fake-test.mjs");
-    writeFileSync(f, "import { tmpdir as __t } from \"os\";\nif (!/mutation-sweep-tmp-/.test(__t())) { console.log(\"  FAIL  tmpdir partilhado: \" + __t()); process.exit(1); }\n" + readFileSync(f, "utf8"));
+    const chk = `if (__d(__t()) !== ${JSON.stringify(tmpIsolado)} || !/^mutation-sweep-\\d+-tmp-/.test(__b(__t()))) { console.log("  FAIL  tmpdir partilhado: " + __t()); process.exit(1); }\n`;
+    writeFileSync(f, "import { tmpdir as __t } from \"os\";\nimport { dirname as __d, basename as __b } from \"path\";\n" + chk + readFileSync(f, "utf8"));
   }
 
   // Copiar o varredor TAL COMO ESTA e escrever um `lib/pares.mjs` proprio com o par falso.
