@@ -87,7 +87,7 @@ if (r.code === 0 || !r.out.includes("encontrei 'mau'")) { console.log("  FAIL  o
 console.log("ok");
 `;
 
-export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, mutacaoPendura = false, mutacaoTransborda = false, ordem = null, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
+export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<![\\w.$])warn\\(/", segundoSitio = true, baselineVermelha = false, semAlvo = false, opcional = false, doisNaMesmaLinha = false, verificadorSemPar = false, sinalEmComentario = false, dadosSemPar = false, dadosComRecusa = false, sinalEmString = false, hookSemPar = false, harnessSemPar = false, harnessComThrow = false, mutacaoRebenta = false, mutacaoPendura = false, mutacaoTransborda = false, tmpIsolado = false, ordem = null, contaCorridas = false, parSao = false, comGit = false, alterado = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sweep-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
 
@@ -209,7 +209,9 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
         // varredura esperava para sempre; com ele, tem de dizer o sitio e nao deixar ninguem vivo.
         ? FAKE_TEST.replace(
             `{ console.log("  FAIL  o verificador nao avisou"); process.exit(1); }`,
-            `{ const { spawn } = await import("child_process"); const { writeFileSync } = await import("fs");\n` +
+            `{ const { spawn } = await import("child_process"); const { writeFileSync, mkdtempSync } = await import("fs");\n` +
+              // #170: uma fixture criada ANTES de pendurar — o timeout mata a suite e ela fica orfa.
+              `  mkdtempSync((await import("path")).join((await import("os")).tmpdir(), "fixture-orfa-"));\n` +
               `  const neto = spawn("node", ["-e", "setInterval(() => {}, 1000)"], { stdio: "inherit" });\n` +
               `  writeFileSync(${JSON.stringify(join(dir, "neto.pid"))}, String(neto.pid));\n` +
               `  setInterval(() => {}, 1000); }`
@@ -223,6 +225,11 @@ export function sandbox({ suite = ".agent/scripts/fake-test.mjs", sinal = "/(?<!
         ? 'console.log("  FAIL  o cenario pediu uma baseline vermelha");\nconsole.log("  0 passaram, 1 falharam.");\nprocess.exit(1);\n'
         : FAKE_TEST
   );
+  // #170: a suite reprova se NAO estiver num tmpdir proprio do seu worker (a baseline fica vermelha).
+  if (tmpIsolado) {
+    const f = join(dir, ".agent/scripts/fake-test.mjs");
+    writeFileSync(f, "import { tmpdir as __t } from \"os\";\nif (!/mutation-sweep-tmp-/.test(__t())) { console.log(\"  FAIL  tmpdir partilhado: \" + __t()); process.exit(1); }\n" + readFileSync(f, "utf8"));
+  }
 
   // Copiar o varredor TAL COMO ESTA e escrever um `lib/pares.mjs` proprio com o par falso.
   // Antes isto era um patch de texto sobre o codigo-fonte do varredor (substituir o literal

@@ -31,9 +31,9 @@
  * a ser o **Guard 19** (`guards/isolamento.mjs`).
  */
 
-import { writeFileSync, readFileSync, readdirSync } from "fs";
+import { writeFileSync, readFileSync, readdirSync, mkdtempSync, rmSync } from "fs";
 import { spawn } from "child_process";
-import { cpus } from "os";
+import { cpus, tmpdir } from "os";
 import { join, dirname, basename } from "path";
 import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE_TESTE, donoDe } from "./ordem-por-alvo.mjs";
 
@@ -154,6 +154,9 @@ export const TETO_SAIDA = 8 * 1024 * 1024;
 /** Os grupos ainda vivos. Com `detached`, um Ctrl-C no terminal deixou de lhes chegar (o sinal
  *  vai para o grupo do terminal, e eles ja nao estao nele) — logo quem os mata a saida e isto. */
 const vivos = new Set();
+/** Os tmpdirs por worker ainda por apagar (#170) — apagados tambem no `exit`, se o
+ *  `medeCobertura` nao chegar ao fim. */
+const tmpsVivos = new Set();
 let limpezaLigada = false;
 function mataGrupo(filho) {
   try {
@@ -169,7 +172,10 @@ function mataGrupo(filho) {
 function ligaLimpeza() {
   if (limpezaLigada) return;
   limpezaLigada = true;
-  process.on("exit", () => vivos.forEach(mataGrupo));
+  process.on("exit", () => {
+    vivos.forEach(mataGrupo);
+    tmpsVivos.forEach((d) => rmSync(d, { recursive: true, force: true }));
+  });
   for (const [sinal, codigo] of [["SIGINT", 130], ["SIGTERM", 143]]) {
     process.once(sinal, () => {
       vivos.forEach(mataGrupo);
@@ -217,6 +223,19 @@ export async function emParalelo(lista, n, fn) {
 export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS }) {
   const workers = copias.length;
 
+  // UM TMPDIR POR WORKER (#170). As suites criam as fixtures em `os.tmpdir()`; com o `TMPDIR` de
+  // cada corrida apontado para uma pasta do SEU worker, (1) o que uma suite morta pelo timeout
+  // deixa para tras sai no fim desta funcao, e nao so na corrida seguinte — o `SIGKILL` nao corre
+  // o `exit` do harness —, e (2) os workers deixam de partilhar o tmpdir do sistema, que foi a
+  // classe do achado ALTO do #157 (contar pastas la dava vermelhos falsos sob a varredura).
+  // AO LADO das copias e nunca DENTRO: ha suites que copiam o repo, e copiariam o tmpdir com ele.
+  // O prefixo `mutation-sweep-` ja e varrido pelo `limpaTmpsAntigos`, logo uma varredura morta a
+  // meio fica coberta pela seguinte.
+  const tmps = copias.map(() => mkdtempSync(join(tmpdir(), "mutation-sweep-tmp-")));
+  tmps.forEach((d) => tmpsVivos.add(d));
+  const corre = (w, suite, extraEnv, limite) =>
+    passa(suite, copias[w], { ...(extraEnv ?? {}), TMPDIR: tmps[w], TEMP: tmps[w], TMP: tmps[w] }, limite);
+
   // --- 1. Baselines, uma por SUITE -------------------------------------------
   // A baseline e a mesma medicao para todos os alvos que partilham a suite, e corria uma vez por
   // ALVO: no repo real sao 28 alvos para 10 suites distintas — **18 corridas a medir o que ja
@@ -232,7 +251,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
     // nomes de suite, e a mensagem `BASELINE VERMELHA` so podia dizer que algo falhou, nunca o
     // que. A unica accao disponivel perante ela era RECORRER, que e o habito que um falso
     // vermelho num portao ensina.
-    baseline.set(suite, await passa(join(copias[w], suite), copias[w]));
+    baseline.set(suite, await corre(w, join(copias[w], suite)));
   });
 
   // Leva a RAZAO consigo, ja extraida. A extraccao vive aqui e nao em quem reporta porque e
@@ -294,7 +313,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
   const ligada = new Set();
   const ordemDependente = [];
   await emParalelo(comDono, workers, async (m, w) => {
-    const r = await passa(join(copias[w], m.suite), copias[w], { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo, [ENV_SO_DONO]: "1" }, limiteDe(m));
+    const r = await corre(w, join(copias[w], m.suite), { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo, [ENV_SO_DONO]: "1" }, limiteDe(m));
     if (r.ok && r.out.includes(MARCA_FIM_DO_DONO)) return void ligada.add(m.alvo);
     // Reprova (quem chama decide o exit): um dono que nao fica verde sozinho e um defeito de
     // isolamento real, e sem reprovar o ganho desaparecia em silencio, alvo a alvo. O veredicto
@@ -327,14 +346,14 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
     const suite = join(copias[w], m.suite);
     let r;
     if (ligada.has(m.alvo)) {
-      r = await passa(suite, copias[w], { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo }, limite);
+      r = await corre(w, suite, { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo }, limite);
       // So conta SEM confirmacao um `FAIL` do DONO: o fail-fast sai no primeiro `FAIL`, antes de a
       // marca ser impressa, logo "FAIL e marca ausente" = apanhado dentro do dono, sobre um
       // prefixo provado verde. QUALQUER outra coisa (FAIL de fora, verde, rebentou, timeout)
       // repete-se na ordem normal, e vale essa: nenhum veredicto da ordem nova fica por medir.
       const doDono = !r.ok && !r.timeout && PROVA_DE_FALHA.test(r.out) && !r.out.includes(MARCA_FIM_DO_DONO);
       if (!doDono) {
-        const normal = await passa(suite, copias[w], FAIL_FAST_ENV, limite);
+        const normal = await corre(w, suite, FAIL_FAST_ENV, limite);
         confirmacoes[t]++;
         if (veredicto(normal) !== veredicto(r)) {
           console.log(`  ORDEM MUDOU O VEREDICTO  ${m.alvo}:${i + 1} — vale o da ordem normal (${veredicto(normal)}, nao ${veredicto(r)})`);
@@ -343,7 +362,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
         r = normal;
       }
     } else {
-      r = await passa(suite, copias[w], FAIL_FAST_ENV, limite);
+      r = await corre(w, suite, FAIL_FAST_ENV, limite);
     }
     const ficouVermelha = !r.ok;
     // Repor ANTES de o worker pegar no item seguinte (e DEPOIS da confirmacao, que tem de ver a
@@ -364,6 +383,11 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
     }
   });
 
+  // Antes de devolver: as pastas de fixture que nenhuma suite apagou (as mortas pelo timeout).
+  tmps.forEach((d) => {
+    rmSync(d, { recursive: true, force: true });
+    tmpsVivos.delete(d);
+  });
   return {
     baselinesVermelhas,
     ordemDependente,
