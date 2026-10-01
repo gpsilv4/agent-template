@@ -56,7 +56,44 @@ const CONTAGENS = [
   // `\S*test` so casava os steps que TESTAM os guards; os que os APLICAM
   // (`check-doc-versions`, `check-backlog`) podiam ser apagados do `ci.yml` sem a superficie
   // reagir — medido. Um guard aplicado e superficie tanto como um teste.
-  { re: /^\s*-?\s*run:\s*node\s+\S*(?:test|check|sweep|simulate)/m, msg: "steps de verificacao no CI" },
+  //
+  // DUAS FORMAS, UMA ENTRADA (#153). A primeira alternativa e a de cima: o `node` na mesma
+  // linha do `run:`. A segunda e o BLOCO (`run: |` / `run: >`) com o `node` numa linha do
+  // corpo — sem ela, **apagar o step da varredura de mutacao, o gate mais caro do CI, passava
+  // verde**, tal como o do `commit-msg` (medido sobre o `ci.yml` real: 21 -> 21).
+  // **Uma entrada e nao duas**, porque o `totalDesceu` e por `msg`: com duas, passar um step de
+  // `run: node x` para `run: |` (para lhe acrescentar `set -euo pipefail`, a evolucao por que
+  // os dois steps em causa passaram) dava 21 -> 20 numa e 2 -> 3 na outra, e reprovava um
+  // refactor legitimo. Achado do leitor independente; ha um teste que o prende.
+  // O bloco conta UMA vez por step: o match vai do `run:` a primeira linha do corpo que invoca
+  // um verificador e para ai.
+  //   `\1[ \t]+` — so linhas MAIS indentadas que o `run:` sao corpo (o `\1` captura a
+  //                indentacao dele), logo o match nao atravessa para o step seguinte;
+  //   `[^#\n]*` — o que vem antes do `node` nao pode ter um `#`: o `semComentarios` so tira
+  //                comentarios JS, nao os do YAML, e um `# node x-test.mjs` (linha inteira
+  //                ou no fim de outra) nao pode contar como step;
+  //   `\.githooks\/` — o `commit-msg` e um verificador que nao se chama `check-*`;
+  //   `[-+0-9]*` e `(?:#.*)?` no cabecalho — `|-`, `|2` e um comentario depois do `|` sao
+  //                YAML valido; `\r?\n` — um checkout CRLF lia 2 -> 0 contra a baseline LF (e o
+  //                `.` do JS nao casa `\r`, logo o corpo tambem precisa dele);
+  //   `^[ \t]*(?:-[ \t]*)?run:` na forma de uma linha — era `^\s*-?\s*run:`, e os dois `\s*`
+  //                seguidos disputavam a indentacao em cada inicio de linha (quadratico,
+  //                medido no teste de 2000 espacos). Para contar e equivalente: um `-` sozinho
+  //                numa linha deixa o `run:` da seguinte casar por si.
+  // **Cada parte e DISJUNTA, de proposito.** A primeira versao (`([ \t]*)-?[ \t]*run:` e um
+  // corpo `\1[ \t]+.*\n|[ \t]*\n`) deixava o `\1` ficar com qualquer prefixo da indentacao e
+  // uma linha so de espacos casar as duas alternativas — backtracking exponencial, medido:
+  // > 120 s sobre o `ci.yml` real. Aqui o `\1` e forcado a indentacao inteira (o caracter a
+  // seguir tem de ser `-` ou `r`), a linha de corpo exige um `\S` (um `(?![ \t])` deixava
+  // passar o `\n`: 20 linhas so de espacos = 114 ms), a linha em branco e a outra alternativa,
+  // e o `(?![ \t])` da linha final impede o `[ \t]+` e o `[^#\n]*` de disputarem a
+  // indentacao (quadratico: 2000 espacos de indentacao = 9 s). Ha testes de tempo que o prendem.
+  // NAO conta (limitacao assumida): `node` dentro de uma string (`out="$(node x)"` — o
+  // `semStrings` tira-a) nem `node --flag x`. A forma de uma linha tem a mesma cegueira.
+  {
+    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n]*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
+    msg: "steps de verificacao no CI",
+  },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
   // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
   // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
