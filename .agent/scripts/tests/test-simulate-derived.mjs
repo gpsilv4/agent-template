@@ -9,7 +9,7 @@
  * a sua suite. O que se testa e o arnes.
  *
  * A fixture e um repo MINIMO montado do zero, com stubs no lugar dos verificadores — logo cada
- * caso corre em milissegundos em vez dos ~50s da simulacao a serio. O simulador ancora a raiz
+ * caso corre em milissegundos em vez do ~1 min da simulacao a serio. O simulador ancora a raiz
  * a sua propria localizacao, logo copia-lo para a fixture faz com que ele simule a fixture: e
  * o mesmo truque do `test-harness.mjs`.
  *
