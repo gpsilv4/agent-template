@@ -38,7 +38,7 @@
  * e o GitHub da 4 cores a repos publicos e 2 a privados (Free/Pro) — logo a VISIBILIDADE do repo
  * duplica o tempo:
  *
- *   portatil (10 cores, 8 workers)       7m30s    (n=1, 2026-10-01, 239 sitios, #156 + #157)
+ *   portatil (10 cores, 8 workers)       4m50s    (n=1, 2026-10-02, 239 sitios, ate ao #171)
  *   ubuntu-latest, repo publico  (4/4)  10-14 min (n=3, 2026-10-01, depois do #156; antes: 12-20, n=10)
  *   (o dono primeiro, #156: alvos `guards/` 542 -> 209-213 s a 8 workers, 1022 -> 343 s a 2)
  *   ubuntu-latest, repo privado  (2/2)  ~51 min   (n=2, 2026-09-18, 208 sitios — ANTES do

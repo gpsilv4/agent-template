@@ -330,3 +330,26 @@ As duas do `test-guards` vinham do `tests-skips-congelados.mjs`: o `mede()` mont
 estado e nunca a apagava, em TODAS as corridas. O ganho de tempo foi maior do que o estimado (~1 min).
 **Nao medido**, e fica dito: a hipotese e que a fuga tambem custava tempo (centenas de pastas no
 tmpdir a cada `mkdtemp`/`readdir`). n=1 dos dois lados; a separacao dos dois efeitos esta por fazer.
+
+## Os testes inline do `test-guards.mjs` foram para os seus donos (#171)
+
+O #156 pos os modulos a correr ANTES dos testes inline (para o dono do alvo mutado poder correr
+primeiro). Isso criou uma regressao que a revisao de regressoes nao apanhou por ler sem medir: os
+17 mutantes do `check-doc-versions.mjs` eram mortos por testes INLINE, que passaram a correr depois
+de ~270 testes de modulos.
+
+| alvo | antes do #156 | depois do #156 | **#171** |
+|---|---|---|---|
+| `check-doc-versions.mjs` (17 sitios) | 59 s | 219 s | **62-63 s** (n=3) |
+| `tests/harness/test-harness.mjs` (9 sitios) | 116 s | 98 s | **44-47 s** (n=2) |
+| varredura completa (portatil) | 841 s | 507-511 s (`main` com #157/#170) | **290 s**, 239/239 |
+
+**O que mudou**: as seccoes inline que testam os guards que vivem DENTRO do orquestrador (2, 4-10,
+cwd, CRLF, ficheiros em branco, SKIP) foram para `tests-check-doc-versions.mjs` — o dono pela
+convencao. Uma segunda seccao do Guard 3 (precedencia SemVer) e a sua NOTE, que o #156 deixara
+inline, foram para `tests-versions.mjs`; os SKIP do Guard 12 num derivado, para
+`tests-derived-counts.mjs`. O `tests-harness-self.mjs` passou a `tests-test-harness.mjs`, e com isso
+a dono do `test-harness.mjs`. O `test-guards.mjs` ficou o entry point e a baseline: 462 -> 86 linhas.
+
+**A licao**: a convencao de dono so rende se os testes de um ficheiro viverem no ficheiro que tem o
+nome dele. Dos tres alvos sem dono do #156, dois tinham-no — so com o nome errado.

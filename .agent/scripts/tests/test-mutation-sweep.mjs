@@ -427,7 +427,7 @@ test("a baseline corre UMA vez por suite partilhada, nao uma por alvo", { contaC
 // todos. Era o ficheiro que decide o veredicto sobre o MEDIDOR a ser a unica coisa sem medida.
 //
 // `avaliar()` e pura, logo chama-se aqui com entradas fabricadas — uma por sitio de recusa.
-// Mesmo desenho do `tests-harness-self.mjs`, que nasceu deste mesmo achado no outro harness.
+// Mesmo desenho do `tests-test-harness.mjs`, que nasceu deste mesmo achado no outro harness.
 function auto(nome, resultado, expect, exigidos, proibidos = []) {
   const problemas = avaliar(resultado, expect);
   const falhas = [];
