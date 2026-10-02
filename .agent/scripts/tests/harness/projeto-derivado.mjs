@@ -14,25 +14,23 @@
  * Guard 13 numa fixture que ainda tem `{{ ... }}` por todo o lado, e o teste falha por avisos de
  * placeholders que nada tem a ver com o que afirma. Um derivado a serio ja os substituiu.
  *
- * ## O QUE ESTA FIXTURE **NAO** MONTA, e vale saber antes de confiar nela
+ * ## AS RULES QUE O BOOTSTRAP GERA, e porque o conteudo nao conta
  *
- * As duas rules que o bootstrap **gera** — `business-logic.md` e `pages-architecture.md` — ficam
- * **ausentes**. A Fase 2 do `BOOTSTRAP.md` escreve-as a partir das respostas do projeto, e isso
- * exigia inventar conteudo de dominio; aqui so se substituem placeholders no que ja existe.
+ * As que a Fase 2.2 do `BOOTSTRAP.md` manda gerar (`lib/derivado.mjs`, `rulesGeradasDe`) saem
+ * com uma linha so. Num derivado a falta delas e um bootstrap a meio, e os Guards 1 e 8 dao WARN
+ * (#190): sem elas a fixture nao era um derivado, era um derivado partido.
  *
- * A consequencia e concreta e ja mordeu uma medicao: o orcamento de contexto de um projeto
- * derivado **nao se pode medir por aqui**. Medido com esta fixture da 32 028 bytes — MENOS do
- * que o template nu (32 312), porque os placeholders encolhem ao ser substituidos — e o numero
- * parece tranquilizador exactamente por lhe faltarem as duas rules que o inflam. As duas passam
- * pelo mesmo tecto de 12 000 das rules obrigatorias (`guards/budgets.mjs`), logo o pior caso
- * conforme de um derivado sao ~56 KB por sessao, e nao 32.
- *
- * Fica escrito aqui, e nao so no issue, porque quem usar esta fixture para medir orcamento vai
+ * O conteudo de dominio continua por inventar, e isso tem uma consequencia concreta: o orcamento
+ * de contexto de um derivado **nao se mede por aqui**. As duas passam pelo mesmo tecto de 12 000
+ * das rules obrigatorias (`guards/budgets.mjs`), logo o pior caso conforme sao ~56 KB por sessao;
+ * medido sem elas, esta fixture deu MENOS do que o template nu (32 028 contra 32 312 bytes), e
+ * uma linha por rule nao muda isso: o numero parece tranquilizador por lhe faltar o que as infla. Fica escrito aqui porque quem a usar para medir orcamento vai
  * obter um numero que parece uma resposta.
  */
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { recongelarContexto } from "./recongelar-contexto.mjs";
+import { rulesGeradasDe } from "../../lib/derivado.mjs";
 import { PRISTINOS } from "../../guards/context-virgem.mjs";
 
 /** Os tipos que a Fase 2.1 do `BOOTSTRAP.md` manda varrer. Se esta lista ficar curta, sobram
@@ -69,6 +67,10 @@ export function bootstrapado(dir, valor = "VALOR") {
     }
   };
   anda("");
+  const bootstrap = existsSync(join(dir, ".agent/BOOTSTRAP.md")) ? readFileSync(join(dir, ".agent/BOOTSTRAP.md"), "utf8") : null;
+  for (const rel of rulesGeradasDe(bootstrap)) {
+    if (!existsSync(join(dir, rel))) writeFileSync(join(dir, rel), `# ${rel.split("/").pop()} (${valor})\n\nGerada no bootstrap.\n`);
+  }
   const marca = join(dir, ".agent/.template-version");
   mkdirSync(dirname(marca), { recursive: true });
   writeFileSync(marca, "sha: abc1234\nversao: v0.3.0\n");

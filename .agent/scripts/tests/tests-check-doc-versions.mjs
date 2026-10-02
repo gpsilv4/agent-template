@@ -199,6 +199,16 @@ export function registar() {
     includes: ["SKIP  @.agent/rules/business-logic.md"],
   });
 
+  test("G8: num DERIVADO, o import das rules do bootstrap ausentes avisa", (dir) => {
+    // O marcador poe o repo em derivado; as duas rules ausentes sao o bootstrap a meio (#190).
+    writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
+    for (const f of ["business-logic.md", "pages-architecture.md"]) rmSync(file(dir, `.agent/rules/${f}`), { force: true });
+  }, {
+    code: 1,
+    synthetic: true,
+    includes: ["importa `@.agent/rules/business-logic.md` mas o ficheiro NAO EXISTE"],
+  });
+
   test("G8: CLAUDE.md sem imports avisa", (dir) => {
     writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md").split("\n").filter((l) => !l.startsWith("@")).join("\n"));
   }, { code: 1, includes: ["sem nenhum `@import`"] });

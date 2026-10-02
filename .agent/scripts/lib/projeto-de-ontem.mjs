@@ -24,6 +24,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "fs"
 import { dirname, join } from "path";
 import { leOuNull, substituivel, andaFicheiros, PLACEHOLDER, CONSTANTES_DO_PROJETO } from "./upgrade-mecanico.mjs";
 import { aplica } from "./patch.mjs";
+import { rulesGeradasDe } from "./derivado.mjs";
 
 /**
  * Enche `dir` com um consumidor da `tag`: a arvore dessa tag, bootstrapada, mais conteudo
@@ -82,9 +83,7 @@ export function montaProjetoDeOntem({ dir, root, tag, sha, substituto, marcaProj
   // As rules GERADAS no bootstrap, derivadas da seccao 2.2 do BOOTSTRAP.md **da tag** — e nao do
   // HEAD. A tabela pode ter mudado entretanto, e o que interessa e o que o consumidor gerou na
   // altura em que bootstrapou.
-  const bootstrapAntigo = leOuNull(join(dir, ".agent/BOOTSTRAP.md"));
-  const seccao = bootstrapAntigo?.split(/^### 2\.2 /m)[1]?.split(/^### 2\.3 /m)[0] ?? "";
-  const geradas = [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
+  const geradas = rulesGeradasDe(leOuNull(join(dir, ".agent/BOOTSTRAP.md")));
   if (geradas.length === 0) {
     fatal(`nao derivei nenhuma rule gerada da seccao 2.2 do BOOTSTRAP.md do ${tag} — o formato mudou?`);
   }

@@ -160,7 +160,7 @@ const ehDerivado = () => ehDerivadoDe(read);
 const CFG_GUARDS = join(ROOT, ".agent/scripts/config/guards-do-projeto.mjs");
 const { GUARDS = [], PASTAS_DE_SCRIPTS = [] } = existsSync(CFG_GUARDS) ? await import(pathToFileURL(CFG_GUARDS).href) : {};
 
-guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir });
+guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir, ehDerivado });
 
 // --- Guard 2: CLAUDE.md === GEMINI.md (normalizando sintaxe de import) ---
 // Gemini usa `@./path`, Claude/Cursor usa `@path`. Normalizar antes de comparar
@@ -313,7 +313,8 @@ if (workflows && claude) {
 
 // --- Guard 8: os `@imports` de CLAUDE.md resolvem ---
 // Um caminho com gralha era silencioso: o agente carregava menos contexto do que
-// pensava, sem sinal nenhum. As duas rules geradas no bootstrap sao a excecao esperada.
+// pensava, sem sinal nenhum. As duas rules geradas no bootstrap sao a excecao esperada — so no
+// template: num derivado e um bootstrap a meio (#190).
 const BOOTSTRAP_GENERATED = new Set([
   ".agent/rules/business-logic.md",
   ".agent/rules/pages-architecture.md",
@@ -327,7 +328,7 @@ if (claude) {
     let pending = 0;
     for (const path of imports) {
       if (read(path) !== null) continue;
-      if (BOOTSTRAP_GENERATED.has(path)) {
+      if (BOOTSTRAP_GENERATED.has(path) && !ehDerivado()) {
         skip(`@${path} — gerado no bootstrap, ainda nao existe`);
         pending++;
       } else {

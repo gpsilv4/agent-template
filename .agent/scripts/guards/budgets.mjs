@@ -19,12 +19,14 @@
 /**
  * @returns {number} guards executados
  */
-export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
+export function guardBudgets({ read, warn, note, ok, skip, listDir, ehDerivado }) {
   let corridos = 0;
 
   // --- Guard 1: orcamento de bytes das rules sempre-carregadas ---
   // Duas listas distintas: a ausencia de uma rule OBRIGATORIA e um defeito (o `@import`
-  // em CLAUDE.md fica pendurado); a das duas geradas no bootstrap e esperada.
+  // em CLAUDE.md fica pendurado); a das duas geradas no bootstrap e esperada NO TEMPLATE. Num
+  // derivado e um bootstrap a meio, com dois `@import` pendurados, e saia 0 na mesma (#190). So
+  // conta se o CLAUDE.md a importar, como no Guard 8: tirar o import e a saida de quem a dispensa.
   const REQUIRED_RULES = ["core-rules.md", "process-rules.md", "anti-patterns.md"];
   const BOOTSTRAP_RULES = ["business-logic.md", "pages-architecture.md"];
   const RULES_WARN_BYTES = 11500;
@@ -58,10 +60,14 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir }) {
     }
     corridos++;
   }
+  const importadas = new Set([...(read("CLAUDE.md") ?? "").matchAll(/^@(\S+)/gm)].map((m) => m[1]));
   for (const f of BOOTSTRAP_RULES) {
     const file = `.agent/rules/${f}`;
-    if (checkRuleBytes(file) === null) skip(`${file} — gerado no bootstrap, ainda nao existe`);
-    else corridos++;
+    if (checkRuleBytes(file) !== null) corridos++;
+    else if (ehDerivado() && importadas.has(file)) {
+      warn(`${file} NAO EXISTE num projeto derivado — o bootstrap gera-a (BOOTSTRAP.md, Fase 2.2) e o CLAUDE.md importa-a`);
+      corridos++;
+    } else skip(`${file} — gerado no bootstrap, ainda nao existe`);
   }
 
   // --- Guard 1b: orcamento das rules NAO carregadas ---

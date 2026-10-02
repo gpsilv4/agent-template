@@ -364,7 +364,8 @@ function syntheticSandbox() {
     [GUARD, ...(existsSync(join(ROOT, GUARD_MODULES)) ? readdirSync(join(ROOT, GUARD_MODULES)).map((f) => `${GUARD_MODULES}/${f}`) : [])]
       .flatMap((f) => [...readFileSync(join(ROOT, f), "utf8").matchAll(/^\s*\/\/ --- (?:Guard )?(\d+[a-z]?):/gm)].map((m) => m[1]))
   ).size;
-  w(".agent/BOOTSTRAP.md", `# Bootstrap\n\nO checker corre ${nGuards} guards numerados.\nO template traz 1 workflows.\n`);
+  // E a tabela 2.2, como a real: e dela que o `bootstrapado()` tira as rules a gerar (#190).
+  w(".agent/BOOTSTRAP.md", `# Bootstrap\n\nO checker corre ${nGuards} guards numerados.\nO template traz 1 workflows.\n\n### 2.2 Ficheiros a GERAR\n\n| \`.agent/rules/business-logic.md\` |\n| \`.agent/rules/pages-architecture.md\` |\n\n### 2.3 Fim\n`);
   w(".agent/workflows/plan.md", "# /plan\n");
   w(".claude/commands/plan.md", "---\ndescription: x\n---\n\nLer `.agent/workflows/plan.md`.\n");
   w(".gemini/commands/plan.toml", 'description = "x"\nprompt = "Le .agent/workflows/plan.md"\n');

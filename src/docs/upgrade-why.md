@@ -424,3 +424,15 @@ desaparecer (`CONSTANTES_DO_PROJETO`).
 aprovar, o que vai deixar de estar como o projeto o tinha. Foi o que faltou para o R7-A se ver
 antes de partir.
 
+
+## Porque um derivado sem as rules do bootstrap passa a avisar (#190)
+
+O `business-logic.md` e o `pages-architecture.md` sao gerados pela Fase 2.2 do `BOOTSTRAP.md`, e
+o `CLAUDE.md` importa-os. No template por estrear, a falta deles e esperada, e os Guards 1 e 8
+dao SKIP. Num derivado davam o **mesmo** SKIP e saiam 0, com dois `@import` pendurados: o
+agente carregava menos contexto do que o `CLAUDE.md` dizia, e nada o denunciava.
+
+Agora, num derivado, a falta e WARN nos dois guards. Um projeto que nunca as gerou recebe esses
+dois avisos no primeiro `/upgrade` que traga esta versao. E o comportamento pretendido, e
+resolve-se gerando-as. Um projeto que as dispense de proposito tira os `@import` dos pontos de
+entrada: os dois guards so avisam de uma rule que o `CLAUDE.md` importa.
