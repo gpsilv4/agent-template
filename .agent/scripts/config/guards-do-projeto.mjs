@@ -32,3 +32,11 @@ export const PARES_DO_PROJETO = [];
  *  procura la os `.mjs` que as instrucoes citam. ADAPTAR no bootstrap; uma pasta que nao exista
  *  e ignorada. Vivia dentro do `guards/citacoes.mjs`, que o upgrade substitui (#176). */
 export const PASTAS_DE_SCRIPTS = ["scripts", "tools"];
+
+/** Os SKIP legitimos dos guards DESTE projeto, com a razao de cada um. O teste dos SKIPs congela
+ *  o conjunto que a fixture produz e reprova um SKIP novo; um guard proprio que salte na fixture
+ *  (ex: "nenhum ficheiro em src/", porque a fixture nao copia a app) declara-se AQUI, e nao no
+ *  teste, que e do template e o upgrade substitui (#177). `chave` e o inicio do texto do SKIP.
+ *  Ex: `{ chave: "Guard 4b (PT-PT) — nenhum ficheiro", razao: "a fixture nao copia src/" }` */
+export const SKIPS_DO_PROJETO = [];
+

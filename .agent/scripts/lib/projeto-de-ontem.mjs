@@ -23,6 +23,7 @@ import { execFileSync } from "child_process";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync } from "fs";
 import { dirname, join } from "path";
 import { leOuNull, substituivel, andaFicheiros, PLACEHOLDER, CONSTANTES_DO_PROJETO } from "./upgrade-mecanico.mjs";
+import { aplica } from "./patch.mjs";
 
 /**
  * Enche `dir` com um consumidor da `tag`: a arvore dessa tag, bootstrapada, mais conteudo
@@ -174,13 +175,14 @@ export function montaProjetoDeOntem({ dir, root, tag, sha, substituto, marcaProj
     //     vive em `test-simulate-upgrade.mjs`, e prova que o upgrade lha traz.
     const relCfg = ".agent/scripts/config/bundles.mjs";
     const cCfg = leOuNull(join(dir, relCfg));
-    const comGateSuspenso =
-      cCfg === null
-        ? "export const TARGETS = {};\nexport const ALVOS_REPROVAM = false;\n"
-        : cCfg.replace(/export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
-    if (cCfg !== null && comGateSuspenso === cCfg) {
+    // `aplica()` e nao `===`: o mesmo texto depois do `replace` quer dizer duas coisas — o literal
+    // mudou de forma (erro), ou o gate JA estava suspenso (sucesso, nada a escrever). Colapsa-las
+    // era o defeito que o `lib/patch.mjs` existe para fechar (#177, resto do T-C).
+    const r = cCfg === null ? null : aplica(cCfg, /export const ALVOS_REPROVAM = (?:true|false);/, "export const ALVOS_REPROVAM = false;");
+    if (r?.estado === "sem-alvo") {
       fatal(`nao consegui suspender o gate em ${relCfg} — o literal mudou de forma`);
     }
+    const comGateSuspenso = r === null ? "export const TARGETS = {};\nexport const ALVOS_REPROVAM = false;\n" : r.texto;
     mkdirSync(dirname(join(dir, relCfg)), { recursive: true });
     writeFileSync(join(dir, relCfg), comGateSuspenso);
   }

@@ -16,6 +16,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { test, file, readF, writeF, GUARD, recongelarContexto, registarResultado } from "./harness/test-harness.mjs";
 import { comoTemplate } from "./harness/projeto-derivado.mjs";
+import { PRISTINOS } from "../guards/context-virgem.mjs";
 // A receita do "bootstrap concluido" vive no harness: estava escrita aqui E no
 // `tests-placeholders.mjs`, a concordar a mao, e a lista de extensoes ja divergiu uma vez (`TP8`).
 import { bootstrapado as derivado } from "./harness/projeto-derivado.mjs";
@@ -147,7 +148,15 @@ export function registar() {
     writeF(dir, ".agent/context/Thumbs.db", "ruido do Explorer");
     writeF(dir, ".agent/context/.session.md.swp", "swap do vim");
     writeF(dir, ".agent/context/task.md~", "backup do editor");
-  }, { code: 0, includes: ["9 ficheiros de .agent/context/ por estrear"], excludes: ["sem entrada em PRISTINOS"] });
+    // O numero vem do `PRISTINOS`, e nao escrito a mao: um "9" fixo era o estado do template.
+  }, { code: 0, includes: [`${Object.keys(PRISTINOS).length} ficheiros de .agent/context/ por estrear`], excludes: ["sem entrada em PRISTINOS"] });
+
+  // O `comoTemplate` monta um TEMPLATE, e um template nao tem trabalho do projeto no contexto:
+  // os ficheiros de um derivado (um `backlog-detail.md`) saem (R7-F, #177).
+  test("G21: o comoTemplate tira do contexto os ficheiros que nao sao andaime", (dir) => {
+    writeF(dir, ".agent/context/backlog-detail.md", "# Detalhe do backlog do projeto\n");
+    comoTemplate(dir);
+  }, { code: 0, excludes: ["sem entrada em PRISTINOS"] });
 
   test("G21: [contra-prova] o filtro de ruido nao deixa passar um ficheiro a serio", (dir) => {
     comoTemplate(dir);

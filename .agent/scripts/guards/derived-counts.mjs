@@ -16,7 +16,7 @@ import { AP_FILES, CABECALHO_AP, semHtml } from "./anti-patterns.mjs";
  *  dois guards, e as duas versoes tinham DIVERGIDO: o 12c nao incluia `CLAUDE.md`/`GEMINI.md`,
  *  logo um numero errado na rule sempre-carregada passava — e o Guard 2 (paridade) tambem nao
  *  o apanha quando o erro esta igual nos dois espelhos. */
-function ficheirosComProsa(listDir) {
+export function ficheirosComProsa(listDir) {
   return [
     ...(listDir(".agent/rules", ".md") || []).map((f) => `.agent/rules/${f}.md`),
     ...(listDir(".agent/workflows", ".md") || []).map((f) => `.agent/workflows/${f}.md`),
@@ -385,7 +385,13 @@ if (metodo) {
     const INTERVALO_AP = /`?((?:AP|TP))(\d+)`?\s*(?:[-–]|\.\.)\s*`?((?:AP|TP))(\d+)`?/g;
     let validados = 0;
     let mal = 0;
-    for (const alvo of ficheirosComProsa(listDir)) {
+    // O `CHANGELOG` fica DE FORA, so aqui (R7-G, #177). E um registo DATADO: um intervalo de
+    // anti-padroes numa entrada antiga era verdade na data dela, e ninguem segue uma release
+    // antiga como instrucao.
+    // Num derivado real, os intervalos historicos davam dois avisos impossiveis de calar sem
+    // reescrever a historia. Os `-why` nao saem: e la que a evidencia vive, e la a regra pesa. Os
+    // outros guards 12x leem-no na mesma — medidos no mesmo derivado, nao dao aviso nenhum dele.
+    for (const alvo of ficheirosComProsa(listDir).filter((f) => f !== "src/docs/CHANGELOG.md")) {
       const bruto = read(alvo);
       if (bruto === null) continue;
       semHtml(bruto)
