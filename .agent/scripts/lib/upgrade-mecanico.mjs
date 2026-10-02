@@ -354,16 +354,10 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     writeFileSync(p, c.replace(alvo, () => bloco));
     repostas++;
   }
-  // (iv) O CABECALHO do `anti-patterns.md`, sem tocar nas ENTRADAS do projeto.
-  //
-  // A instrucao dizia "nunca tocar" neste ficheiro. Esta certo para as entradas — sao os `APn`
-  // do projeto e nao existem em mais sitio nenhum — e errado para o cabecalho, que e prosa do
-  // template e cita os IDs dele. Depois da separacao de prefixos, o cabecalho antigo ficou a
-  // citar IDs que deixaram de existir: o consumidor levava vermelho num ficheiro que lhe
-  // disseram para nao tocar, e a mensagem nao lhe dizia porque.
-  //
-  // Esta simulacao foi o que o mostrou, e na corrida em que o mostrou a afirmacao que o PR do
-  // namespace fez — "o Guard 15 diz ficheiro e linha" — foi verificada pela primeira vez.
+  // (iv) O CABECALHO do `anti-patterns.md`: a regra do (v), sem tocar nas ENTRADAS (`APn`, so do
+  // projeto). Intacto contra a tag, a menos dos placeholders, traz-se o novo; customizado, nao se
+  // toca — trazer o inteiro apagava o que o projeto condensou e rebentava o tecto (#178). A prosa
+  // velha aponta-a o Guard 15 (ID morto) ou o G12g (intervalo), com ficheiro e linha.
   {
     const rel = ".agent/rules/anti-patterns.md";
     // O `---` separa cabecalho de entradas nos dois lados. Se mudar, ISTO REPROVA em vez de
@@ -378,7 +372,12 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     if (doTemplate === null || doProjeto === null) {
       fatal(`nao consegui separar o cabecalho das entradas em ${rel} — o separador '---' mudou de forma`);
     }
-    writeFileSync(join(dir, rel), doTemplate[0] + doProjeto[1]);
+    const naTag = corta(tagFicheiro(rel));
+    const vals = naTag === null ? null : capturaPlaceholders(doProjeto[0], naTag[0]);
+    if (vals !== null) {
+      recolhe(vals);
+      writeFileSync(join(dir, rel), doTemplate[0] + doProjeto[1]);
+    }
   }
   
   // (v) **Nao customizado -> traz-se o novo.** A regra ja existia no workflow, so que escrita
