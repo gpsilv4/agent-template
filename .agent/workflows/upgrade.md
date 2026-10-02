@@ -115,7 +115,7 @@ node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
 
 Corre-se **do clone do template** (`$TPL`, o da secao 1) apontado a este projeto, e nao ao
 contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **passa** a reprovar aqui
-(o que ja estava vermelho e subtraido), o que **saiu** do template com a marca migracao/limpeza,
+(subtraido, linha a linha, o que ja falhava), o que **saiu** do template com a marca migracao/limpeza,
 e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precisa de decisao.
 
 > Corre sobre uma copia em `tmpdir`: **nao toca neste projeto**. Sai `0` mesmo com lista cheia —

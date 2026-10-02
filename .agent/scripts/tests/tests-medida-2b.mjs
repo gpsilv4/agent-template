@@ -250,4 +250,99 @@ export function registar() {
     );
   });
 
+
+  // --- A 2b mostra TODAS as reprovacoes, linha a linha (#175) -----------------------
+  //
+  // Guardava so a primeira linha de cada comando, e o "antes" era um conjunto de COMANDOS. No
+  // derivado real a 2b mostrou 2 linhas onde a bateria tinha 19 — e entre as escondidas estava um
+  // guard do proprio projeto desligado pelo upgrade (R7-A).
+  const CI_UM = (cmd) => `jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/${cmd}\n`;
+  const imprime = (...linhas) => linhas.map((l) => `console.log(${JSON.stringify(l)});\n`).join("") + "process.exit(1);\n";
+
+  test("dois FAIL novos no mesmo comando saem os dois, e o que ja reprovava nao", () =>
+    exige(
+      contraProjeto({
+        projeto: { ".github/workflows/ci.yml": CI_UM("multi.mjs"), ".agent/scripts/multi.mjs": imprime("  WARN  antigo") },
+        hoje: {
+          ".github/workflows/ci.yml": CI_UM("multi.mjs"),
+          ".agent/scripts/multi.mjs": imprime("  WARN  antigo", "  WARN  novo-um", "  FAIL  novo-dois"),
+        },
+      }),
+      { codigo: 0, inclui: ["novo-um", "novo-dois"], exclui: ["WARN  antigo"] }
+    ));
+
+  // A linha de RESUMO comeca por `WARNING:` e casava `^WARN`: linha a linha, contava como achado.
+  test("a linha de resumo `WARNING:` nao conta como reprovacao", () =>
+    exige(
+      contraProjeto({
+        hoje: {
+          ".github/workflows/ci.yml": CI_UM("resumo.mjs"),
+          ".agent/scripts/resumo.mjs": imprime("  WARN  real", "WARNING: ha divergencias/avisos de documentacao."),
+        },
+      }),
+      { codigo: 0, inclui: ["WARN  real"], exclui: ["WARNING: ha divergencias"] }
+    ));
+
+  // Um crash nao tem linhas de aviso. Sem a sentinela, um comando que rebenta sumia da lista.
+  test("um comando que rebenta sem linhas de aviso sai como `exit N`", () =>
+    exige(
+      contraProjeto({ hoje: { ".github/workflows/ci.yml": CI_UM("rebenta.mjs"), ".agent/scripts/rebenta.mjs": "process.exit(3);\n" } }),
+      { codigo: 0, inclui: ["rebenta.mjs", "exit 3"] }
+    ));
+
+  // Normalizar os numeros escondia `31 -> 33`, que e uma regressao. Sai, anotada.
+  test("uma linha que so mudou nos numeros SAI, anotada, e nao se esconde", () =>
+    exige(
+      contraProjeto({
+        projeto: { ".github/workflows/ci.yml": CI_UM("conta.mjs"), ".agent/scripts/conta.mjs": imprime("  WARN  existem 31") },
+        hoje: { ".github/workflows/ci.yml": CI_UM("conta.mjs"), ".agent/scripts/conta.mjs": imprime("  WARN  existem 33") },
+      }),
+      { codigo: 0, inclui: ["existem 33", "mudou so em numeros"] }
+    ));
+
+  // --- Os blocos `run: |` contam (#184) --------------------------------------------
+  //
+  // A varredura do template vive num bloco, dentro de um `if`, e so `run: node X` numa linha era
+  // lido. A forma copiada do `ci.yml` real, e nao uma linha sintetica que passasse por acaso.
+  const CI_BLOCO = (corpo) =>
+    "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n" +
+    "      - name: bloco\n        run: |\n          set -euo pipefail\n          if true; then\n" +
+    `            ${corpo}\n          fi\n`;
+
+  test("um comando dentro de um bloco `run: |` e medido", () =>
+    exige(
+      contraProjeto({
+        hoje: {
+          ".github/workflows/ci.yml": CI_BLOCO("node .agent/scripts/bloco.mjs"),
+          ".agent/scripts/bloco.mjs": imprime("  WARN  do bloco"),
+        },
+      }),
+      { codigo: 0, inclui: ["PASSA A REPROVAR", "bloco.mjs"] }
+    ));
+
+  // O caso das seis rondas: o projeto tem a varredura COMENTADA. A NOTE tem de a nomear — e a
+  // bateria NAO a corre (minutos; mede as suites), o que a fixture prova com uma que reprova.
+  test("a varredura num bloco, comentada no projeto, e NOMEADA e nao corre", () =>
+    exige(
+      contraProjeto({
+        projeto: { ".github/workflows/ci.yml": CI_BLOCO("# node .agent/scripts/mutation-sweep.mjs") },
+        hoje: {
+          ".github/workflows/ci.yml": CI_BLOCO("node .agent/scripts/mutation-sweep.mjs"),
+          ".agent/scripts/mutation-sweep.mjs": imprime("  WARN  a varredura correu"),
+        },
+      }),
+      { codigo: 0, inclui: ["mutation-sweep.mjs", "COMENTADA", "nao corre"], exclui: ["a varredura correu"] }
+    ));
+
+  // O job SEGUINTE nao e do `guard-tests`: o `split` levava todos os que vinham depois.
+  test("um comando de OUTRO job, depois do guard-tests, nao entra", () =>
+    exige(
+      contraProjeto({
+        hoje: {
+          ".github/workflows/ci.yml": CI_UM("stub.mjs") + "  outro:\n    steps:\n      - run: node .agent/scripts/fora.mjs\n",
+          ".agent/scripts/fora.mjs": imprime("  WARN  de outro job"),
+        },
+      }),
+      { codigo: 0, exclui: ["fora.mjs"] }
+    ));
 }
