@@ -48,8 +48,12 @@ export const SUITES = [
   // a primeira e o instrumento que responde a seccao 2b (dos DOIS lados, template e derivado),
   // a segunda e a fixture do modo template. Quem lhes mexe tem de correr esta suite, que e a
   // unica que as exercita.
+  // O filtro do que NAO e do template tem DOIS consumidores — o motor do `/upgrade` e o
+  // `simulate-derived` (#182) — e a primeira regra que casa vence. Na regra do upgrade, mexer nele
+  // deixava a copia do derivado sem ninguem a medir.
+  { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem|fora-do-template)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },

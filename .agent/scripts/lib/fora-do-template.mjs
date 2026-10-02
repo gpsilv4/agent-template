@@ -7,6 +7,9 @@
  * `.git`, e os `RELATORIO-*.md` ignorados aterraram na copia de um derivado real (ronda 7, R7-D).
  * O que o git do template ignora nao e do template.
  *
+ * Usado por DOIS: o motor do `/upgrade` e o `simulate-derived.mjs`, que tinha a sua propria lista
+ * escrita a mao e ja divergida do `.gitignore` (#182). Uma regra, um sitio (`TP8`).
+ *
  * Duas camadas, e cada uma cobre o furo da outra:
  * 1. **O que o git ignora**, perguntado ao proprio git — nunca reimplementar o `.gitignore`.
  * 2. **Nomes de segredo**, fixos, para o dia em que o `.gitignore` de quem mantem o template nao
