@@ -140,7 +140,9 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/tests\/(test-[\w-]+)\.mjs$/, verifica: [], suiteDeSi: true },
   // ANTES da regra generica de `lib/`: a ordem da tabela e a semantica, e o `lib/` generico
   // manda tudo para a suite do registo — que nao toca nestes dois.
-  { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado|lib\/ficheiros)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  // O `lib/ficheiros.mjs` serve os dois simuladores: o `blocoDaConstante` mudou-se para la (#179).
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A
   // regra vem ANTES da geral de `lib/` porque o mapa decide pela primeira que casa.
   { re: /^\.agent\/scripts\/lib\/derivado-maduro\.mjs$/, verifica: [S("test-derivado-maduro.mjs"), S("test-simulate-derived.mjs")] },
