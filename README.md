@@ -217,6 +217,7 @@ gh pr create --fill     # then merge once CI is green
             ├── test-surface-harness.mjs  <- A real git repo as a fixture
             ├── test-sweep-harness.mjs    <- Fake checker + fake suite of known behaviour
             ├── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
+            ├── test-derived-harness.mjs  <- The minimal repo the derived-project simulator runs in
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
