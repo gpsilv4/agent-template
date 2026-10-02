@@ -12,6 +12,7 @@ import { pathToFileURL } from "url";
 const PONTEIROS_1D = ["AGENTS.md", ".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
 import { join } from "path";
 import { test, file, readF, writeF } from "./harness/test-harness.mjs";
+import { bootstrapado } from "./harness/projeto-derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -59,11 +60,14 @@ export function registar() {
   });
 
   // A SAIDA de quem as dispensa: sem o `@import` nao ha nada pendurado, e nenhum dos dois avisa.
+  // Um derivado COMPLETO (`bootstrapado`) e `code: 0`: so com o marcador, o Guard 13 avisava dos
+  // placeholders da sandbox, e o teste passava no template por esse aviso alheio — no
+  // `simulate-derived` nao havia placeholders e ele reprovava (`TP3`).
   test("G1/G8: num DERIVADO que nao as importa, as rules ausentes nao avisam", (dir) => {
-    writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
+    bootstrapado(dir);
     for (const f of ["business-logic.md", "pages-architecture.md"]) rmSync(file(dir, `.agent/rules/${f}`), { force: true });
     for (const e of ["CLAUDE.md", "GEMINI.md"]) writeF(dir, e, readF(dir, e).split("\n").filter((l) => !/business-logic|pages-architecture/.test(l)).join("\n"));
-  }, { synthetic: true, excludes: ["NAO EXISTE num projeto derivado", "importa `@.agent/rules/business-logic.md`", "importa `@.agent/rules/pages-architecture.md`"] });
+  }, { synthetic: true, code: 0, excludes: ["NAO EXISTE num projeto derivado", "importa `@.agent/rules/business-logic.md`", "importa `@.agent/rules/pages-architecture.md`"] });
 
   // --- Guard 1b: orcamento das rules de REFERENCIA (nao carregadas) -------------
   // Nao tinham limite nenhum, e uma delas chegou aos 16 KB sem nada avisar — apesar de ser
