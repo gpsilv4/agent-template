@@ -334,6 +334,12 @@ caso('patch: padrao que NAO casa devolve `sem-alvo`', () => {
 // Um `RegExp` com a flag `g` guarda `lastIndex` entre chamadas, e o `test()` alterna entre `true`
 // e `false` sobre o mesmo input. Ja aconteceu num guard deste repo. O `aplica()` usa `match`, e
 // este caso e o que o prende la.
+// Uma string LITERAL com caracteres de regex: o `match` convertia-a em regex e rebentava (#177).
+caso('patch: string literal com `[` que nao casa devolve `sem-alvo`, e nao rebenta', () => {
+  const r = aplica('const OUTRA = 1;', 'export const LISTA = [', 'export const LISTA = [1, ');
+  return r.estado === 'sem-alvo' ? [] : [`estado ${r.estado}, esperado sem-alvo`];
+});
+
 caso('patch: padrao com flag `g` nao alterna resultados entre chamadas', () => {
   const g = /const X = (?:true|false);/g;
   const a = aplica('const X = false;', g, 'const X = false;');

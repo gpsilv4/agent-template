@@ -41,5 +41,10 @@ export function aplica(texto, padrao, novo) {
   if (depois !== texto) return { estado: "aplicado", texto: depois };
   // `match` e nao `test`: um `RegExp` com a flag `g` guarda `lastIndex` entre chamadas e o `test`
   // alterna entre `true` e `false` sobre o mesmo input. Ja aconteceu neste repo, num guard.
-  return { estado: texto.match(padrao) === null ? "sem-alvo" : "ja-estava", texto };
+  //
+  // Uma STRING pergunta-se com `includes`, e nao com `match`: o `match` converte-a em regex, e um
+  // padrao literal com `[` (`export const LISTA = [`) rebentava em vez de dizer `sem-alvo` —
+  // contra o que o `@param` promete. Apanhado ao escrever o 3f do `derivado-maduro` (#177).
+  const casa = typeof padrao === "string" ? texto.includes(padrao) : texto.match(padrao) !== null;
+  return { estado: casa ? "ja-estava" : "sem-alvo", texto };
 }

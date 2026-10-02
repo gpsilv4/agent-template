@@ -87,6 +87,8 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
   // logica fica sem a constante — foi essa a mudanca que tirou a decisao do caminho do upgrade.
   w(".agent/scripts/check-bundle-sizes.mjs", "// logica do verificador\n");
   w(".agent/scripts/config/bundles.mjs", "export const ALVOS_REPROVAM = true;\n");
+  // A config dos guards do PROJETO, como o template a entrega (#176): o 3f declara la o seu.
+  w(".agent/scripts/config/guards-do-projeto.mjs", "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\nexport const SKIPS_DO_PROJETO = [];\n");
   w(".agent/rules/process-rules.md", "# Processo\n\nO metodo passa por 6 fases.\n");
   if (!semGuardTamanhos) {
     // O `contaLinhas` vem JUNTO com a tabela: o simulador importa-o do guard da copia em vez de
