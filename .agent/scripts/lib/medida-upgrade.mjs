@@ -306,10 +306,12 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
 
   // O upgrade MECANICO, o mesmo motor e as mesmas categorias que o outro modo usa.
   //
-  // O `substituto` e um nome de fachada e nao o do projeto: o que a 2b mede e QUE verificadores
-  // passam a reprovar, e o guard dos placeholders da o mesmo veredicto com qualquer nome desde
-  // que algum substitua. Ir buscar o nome real obrigava a adivinha-lo a partir de prosa ja
-  // substituida — uma heuristica a mais, para nao mudar resposta nenhuma.
+  // O `substituto` e um nome de fachada, e ja nao decide nada (#179). Este comentario dizia que o
+  // nome "nao muda resposta nenhuma", e era FALSO: o motor comparava contra a tag com a fachada
+  // posta, e lia como customizado todo o documento com o nome real — no derivado real, 2 docs
+  // trazidos onde eram 7, e um FAIL do G18 que era da medicao. Agora a comparacao e a menos dos
+  // placeholders, e os valores reais saem dos ficheiros intactos; a fachada so preenche um `X`
+  // que nunca apareca intacto.
   const medido = aplicaUpgradeMecanico({ dir, root: template, tag: ref, fatal, substituto: "EsteProjeto" });
   ok(
     `upgrade mecanico aplicado a copia: ${medido.repostas} constante(s) preservada(s), ` +

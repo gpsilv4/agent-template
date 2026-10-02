@@ -21,9 +21,9 @@ import { join, dirname, sep, relative } from "path";
 // Re-exportado para nao partir quem ja o importava daqui. A definicao vive em
 // `lib/ficheiros.mjs` — estava escrita duas vezes, identica (`TP8`).
 export { leOuNull } from "./ficheiros.mjs";
-import { leOuNull } from "./ficheiros.mjs";
+import { leOuNull, blocoDaConstante } from "./ficheiros.mjs";
 import { foraDoTemplate } from "./fora-do-template.mjs";
-import { intactoAMenosDePlaceholders } from "./intacto.mjs";
+import { intactoAMenosDePlaceholders, capturaPlaceholders, valoresDoProjeto } from "./intacto.mjs";
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Curta de mais, sobram placeholders — e o
  *  Guard 13 denuncia-o no fim, por desenho. */
@@ -122,20 +122,6 @@ export const CONSTANTES_DO_PROJETO = [
  */
 export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, constantes = CONSTANTES_DO_PROJETO }) {
   
-  /** O bloco `const NOME = ...` ate a linha que fecha na coluna 0 (`};` ou `];`). Devolve `null`
-   *  se nao existir — e quem chama decide, porque "nao ha" e "nao consegui ler" pedem accoes
-   *  diferentes (`TP2`). */
-  function blocoDaConstante(texto, nome) {
-    if (texto === null) return null;
-    const linhas = texto.split("\n");
-    const i = linhas.findIndex((l) => l.startsWith(`const ${nome} = `));
-    if (i === -1) return null;
-    // Uma constante de uma linha so (`const X = [];`) fecha nela propria.
-    if (/;\s*$/.test(linhas[i]) && !/[[{]\s*$/.test(linhas[i])) return linhas[i];
-    const fim = linhas.findIndex((l, n) => n > i && /^[\]}]\);?;?$|^[\]}];$/.test(l));
-    if (fim === -1) return null;
-    return linhas.slice(i, fim + 1).join("\n");
-  }
   
   /** O conteudo de um ficheiro NA TAG. `null` quando nao existia — e quem chama decide, porque
    *  "nao existia" e "nao consegui ler" pedem accoes diferentes (`TP2`). */
@@ -260,6 +246,9 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     })
     .sort();
 
+  // Os VALORES reais dos placeholders, recolhidos dos ficheiros intactos do consumidor (#179).
+  const { recolhe, substitui, emConflito } = valoresDoProjeto(substituto);
+
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];
   for (const [rel, nome] of constantes) {
@@ -286,8 +275,11 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     }
 
     const naTagBruto = blocoDaConstante(tagFicheiro(rel), nome);
-    const naTagSubst = naTagBruto === null ? null : naTagBruto.replace(PLACEHOLDER, substituto);
-    if (antigo !== null && antigo === naTagSubst) continue; // intacto: fica o do template novo
+    const vals = antigo === null || naTagBruto === null ? null : capturaPlaceholders(antigo, naTagBruto);
+    if (vals !== null) {
+      recolhe(vals);
+      continue; // intacto: fica o do template novo
+    }
     if (antigo !== null) guardados.push([rel, nome, antigo]);
   }
 
@@ -300,8 +292,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     const doConsumidor = blocoDaConstante(leOuNull(join(dir, rel)), nome);
     if (doConsumidor === null) continue;
     const naTag = blocoDaConstante(tagFicheiro(rel), nome);
-    const naTagSub = naTag === null ? null : naTag.replace(PLACEHOLDER, substituto);
-    if (doConsumidor !== naTagSub) migracoes.push({ nome, de: rel, para });
+    if (naTag === null || !intactoAMenosDePlaceholders(doConsumidor, naTag)) migracoes.push({ nome, de: rel, para });
   }
   
   /** Copia recursiva de uma pasta do HEAD para a copia. */
@@ -404,6 +395,8 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   // ficheiros que o projeto MODIFICOU ficam com a versao dele — e ai que o julgamento vive, e e
   // essa mistura que esta simulacao existe para exercitar.
   let trazidos = 0;
+  const novos = [];
+  const atualizados = [];
   {
     const JA_TRATADO = new Set([".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"]);
     andaFicheiros(root, (sub, nome) => {
@@ -431,30 +424,40 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // ausente. Um ficheiro novo SEM ponteiro de entrada chegava ausente em silencio, e o
       // consumidor ficava sem ele para sempre sem nada o denunciar.
       //
-      // Os placeholders SUBSTITUEM-SE aqui, ao contrario do caminho de baixo: um ficheiro novo
-      // entra no consumidor pela primeira vez e o bootstrap dele ja correu ha muito, logo
-      // ninguem os vai la substituir depois — e o Guard 13 reprova-os no projeto do consumidor.
+      // Os placeholders de um ficheiro NOVO substituem-se ao escreve-lo, NO FIM, com os valores
+      // reais recolhidos (#179): o bootstrap do consumidor ja correu, e ninguem os substituiria.
       if (antigo === null) {
         if (doConsumidor !== null) return;
         const novoC = leOuNull(join(root, sub));
         if (novoC === null) return;
-        mkdirSync(dirname(join(dir, sub)), { recursive: true });
-        writeFileSync(join(dir, sub), novoC.replace(PLACEHOLDER, substituto));
-        trazidos++;
+        novos.push([sub, novoC]);
         return;
       }
-      // A comparacao e contra a versao antiga **com os placeholders ja substituidos**, que e o
-      // estado em que o ficheiro ficou depois do bootstrap. Comparar com o bruto dava tudo por
-      // customizado e a regra nunca disparava.
-      if (doConsumidor === null || doConsumidor !== antigo.replace(PLACEHOLDER, substituto)) return;
+      // Contra a versao antiga A MENOS DOS PLACEHOLDERS (`lib/intacto.mjs`): um so `substituto`
+      // dava por customizado todo o ficheiro com o nome real ou com outro placeholder (#179).
+      const vals = doConsumidor === null ? null : capturaPlaceholders(doConsumidor, antigo);
+      if (vals === null) return;
+      recolhe(vals);
       const novoC = leOuNull(join(root, sub));
       if (novoC === null || novoC === antigo) return;
-      mkdirSync(dirname(join(dir, sub)), { recursive: true });
-      writeFileSync(join(dir, sub), novoC);
-      trazidos++;
+      atualizados.push([sub, novoC]); // escrito depois da verificacao dos conflitos, como os novos
     });
   }
   
+  // Dois valores para o mesmo placeholder: escolher um em silencio era texto que ninguem escreveu.
+  // So conta um conflito num `X` que alguem vai escrever: nos novos, ou na passagem final.
+  const usados = new Set();
+  const nomesEm = (t) => { for (const m of t.matchAll(PLACEHOLDER)) usados.add(m[0].slice(2, -2)); };
+  for (const [, c] of [...novos, ...atualizados]) nomesEm(c);
+  andaFicheiros(dir, (sub, nome) => substituivel(sub, nome) && nomesEm(readFileSync(join(dir, sub), "utf8")));
+  const conflito = emConflito(usados);
+  if (conflito) fatal(`placeholders com mais de um valor nos ficheiros intactos: ${conflito} — sem consenso nao sei o que escrever`);
+  for (const [sub, c, escreve] of [...atualizados.map(([s, c]) => [s, c, (t) => t]), ...novos.map(([s, c]) => [s, c, substitui])]) {
+    mkdirSync(dirname(join(dir, sub)), { recursive: true });
+    writeFileSync(join(dir, sub), escreve(c));
+    trazidos++;
+  }
+
   // Os placeholders OUTRA VEZ, sobre o que acabou de chegar. Um ficheiro trazido do template
   // vem com `{{...}}` por substituir — o `anti-patterns-template.md` tem um no titulo — e
   // deixa-lo assim poe o Guard 13 a reprovar o consumidor. A tabela do `/upgrade` ja manda
@@ -465,7 +468,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     if (!substituivel(sub, nome)) return;
     const p = join(dir, sub);
     const c = readFileSync(p, "utf8");
-    const n = c.replace(PLACEHOLDER, substituto);
+    const n = substitui(c);
     if (n !== c) {
       writeFileSync(p, n);
       repostosPh++;

@@ -33,6 +33,7 @@ import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { registar as registarMedida2b } from "./tests-medida-2b.mjs";
 import { registar as registarForaDoTemplate } from "./tests-upgrade-fora-do-template.mjs";
+import { registar as registarPlaceholders } from "./tests-upgrade-placeholders.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
@@ -45,6 +46,7 @@ const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
 registarMotor();
 registarMedida2b();
 registarForaDoTemplate();
+registarPlaceholders();
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 
