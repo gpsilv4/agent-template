@@ -65,6 +65,24 @@ export function registar() {
     citaEm(dir, "Um ficheiro chamado `tests-x.mjs` que passa sem correr nada e a forma errada.");
   }, { code: 0, includes: ["todas resolvem para um so"] });
 
+  // --- As pastas de scripts DO PROJETO vem da config (#176) ---------------------
+  // Viviam dentro deste guard, e o `/upgrade` apagava-as ao substitui-lo. O par: declarada na
+  // config, a citacao resolve; sem a declarar, a mesma citacao avisa.
+  const comPastas = (dir, pastas) => {
+    const cfg = ".agent/scripts/config/guards-do-projeto.mjs";
+    writeF(dir, cfg, readF(dir, cfg).replace(/export const PASTAS_DE_SCRIPTS = \[[^\]]*\];/, `export const PASTAS_DE_SCRIPTS = ${JSON.stringify(pastas)};`));
+    writeF(dir, "ferramentas-do-projeto/semear.mjs", "// do projeto\n");
+    citaEm(dir, "Correr o `semear.mjs` antes dos testes.");
+  };
+  test("G20: uma pasta de scripts declarada na config resolve a citacao", (dir) => comPastas(dir, ["ferramentas-do-projeto"]), {
+    code: 0,
+    includes: ["todas resolvem para um so"],
+  });
+  test("G20: [controlo] a mesma pasta, sem a declarar, avisa", (dir) => comPastas(dir, []), {
+    code: 1,
+    includes: ["`semear.mjs`"],
+  });
+
   // --- Ambiguidade: dois ficheiros com o mesmo nome ---------------------------
   // Hoje nao acontece, e e por isso que tem de ser medido: quando acontecer, a instrucao manda
   // procurar um nome que corresponde a dois sitios e nao diz qual.

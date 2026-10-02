@@ -36,10 +36,11 @@ const PASTAS = [".agent/rules", ".agent/workflows"];
  *  O proprio cabecalho deste guard avisa contra isso — *"um guard que acusa quem lhe obedece e
  *  desligado na primeira semana"* — e era ele a faze-lo.
  *
- *  As duas primeiras sao do template e nao se tiram; as seguintes acrescentam-se no bootstrap,
- *  conforme onde o projeto poe os seus scripts. Uma pasta que nao exista e ignorada em silencio:
- *  a lista diz onde PODE viver, nao o que tem de existir. */
-const MAQUINARIA = [".agent/scripts", ".claude/hooks", "scripts", "tools"];
+ *  As duas daqui sao do template e nao se tiram. As do PROJETO vem de
+ *  `config/guards-do-projeto.mjs` (`PASTAS_DE_SCRIPTS`): escritas aqui, o `/upgrade` apagava-as ao
+ *  substituir este ficheiro (#176). Uma pasta que nao exista e ignorada em silencio: a lista diz
+ *  onde PODE viver, nao o que tem de existir. */
+const MAQUINARIA_DO_TEMPLATE = [".agent/scripts", ".claude/hooks"];
 
 /** Um nome de ficheiro `.mjs` dentro de crases. */
 const CITADO = /`([a-z][\w-]*\.mjs)`/g;
@@ -69,7 +70,8 @@ const PONTEIRO_SEM_ANCORA = /\(porque[:,](?![^)]*§)(?![^)]*<ficheiro>)[^)]*\)/g
 /**
  * @returns {number} guards executados
  */
-export function guardCitacoes({ read, warn, ok, skip, listDir, listTree }) {
+export function guardCitacoes({ read, warn, ok, skip, listDir, listTree, pastasDoProjeto = [] }) {
+  const MAQUINARIA = [...MAQUINARIA_DO_TEMPLATE, ...pastasDoProjeto];
   const instrucoes = PASTAS.flatMap((p) => (listDir(p, ".md") ?? []).map((n) => `${p}/${n}.md`));
   if (instrucoes.length === 0) {
     // Um projeto derivado pode ter podado as rules e os workflows. "Nao encontrei" tem de o DIZER:

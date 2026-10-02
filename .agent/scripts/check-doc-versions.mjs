@@ -29,8 +29,8 @@
  * Correr antes de commit e apos merge de Dependabot PRs. Opt-in no CI (descomentar em .github/workflows/ci.yml).
  */
 
-import { readFileSync, readdirSync } from "fs";
-import { fileURLToPath } from "url";
+import { readFileSync, readdirSync, existsSync } from "fs";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { guardSettings } from "./guards/settings.mjs";
 import { guardChangelogVersion, guardDependencyVersions } from "./guards/versions.mjs";
@@ -154,6 +154,11 @@ console.log(`  raiz: ${ROOT}\n`);
 // A deteccao vive em `lib/derivado.mjs`: estava escrita aqui e no simulador de /upgrade,
 // a mao, e o `simulate-derived.mjs` ia levar a terceira copia (`TP8`).
 const ehDerivado = () => ehDerivadoDe(read);
+
+// A config do PROJETO para os guards: os seus guards proprios e as suas pastas de scripts. Vive em
+// `config/`, que o `/upgrade` nunca substitui (#176). Ausente (uma sandbox minima), fica o default.
+const CFG_GUARDS = join(ROOT, ".agent/scripts/config/guards-do-projeto.mjs");
+const { GUARDS = [], PASTAS_DE_SCRIPTS = [] } = existsSync(CFG_GUARDS) ? await import(pathToFileURL(CFG_GUARDS).href) : {};
 
 guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir });
 
@@ -417,7 +422,7 @@ guardsRun += guardContextVirgem({ read, warn, ok, skip, listTree, ehDerivado });
 
 // --- Guard 20: um ficheiro citado numa instrucao existe, e e um so ---
 // Uma citacao morta nao da erro: fica a mentir ate alguem a seguir.
-guardsRun += guardCitacoes({ read, warn, ok, skip, listDir, listTree });
+guardsRun += guardCitacoes({ read, warn, ok, skip, listDir, listTree, pastasDoProjeto: PASTAS_DE_SCRIPTS });
 
 // --- Guard 19: as suites sao isoladas (e o que torna o paralelismo seguro) ---
 // A propriedade era verdade por acidente e nada a verificava. Ver o cabecalho do modulo.
@@ -442,6 +447,33 @@ guardsRun += guardAntiPatternEvidence({ read, warn, ok, skip });
 // --- Guards CONFIGURAVEIS: versoes de dependencias documentadas ---
 // Extraidos para `guards/versions.mjs`. Configurar o `CHECKS` la.
 guardsRun += guardDependencyVersions({ read, warn, ok, skip });
+
+// --- Os guards PROPRIOS do projeto, declarados em `config/guards-do-projeto.mjs` ---
+// Ligados aqui a mao, o `/upgrade` desligava-os ao substituir este ficheiro (#176). A config e do
+// projeto e o upgrade nunca a substitui.
+{
+  // Um modulo em `guards/` que ninguem chama e um guard DESLIGADO. Foi assim que o R7-A ficou
+  // invisivel: depois do upgrade os modulos do derivado continuavam no disco e a config vinha
+  // vazia — sem isto, o resultado era um SKIP verde. Ligado = importado aqui, ou declarado.
+  const ligados = new Set([
+    ...[...readFileSync(fileURLToPath(import.meta.url), "utf8").matchAll(/from "\.\/guards\/([\w-]+\.mjs)"/g)].map((m) => m[1]),
+    ...GUARDS.map((g) => g.modulo.split("/").pop()),
+  ]);
+  for (const nome of listDir(".agent/scripts/guards", ".mjs") ?? []) {
+    if (!ligados.has(`${nome}.mjs`)) warn(`.agent/scripts/guards/${nome}.mjs nao e chamado por ninguem — declarar em config/guards-do-projeto.mjs (GUARDS), ou apagar`);
+  }
+  if (GUARDS.length === 0) skip("guards do projeto — nenhum declarado em config/guards-do-projeto.mjs");
+  const ctx = { read, readMeaningful, warn, ok, note, skip, listDir, listTree, ehDerivado, ROOT, join, existsSync, readdirSync };
+  for (const { modulo, funcao } of GUARDS) {
+    const caminho = join(ROOT, ".agent/scripts", modulo);
+    const m = existsSync(caminho) ? await import(pathToFileURL(caminho).href) : null;
+    if (typeof m?.[funcao] !== "function") {
+      warn(`config/guards-do-projeto.mjs declara ${funcao} em ${modulo}, e ${m ? "o modulo nao a exporta" : "o modulo nao existe"} — o guard nao corre`);
+      continue;
+    }
+    guardsRun += m[funcao](ctx);
+  }
+}
 
 console.log("");
 console.log(`  ${guardsRun} guard(s) executado(s), ${guardsSkipped} saltado(s).`);

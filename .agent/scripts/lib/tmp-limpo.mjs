@@ -84,6 +84,7 @@ export function criaTmp(prefixo) {
  *  aqui. A lista e mantida a mao; a divergencia e que nao passa. */
 export const PREFIXOS_DE_TESTE = [
   "sweep-test-",
+  "pares-test-",
   "bundle-test-",
   "surface-test-",
   "morto-test-",

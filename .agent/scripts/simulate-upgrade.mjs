@@ -58,6 +58,7 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
+import { linhasSubstituidos, linhasMigracoes } from "./lib/saida-upgrade.mjs";
 import { linhasNaoCopiados } from "./lib/fora-do-template.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
@@ -224,6 +225,11 @@ ok(
   `upgrade mecanico aplicado: ${medido.repostas} constante(s) customizada(s) preservada(s), ` +
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`
 );
+const [substituiu, ...substituiuLinhas] = linhasSubstituidos(medido.substituidos);
+if (substituiu) {
+  ok(substituiu);
+  for (const l of substituiuLinhas) console.log(l);
+}
 const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
 if (semCopia) {
   ok(semCopia);
@@ -258,12 +264,12 @@ if (semCopia) {
 //
 // Avisa e nao migra: o formato pode ter mudado com a mudanca de casa, e um motor que adivinhasse
 // o merge entregava configuracao que ninguem escreveu.
-if (medido.migracoes?.length) {
-  ok(`${medido.migracoes.length} constante(s) customizada(s) mudaram de casa — migrar A MAO:`);
-  for (const { nome, de, para } of medido.migracoes) {
-    console.log(`        ${nome}: ${de}  ->  ${para}`);
+{
+  const [titulo, ...resto] = linhasMigracoes(medido.migracoes ?? []);
+  if (titulo) {
+    ok(titulo);
+    for (const l of resto) console.log(l);
   }
-  console.log("        O valor antigo esta no historico do git; o novo ficheiro chega com os defaults.");
 }
 
 if (medido.removidos.length) {

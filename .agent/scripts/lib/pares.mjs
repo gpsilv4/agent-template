@@ -13,6 +13,8 @@
  * novo de entrar sem rede nenhuma.
  */
 
+import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
+
 // Cada verificador tem de ter a sua suite E declarar como sinaliza um problema — nem todos
 // sinalizam da mesma forma, e um regex global daria "0 sitios, nada a varrer" a um
 // verificador inteiro (o mesmo silencio que este repo passou a sessao a eliminar).
@@ -28,7 +30,7 @@
 //
 // `skip(` fica de fora de proposito: um SKIP nao e um achado, e o que o dispara e a
 // ausencia de um ficheiro, nao a linha em si.
-export const PARES = [
+const PARES_DO_TEMPLATE = [
   {
     // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
     // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel
@@ -404,3 +406,8 @@ export const PARES = [
     neutro: "falhou = falhou;",
   },
 ];
+
+// Os pares dos guards PROPRIOS do projeto vivem na config, que o `/upgrade` nunca substitui. Este
+// ficheiro e do template e o upgrade substitui-o: os pares escritos aqui por um derivado perdiam-se,
+// e a descoberta reprovava os modulos dele com `SEM PAR` (ronda 7, R7-A, #176).
+export const PARES = [...PARES_DO_TEMPLATE, ...PARES_DO_PROJETO];

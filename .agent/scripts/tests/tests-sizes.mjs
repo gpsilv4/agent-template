@@ -59,21 +59,23 @@ export function registar() {
   // O caso que a regra sempre descreveu e que ninguem media: alguem escreve um verificador
   // de 600 linhas e o `core-rules.md` limita-se a ter razao em silencio.
   test("G17: ficheiro novo acima de 500 linhas avisa", (dir) => {
-    writeF(dir, ".agent/scripts/guards/inchado.mjs", "// linha\n".repeat(600));
-  }, { code: 1, includes: ["guards/inchado.mjs tem 600 linhas (> 500)", "splitting obrigatorio"] });
+    // Em `lib/` e nao em `guards/`: um `.mjs` em `guards/` que ninguem chama passou a avisar (#176),
+    // e estes casos medem o TAMANHO — qualquer pasta da maquinaria serve.
+    writeF(dir, ".agent/scripts/lib/inchado.mjs", "// linha\n".repeat(600));
+  }, { code: 1, includes: ["lib/inchado.mjs tem 600 linhas (> 500)", "splitting obrigatorio"] });
 
   test("G17: ficheiro novo DENTRO do limite nao avisa", (dir) => {
-    writeF(dir, ".agent/scripts/guards/curto.mjs", "// linha\n".repeat(499));
+    writeF(dir, ".agent/scripts/lib/curto.mjs", "// linha\n".repeat(499));
   }, { code: 0, includes: ["tamanho de ficheiro:"] });
 
   // O limite e `> 500`, nao `>= 500`. Sem este teste, trocar o operador passava despercebido
   // — e a fronteira e o unico sitio onde um guard de contagem costuma estar errado.
   test("G17: exatamente 500 linhas ainda cabe", (dir) => {
-    writeF(dir, ".agent/scripts/guards/fronteira.mjs", "// linha\n".repeat(500));
+    writeF(dir, ".agent/scripts/lib/fronteira.mjs", "// linha\n".repeat(500));
   }, { code: 0, includes: ["tamanho de ficheiro:"] });
 
   test("G17: 501 linhas ja nao cabe", (dir) => {
-    writeF(dir, ".agent/scripts/guards/fronteira.mjs", "// linha\n".repeat(501));
+    writeF(dir, ".agent/scripts/lib/fronteira.mjs", "// linha\n".repeat(501));
   }, { code: 1, includes: ["fronteira.mjs tem 501 linhas (> 500)"] });
 
   // --- A catraca: os congelados so podem ENCOLHER ----------------------------

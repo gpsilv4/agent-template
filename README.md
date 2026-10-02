@@ -175,7 +175,8 @@ gh pr create --fill     # then merge once CI is green
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │
     ├── config/                 <- THIS project's configuration. /upgrade never replaces it
-    │   └── bundles.mjs         <- Routes, budgets, and the ALVOS_REPROVAM switch
+    │   ├── bundles.mjs         <- Routes, budgets, and the ALVOS_REPROVAM switch
+    │   └── guards-do-projeto.mjs <- THIS project's own guards, their sweep pairs, its script dirs
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
@@ -200,6 +201,8 @@ gh pr create --fill     # then merge once CI is green
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── fora-do-template.mjs   <- What sits on the template's disk but is NOT the template's
+    │   ├── intacto.mjs         <- "The project did not touch this file", placeholders aside
+    │   ├── saida-upgrade.mjs   <- The lists /upgrade shows before approval, one formatter for both modes
     │   ├── medida-upgrade.mjs  <- Section 2b measured from BOTH sides (template and consumer)
     │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
     │   ├── tmp-limpo.mjs      <- tmpdir copies don't outlive their owner (swept at startup)

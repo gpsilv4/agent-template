@@ -345,4 +345,12 @@ export function registar() {
       }),
       { codigo: 0, exclui: ["fora.mjs"] }
     ));
+
+  // As MIGRACOES so eram impressas pelo simulador: a 2b, o modo que um consumidor real corre, nunca
+  // as mostrava (#176). Um projeto que customizou uma constante que mudou de casa tem de o ler aqui.
+  test("a 2b mostra as constantes customizadas que mudaram de casa", () =>
+    exige(
+      contraProjeto({ projeto: { ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n  /meu-padrao/,\n];\nconst CONFIG_GLOBS = [\n];\n" } }),
+      { codigo: 0, inclui: ["mudaram de casa", "TEST_GLOBS"] }
+    ));
 }

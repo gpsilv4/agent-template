@@ -26,6 +26,7 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import { leOuNull } from "./ficheiros.mjs";
 import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
+import { linhasSubstituidos, linhasMigracoes } from "./saida-upgrade.mjs";
 import { linhasNaoCopiados } from "./fora-do-template.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
@@ -314,6 +315,14 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     `upgrade mecanico aplicado a copia: ${medido.repostas} constante(s) preservada(s), ` +
       `${medido.trazidos} doc(s) actualizado(s)`
   );
+  // As migracoes so eram mostradas pelo simulador: aqui, no modo que um consumidor real corre,
+  // perdiam-se (#176).
+  for (const [i, l] of linhasMigracoes(medido.migracoes ?? []).entries()) i === 0 ? ok(l) : console.log(l);
+  const [substituiu, ...substituiuLinhas] = linhasSubstituidos(medido.substituidos);
+  if (substituiu) {
+    ok(substituiu);
+    for (const l of substituiuLinhas) console.log(l);
+  }
   const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
   if (semCopia) {
     ok(semCopia);
