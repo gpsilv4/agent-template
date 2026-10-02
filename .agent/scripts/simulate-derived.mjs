@@ -43,6 +43,7 @@ import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { leOuNull } from "./lib/ficheiros.mjs";
 import { foraDoTemplate } from "./lib/fora-do-template.mjs";
+import { comandosDoCI, correNaBateria } from "./lib/medida-upgrade.mjs";
 import { comHistoria, queConfigurou, comFicheirosGrandes } from "./lib/derivado-maduro.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -78,32 +79,6 @@ if (ehDerivado((rel) => leOuNull(join(ROOT, rel)))) {
   console.log("  SKIP  simulacao de projeto derivado — este repo JA e um derivado, nao o template.");
   console.log("        O que este script configura ja esta configurado; mediria outra coisa.\n");
   process.exit(0);
-}
-
-/** Os comandos que um projeto derivado corre — DERIVADOS do job `guard-tests` do `ci.yml`.
- *
- *  Estava escrito a mao, com um comentario a dizer "os mesmos do `ci.yml`" e nada a
- *  verifica-lo: acrescentar uma suite ao CI e esquecer aqui fazia a simulacao medir menos,
- *  em silencio — a mesma classe que o `PARES` ja resolveu com descoberta. O `check-test-surface`
- *  nao e incluido: precisa de um `.git` com historia, que a copia nao tem. */
-function comandosDoCI() {
-  const ci = leOuNull(join(ROOT, ".github/workflows/ci.yml"));
-  if (ci === null) return null;
-  const job = ci.split(/^  guard-tests:/m)[1];
-  if (!job) return null;
-  const encontrados = [...job.matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]);
-  // EXCLUSOES, cada uma por uma razao concreta:
-  //  - `check-test-surface`: precisa de um `.git` com historia, e a copia nao tem;
-  //  - `simulate-derived` (este ficheiro) e a sua suite: correr-se-iam DENTRO da copia, que
-  //    por sua vez faria outra copia — recursao infinita. Medido: o processo nao terminava e
-  //    deixou dezenas de copias em `/tmp`. E a armadilha obvia de derivar a lista do CI, e
-  //    por isso esta escrita aqui em vez de ser descoberta outra vez.
-  //  - `simulate-upgrade`: precisa de TAGS, e a copia nao tem `.git` nenhum. Mesma classe
-  //    que o `check-test-surface` acima. Sem esta linha, acrescentar o simulador de
-  //    upgrade ao `ci.yml` punha esta simulacao vermelha — e a falha nao dizia respeito
-  //    ao derivado, dizia respeito a copia nao ser um repo. Medido ao ligar os dois.
-  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade"];
-  return [...new Set(encontrados)].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
 }
 
 let problemas = 0;
@@ -142,7 +117,12 @@ process.on("SIGINT", () => {
   process.exit(130);
 });
 
-const COMANDOS = comandosDoCI();
+// Os comandos que um derivado corre, DERIVADOS do job `guard-tests` do `ci.yml` (uma lista a mao
+// media menos a cada suite nova). O leitor vive num sitio so, `lib/medida-upgrade.mjs`, com as
+// exclusoes e as razoes delas: havia uma segunda copia aqui, e ficou para tras nos tres defeitos
+// que a do `lib/` corrigiu — corria passos comentados, lia os jobs seguintes, e nao via os blocos
+// `run: |` (#198). A varredura de mutacao fica de fora: numa copia sem `.git` nem corria.
+const COMANDOS = comandosDoCI(ROOT)?.filter(correNaBateria) ?? null;
 if (COMANDOS === null || COMANDOS.length === 0) {
   // TP2: "nao consegui ler o ci.yml" != "nao ha comandos a correr". Uma lista vazia faria a
   // simulacao passar sem medir nada.

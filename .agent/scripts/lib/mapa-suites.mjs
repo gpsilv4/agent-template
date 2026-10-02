@@ -86,6 +86,8 @@ export const SUITES = [
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
   { re: /^\.agent\/scripts\/tests\/harness\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
+  // O construtor de fixture do simulador de derivado, extraido pela mesma catraca (#198).
+  { re: /^\.agent\/scripts\/tests\/harness\/test-derived-harness\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do
   // projeto: mexer na configuracao obriga a correr quem a le.
   { re: /^\.agent\/scripts\/(tests\/harness\/test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
