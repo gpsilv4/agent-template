@@ -199,6 +199,7 @@ gh pr create --fill     # then merge once CI is green
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
+    │   ├── fora-do-template.mjs   <- What sits on the template's disk but is NOT the template's
     │   ├── medida-upgrade.mjs  <- Section 2b measured from BOTH sides (template and consumer)
     │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
     │   ├── tmp-limpo.mjs      <- tmpdir copies don't outlive their owner (swept at startup)

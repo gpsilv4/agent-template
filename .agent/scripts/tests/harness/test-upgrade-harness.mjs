@@ -207,6 +207,10 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
     git(root, ["init", "-q", "-b", "main"]);
     git(root, ["config", "user.email", "t@t"]);
     git(root, ["config", "user.name", "t"]);
+    // O `.gitignore` GLOBAL de quem corre nao entra: com `*.pem` la, o teste da segunda camada
+    // via o ficheiro como "ignorado" e reprovava nessa maquina e so nela (`TP3`). Em producao o
+    // motor respeita-o, e deve — e so a fixture que tem de ser igual em todo o lado.
+    git(root, ["config", "core.excludesFile", "/dev/null"]);
     git(root, ["add", "-A"]);
     git(root, ["commit", "-qm", "ontem"]);
     git(root, ["tag", "v1.0.0"]);

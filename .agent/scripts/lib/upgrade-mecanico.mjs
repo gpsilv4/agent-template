@@ -22,6 +22,7 @@ import { join, dirname, sep, relative } from "path";
 // `lib/ficheiros.mjs` — estava escrita duas vezes, identica (`TP8`).
 export { leOuNull } from "./ficheiros.mjs";
 import { leOuNull } from "./ficheiros.mjs";
+import { foraDoTemplate } from "./fora-do-template.mjs";
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Curta de mais, sobram placeholders — e o
  *  Guard 13 denuncia-o no fim, por desenho. */
@@ -109,8 +110,9 @@ export const CONSTANTES_DO_PROJETO = [
  * seguranca tem de parar tudo. Escrever por cima dos ficheiros de um consumidor as cegas e
  * pior do que nao fazer upgrade nenhum.
  *
- * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: string[]}} o que
- *          mediu. `removidos` sao `{caminho, migrado}`: os ficheiros que sairam do template e o
+ * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: object[], migracoes: object[], naoCopiados: object[]}}
+ *          o que mediu. `naoCopiados` sao `{caminho, razao}`: o que estava no disco do template
+ *          e NAO e dele (ignorado pelo git, ou nome de segredo/lixo) — ver `lib/fora-do-template.mjs`. `removidos` sao `{caminho, migrado}`: os ficheiros que sairam do template e o
  *          consumidor ainda tem. `migrado: true` quando o mesmo NOME existe noutro caminho — ou
  *          seja, o ficheiro mudou de sitio e a remocao **faz parte da migracao**, nao e uma
  *          limpeza opcional. Continua a ser uma LISTA, nunca uma accao ja feita.
@@ -169,9 +171,25 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     for (const pre of PREFIXOS_COPIADOS) {
       const base = join(root, pre);
       if (!existsSync(base)) continue;
-      andaFicheiros(base, (sub) => fs.add(`${pre}${sub}`));
+      andaFicheiros(base, (sub) => {
+        if (razaoParaNaoCopiar(`${pre}${sub}`) === null) fs.add(`${pre}${sub}`);
+      });
     }
     return fs;
+  };
+
+  // O que esta no disco e NAO e do template (ignorado pelo git, ou nome de segredo) nao se copia
+  // nem conta como "existe agora" — ver `lib/fora-do-template.mjs`.
+  const { razao: razaoParaNaoCopiar, erro: semIgnorados } = foraDoTemplate(root);
+  if (semIgnorados !== undefined) {
+    fatal(`nao consegui perguntar ao git o que o template ignora (${semIgnorados}) — sem isso copiava-se o que nao e do template, segredos incluidos`);
+  }
+  // Nunca em silencio: o que fica de fora vai no resultado, e quem chama mostra-o.
+  const naoCopiados = new Map();
+  const podeCopiar = (rel) => {
+    const r = razaoParaNaoCopiar(rel);
+    if (r !== null) naoCopiados.set(rel, r);
+    return r === null;
   };
 
   /** O que SAIU do template entre a tag e o HEAD, e que o consumidor ainda tem.
@@ -276,6 +294,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // Trazer a logica sem a configuracao que ela importa nao e proteger a configuracao — e
       // partir o consumidor para a proteger.
       filter: (src) => {
+        if (!podeCopiar(relative(root, src).split(sep).join("/"))) return false;
         const p = src.split(sep).join("/");
         if (!p.includes("/.agent/scripts/config/")) return true;
         // Descer sempre nas pastas: recusar a pasta `config/` porque ela ja existe saltava
@@ -367,6 +386,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       if (!naRaiz && !sub.startsWith(".agent/") && !sub.startsWith("src/docs/") && !sub.startsWith(".claude/")) return;
       if (sub.startsWith(".agent/context/") || sub.startsWith(".agent/scripts/") || sub.startsWith(".claude/hooks/")) return;
       if (JA_TRATADO.has(sub) || !substituivel(sub, nome)) return;
+      if (!podeCopiar(sub)) return;
       const antigo = tagFicheiro(sub);
       const doConsumidor = leOuNull(join(dir, sub));
       // FICHEIRO NOVO desde a tag. O consumidor nunca o teve, logo **nao ha customizacao a
@@ -422,5 +442,12 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     }
   });
 
-  return { repostas, trazidos, placeholders: repostosPh, removidos, migracoes };
+  return {
+    repostas,
+    trazidos,
+    placeholders: repostosPh,
+    removidos,
+    migracoes,
+    naoCopiados: [...naoCopiados].map(([caminho, razao]) => ({ caminho, razao })).sort((a, b) => a.caminho.localeCompare(b.caminho)),
+  };
 }

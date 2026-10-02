@@ -26,6 +26,7 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import { leOuNull } from "./ficheiros.mjs";
 import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
+import { linhasNaoCopiados } from "./fora-do-template.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
@@ -243,6 +244,11 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     `upgrade mecanico aplicado a copia: ${medido.repostas} constante(s) preservada(s), ` +
       `${medido.trazidos} doc(s) actualizado(s)`
   );
+  const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
+  if (semCopia) {
+    ok(semCopia);
+    for (const l of semCopiaLinhas) console.log(l);
+  }
 
   // O que SAIU do template e o projeto ainda tem. Nao e desarrumacao: a descoberta em disco
   // exige par ao orfao, o Guard 17 conta-o e o `check-test-surface` ve a superficie duplicada.
