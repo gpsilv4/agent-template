@@ -101,6 +101,80 @@ export function registar() {
     }
   });
 
+  // Os guards PROPRIOS do projeto vivem na config, e e por isso que sobrevivem (#176). Ligados no
+  // `check-doc-versions.mjs`, a copia limpa desligava-os: foi o que aconteceu a um derivado real.
+  test("os guards declarados em config/guards-do-projeto.mjs sobrevivem ao upgrade", () => {
+    let c;
+    try {
+      const cfg = ".agent/scripts/config/guards-do-projeto.mjs";
+      const vazia = "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\n";
+      c = cenario({
+        ontem: { [cfg]: vazia },
+        hoje: { [cfg]: vazia + "// o template mexeu no comentario\n" },
+        consumidor: { [cfg]: 'export const GUARDS = [{ modulo: "./guards/meu.mjs", funcao: "guardMeu" }];\nexport const PARES_DO_PROJETO = [];\n' },
+      });
+      return /guardMeu/.test(c.ler(cfg) ?? "") ? [] : ["o guard declarado pelo projeto perdeu-se no upgrade"];
+    } finally {
+      limpa(c);
+    }
+  });
+
+  // A rede do outro lado: o que o projeto ALTEROU e a copia vai substituir tem de ser DITO antes
+  // de aprovar. Sem isto, as ligacoes partidas so se viam depois, num FAIL a quilometros da causa.
+  test("um ficheiro da maquinaria que o projeto ALTEROU e listado em `substituidos`", () => {
+    let c;
+    try {
+      c = cenario({
+        ontem: { ".agent/scripts/alterado.mjs": "// a\n", ".agent/scripts/intacto.mjs": "// i\n", ".agent/scripts/config/x.mjs": "// c\n" },
+        hoje: { ".agent/scripts/alterado.mjs": "// b\n", ".agent/scripts/intacto.mjs": "// i2\n", ".agent/scripts/config/x.mjs": "// c2\n" },
+        consumidor: { ".agent/scripts/alterado.mjs": "// a\nimport './guards/meu.mjs';\n", ".agent/scripts/intacto.mjs": "// i\n", ".agent/scripts/config/x.mjs": "// do projeto\n" },
+      });
+      const s = c.medido.substituidos;
+      const p = [];
+      if (!s.includes(".agent/scripts/alterado.mjs")) p.push(`substituidos = ${JSON.stringify(s)}, devia conter o alterado`);
+      if (s.includes(".agent/scripts/intacto.mjs")) p.push("um ficheiro INTACTO nao e uma perda — nao devia ser listado");
+      if (s.some((x) => x.includes("/config/"))) p.push("a config nunca e substituida — nao devia ser listada");
+      return p;
+    } finally {
+      limpa(c);
+    }
+  });
+
+  // O que NAO e alteracao nao pode afogar a lista — medido na 2b de um derivado real: 68 de 71.
+  // O placeholder MONTADO, para o sweep do bootstrap nao o substituir num derivado.
+  const PH = "{" + "{" + "PROJECT_NAME" + "}" + "}";
+  test("`substituidos` desconta placeholders e constantes preservadas, e ve um caminho que colide", () => {
+    let c;
+    try {
+      c = cenario({
+        ontem: {
+          ".agent/scripts/com-nome.mjs": `// Guia (${PH})\n`,
+          ".agent/scripts/so-constante.mjs": "const CHECKS = [\n];\n// logica\n",
+        },
+        hoje: {
+          ".agent/scripts/com-nome.mjs": `// Guia (${PH}) — novo\n`,
+          ".agent/scripts/so-constante.mjs": "const CHECKS = [\n];\n// logica nova\n",
+          ".agent/scripts/novo-no-template.mjs": "// do template\n",
+        },
+        consumidor: {
+          // O bootstrap pos la um nome que NAO e o `substituto` de quem mede: o caso da 2b.
+          ".agent/scripts/com-nome.mjs": "// Guia (Outro Nome Real)\n",
+          ".agent/scripts/so-constante.mjs": 'const CHECKS = [\n  { nome: "react" },\n];\n// logica\n',
+          ".agent/scripts/novo-no-template.mjs": "// o projeto ja tinha um com este caminho\n",
+        },
+        constantes: [[".agent/scripts/so-constante.mjs", "CHECKS"]],
+      });
+      const s = c.medido.substituidos;
+      const p = [];
+      if (s.includes(".agent/scripts/com-nome.mjs")) p.push("o valor de um placeholder contou como alteracao");
+      if (s.includes(".agent/scripts/so-constante.mjs")) p.push("uma constante que o motor preserva contou como alteracao");
+      if (!s.includes(".agent/scripts/novo-no-template.mjs")) p.push("o ficheiro do projeto com o caminho de um novo do template nao foi listado");
+      return p;
+    } finally {
+      limpa(c);
+    }
+  });
+
   // A OUTRA METADE, e a que o CI apanhou. Um consumidor tirado de uma tag anterior a `config/`
   // NAO a tem — e todos estao nesse caso na ronda em que ela nasce. Saltar a pasta por "e do
   // projeto" deixava o verificador a rebentar no arranque: proteger a configuracao partindo o
@@ -333,41 +407,43 @@ export function registar() {
   // preservadas, e o `config/` novo chega com os defaults ("copiar se AUSENTE"). E o modo de
   // falha que o `upgrade-why.md` descreve — diferenca de output apanha o que some, **nao apanha
   // um default que regressa**.
-  test('constante que mudou de casa E estava customizada e ANUNCIADA', () => {
-    const { rel, nome } = MIGRACOES[0];
-    let c;
-    try {
-      c = cenario({
-        ontem: { [rel]: `const ${nome} = [];\n` },
-        hoje: { [rel]: `const ${nome} = [];\n` },
-        consumidor: { [rel]: `const ${nome} = [/meu-padrao/];\n` },
-      });
-      return c.medido.migracoes?.some((m) => m.nome === nome)
-        ? []
-        : [`${nome} customizada e nao anunciada: ${JSON.stringify(c.medido.migracoes)}`];
-    } finally {
-      limpa(c);
-    }
-  });
+  // Para TODAS as entradas, e nao so a primeira: uma entrada nova (a `MAQUINARIA`, #176) entrava
+  // sem nenhum caso que a exercitasse.
+  for (const { rel, nome } of MIGRACOES) {
+    test(`constante que mudou de casa E estava customizada e ANUNCIADA (${nome})`, () => {
+      let c;
+      try {
+        c = cenario({
+          ontem: { [rel]: `const ${nome} = [];\n` },
+          hoje: { [rel]: `const ${nome} = [];\n` },
+          consumidor: { [rel]: `const ${nome} = [/meu-padrao/];\n` },
+        });
+        return c.medido.migracoes?.some((m) => m.nome === nome)
+          ? []
+          : [`${nome} customizada e nao anunciada: ${JSON.stringify(c.medido.migracoes)}`];
+      } finally {
+        limpa(c);
+      }
+    });
 
-  // O CONTRA-CASO, e e ele que impede isto de virar ruido: um projeto que NUNCA tocou na
-  // constante nao tem trabalho de migracao nenhum, e avisa-lo era mandar-lhe fazer nada.
-  test('constante que mudou de casa mas NAO estava customizada nao e anunciada', () => {
-    const { rel, nome } = MIGRACOES[0];
-    let c;
-    try {
-      c = cenario({
-        ontem: { [rel]: `const ${nome} = [];\n` },
-        hoje: { [rel]: `const ${nome} = [];\n` },
-        consumidor: { [rel]: `const ${nome} = [];\n` },
-      });
-      return (c.medido.migracoes ?? []).length === 0
-        ? []
-        : [`anunciou migracao a quem nao customizou: ${JSON.stringify(c.medido.migracoes)}`];
-    } finally {
-      limpa(c);
-    }
-  });
+    // O CONTRA-CASO, e e ele que impede isto de virar ruido: um projeto que NUNCA tocou na
+    // constante nao tem trabalho de migracao nenhum, e avisa-lo era mandar-lhe fazer nada.
+    test(`constante que mudou de casa mas NAO estava customizada nao e anunciada (${nome})`, () => {
+      let c;
+      try {
+        c = cenario({
+          ontem: { [rel]: `const ${nome} = [];\n` },
+          hoje: { [rel]: `const ${nome} = [];\n` },
+          consumidor: { [rel]: `const ${nome} = [];\n` },
+        });
+        return (c.medido.migracoes ?? []).length === 0
+          ? []
+          : [`anunciou migracao a quem nao customizou: ${JSON.stringify(c.medido.migracoes)}`];
+      } finally {
+        limpa(c);
+      }
+    });
+  }
 
   // A metade que interessa: a forma espacada SOBREVIVE. Sem este caso, o de cima sozinho era
   // satisfeito por um padrao que casasse tudo.

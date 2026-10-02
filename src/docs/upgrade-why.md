@@ -393,3 +393,26 @@ da segunda camada reprovar numa maquina com `*.pem` la (`TP3`). O motor em si re
 **Ficou de fora uma entrada no catalogo.** A licao merecia um anti-padrao do template, mas o
 `anti-patterns-template.md` esta nos 11 969 bytes, a 31 do tecto do Guard 1e. Arranjar espaco e
 condensar entradas antigas, e isso e trabalho proprio.
+
+## Porque os guards proprios de um derivado vivem na `config/` (#176)
+
+Num derivado real, o `/upgrade` desligou dois guards do proprio projeto. Os modulos
+(`guards/pt-pt.mjs`, `guards/conflict-markers.mjs`) ficaram no disco; o que se perdeu foram as
+**ligacoes**: o `import` e a chamada no `check-doc-versions.mjs`, e o par no `lib/pares.mjs`. Os
+dois ficheiros sao do template e o upgrade substitui-os por inteiro. O `check-doc-versions` ficou
+verde, e quem deu por isso foram os testes do proprio derivado. Sem eles, perdia-se em silencio.
+
+**A regra e a mesma da configuracao, e por isso nao precisou de mecanismo novo:** o que e do
+projeto vive na `config/`, que o upgrade nunca substitui, e copia se faltar.
+`config/guards-do-projeto.mjs` declara os guards (`GUARDS`), os pares (`PARES_DO_PROJETO`) e as
+pastas de scripts do Guard 20 (`PASTAS_DE_SCRIPTS`, que vivia dentro do `guards/citacoes.mjs`).
+Uma ligacao partida (um modulo que nao existe, ou que nao exporta a funcao) da WARN.
+
+**Preservar os imports por nome foi recusado:** era mais uma lista a mao, e esta lista existe para
+desaparecer (`CONSTANTES_DO_PROJETO`).
+
+**E uma rede do outro lado:** o motor passa a listar os ficheiros da maquinaria que o projeto
+**alterou** e que a copia vai substituir (`substituidos`). Nao impede a copia; diz, antes de
+aprovar, o que vai deixar de estar como o projeto o tinha. Foi o que faltou para o R7-A se ver
+antes de partir.
+

@@ -348,4 +348,45 @@ export function registar() {
     rmSync(file(dir, ".claude/commands"), { recursive: true, force: true });
     rmSync(file(dir, ".gemini/commands"), { recursive: true, force: true });
   }, { code: 0, includes: ["SKIP  Guard 10"] });
+
+  // --- Os guards PROPRIOS do projeto, declarados na config (#176) -------------------
+  // Ligados a mao no `check-doc-versions.mjs`, o `/upgrade` desligava-os ao substituir o ficheiro.
+  // A config e do projeto e o upgrade nunca a substitui.
+  const CFG = ".agent/scripts/config/guards-do-projeto.mjs";
+  // ACRESCENTA a `GUARDS`, e nao a substitui: num derivado a lista ja tem os guards dele, e
+  // tira-los punha-os "nao chamados por ninguem" — o teste reprovava la e passava aqui (`TP3`).
+  // O resto da config (as pastas do Guard 20) fica como o repo a tem.
+  const declara = (dir, guards) => {
+    const antes = readF(dir, CFG);
+    const depois = antes.replace("export const GUARDS = [", `export const GUARDS = [${guards.map((g) => JSON.stringify(g)).join(", ")}, `);
+    if (depois === antes) throw new Error(`nao encontrei \`export const GUARDS = [\` em ${CFG}`);
+    writeF(dir, CFG, depois);
+  };
+  const PROPRIO = { modulo: "./guards/proprio.mjs", funcao: "guardProprio" };
+  const modulo = (corpo) => `export function guardProprio({ warn, ok }) {\n  ${corpo}\n  return 1;\n}\n`;
+
+  test("guard PROPRIO declarado na config corre, e o seu aviso reprova", (dir) => {
+    writeF(dir, ".agent/scripts/guards/proprio.mjs", modulo('warn("regra do projeto violada");'));
+    declara(dir, [PROPRIO]);
+  }, { code: 1, includes: ["regra do projeto violada"] });
+
+  test("guard PROPRIO que passa conta como executado, sem aviso", (dir) => {
+    writeF(dir, ".agent/scripts/guards/proprio.mjs", modulo('ok("regra do projeto cumprida");'));
+    declara(dir, [PROPRIO]);
+  }, { code: 0, includes: ["OK    regra do projeto cumprida"], excludes: ["guards do projeto — nenhum declarado"] });
+
+  // O R7-A outra vez, mas com um SKIP: depois do upgrade o modulo esta no disco e a config vazia.
+  test("modulo em guards/ que ninguem chama avisa", (dir) => {
+    writeF(dir, ".agent/scripts/guards/proprio.mjs", modulo('ok("nunca corre");'));
+  }, { code: 1, includes: ["guards/proprio.mjs nao e chamado por ninguem"] });
+
+  // Uma ligacao partida nao pode passar por "nao ha nada a verificar" (`TP2`).
+  test("guard PROPRIO declarado e ausente do disco avisa", (dir) => {
+    declara(dir, [PROPRIO]);
+  }, { code: 1, includes: ["guardProprio em ./guards/proprio.mjs, e o modulo nao existe"] });
+
+  test("guard PROPRIO cujo modulo nao exporta a funcao avisa", (dir) => {
+    writeF(dir, ".agent/scripts/guards/proprio.mjs", "export const outraCoisa = 1;\n");
+    declara(dir, [PROPRIO]);
+  }, { code: 1, includes: ["o modulo nao a exporta"] });
 }

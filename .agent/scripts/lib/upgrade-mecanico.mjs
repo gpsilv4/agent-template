@@ -23,6 +23,7 @@ import { join, dirname, sep, relative } from "path";
 export { leOuNull } from "./ficheiros.mjs";
 import { leOuNull } from "./ficheiros.mjs";
 import { foraDoTemplate } from "./fora-do-template.mjs";
+import { intactoAMenosDePlaceholders } from "./intacto.mjs";
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Curta de mais, sobram placeholders — e o
  *  Guard 13 denuncia-o no fim, por desenho. */
@@ -93,6 +94,8 @@ const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/"];
 export const MIGRACOES = [
   { rel: ".agent/scripts/check-test-surface.mjs", nome: "TEST_GLOBS", para: ".agent/scripts/config/superficie-de-teste.mjs" },
   { rel: ".agent/scripts/check-test-surface.mjs", nome: "CONFIG_GLOBS", para: ".agent/scripts/config/superficie-de-teste.mjs" },
+  // As pastas de scripts do projeto que o Guard 20 procura (#176).
+  { rel: ".agent/scripts/guards/citacoes.mjs", nome: "MAQUINARIA", para: ".agent/scripts/config/guards-do-projeto.mjs" },
 ];
 
 export const CONSTANTES_DO_PROJETO = [
@@ -229,6 +232,33 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   const nomeDe = (p) => p.split("/").pop();
   const nomesAgora = new Set([...agora].map(nomeDe));
   const removidos = saiu.map((p) => ({ caminho: p, migrado: nomesAgora.has(nomeDe(p)) }));
+
+  // O que o projeto ALTEROU e a copia vai SUBSTITUIR (#176). A copia de `.agent/scripts/**` e dos
+  // hooks e limpa por desenho, e foi assim que um derivado perdeu as ligacoes dos seus guards
+  // proprios no `check-doc-versions.mjs` e no `lib/pares.mjs` — sem nada no ecra. Nao impede a
+  // copia: diz, ANTES de aprovar, o que vai deixar de ser como o projeto o tinha. A `config/`
+  // fica de fora porque o upgrade nunca a substitui.
+  //
+  // "Alterou" tem de descontar o que NAO e alteracao, ou a lista afoga-se — medido no modo 2b de
+  // um derivado real: 68 de 71 ficheiros listados. Duas coisas a descontar:
+  //  - os PLACEHOLDERS: a 2b usa um nome de fachada e o derivado tem o nome real, logo cada `{{ X }}`
+  //    aceita o que la estiver, na mesma linha (`intactoAMenosDePlaceholders`);
+  //  - as CONSTANTES que o motor preserva: um ficheiro que so difere no `CHECKS` nao perde nada.
+  // E um ficheiro NOVO no template com o caminho de um que o projeto ja tinha tambem e substituido.
+  const semPreservadas = (rel, t) =>
+    constantes.filter(([r]) => r === rel).reduce((acc, [, nome]) => {
+      const bloco = blocoDaConstante(acc, nome);
+      return bloco === null ? acc : acc.replace(bloco, `<${nome} preservada>`);
+    }, t);
+  const substituidos = [...agora]
+    .filter((p) => !p.includes("/config/"))
+    .filter((p) => {
+      const doConsumidor = leOuNull(join(dir, p));
+      const referencia = naTag.has(p) ? tagFicheiro(p) : leOuNull(join(root, p));
+      if (doConsumidor === null || referencia === null) return false;
+      return !intactoAMenosDePlaceholders(semPreservadas(p, doConsumidor), semPreservadas(p, referencia));
+    })
+    .sort();
 
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];
@@ -447,6 +477,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     trazidos,
     placeholders: repostosPh,
     removidos,
+    substituidos,
     migracoes,
     naoCopiados: [...naoCopiados].map(([caminho, razao]) => ({ caminho, razao })).sort((a, b) => a.caminho.localeCompare(b.caminho)),
   };

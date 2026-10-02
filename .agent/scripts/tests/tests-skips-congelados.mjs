@@ -29,6 +29,7 @@
  */
 import { pathToFileURL } from "url";
 import { existsSync, rmSync } from "fs";
+import { execFileSync } from "child_process";
 import { join } from "path";
 import { sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
 import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
@@ -72,6 +73,20 @@ const COMUNS = [
  *  ja as gerou — elas vao para a sandbox e os quatro `SKIP` desaparecem. Congelar a expectativa
  *  era congelar o estado deste repo, que e o `TP3` que este proprio ticket combate. */
 const GERADAS_NO_BOOTSTRAP = ["business-logic.md", "pages-architecture.md"];
+
+/** Os guards PROPRIOS do projeto (#176): com a lista vazia saltam, com ela preenchida correm.
+ *  Derivado da config da sandbox pela mesma razao das rules acima — um derivado que declare os
+ *  seus guards nao tem este SKIP, e congela-lo punha-o vermelho sem nada partido (`TP3`). */
+//  Lida como o verificador a le — importando —, e nao por regex: uma lista vazia com o exemplo
+//  comentado la dentro dizia "nao vazia" ao regex, e o teste reprovava um SKIP legitimo.
+const semGuardsProprios = (dir) => {
+  const cfg = join(dir, ".agent/scripts/config/guards-do-projeto.mjs");
+  const n = existsSync(cfg)
+    ? Number(execFileSync(process.execPath, ["--input-type=module", "-e",
+        `const { GUARDS = [] } = await import(${JSON.stringify(pathToFileURL(cfg).href)}); console.log(GUARDS.length);`], { encoding: "utf8" }))
+    : 0;
+  return n === 0 ? [{ chave: "guards do projeto — nenhum declarado", vezes: 1 }] : [];
+};
 const porGerar = (dir) =>
   GERADAS_NO_BOOTSTRAP.filter((f) => !existsSync(join(dir, ".agent/rules", f))).map((f) => ({
     chave: `${f} — gerado no bootstrap`,
@@ -89,7 +104,7 @@ export function registar() {
     montar(dir);
     const out = runGuard(dir).out ?? "";
     const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
-    const esp = [...esperados, ...porGerar(dir)];
+    const esp = [...esperados, ...porGerar(dir), ...semGuardsProprios(dir)];
     const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
     // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o

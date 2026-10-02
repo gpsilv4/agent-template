@@ -51,9 +51,12 @@ export const SUITES = [
   // O filtro do que NAO e do template tem DOIS consumidores — o motor do `/upgrade` e o
   // `simulate-derived` (#182) — e a primeira regra que casa vence. Na regra do upgrade, mexer nele
   // deixava a copia do derivado sem ninguem a medir.
+  // O "intacto a menos dos placeholders" (#176): os seus casos estao no `tests-intacto.mjs` (corre no
+  // `test-guards`) e o motor do upgrade usa-o — mexer nele manda correr os dois.
+  { re: /^\.agent\/scripts\/lib\/intacto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem|saida-upgrade)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },
@@ -91,6 +94,9 @@ export const SUITES = [
   // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do
   // projeto: mexer na configuracao obriga a correr quem a le.
   { re: /^\.agent\/scripts\/(tests\/harness\/test-bundle-harness\.mjs|config\/bundles\.mjs)$/, verifica: [S("test-bundle-sizes.mjs")] },
+  // Os guards e os pares PROPRIOS do projeto (#176): o `check-doc-versions` chama-os e o
+  // `lib/pares.mjs` junta-os a varredura. Mexer na lista obriga a correr os dois.
+  { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   // A limpeza de `tmpdir` decide se uma copia de trabalho e apagada — e uma decisao errada aqui
   // apaga a copia de uma corrida VIVA. Regra propria, antes da generica de `lib/`, porque a
