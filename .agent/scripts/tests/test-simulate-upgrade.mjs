@@ -15,8 +15,10 @@
  *
  * O QUE ESTA SUITE COBRE, contando os modulos que importa: o SIMULADOR e os seus guardas de
  * arranque (aqui), o MOTOR de `lib/upgrade-mecanico.mjs` (em `tests-upgrade-motor.mjs`), a
- * fixture `lib/projeto-de-ontem.mjs`, e o instrumento da seccao 2b em `lib/medida-upgrade.mjs`
- * (em `tests-medida-2b.mjs`). O `lib/mapa-suites.mjs` manda verificar os quatro com esta suite.
+ * fixture `lib/projeto-de-ontem.mjs`, o instrumento da seccao 2b em `lib/medida-upgrade.mjs`
+ * (em `tests-medida-2b.mjs`), e o filtro do que nao e do template em `lib/fora-do-template.mjs`
+ * (em `tests-upgrade-fora-do-template.mjs`). O `lib/mapa-suites.mjs` manda verificar os cinco
+ * com esta suite.
  *
  *   node .agent/scripts/tests/test-simulate-upgrade.mjs
  */
@@ -29,6 +31,7 @@ import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
 import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta, test, resumo } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { registar as registarMedida2b } from "./tests-medida-2b.mjs";
+import { registar as registarForaDoTemplate } from "./tests-upgrade-fora-do-template.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
@@ -40,6 +43,7 @@ const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
 // chamados explicitamente e nao por descoberta: esta suite tem contadores proprios.
 registarMotor();
 registarMedida2b();
+registarForaDoTemplate();
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 

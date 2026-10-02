@@ -342,3 +342,37 @@ nem menos coberto, porque eles ja davam `SKIP` la.
 **E num repo com branch protection**: se o `Guard Tests` for required check, os simuladores deixam de
 bloquear o merge ate o `Simuladores` passar tambem a required. Neste template nao ha protecao
 configurada (#161); fica dito para quem a ligar.
+
+## Porque o que o git do template IGNORA nao se copia (R7-D)
+
+O motor copia do **disco** do template, e e de proposito: o `simulate-upgrade` corre antes do
+commit, e um ficheiro novo ainda por commitar tem de contar como do template (ver o
+`arvoreNoDisco`). Mas o disco de quem mantem o template tem tambem o que o git dele **ignora**, e
+o `andaFicheiros` so saltava `.git`. Na ronda 7, os `RELATORIO-*.md` ignorados aterraram na copia
+de um derivado real; na reproducao, `settings.local.json`, `credentials.json`, `*.pem`, `id_rsa`
+e `node_modules/` iam pelo mesmo caminho. O `.env` so escapava porque a extensao dele nao passa
+no filtro dos substituiveis: por acaso, nao por desenho.
+
+**Onde doi.** O motor escreve em copias em `tmpdir` (a do simulador e a da §2b), nunca no projeto.
+O custo e duplo: a medicao da §2b corre sobre ficheiros que o projeto nunca vai ter, e da avisos
+que nao sao dele; e uma chave do mantenedor e copiada para `tmpdir`. O risco para o projeto real
+e a **mesma copia feita a mao**, com um `cp -R` da arvore de trabalho do `$TPL` — dai a linha na
+tabela: a mao, so o que o `git ls-files` lista.
+
+**Duas camadas** (`lib/fora-do-template.mjs`):
+1. **O que o git ignora**, perguntado ao proprio git (`ls-files --others --ignored
+   --exclude-standard --directory`). Nunca reimplementar o `.gitignore`. Se o git nao responde, o
+   motor reprova: "nao ignora nada" e "nao consegui perguntar" nao sao a mesma resposta (`TP2`).
+2. **Nomes de segredo fixos**, para o dia em que o `.gitignore` do mantenedor nao cobrir uma chave
+   (sem distinguir maiusculas), e o lixo do SO e as dependencias (`.DS_Store`, `node_modules/`), com
+   razao propria. Falha para o lado seguro, e nao em silencio: o que fica de fora vai em
+   `naoCopiados`, e os dois modos mostram-no.
+
+**Dois cuidados que o leitor independente encontrou**, e que os testes agora fixam: o git devolve
+os nomes em NFC no macOS e o disco pode te-los em NFD, logo os dois lados normalizam-se antes de
+comparar; e a fixture desliga o `.gitignore` GLOBAL de quem corre, que de outro modo fazia o teste
+da segunda camada reprovar numa maquina com `*.pem` la (`TP3`). O motor em si respeita-o.
+
+**Ficou de fora uma entrada no catalogo.** A licao merecia um anti-padrao do template, mas o
+`anti-patterns-template.md` esta nos 11 969 bytes, a 31 do tecto do Guard 1e. Arranjar espaco e
+condensar entradas antigas, e isso e trabalho proprio.

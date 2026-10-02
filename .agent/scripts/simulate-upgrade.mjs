@@ -58,6 +58,7 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
+import { linhasNaoCopiados } from "./lib/fora-do-template.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { comandosDoCI, correBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
@@ -223,6 +224,11 @@ ok(
   `upgrade mecanico aplicado: ${medido.repostas} constante(s) customizada(s) preservada(s), ` +
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`
 );
+const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
+if (semCopia) {
+  ok(semCopia);
+  for (const l of semCopiaLinhas) console.log(l);
+}
 
 // O que SAIU do template e o consumidor ainda tem. O upgrade copia com `cpSync`, que acrescenta
 // e substitui mas NUNCA apaga — logo uma renomeacao no template deixava o ficheiro velho no
