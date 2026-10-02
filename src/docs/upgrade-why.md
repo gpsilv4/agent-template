@@ -274,6 +274,14 @@ a mesma que o template aplica a si proprio: a entrada sempre-carregada fica ters
 para um `-why`. O `anti-patterns.md` deste repo tem 1 811 bytes; o `anti-patterns-why.md` tem
 19 006.
 
+**O que o motor faz (#178).** Ate aqui a regra so estava escrita, e o motor trazia o cabecalho
+**inteiro** mesmo assim. Medido no derivado da ronda 7, o ficheiro passava de 11 666 para 12 235
+bytes, e o cabecalho que o projeto tinha condensado a mao era apagado. Agora o cabecalho segue a
+regra do passo (v): se estiver **intacto** contra a tag, a menos dos placeholders, traz-se o
+novo; se estiver **customizado**, nao se toca. Um cabecalho customizado com prosa velha nao fica em
+silencio: um ID que ja nao existe e o Guard 15 que o aponta, um intervalo desactualizado e o
+G12g, ambos com ficheiro e linha. Quem integra a prosa nova e o consumidor.
+
 ---
 
 ## Duas licoes da ronda 6 — a evidencia das instrucoes que o `upgrade.md` ja traz

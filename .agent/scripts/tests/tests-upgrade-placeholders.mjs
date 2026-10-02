@@ -110,6 +110,50 @@ export function registar() {
       () => []
     ));
 
+  // O cabecalho do `anti-patterns.md` segue a mesma regra (#178). As ENTRADAS sao do projeto e
+  // ficam sempre; o cabecalho intacto atualiza-se, com o valor real no placeholder.
+  const AP = "## " + "AP" + "1" + " — meu\n";
+  const AP_REL = ".agent/rules/anti-patterns.md";
+  test("cabecalho do `anti-patterns.md` INTACTO e atualizado, e as entradas ficam", () =>
+    mede(
+      {
+        ontem: { [AP_REL]: `# Anti (${NOME})\n\n> velho\n\n---\n\n${AP}` },
+        hoje: { [AP_REL]: `# Anti (${NOME})\n\n> novo\n\n---\n\n${AP}` },
+        consumidor: { [AP_REL]: `# Anti (Projeto Real)\n\n> velho\n\n---\n\n${AP}## ${"AP" + "2"} — outro\n` },
+      },
+      (c) => {
+        const v = c.ler(AP_REL);
+        return v === `# Anti (Projeto Real)\n\n> novo\n\n---\n\n${AP}## ${"AP" + "2"} — outro\n` ? [] : [`ficou ${JSON.stringify(v)}`];
+      }
+    ));
+
+  // O CONTRA-CASO: o cabecalho que o projeto condensou a mao fica byte a byte. Trazer o inteiro
+  // apagava-o e, num derivado maduro, passava o tecto do Guard 1.
+  test("cabecalho do `anti-patterns.md` CUSTOMIZADO fica byte a byte", () => {
+    const meu = `# Anti (Projeto Real)\n\n> condensado a mao\n\n---\n\n${AP}`;
+    return mede(
+      {
+        ontem: { [AP_REL]: `# Anti (${NOME})\n\n> velho\n\n---\n\n${AP}` },
+        hoje: { [AP_REL]: `# Anti (${NOME})\n\n> novo\n\n---\n\n${AP}` },
+        consumidor: { [AP_REL]: meu },
+      },
+      (c) => (c.ler(AP_REL) === meu ? [] : [`o cabecalho do projeto foi atropelado: ${JSON.stringify(c.ler(AP_REL))}`])
+    );
+  });
+
+  // Sem cabecalho na TAG nao ha contra que comparar: nao se adivinha, fica o do projeto (`TP2`).
+  test("tag sem separador no `anti-patterns.md`: o do projeto fica byte a byte", () => {
+    const meu = `# Anti (Projeto Real)\n\n> meu\n\n---\n\n${AP}`;
+    return mede(
+      {
+        ontem: { [AP_REL]: "# Anti\n\nsem separador\n" },
+        hoje: { [AP_REL]: `# Anti (${NOME})\n\n> novo\n\n---\n\n${AP}` },
+        consumidor: { [AP_REL]: meu },
+      },
+      (c) => (c.ler(AP_REL) === meu ? [] : [`sem cabecalho na tag, o do projeto mudou: ${JSON.stringify(c.ler(AP_REL))}`])
+    );
+  });
+
   // A regex e montada do texto da tag: um ficheiro grande nao pode pendurar a comparacao.
   // Num processo filho e com tecto, para um retrocesso catastrofico reprovar em vez de pendurar.
   test("a captura num ficheiro grande e rapida (sem retrocesso catastrofico)", () => {
