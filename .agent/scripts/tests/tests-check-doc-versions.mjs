@@ -353,8 +353,15 @@ export function registar() {
   // Ligados a mao no `check-doc-versions.mjs`, o `/upgrade` desligava-os ao substituir o ficheiro.
   // A config e do projeto e o upgrade nunca a substitui.
   const CFG = ".agent/scripts/config/guards-do-projeto.mjs";
-  // So a lista `GUARDS` muda: o resto da config (as pastas do Guard 20) fica como o repo a tem.
-  const declara = (dir, guards) => writeF(dir, CFG, readF(dir, CFG).replace(/export const GUARDS = \[[^\]]*\];/, `export const GUARDS = ${JSON.stringify(guards)};`));
+  // ACRESCENTA a `GUARDS`, e nao a substitui: num derivado a lista ja tem os guards dele, e
+  // tira-los punha-os "nao chamados por ninguem" — o teste reprovava la e passava aqui (`TP3`).
+  // O resto da config (as pastas do Guard 20) fica como o repo a tem.
+  const declara = (dir, guards) => {
+    const antes = readF(dir, CFG);
+    const depois = antes.replace("export const GUARDS = [", `export const GUARDS = [${guards.map((g) => JSON.stringify(g)).join(", ")}, `);
+    if (depois === antes) throw new Error(`nao encontrei \`export const GUARDS = [\` em ${CFG}`);
+    writeF(dir, CFG, depois);
+  };
   const PROPRIO = { modulo: "./guards/proprio.mjs", funcao: "guardProprio" };
   const modulo = (corpo) => `export function guardProprio({ warn, ok }) {\n  ${corpo}\n  return 1;\n}\n`;
 

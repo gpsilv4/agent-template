@@ -310,6 +310,12 @@ function syntheticSandbox() {
     // devolve `null`). Sem eles o import rebenta ANTES de qualquer guard correr, e a suite inteira
     // morre por uma razao que nada tem a ver com o que ela mede.
     cpSync(join(ROOT, ".agent/scripts/lib"), join(dir, ".agent/scripts/lib"), { recursive: true });
+    // E a `config/`, que diz quais dos `guards/` sao do PROJETO (#176). Copiar os guards sem ela
+    // punha os de um derivado como "nao chamados por ninguem" — vermelho num derivado que os
+    // declarou, e verde no template, que nao tem nenhum.
+    if (existsSync(join(ROOT, ".agent/scripts/config"))) {
+      cpSync(join(ROOT, ".agent/scripts/config"), join(dir, ".agent/scripts/config"), { recursive: true });
+    }
   }
 
   // Os ficheiros que o Guard 17 congelou em `TETOS`. A fixture copia o verificador e os seus
