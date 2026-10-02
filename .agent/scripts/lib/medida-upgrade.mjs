@@ -34,7 +34,8 @@ import { linhasNaoCopiados } from "./fora-do-template.mjs";
  *  diferentes, e quem chama e que decide (`TP2`). */
 export function comandosDoCI(raiz) {
   const ci = leOuNull(join(raiz, ".github/workflows/ci.yml"));
-  const job = ci?.split(/^  guard-tests:/m)[1];
+  // So ate ao job SEGUINTE: o `split` sozinho levava todos os jobs que vem depois.
+  const job = ci?.split(/^  guard-tests:/m)[1]?.split(/^  [\w-]+:\s*$/m)[0];
   if (!job) return null;
   // EXCLUSOES, cada uma por uma razao concreta:
   //  - `check-test-surface`: precisa de um `.git` com historia, e um archive nao traz nenhum;
@@ -50,19 +51,53 @@ export function comandosDoCI(raiz) {
   // So conta o `#` que ABRE a linha: `run: node x.mjs  # nota` e um passo activo com um
   // comentario ao lado, e excluir a linha inteira ai era trocar um falso positivo por um
   // falso negativo — a medicao passaria a nao correr um passo que o projeto corre.
-  const activas = job.split("\n").filter((l) => !/^\s*#/.test(l));
-  const achados = [...new Set([...activas.join("\n").matchAll(/run:\s*node\s+(\S+\.mjs)/g)].map((m) => m[1]))];
-  return achados.filter((c) => !EXCLUIR.some((x) => c.includes(x)));
+  //
+  // E os blocos `run: |` CONTAM (#184). A varredura de mutacao do template vive num, dentro de um
+  // `if`, e so o `run: node X` numa linha era lido: a NOTE escrita para o caso das seis rondas com
+  // a varredura comentada nunca a nomeava. Uma linha pertence ao bloco enquanto estiver mais
+  // indentada do que o `run:` que o abre.
+  const NODE = /(?:^|[\s;&|(])node\s+(\S+\.mjs)/g;
+  const achados = [];
+  let bloco = -1;
+  for (const l of job.split("\n")) {
+    if (/^\s*#/.test(l)) continue;
+    const ind = l.match(/^\s*/)[0].length;
+    if (bloco >= 0 && (l.trim() === "" || ind > bloco)) {
+      for (const m of l.matchAll(NODE)) achados.push(m[1]);
+      continue;
+    }
+    bloco = -1;
+    const run = l.match(/^\s*(?:-\s+)?run:\s*(.*)$/);
+    if (!run) continue;
+    if (/^[|>][+-]?\s*$/.test(run[1])) bloco = ind;
+    else for (const m of run[1].matchAll(NODE)) achados.push(m[1]);
+  }
+  return [...new Set(achados)].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
 }
 
+/** Os que a BATERIA nao corre, embora contem para a comparacao com o template. A varredura de
+ *  mutacao demora minutos (dezenas num derivado privado) e mede as suites, nao o projeto: corre-la
+ *  duas vezes por medicao era o custo que a 2b existe para poupar. Fica de fora DITO, nunca calado. */
+//  Pelo NOME do ficheiro, e nao por substring: `includes("mutation-sweep")` tirava tambem o
+//  `test-mutation-sweep.mjs`, que e uma suite rapida e tem de correr.
+const SO_COMPARAR = ["mutation-sweep.mjs"];
+export const correNaBateria = (c) => !SO_COMPARAR.includes(c.split("/").pop());
+
+/** Uma linha de aviso, sem a de RESUMO: `WARNING: ha divergencias...` casava `^WARN` e, numa
+ *  comparacao linha a linha, passaria a contar como um achado. */
+const AVISO = /^\s*(WARN|FAIL)\b/;
+
 /**
- * Corre a bateria dentro de `dir`. Devolve os que sairam `!= 0`, com a primeira linha util.
+ * Corre a bateria dentro de `dir`. Devolve, dos que sairam `!= 0`, **todas** as linhas de aviso —
+ * um par por linha. Guardava so a primeira, e a 2b de um derivado real mostrou 2 linhas onde a
+ * bateria tinha 19 (#175): entre as escondidas estava um guard proprio do projeto desligado.
+ * Um comando que reprova sem nenhuma linha de aviso (um crash) da `exit N`, para nao sumir.
  *
  * Um comando AUSENTE na copia entra na lista em vez de ser ignorado: e quase sempre um
  * verificador que o template novo traz e o projeto ainda nao tem, e ler isso como "passou" e
  * o `TP2` — zero resultados lidos como zero problemas.
  *
- * @returns {Array<[string, string]>} pares `[comando, primeira linha util]`
+ * @returns {Array<[string, string]>} pares `[comando, linha]`, um por linha de aviso
  */
 export function correBateria({ dir, comandos }) {
   const falhados = [];
@@ -75,11 +110,42 @@ export function correBateria({ dir, comandos }) {
       execFileSync(process.execPath, [join(dir, c)], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     } catch (err) {
       const out = (err.stdout ?? "") + (err.stderr ?? "");
-      const linha = out.split("\n").find((l) => /^\s*(WARN|FAIL)/.test(l))?.trim() ?? `exit ${err.status ?? 1}`;
-      falhados.push([c, linha]);
+      const linhas = out.split("\n").filter((l) => AVISO.test(l)).map((l) => l.trim());
+      for (const linha of linhas.length ? linhas : [`exit ${err.status ?? 1}`]) falhados.push([c, linha]);
     }
   }
   return falhados;
+}
+
+/**
+ * O que reprova DEPOIS e nao reprovava ANTES, **linha a linha** e com repeticoes (#175).
+ *
+ * O "antes" era um conjunto de COMANDOS: um comando que ja reprovasse por uma razao escondia
+ * tudo o que passasse a reprovar por outras. Agora subtrai-se o multiconjunto das linhas.
+ *
+ * A comparacao e pela linha EXACTA. Normalizar os numeros esconderia `existem 31 -> 33`, que e
+ * uma regressao; quando a unica diferenca sao numeros, a linha sai na mesma, ANOTADA. Ruido
+ * aceita-se, supressao nao. O limite que fica: a mesma linha antes e depois, com uma causa nova,
+ * continua escondida — e a classe que o `upgrade-why.md` ja admite.
+ *
+ * @returns {Array<[string, string, string]>} `[comando, linha, nota]`
+ */
+export function novasLinhas(antes, depois) {
+  const chave = (c, l) => `${c}\0${l}`;
+  const sobra = new Map();
+  for (const [c, l] of antes) sobra.set(chave(c, l), (sobra.get(chave(c, l)) ?? 0) + 1);
+  const soNumeros = (l) => l.replace(/\d+/g, "N");
+  const novos = [];
+  for (const [c, l] of depois) {
+    const n = sobra.get(chave(c, l)) ?? 0;
+    if (n > 0) {
+      sobra.set(chave(c, l), n - 1);
+      continue;
+    }
+    const parecida = antes.find(([ca, la]) => ca === c && soNumeros(la) === soNumeros(l));
+    novos.push([c, l, parecida ? `   (mudou so em numeros; antes: ${parecida[1]})` : ""]);
+  }
+  return novos;
 }
 
 /**
@@ -230,8 +296,12 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     );
   }
 
-  const antes = new Set(correBateria({ dir, comandos: cmdAntes }).map(([c]) => c));
-  ok(`estado actual: ${antes.size} de ${cmdAntes.length} verificacao(oes) ja reprovam antes do upgrade`);
+  const naoCorre = [...new Set([...cmdAntes, ...cmdDepois].filter((c) => !correNaBateria(c)))];
+  if (naoCorre.length) {
+    note(`${naoCorre.join(", ")} conta(m) na comparacao mas nao corre(m) aqui (minutos, e mede as suites e nao o projeto) — correr a parte`);
+  }
+  const antes = correBateria({ dir, comandos: cmdAntes.filter(correNaBateria) });
+  ok(`estado actual: ${new Set(antes.map(([c]) => c)).size} de ${cmdAntes.length} verificacao(oes) ja reprovam antes do upgrade`);
 
   // O upgrade MECANICO, o mesmo motor e as mesmas categorias que o outro modo usa.
   //
@@ -267,14 +337,14 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     for (const { caminho } of medido.removidos) rmSync(join(dir, caminho), { force: true });
   }
 
-  const depois = correBateria({ dir, comandos: cmdDepois });
-  const novos = depois.filter(([c]) => !antes.has(c));
+  const depois = correBateria({ dir, comandos: cmdDepois.filter(correNaBateria) });
+  const novos = novasLinhas(antes, depois);
 
   console.log("\n  --- O que ESTE upgrade faz reprovar NESTE projeto ---\n");
   if (novos.length === 0) {
     console.log("  (nenhuma) — para este projeto, este upgrade e puramente aditivo.\n");
   } else {
-    for (const [c, linha] of novos) console.log(`  PASSA A REPROVAR  ${c}\n                    ${linha}`);
+    for (const [c, linha, nota] of novos) console.log(`  PASSA A REPROVAR  ${c}\n                    ${linha}${nota}`);
     console.log("");
   }
 
@@ -286,10 +356,10 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
       ? `adaptacao 2b (Guard 17): ${congelados} ficheiro(s) deste projeto a congelar em TETOS`
       : `adaptacao 2b (Guard 17): nenhum ficheiro acima das ${limite} linhas por congelar`
   );
-  const sobra = correBateria({ dir, comandos: cmdDepois }).filter(([c]) => !antes.has(c));
+  const sobra = novasLinhas(antes, correBateria({ dir, comandos: cmdDepois.filter(correNaBateria) }));
   if (sobra.length) {
     console.log("\n  Depois das adaptacoes mecanicas, continuam a reprovar:\n");
-    for (const [c, linha] of sobra) console.log(`  DECIDIR  ${c}\n           ${linha}`);
+    for (const [c, linha, nota] of sobra) console.log(`  DECIDIR  ${c}\n           ${linha}${nota}`);
     console.log("\n  Estas exigem decisao: acrescentar o que falta, ou nao trazer o guard.");
     console.log("  Nunca trazer e deixar vermelho.\n");
   } else if (novos.length) {

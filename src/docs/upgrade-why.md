@@ -182,6 +182,23 @@ decidido isso — ai o que se perde nao e o gate, e a confianca em todos os outr
 
 O historico das rondas anteriores esta neste ficheiro, mais acima.
 
+**A lista so serve se for completa** (#175, #184). Medido num derivado real: a 2b mostrou 2 linhas
+onde a bateria tinha 19, e entre as escondidas estava um guard do proprio projeto que o upgrade
+desligava. Duas causas: guardava-se so a **primeira** linha de aviso de cada comando, e o "antes"
+era um conjunto de **comandos** — um comando que ja reprovasse escondia tudo o que passasse a
+reprovar por outras razoes. Agora compara-se o multiconjunto das **linhas**, exactas:
+normalizar os numeros esconderia `existem 31 -> 33`. Uma linha que so mudou em numeros sai na
+mesma, anotada. Um comando que rebenta sem linhas de aviso sai como `exit N`.
+
+**O limite que fica:** a mesma linha antes e depois, com uma causa nova, continua escondida. E a
+mesma classe do "default que regressa", mais acima.
+
+**E os blocos `run: |` contam.** A varredura de mutacao do template vive num, e so `run: node X`
+numa linha era lido. A NOTE que avisa "o template corre isto e o projeto nao" nunca a nomeava, e
+foi para esse caso que ela foi escrita: seis rondas com a varredura comentada. A varredura entra
+na comparacao, mas **nao corre na bateria**: demora minutos e mede as suites, nao o projeto. A
+saida diz que ficou de fora.
+
 ## Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto
 
 A secao 2b promete uma lista — *"o que e que este upgrade faz reprovar neste projeto?"* — e

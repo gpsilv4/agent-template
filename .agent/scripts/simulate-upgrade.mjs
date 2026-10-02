@@ -61,7 +61,7 @@ import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
 import { linhasNaoCopiados } from "./lib/fora-do-template.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
-import { comandosDoCI, correBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
+import { comandosDoCI, correBateria, correNaBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
 import { montaProjetoDeOntem } from "./lib/projeto-de-ontem.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -317,7 +317,10 @@ if (COMANDOS === null || COMANDOS.length === 0) {
   fatal("nao derivei nenhum comando do job `guard-tests` do ci.yml — o job mudou de nome ou de formato?");
 }
 
-const corre = () => correBateria({ dir, comandos: COMANDOS });
+// A varredura conta para a lista mas nao corre aqui: demora minutos e mede as suites (`lib/medida-upgrade.mjs`).
+const CORRIDOS = COMANDOS.filter(correNaBateria);
+for (const c of COMANDOS.filter((c) => !correNaBateria(c))) note(`${c} nao corre na simulacao (minutos; mede as suites) — correr a parte`);
+const corre = () => correBateria({ dir, comandos: CORRIDOS });
 
 console.log("\n  --- FASE 1: o que este upgrade faz reprovar num projeto que estava verde ---\n");
 const fase1 = corre();
@@ -326,7 +329,7 @@ if (fase1.length === 0) {
 } else {
   for (const [c, linha] of fase1) console.log(`  REPROVA  ${c}\n           ${linha}`);
   console.log(
-    `\n  ${fase1.length} verificacao(oes) passam a reprovar. A seccao 2b do /upgrade promete esta\n` +
+    `\n  ${new Set(fase1.map(([c]) => c)).size} verificacao(oes) passam a reprovar (${fase1.length} linha(s)). A seccao 2b do /upgrade promete esta\n` +
       "  lista ANTES de aplicar — e isto e ela, medida em vez de prometida.\n"
   );
 }
@@ -342,7 +345,7 @@ if (fase1.length === 0) {
 console.log("\n  --- FASE 2: depois das adaptacoes ---\n");
 const fase2 = corre();
 for (const [c, linha] of fase2) warn(`${c}: ${linha}`);
-if (fase2.length === 0) ok(`${COMANDOS.length} verificacao(oes) verdes num projeto atualizado do ${tag}`);
+if (fase2.length === 0) ok(`${CORRIDOS.length} verificacao(oes) verdes num projeto atualizado do ${tag}`);
 
 // O que o `/upgrade` manda NUNCA tocar continua intacto. Esta verificacao vem no fim de
 // proposito: se alguma das copias acima tiver alvo errado, e aqui que se ve.
