@@ -10,7 +10,7 @@
  */
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF } from "./harness/test-harness.mjs";
+import { test, file, readF, writeF, registarResultado } from "./harness/test-harness.mjs";
 import { TETOS } from "../guards/sizes.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -38,17 +38,38 @@ export const entryPoint = "test-guards.mjs";
  *  **Exclui o proprio verificador e os seus modulos**: estes testes truncam e esvaziam o
  *  ficheiro escolhido, e faze-lo ao `check-doc-versions.mjs` (ou a um `guards/*.mjs`) rebenta
  *  quem esta a correr, em vez de produzir o aviso que se quer medir. */
-const CONGELADO = Object.keys(TETOS).find(
-  (f) => !/check-doc-versions\.mjs$|\/guards\/|\/lib\//.test(f)
-);
-if (!CONGELADO) {
-  throw new Error(
-    "tests-sizes: nenhuma entrada de TETOS serve de cobaia (todas sao o verificador ou modulos dele). " +
-      "Acrescentar um teto de um ficheiro que os testes possam truncar, ou ajustar a exclusao."
-  );
+// Quando NAO ha nenhum — `TETOS = {}`, o estado que a catraca quer atingir —, a suite rebentava
+// ao carregar e levava o `test-guards` inteiro com ela (#186). Passa a usar uma cobaia
+// SINTETICA, que cada teste monta na sandbox (o ficheiro e a sua entrada em `TETOS`): perde-se a
+// prova "os tetos apontam para os ficheiros certos", que so faz sentido com tetos, e mantem-se
+// a da catraca.
+export function escolheCobaia(tetos) {
+  const rel = Object.keys(tetos).find((f) => !/check-doc-versions\.mjs$|\/guards\/|\/lib\//.test(f));
+  return rel ? { rel, teto: tetos[rel], sintetica: false } : { rel: ".agent/scripts/cobaia-do-teto.mjs", teto: 600, sintetica: true };
+}
+const COBAIA = escolheCobaia(TETOS);
+const SINTETICA = escolheCobaia({});
+
+/** Monta a cobaia sintetica na sandbox. A real ja la esta. */
+function prepara(dir, c) {
+  if (!c.sintetica) return;
+  writeF(dir, c.rel, "// linha\n".repeat(c.teto));
+  const g = ".agent/scripts/guards/sizes.mjs";
+  const antes = readF(dir, g);
+  const depois = antes.replace("export const TETOS = {", `export const TETOS = {\n  ${JSON.stringify(c.rel)}: ${c.teto},`);
+  if (depois === antes) throw new Error(`nao encontrei \`export const TETOS = {\` em ${g}`);
+  writeF(dir, g, depois);
 }
 
 export function registar() {
+  // #186: com `TETOS = {}` (ou so com entradas que nao se podem truncar), a escolha cai na
+  // sintetica em vez de rebentar ao carregar. E com uma entrada utilizavel, usa a real.
+  registarResultado("G17: sem cobaia em TETOS, a suite usa uma sintetica e nao rebenta", [
+    ...(escolheCobaia({}).sintetica ? [] : ["TETOS vazio nao deu a sintetica"]),
+    ...(escolheCobaia({ ".agent/scripts/guards/x.mjs": 510 }).sintetica ? [] : ["so um guard em TETOS nao deu a sintetica"]),
+    ...(escolheCobaia({ ".agent/scripts/x.mjs": 510 }).rel === ".agent/scripts/x.mjs" ? [] : ["com uma entrada utilizavel nao a usou"]),
+  ]);
+
   // --- O estado limpo do repo ------------------------------------------------
   test("G17: o repo como esta passa — nenhum congelado cresceu", null, {
     code: 0,
@@ -79,13 +100,16 @@ export function registar() {
   }, { code: 1, includes: ["fronteira.mjs tem 501 linhas (> 500)"] });
 
   // --- A catraca: os congelados so podem ENCOLHER ----------------------------
-  test("G17: ficheiro congelado que CRESCE avisa", (dir) => {
+  // A catraca, contra a cobaia do repo e contra a sintetica: os dois caminhos tem de medir.
+  for (const [rotulo, C] of [["", COBAIA], [" (cobaia sintetica)", SINTETICA]]) {
+  test(`G17: ficheiro congelado que CRESCE avisa${rotulo}`, (dir) => {
+    prepara(dir, C);
     // Quantas linhas acrescentar deriva do TETO e do tamanho ATUAL — uma so nao chega quando
     // o ficheiro encolheu e ficou com folga, e fixar o numero aqui obrigava a mexer neste
     // teste a cada extraccao. Foi o que aconteceu ao extrair `lib/verbos-git.mjs`.
-    const atual = readF(dir, CONGELADO).replace(/\n$/, "").split("\n").length;
-    const faltam = TETOS[CONGELADO] - atual + 1;
-    writeF(dir, CONGELADO, readF(dir, CONGELADO) + "// mais uma linha\n".repeat(Math.max(1, faltam)));
+    const atual = readF(dir, C.rel).replace(/\n$/, "").split("\n").length;
+    const faltam = C.teto - atual + 1;
+    writeF(dir, C.rel, readF(dir, C.rel) + "// mais uma linha\n".repeat(Math.max(1, faltam)));
   }, { code: 1, includes: ["o teto congelado e", "so pode ENCOLHER"] });
 
   // --- A catraca tem de FECHAR, e este teste dizia o contrario ----------------
@@ -99,33 +123,38 @@ export function registar() {
   // A regra ja estava escrita no comentario da propria tabela ("RE-CONGELA a cada descida") e
   // era cumprida a mao. Medido no dia em que o ramo nasceu: o `test-guards.mjs` estava a 510
   // com o teto em 525, com 15 linhas de folga por reclamar.
-  test("G17: ficheiro congelado que ENCOLHE manda reclamar a folga", (dir) => {
+  test(`G17: ficheiro congelado que ENCOLHE manda reclamar a folga${rotulo}`, (dir) => {
+    prepara(dir, C);
     // O alvo e DERIVADO do teto real, e nao fixado: fixa-lo obrigava a mexer neste teste
     // sempre que o ficheiro encolhesse, e foi o que aconteceu ao re-congelar o teto em 590.
-    const teto = TETOS[CONGELADO];
+    const teto = C.teto;
     const alvo = Math.floor((500 + teto) / 2);
-    writeF(dir, CONGELADO, readF(dir, CONGELADO).split("\n").slice(0, alvo).join("\n") + "\n");
+    writeF(dir, C.rel, readF(dir, C.rel).split("\n").slice(0, alvo).join("\n") + "\n");
     return { includes: [`Baixar o teto para ${alvo}`, "folga ficou por reclamar"] };
   }, { code: 1 });
 
   // O CONTRA-CASO, e sem ele o de cima era satisfeito por um guard que avisasse SEMPRE que
   // existisse uma entrada em TETOS: no teto exacto nao ha folga nenhuma a reclamar.
-  test("G17: ficheiro congelado EXACTAMENTE no teto nao avisa", (dir) => {
-    const teto = TETOS[CONGELADO];
-    const linhas = readF(dir, CONGELADO).replace(/\n$/, "").split("\n");
+  test(`G17: ficheiro congelado EXACTAMENTE no teto nao avisa${rotulo}`, (dir) => {
+    prepara(dir, C);
+    const teto = C.teto;
+    const linhas = readF(dir, C.rel).replace(/\n$/, "").split("\n");
     const corpo = linhas.slice(0, teto - 1).join("\n");
-    writeF(dir, CONGELADO, corpo + "\n" + "// enche ate ao teto\n".repeat(teto - (teto - 1)));
+    writeF(dir, C.rel, corpo + "\n" + "// enche ate ao teto\n".repeat(teto - (teto - 1)));
     return { excludes: ["folga ficou por reclamar", "so pode ENCOLHER"] };
   }, { code: 0 });
 
   // --- A excecao nao sobrevive ao problema -----------------------------------
   // Sem isto, um ficheiro dividido ate as 200 linhas ficava com a entrada de TETOS para
   // sempre, e a proxima pessoa lia-a como licenca para voltar a crescer ate 668.
-  test("G17: congelado que ja cabe no limite manda remover a entrada", (dir) => {
-    writeF(dir, CONGELADO, "// linha\n".repeat(120));
+  test(`G17: congelado que ja cabe no limite manda remover a entrada${rotulo}`, (dir) => {
+    prepara(dir, C);
+    writeF(dir, C.rel, "// linha\n".repeat(120));
   }, { code: 1, includes: ["ja cabe no limite de 500", "remover a entrada de TETOS"] });
 
-  test("G17: TETOS a citar um ficheiro que nao existe avisa", (dir) => {
-    rmSync(file(dir, CONGELADO), { force: true });
+  test(`G17: TETOS a citar um ficheiro que nao existe avisa${rotulo}`, (dir) => {
+    prepara(dir, C);
+    rmSync(file(dir, C.rel), { force: true });
   }, { code: 1, includes: ["que nao existe", "renomeado ou removido"] });
+  }
 }

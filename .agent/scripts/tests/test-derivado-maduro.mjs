@@ -19,7 +19,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
-import { comHistoria, queConfigurou, comFicheirosGrandes } from "../lib/derivado-maduro.mjs";
+import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal } from "../lib/derivado-maduro.mjs";
 
 let passed = 0;
 const falhas = [];
@@ -209,6 +209,53 @@ await test("comFicheirosGrandes: RECUSA quando os TETOS mudaram de forma", async
     return ["passou sem reescrever os TETOS — o derivado ficava sem os seus ficheiros grandes"];
   } catch (err) {
     return err instanceof Recusa && /nao consegui reescrever os TETOS/.test(err.message) ? [] : [`recusa errada: ${err.message}`];
+  } finally {
+    limpa(dir);
+  }
+});
+
+// --- 3f: o derivado como os reais ficam (#177) ------------------------------------
+const CFG_VAZIA = "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\nexport const SKIPS_DO_PROJETO = [];\n";
+const comCfg = (txt) => {
+  const dir = copia();
+  mkdirSync(join(dir, ".agent/scripts/config"), { recursive: true });
+  if (txt !== null) writeFileSync(join(dir, ".agent/scripts/config/guards-do-projeto.mjs"), txt);
+  mkdirSync(join(dir, ".agent/context"), { recursive: true });
+  mkdirSync(join(dir, "src/docs"), { recursive: true });
+  return dir;
+};
+await test("comoUmDerivadoReal: declara o guard proprio E o seu SKIP na config", async () => {
+  const dir = comCfg(CFG_VAZIA);
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    const c = le(dir, ".agent/scripts/config/guards-do-projeto.mjs");
+    const p = [];
+    if (!c.includes("guardDoProjeto")) p.push("o guard nao ficou declarado em GUARDS");
+    if (!c.includes("Guard do projeto (simulacao)")) p.push("o SKIP nao ficou declarado em SKIPS_DO_PROJETO");
+    if (!le(dir, "src/docs/CHANGELOG.md").includes("`TP1`-`TP2`")) p.push("o CHANGELOG nao ganhou historia");
+    return p;
+  } finally {
+    limpa(dir);
+  }
+});
+await test("comoUmDerivadoReal: sem a config, REPROVA", async () => {
+  const dir = comCfg(null);
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    return ["devia ter reprovado sem a config"];
+  } catch (err) {
+    return err instanceof Recusa && /nao existe na copia/.test(err.message) ? [] : [`razao errada: ${err.message}`];
+  } finally {
+    limpa(dir);
+  }
+});
+await test("comoUmDerivadoReal: com a lista noutra forma, REPROVA", async () => {
+  const dir = comCfg("export const GUARDS = [];\n// sem a lista dos SKIPs\n");
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    return ["devia ter reprovado com a lista dos SKIPs ausente"];
+  } catch (err) {
+    return err instanceof Recusa && /mudou de forma/.test(err.message) ? [] : [`razao errada: ${err.message}`];
   } finally {
     limpa(dir);
   }

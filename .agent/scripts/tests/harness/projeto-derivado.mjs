@@ -100,11 +100,13 @@ export function comoTemplate(dir) {
     /* no template nu nao existe — e o estado que queremos */
   }
   if (!existsSync(join(dir, ".agent/BOOTSTRAP.md"))) {
-    // Sem contagens: os guards 12d/12e comparam citacoes com a fonte, e um ficheiro que nao
-    // cita nada nao acrescenta aviso nenhum. Escrever numeros aqui a mao era o que eles
-    // existem para apanhar.
+    // Cita o numero de workflows, DERIVADO do disco e nao escrito a mao. O de um template real
+    // cita-o, e num template ZERO citacoes e aviso do 12e. Sem ela, um derivado que substituiu o
+    // `README` (a §2.7 manda-o, e era a outra citacao) ficava aqui com um aviso que nao e do teste
+    // — medido no `simulate-derived` (#177).
+    const n = existsSync(join(dir, ".agent/workflows")) ? readdirSync(join(dir, ".agent/workflows")).filter((f) => f.endsWith(".md")).length : 0;
     mkdirSync(join(dir, ".agent"), { recursive: true });
-    writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), "# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do `ehDerivado()`.\n");
+    writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), `# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do \`ehDerivado()\`. O template traz ${n} workflows.\n`);
   }
   // O `.agent/context/` de um template so tem o andaime. Um derivado tem la ficheiros SEUS (um
   // `backlog-detail.md`), e deixa-los punha o Guard 21 a acusar "sem entrada em PRISTINOS" numa

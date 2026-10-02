@@ -28,11 +28,12 @@
  * (bom, e a entrada sai da lista) ou a fixture mudou de forma (mau, e quer-se saber).
  */
 import { pathToFileURL } from "url";
-import { existsSync, rmSync } from "fs";
+import { existsSync, readdirSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { sandbox, runGuard, registarResultado, readF, writeF } from "./harness/test-harness.mjs";
 import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
+import { ficheirosComProsa } from "../guards/derived-counts.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -62,6 +63,20 @@ const COMUNS = [
   { chave: "Guard 4 (termos banidos) — lista BANNED vazia", vezes: 1 },
   { chave: "Guard 16 (politica MCP) — nenhum servidor configurado", vezes: 1 },
 ];
+
+/** O 12e salta num derivado em que NENHUM ficheiro cita o numero de workflows. E legitimo: a
+ *  §2.7 manda substituir o `README`, que era a citacao (#177). Derivado do disco, como os outros
+ *  eixos: um derivado que conserve a citacao nao tem este SKIP. */
+const semCitacaoDeWorkflows = (dir) => {
+  const cita = ficheirosComProsa((rel, ext) => {
+    try {
+      return readdirSync(join(dir, rel)).filter((n) => n.endsWith(ext)).map((n) => n.slice(0, -ext.length));
+    } catch {
+      return null;
+    }
+  }).some((f) => existsSync(join(dir, f)) && /(\d+)\s+(workflows|comandos|commands)\b/i.test(readF(dir, f)));
+  return cita ? [] : [{ chave: "Guard 12e (N workflows) — projeto derivado sem citacao propria", vezes: 1 }];
+};
 
 /** As rules que a Fase 2.2 do bootstrap GERA. Se existem na sandbox, os guards leem-nas e nao
  *  saltam; se nao existem, saltam duas vezes cada — uma pelo ficheiro, outra pelo `@import` que
@@ -108,7 +123,7 @@ export function registar() {
     montar(dir);
     const out = runGuard(dir).out ?? "";
     const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
-    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir)];
+    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir), ...semCitacaoDeWorkflows(dir)];
     const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
     // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o

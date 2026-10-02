@@ -23,9 +23,9 @@
  * @param ok     reporter de sucesso do simulador
  * @param fatal  recusa do simulador: avisa e sai `!= 0` na hora
  */
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { pathToFileURL } from "url";
-import { join } from "path";
+import { join, dirname } from "path";
 import { aplica } from "./patch.mjs";
 import { leOuNull } from "./ficheiros.mjs";
 
@@ -150,4 +150,40 @@ export async function comFicheirosGrandes({ dir, ok, fatal }) {
   if (depois === c) fatal(`nao consegui reescrever os TETOS em ${relGuard} — o literal mudou de forma`);
   writeFileSync(p, depois);
   ok(`derivado com ficheiros grandes seus: ${rel} (${n} linhas) congelado, TETOS do projeto`);
+}
+
+// --- 3f. o derivado como os REAIS ficam ------------------------------------------
+// PORQUE EXISTE: cada um destes partiu um teste do template num derivado real (ronda 7, R7-F),
+// e nenhum existia no projeto que este simulador montava — o CI do template estava verde e o do
+// derivado vermelho, sem nada partido em nenhum dos dois (#177). Com eles aqui, o proximo teste
+// que dependa do conteudo do template fica vermelho NO TEMPLATE, e nao numa ronda 8.
+//  - (b) um guard PROPRIO declarado na config, que salta na copia e declara o SKIP com a razao;
+//  - (c) um CHANGELOG com historia: um intervalo de anti-padroes que ja nao e o de hoje;
+//  - (d) ficheiros do projeto no `.agent/context/`, e decisoes escritas;
+//  - (e) o `README.md` substituido (a §2.7 do bootstrap manda-o) e o `review.md` reescrito sem
+//    citar o intervalo do template.
+export function comoUmDerivadoReal({ dir, ok, fatal }) {
+  const w = (rel, txt) => {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), txt);
+  };
+  w(".agent/scripts/guards/do-projeto.mjs",
+    'export function guardDoProjeto({ skip }) {\n  skip("Guard do projeto (simulacao) — sem dados na copia");\n  return 0;\n}\n');
+  const relCfg = ".agent/scripts/config/guards-do-projeto.mjs";
+  const cfg = leOuNull(join(dir, relCfg));
+  if (cfg === null) fatal(`${relCfg} nao existe na copia — sem ela o derivado nao declara os seus guards`);
+  const comGuard = aplica(cfg, "export const GUARDS = [", 'export const GUARDS = [{ modulo: "./guards/do-projeto.mjs", funcao: "guardDoProjeto" }, ');
+  const comSkip = comGuard.estado === "sem-alvo" ? comGuard
+    : aplica(comGuard.texto, "export const SKIPS_DO_PROJETO = [", 'export const SKIPS_DO_PROJETO = [{ chave: "Guard do projeto (simulacao) — sem dados", razao: "a copia nao tem dados" }, ');
+  if (comSkip.estado === "sem-alvo") fatal(`nao consegui declarar o guard do projeto em ${relCfg} — a lista mudou de forma`);
+  w(relCfg, comSkip.texto);
+  const relLog = "src/docs/CHANGELOG.md";
+  w(relLog, `${leOuNull(join(dir, relLog)) ?? "# Changelog\n"}\n## [v0.1.0] - primeira release\n\n- Os anti-padroes do template eram os \`TP1\`-\`TP2\`.\n`);
+  w(".agent/context/backlog-detail.md", "# Detalhe do backlog\n\nNotas do projeto.\n");
+  w(".agent/context/decisions.md", "# Decisoes\n\n## 2026-01-01 — Uma decisao do projeto\n\nVer os `TP1`-`TP2`.\n");
+  w("README.md", "# Projeto Simulado\n\nO README deste projeto, escrito no bootstrap (§2.7).\n");
+  const relReview = ".agent/workflows/review.md";
+  const review = leOuNull(join(dir, relReview));
+  if (review !== null) w(relReview, review.replace(/`TP\d+`-`TP\d+`/g, "os do template"));
+  ok("derivado como os reais: guard proprio com SKIP declarado, CHANGELOG com historia, contexto e README do projeto");
 }
