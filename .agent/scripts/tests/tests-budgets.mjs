@@ -110,7 +110,20 @@ export function registar() {
   // A copia existe porque nao esta verificado que o Cursor e o Copilot SIGAM um ponteiro em
   // markdown. Copia significa divergencia, logo e comparada.
 
+  // O ponteiro do Cursor so existe se o projeto usar o Cursor: um derivado que o dispensou nao o
+  // tem (#189). Os dois casos que lhe mexem montam-no primeiro, a partir do do Copilot — o guard
+  // mede o mesmo, e os dois ponteiros levam o mesmo bloco.
+  const comCursor = (dir) => {
+    const f = ".cursor/rules/project.mdc";
+    try {
+      readF(dir, f);
+    } catch {
+      writeF(dir, f, readF(dir, ".github/copilot-instructions.md"));
+    }
+  };
+
   test("G1d: Fronteiras divergentes no ponteiro do Cursor avisam", (dir) => {
+    comCursor(dir);
     const f = ".cursor/rules/project.mdc";
     writeF(dir, f, readF(dir, f).replace("- **Nunca**:", "- **Nunca (versao antiga)**:"));
   }, { code: 1, includes: ["project.mdc", "divergem do CLAUDE.md"] });
@@ -121,6 +134,7 @@ export function registar() {
   }, { code: 1, includes: ["copilot-instructions.md", "sem regra nenhuma"] });
 
   test("G1d: ponteiro ausente da SKIP visivel, nao silencio", (dir) => {
+    comCursor(dir);
     rmSync(file(dir, ".cursor/rules/project.mdc"));
   }, { code: 0, includes: ["SKIP  .cursor/rules/project.mdc"] });
 

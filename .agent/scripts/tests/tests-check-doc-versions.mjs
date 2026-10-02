@@ -10,7 +10,7 @@
  *
  * NAO e um entry point: o `test-guards.mjs` descobre-o e chama `registar()`.
  */
-import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
+import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD } from "./harness/test-harness.mjs";
 
@@ -157,9 +157,19 @@ export function registar() {
     for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, ".agent/workflows/plan.md");
   }, { code: 1, includes: ['Workflow "plan" nao listado'] });
 
-  test("G7: /design-review removido da tabela avisa", (dir) => {
-    for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, ".agent/workflows/design-review.md");
-  }, { code: 1, includes: ['Workflow "design-review" nao listado'] });
+  /** Um workflow que EXISTE na sandbox, para os testes que tiram um das tabelas. O Modo minimo
+   *  (§2.6) poda oito, e cravar o nome partia o teste no derivado que o seguiu (#189). O preferido
+   *  se estiver; senao o primeiro que nao seja `review`/`plan`, que tem os seus casos proprios. */
+  const umWorkflow = (dir, preferido) => {
+    const ws = readdirSync(file(dir, ".agent/workflows")).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -3));
+    return ws.includes(preferido) ? preferido : ws.find((w) => !["review", "plan"].includes(w));
+  };
+
+  test("G7: um workflow removido da tabela avisa", (dir) => {
+    const w = umWorkflow(dir, "design-review");
+    for (const f of ["CLAUDE.md", "GEMINI.md"]) dropLinesContaining(dir, f, `.agent/workflows/${w}.md`);
+    return { includes: [`Workflow "${w}" nao listado`] };
+  }, { code: 1 });
 
   test("G7: workflow sem colisao de nome continua a ser apanhado", (dir) => {
     // Escrever a tabela COMPLETA primeiro: num projeto derivado que ja tenha removido
@@ -195,16 +205,20 @@ export function registar() {
 
   // --- Guard 9: AGENTS.md e agent-guide.md -------------------------------------
   test("G9a: workflow removido do AGENTS.md avisa", (dir) => {
-    writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace("`market-scan`", "`removido`"));
-  }, { code: 1, includes: ['Workflow "market-scan" nao listado em AGENTS.md'] });
+    const w = umWorkflow(dir, "market-scan");
+    writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace(`\`${w}\``, "`removido`"));
+    return { includes: [`Workflow "${w}" nao listado em AGENTS.md`] };
+  }, { code: 1 });
 
   test("G9a: /review removido nao e mascarado por design-review", (dir) => {
     writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace("`review` · ", ""));
   }, { code: 1, includes: ['Workflow "review" nao listado em AGENTS.md'] });
 
   test("G9b: workflow removido do agent-guide.md avisa", (dir) => {
-    dropLinesContaining(dir, "src/docs/agent-guide.md", "`/refactor`");
-  }, { code: 1, includes: ['Workflow "refactor" nao listado em src/docs/agent-guide.md'] });
+    const w = umWorkflow(dir, "refactor");
+    dropLinesContaining(dir, "src/docs/agent-guide.md", `\`/${w}\``);
+    return { includes: [`Workflow "${w}" nao listado em src/docs/agent-guide.md`] };
+  }, { code: 1 });
 
   // --- Guard 10: conteudo dos wrappers -----------------------------------------
   test("G10: wrapper a apontar para o workflow ERRADO avisa", (dir) => {

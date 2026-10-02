@@ -44,7 +44,7 @@ import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo
 import { leOuNull } from "./lib/ficheiros.mjs";
 import { foraDoTemplate } from "./lib/fora-do-template.mjs";
 import { comandosDoCI, correNaBateria } from "./lib/medida-upgrade.mjs";
-import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal } from "./lib/derivado-maduro.mjs";
+import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "./lib/derivado-maduro.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -314,6 +314,7 @@ comHistoria({ dir, ok });
 queConfigurou({ dir, ok, fatal });
 await comFicheirosGrandes({ dir, ok, fatal });
 comoUmDerivadoReal({ dir, ok, fatal });
+comOptOuts({ dir, ok, fatal });
 
 // --- 3f. apagar o BOOTSTRAP.md, que e o ULTIMO passo da checklist ------------------
 // O `ehDerivado()` tem dois sinais: o marcador presente **ou** este ficheiro ausente. Desde o

@@ -54,7 +54,8 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
 
   w(".agent/BOOTSTRAP.md", bootstrapQuebrado
     ? "# Bootstrap\n\nSem a seccao que o simulador procura.\n"
-    : "# Bootstrap\n\n### 2.2 Ficheiros a GERAR do zero\n\n| Ficheiro |\n|---|\n" +
+    : "# Bootstrap\n\n- **Modo minimo**: manter so os essenciais e **remover os restantes** (`podado` — sem uso) na Fase 2.\n\n" +
+      "### 2.2 Ficheiros a GERAR do zero\n\n| Ficheiro |\n|---|\n" +
       "| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra coisa\n\nTexto.\n");
 
   // O placeholder e construido, nao escrito: o bootstrap substitui placeholders tambem em

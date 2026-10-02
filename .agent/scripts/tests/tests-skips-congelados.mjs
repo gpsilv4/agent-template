@@ -78,6 +78,11 @@ const semCitacaoDeWorkflows = (dir) => {
   return cita ? [] : [{ chave: "Guard 12e (N workflows) — projeto derivado sem citacao propria", vezes: 1 }];
 };
 
+/** Um projeto que nao usa o Cursor nao tem o ponteiro dele, e o Guard 1d salta-o — e legitimo, e
+ *  e um opt-out que o template oferece (#189). Do disco, como os outros eixos. */
+const semCursor = (dir) =>
+  existsSync(join(dir, ".cursor/rules/project.mdc")) ? [] : [{ chave: ".cursor/rules/project.mdc — ponteiro ausente", vezes: 1 }];
+
 /** As rules que a Fase 2.2 do bootstrap GERA. Se existem na sandbox, os guards leem-nas e nao
  *  saltam; se nao existem, saltam duas vezes cada — uma pelo ficheiro, outra pelo `@import` que
  *  o CLAUDE.md lhe faz.
@@ -123,7 +128,7 @@ export function registar() {
     montar(dir);
     const out = runGuard(dir).out ?? "";
     const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
-    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir), ...semCitacaoDeWorkflows(dir)];
+    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir), ...semCitacaoDeWorkflows(dir), ...semCursor(dir)];
     const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
     // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o
