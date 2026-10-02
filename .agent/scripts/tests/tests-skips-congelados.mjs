@@ -31,7 +31,7 @@ import { pathToFileURL } from "url";
 import { existsSync, rmSync } from "fs";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import { sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
+import { sandbox, runGuard, registarResultado, readF, writeF } from "./harness/test-harness.mjs";
 import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -79,13 +79,17 @@ const GERADAS_NO_BOOTSTRAP = ["business-logic.md", "pages-architecture.md"];
  *  seus guards nao tem este SKIP, e congela-lo punha-o vermelho sem nada partido (`TP3`). */
 //  Lida como o verificador a le — importando —, e nao por regex: uma lista vazia com o exemplo
 //  comentado la dentro dizia "nao vazia" ao regex, e o teste reprovava um SKIP legitimo.
-const semGuardsProprios = (dir) => {
+//  E os SKIPs que o PROJETO declara la, com a razao (`SKIPS_DO_PROJETO`): um guard dele que salte
+//  na fixture e legitimo, e escreve-lo neste teste era editar um ficheiro que o upgrade substitui.
+const doProjeto = (dir) => {
   const cfg = join(dir, ".agent/scripts/config/guards-do-projeto.mjs");
-  const n = existsSync(cfg)
-    ? Number(execFileSync(process.execPath, ["--input-type=module", "-e",
-        `const { GUARDS = [] } = await import(${JSON.stringify(pathToFileURL(cfg).href)}); console.log(GUARDS.length);`], { encoding: "utf8" }))
-    : 0;
-  return n === 0 ? [{ chave: "guards do projeto — nenhum declarado", vezes: 1 }] : [];
+  if (!existsSync(cfg)) return [{ chave: "guards do projeto — nenhum declarado", vezes: 1 }];
+  const { guards, skips } = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e",
+    `const { GUARDS = [], SKIPS_DO_PROJETO = [] } = await import(${JSON.stringify(pathToFileURL(cfg).href)}); console.log(JSON.stringify({ guards: GUARDS.length, skips: SKIPS_DO_PROJETO.map((s) => s.chave) }));`], { encoding: "utf8" }));
+  return [
+    ...(guards === 0 ? [{ chave: "guards do projeto — nenhum declarado", vezes: 1 }] : []),
+    ...skips.map((chave) => ({ chave, vezes: 1 })),
+  ];
 };
 const porGerar = (dir) =>
   GERADAS_NO_BOOTSTRAP.filter((f) => !existsSync(join(dir, ".agent/rules", f))).map((f) => ({
@@ -104,7 +108,7 @@ export function registar() {
     montar(dir);
     const out = runGuard(dir).out ?? "";
     const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
-    const esp = [...esperados, ...porGerar(dir), ...semGuardsProprios(dir)];
+    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir)];
     const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
     // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o
@@ -142,4 +146,16 @@ export function registar() {
   // OS DOIS ESTADOS, montados e nao herdados. Correr so um foi o defeito da primeira versao.
   mede("template", comoTemplate, [...COMUNS, ...SO_TEMPLATE]);
   mede("derivado", bootstrapado, [...COMUNS, ...SO_DERIVADO]);
+
+  // Um derivado com um guard PROPRIO que salta na fixture, e o declara na config com a razao
+  // (`SKIPS_DO_PROJETO`, #177). E o caso real: o Guard 4b de um derivado salta porque a fixture
+  // nao copia a app. Sem a declaracao, este teste era vermelho la e verde aqui.
+  mede("derivado com guard proprio", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, ".agent/scripts/guards/salta.mjs", 'export function guardSalta({ skip }) {\n  skip("Guard do projeto (exemplo) — sem dados na fixture");\n  return 0;\n}\n');
+    const cfg = ".agent/scripts/config/guards-do-projeto.mjs";
+    writeF(dir, cfg, readF(dir, cfg)
+      .replace("export const GUARDS = [", 'export const GUARDS = [{ modulo: "./guards/salta.mjs", funcao: "guardSalta" }, ')
+      .replace("export const SKIPS_DO_PROJETO = [", 'export const SKIPS_DO_PROJETO = [{ chave: "Guard do projeto (exemplo) — sem dados", razao: "a fixture nao tem dados" }, '));
+  }, [...COMUNS, ...SO_DERIVADO]);
 }

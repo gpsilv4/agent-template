@@ -101,6 +101,8 @@ const CITACAO_AP = /\b(?:AP|TP)\d+\b/g;
  */
 export const FIXTURES_DE_OUTRO_REPO = new Set([
   ".agent/scripts/tests/tests-derived-counts.mjs",
+  // Os casos do 12g sairam do de cima pelo Guard 17 (#177), com as fixtures que inventam IDs.
+  ".agent/scripts/tests/tests-derived-counts-12g.mjs",
   ".agent/scripts/tests/test-derivado-maduro.mjs",
 ]);
 

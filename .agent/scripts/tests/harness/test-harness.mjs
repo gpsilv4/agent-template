@@ -61,6 +61,10 @@ const FIXTURE_PATHS = [
   // O `BOOTSTRAP.md` nao estava aqui, logo qualquer guard que o leia ficava sem teste — foi
   // o que aconteceu ao 12d (contagem de guards numerados), que o cita.
   ".agent/BOOTSTRAP.md",
+  // A MARCA de derivado (#177). Sem ela, um derivado que guardasse o `BOOTSTRAP.md` (o bootstrap
+  // permite-o) via a sandbox como TEMPLATE, e os guards que dependem disso (o 21, o 12d/e)
+  // mediam outro estado. No template nao existe, e a copia salta-a.
+  ".agent/.template-version",
   ".agent/context",
   ".agent/scripts",
   ".claude/commands",

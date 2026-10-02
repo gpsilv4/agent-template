@@ -33,6 +33,7 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { recongelarContexto } from "./recongelar-contexto.mjs";
+import { PRISTINOS } from "../../guards/context-virgem.mjs";
 
 /** Os tipos que a Fase 2.1 do `BOOTSTRAP.md` manda varrer. Se esta lista ficar curta, sobram
  *  placeholders — e e exactamente o defeito que ja aconteceu com o `.mdc`. */
@@ -104,6 +105,16 @@ export function comoTemplate(dir) {
     // existem para apanhar.
     mkdirSync(join(dir, ".agent"), { recursive: true });
     writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), "# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do `ehDerivado()`.\n");
+  }
+  // O `.agent/context/` de um template so tem o andaime. Um derivado tem la ficheiros SEUS (um
+  // `backlog-detail.md`), e deixa-los punha o Guard 21 a acusar "sem entrada em PRISTINOS" numa
+  // fixture que diz montar um template (R7-F, #177). Sai o que nao e andaime.
+  const ctx = join(dir, ".agent/context");
+  if (existsSync(ctx)) {
+    for (const f of readdirSync(ctx, { recursive: true, withFileTypes: true })) {
+      const rel = `.agent/context/${join(f.parentPath ?? f.path, f.name).slice(ctx.length + 1)}`;
+      if (f.isFile() && !(rel in PRISTINOS)) rmSync(join(dir, rel));
+    }
   }
   recongelarContexto(dir);
 }
