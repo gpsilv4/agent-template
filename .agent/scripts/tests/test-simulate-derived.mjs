@@ -56,7 +56,7 @@ const falhas = [];
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 const ap = (n) => "AP" + n;
 
-function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false } = {}) {
+function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -154,6 +154,8 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
     w(".claude/state/sessao.json", '{"segredo":"nao devia sair daqui"}\n');
     w("infra/certs/servidor.pem", "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n");
     w("apps/web/.env.local", "SUPABASE_SERVICE_KEY=nao-copiar\n");
+    // Ignorado pelo `.gitignore`: a lista a mao so conhecia `TEMPLATE-FIXES` e deixava-o entrar (#182).
+    w("RELATORIO-TEMPLATE-RONDA9.md", "# notas de trabalho\n");
   }
   copyFileSync(SIMULADOR, join(dir, ".agent/scripts/simulate-derived.mjs"));
   // O simulador importa `lib/patch.mjs` — a distincao entre "o patch nao aplicou" e "o valor ja
@@ -167,6 +169,15 @@ function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado
   // Copiar de mais e barato: um modulo que ninguem importa nao chega a ser lido.
   for (const m of readdirSync(join(ROOT, ".agent/scripts/lib")).filter((f) => f.endsWith(".mjs"))) {
     copyFileSync(join(ROOT, `.agent/scripts/lib/${m}`), join(dir, `.agent/scripts/lib/${m}`));
+  }
+  // Um REPO, como o template: o simulador pergunta ao git o que nao e do template (#182). O
+  // `.gitignore` GLOBAL de quem corre fica de fora (`TP3`); um `.git` para lado nenhum faz o git
+  // falhar sem subir a um repo pai.
+  if (gitSemResposta) w(".git", "gitdir: /nao/existe\n");
+  else {
+    w(".gitignore", ".claude/state/\nRELATORIO-*.md\n");
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["config", "core.excludesFile", "/dev/null"], { cwd: dir });
   }
   return dir;
 }
@@ -408,7 +419,7 @@ test("segredos e estado local em subpastas NAO entram na copia", { segredosAninh
   args: ["--keep"],
   copia: (dir) => {
     const problemas = [];
-    for (const rel of [".claude/state/sessao.json", "infra/certs/servidor.pem", "apps/web/.env.local"]) {
+    for (const rel of [".claude/state/sessao.json", "infra/certs/servidor.pem", "apps/web/.env.local", "RELATORIO-TEMPLATE-RONDA9.md"]) {
       if (existsSync(join(dir, rel))) problemas.push(`${rel} entrou na copia e nao devia`);
     }
     // O contra-teste: se a copia estivesse vazia, o de cima passava por nao haver nada.
@@ -421,6 +432,12 @@ test("segredos e estado local em subpastas NAO entram na copia", { segredosAninh
     if (!existsSync(join(dir, "infra/certs"))) problemas.push("a subpasta `infra/certs` devia existir (so o .pem e que sai)");
     return problemas;
   },
+});
+
+// Sem resposta do git, seguir com "nada ignorado" e o `TP2`: copiava o que o filtro existe para travar.
+test("git que nao responde REPROVA em vez de copiar tudo", { gitSemResposta: true }, {
+  code: 1,
+  includes: ["o que o template ignora"],
 });
 
 // --- `lib/patch.mjs`: os TRES estados de um patch de texto ---------------------

@@ -42,18 +42,12 @@ import { dirname, resolve, join, sep } from "path";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { leOuNull } from "./lib/ficheiros.mjs";
+import { foraDoTemplate } from "./lib/fora-do-template.mjs";
 import { comHistoria, queConfigurou, comFicheirosGrandes } from "./lib/derivado-maduro.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 
-/** Nao pertencem a um clone novo. `TEMPLATE-FIXES*` sao relatorios de revisao entregues de
- *  fora (ver `.gitignore`); `node_modules` e `.git` sao obvios. */
-const NAO_COPIAR = [".git", "node_modules", ".env", ".claude/state"];
-/** Segredos e estado local nunca entram na copia. Num projeto derivado a copia inclui tudo o
- *  que esta na raiz — e ia parar a `/tmp`, onde ficava se o script saisse por `fatal()`. */
-const NAO_COPIAR_SUFIXO = [".pem", ".key", ".p12", ".pfx"];
-const NAO_COPIAR_PREFIXO = ["TEMPLATE-FIXES"];
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Se esta lista ficar curta, sobram
  *  placeholders e o Guard 13 reprova no passo 4 — por desenho. */
@@ -178,23 +172,22 @@ const abandonadas = limpaTmpsAntigos("derivado-") + limpaFixturesDeTeste();
 if (abandonadas) console.log(`  OK    ${abandonadas} copia(s) de corridas interrompidas apagadas`);
 const dir = criaTmp("derivado-");
 copiaAtiva = dir;
-/** Aplica-se a QUALQUER profundidade, e nao so a raiz.
- *
- *  O filtro corria uma vez por entrada de topo e o `cpSync` recursivo copiava o resto sem
- *  perguntar. Consequencias medidas: `.claude/state` estava na lista de exclusao e **entrava
- *  sempre** (a comparacao via `.claude`, nao `.claude/state`); um `.pem`, uma `.key` ou um
- *  `.env.local` dentro de qualquer subpasta entrava tambem — e a copia ia parar a `/tmp`,
- *  onde ficava se o script saisse por `fatal()`. Uma lista de exclusao que so olha para o
- *  primeiro nivel de uma arvore e uma lista que nao exclui.
- *  @param rel caminho relativo a ROOT, com `/` (ex: `.claude/state`) */
-const excluido = (rel) => {
-  const nome = rel.slice(rel.lastIndexOf("/") + 1);
-  if (NAO_COPIAR.includes(rel) || NAO_COPIAR.includes(nome)) return true;
-  if (NAO_COPIAR_PREFIXO.some((p) => nome.startsWith(p))) return true;
-  if (nome.startsWith(".env")) return true;
-  if (NAO_COPIAR_SUFIXO.some((x) => nome.endsWith(x))) return true;
-  return false;
-};
+// O que NAO e do template nao entra na copia: o que o git dele ignora, e nomes de segredo. Era uma
+// lista escrita a mao aqui (`TEMPLATE-FIXES*`, `.claude/state`, `.pem`...), uma segunda copia da
+// regra do motor do `/upgrade`, e ja tinha divergido do `.gitignore`: os `RELATORIO-*.md` entravam
+// (#182). A regra vive num sitio so — `lib/fora-do-template.mjs` — e e o git que responde (`TP8`).
+//
+// Tem de valer a QUALQUER profundidade, e nao so a raiz: o filtro corria uma vez por entrada de
+// topo e o `cpSync` copiava o resto sem perguntar. Medido: `.claude/state` estava na lista e
+// entrava sempre, e um `.pem` ou um `.env.local` em qualquer subpasta tambem — e a copia ia parar
+// a `/tmp`, onde ficava se o script saisse por `fatal()`.
+const { razao: foraDoRepo, erro: semIgnorados } = foraDoTemplate(ROOT);
+if (semIgnorados !== undefined) {
+  fatal(`nao consegui perguntar ao git o que o template ignora (${semIgnorados}) — sem isso copiava-se o que nao e do template, segredos incluidos`);
+}
+/** @param rel caminho relativo a ROOT, com `/` (ex: `.claude/state`). O `.git` sai a parte: o git
+ *  nao o declara como ignorado, e nao e conteudo do projeto. */
+const excluido = (rel) => rel === ".git" || rel.startsWith(".git/") || foraDoRepo(rel) !== null;
 
 let copiados = 0;
 for (const e of readdirSync(ROOT, { withFileTypes: true })) {
