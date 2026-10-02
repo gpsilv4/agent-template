@@ -23,7 +23,7 @@
  * @param ok     reporter de sucesso do simulador
  * @param fatal  recusa do simulador: avisa e sai `!= 0` na hora
  */
-import { readFileSync, writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync, unlinkSync } from "fs";
 import { pathToFileURL } from "url";
 import { join, dirname } from "path";
 import { aplica } from "./patch.mjs";
@@ -186,4 +186,49 @@ export function comoUmDerivadoReal({ dir, ok, fatal }) {
   const review = leOuNull(join(dir, relReview));
   if (review !== null) w(relReview, review.replace(/`TP\d+`-`TP\d+`/g, "os do template"));
   ok("derivado como os reais: guard proprio com SKIP declarado, CHANGELOG com historia, contexto e README do projeto");
+}
+
+// --- 3g. o derivado que usa os OPT-OUTS ------------------------------------------
+// O template oferece-os e as suites nao os aguentavam (#189): o Modo minimo da §2.6 (podar oito
+// workflows) deixava o `test-guards` com 3 falhas, e dispensar o Cursor juntava mais 5. As
+// suites do template correm sobre o proprio repo, com o inventario COMPLETO; esta simulacao e o
+// caso oposto — o derivado que dispensou o que e opcional —, e e por isso que os dois juntos
+// cobrem os dois extremos.
+//
+// A lista a podar vem do PROPRIO `BOOTSTRAP.md` (a frase do Modo minimo), e nao escrita aqui:
+// escrita a mao, envelhecia no primeiro workflow novo, e a simulacao podava outra coisa.
+export function comOptOuts({ dir, ok, fatal }) {
+  const bootstrap = leOuNull(join(dir, ".agent/BOOTSTRAP.md")) ?? "";
+  const frase = /remover os restantes\*\* \(([^)]*?)(?: —|\))/.exec(bootstrap);
+  const podar = frase ? [...frase[1].matchAll(/`([\w-]+)`/g)].map((m) => m[1]) : [];
+  if (podar.length === 0) fatal("nao derivei os workflows do Modo minimo do BOOTSTRAP.md (§2.6) — a frase mudou de forma?");
+  const apaga = (rel) => {
+    try {
+      unlinkSync(join(dir, rel));
+    } catch {
+      /* um wrapper que a copia nao tem: nada a podar */
+    }
+  };
+  for (const w of podar) {
+    for (const rel of [`.agent/workflows/${w}.md`, `.claude/commands/${w}.md`, `.gemini/commands/${w}.toml`]) apaga(rel);
+    for (const rel of ["CLAUDE.md", "GEMINI.md", "src/docs/agent-guide.md"]) {
+      const c = leOuNull(join(dir, rel));
+      if (c !== null) writeFileSync(join(dir, rel), c.split("\n").filter((l) => !l.includes(`workflows/${w}.md`) && !l.includes(`\`/${w}\``)).join("\n"));
+    }
+    const agents = leOuNull(join(dir, "AGENTS.md"));
+    if (agents !== null) writeFileSync(join(dir, "AGENTS.md"), agents.replace(`\`${w}\` · `, "").replace(` · \`${w}\``, ""));
+  }
+  // A §2.6 manda acertar as citacoes do NUMERO de workflows; o Guard 12e reprova se ficarem.
+  let n = 0;
+  try {
+    n = readdirSync(join(dir, ".agent/workflows")).filter((f) => f.endsWith(".md")).length;
+  } catch {
+    /* uma copia sem a pasta (a fixture minima): nada a contar, nada a acertar */
+  }
+  if (n > 0) for (const rel of ["README.md", ".agent/BOOTSTRAP.md", ".agent/rules/scripts-guide.md", "CLAUDE.md", "GEMINI.md", "AGENTS.md", "src/docs/agent-guide.md"]) {
+    const c = leOuNull(join(dir, rel));
+    if (c !== null) writeFileSync(join(dir, rel), c.replace(/\b\d+ (workflows|comandos|commands)\b/g, `${n} $1`));
+  }
+  rmSync(join(dir, ".cursor"), { recursive: true, force: true });
+  ok(`derivado com os opt-outs: Modo minimo (${podar.length} workflows podados, ficam ${n}) e sem .cursor/`);
 }

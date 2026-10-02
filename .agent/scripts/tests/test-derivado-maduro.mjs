@@ -16,10 +16,10 @@
  *
  *   node .agent/scripts/tests/test-derivado-maduro.mjs
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
-import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal } from "../lib/derivado-maduro.mjs";
+import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "../lib/derivado-maduro.mjs";
 
 let passed = 0;
 const falhas = [];
@@ -256,6 +256,50 @@ await test("comoUmDerivadoReal: com a lista noutra forma, REPROVA", async () => 
     return ["devia ter reprovado com a lista dos SKIPs ausente"];
   } catch (err) {
     return err instanceof Recusa && /mudou de forma/.test(err.message) ? [] : [`razao errada: ${err.message}`];
+  } finally {
+    limpa(dir);
+  }
+});
+
+// --- 3g: os opt-outs (#189) -------------------------------------------------------
+const comWorkflows = (bootstrap) => {
+  const dir = copia();
+  const w = (rel, txt) => {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), txt);
+  };
+  w(".agent/BOOTSTRAP.md", bootstrap);
+  for (const n of ["plan", "audit"]) w(`.agent/workflows/${n}.md`, `# ${n}\n`);
+  w(".claude/commands/audit.md", "ler audit\n");
+  w("CLAUDE.md", "| /plan | `.agent/workflows/plan.md` |\n| /audit | `.agent/workflows/audit.md` |\n");
+  w("README.md", "O template traz 2 workflows.\n");
+  w(".cursor/rules/project.mdc", "ponteiro\n");
+  return dir;
+};
+const FRASE = "- **Modo minimo**: **remover os restantes** (`audit` — sem uso) na Fase 2.\n";
+await test("comOptOuts: poda o que a §2.6 manda, acerta a contagem e tira o .cursor/", async () => {
+  const dir = comWorkflows(FRASE);
+  try {
+    comOptOuts({ dir, ...espia() });
+    const p = [];
+    if (existsSync(join(dir, ".agent/workflows/audit.md"))) p.push("o workflow podado ficou");
+    if (!existsSync(join(dir, ".agent/workflows/plan.md"))) p.push("podou um que a §2.6 manda manter");
+    if (existsSync(join(dir, ".claude/commands/audit.md"))) p.push("o wrapper do podado ficou");
+    if (le(dir, "CLAUDE.md").includes("audit.md")) p.push("a linha da tabela do podado ficou");
+    if (!le(dir, "README.md").includes("1 workflows")) p.push("a contagem nao foi acertada");
+    if (existsSync(join(dir, ".cursor"))) p.push("o .cursor/ ficou");
+    return p;
+  } finally {
+    limpa(dir);
+  }
+});
+await test("comOptOuts: sem a frase do Modo minimo no BOOTSTRAP, REPROVA", async () => {
+  const dir = comWorkflows("# Bootstrap sem a frase\n");
+  try {
+    comOptOuts({ dir, ...espia() });
+    return ["devia ter reprovado"];
+  } catch (err) {
+    return err instanceof Recusa && /Modo minimo/.test(err.message) ? [] : [`razao errada: ${err.message}`];
   } finally {
     limpa(dir);
   }
