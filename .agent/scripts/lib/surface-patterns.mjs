@@ -10,9 +10,9 @@
  * ficheiro sem sitios de aviso — e este nao tem nenhum — reprova ali com `SINAL ERRADO`, e com
  * razao: um par que casa zero sitios esta desatualizado. Medido antes de escolher o nome.
  *
- * Mas ele **continua na superficie congelada**: ha uma entrada em `CONFIG_CONTAVEIS` para este
- * caminho. Sem ela, apagar metade das tabelas — que e desligar o detetor — nao mexia em nenhuma
- * contagem vigiada. Era esse o risco de extrair, e e ela que o fecha.
+ * Mas ele **continua na superficie congelada**, pelo glob de `.agent/scripts/lib/` do
+ * `CONFIG_CONTAVEIS`. Sem ele, apagar metade das tabelas — que e desligar o detetor — nao mexia
+ * em nenhuma contagem vigiada. Era esse o risco de extrair, e e esse glob que o fecha.
  *
  * Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que os nomes contados sejam
  * os que o projeto **usa** para declarar um teste e uma assercao.
