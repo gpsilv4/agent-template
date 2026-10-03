@@ -173,9 +173,10 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir, ehDerivado }
     ...[...DEFINICOES].map((f) => ({ file: `.agent/rules/${f}`, tipo: "catalogo de definicoes" })),
     ...(listDir(".agent/workflows", ".md") || []).map((n) => ({ file: `.agent/workflows/${n}.md`, tipo: "workflow" })),
   ];
-  if (outros.length === 0) {
-    skip("Guard 1e — sem catalogos nem workflows para orcamentar");
-  } else {
+  // Sem ramo para "nenhum candidato": `DEFINICOES` e fixo, logo `outros` nunca fica vazio, e um
+  // SKIP inalcancavel era uma rede que nao existe (#192, `--skips`). O caso real — nenhum
+  // ficheiro LIDO — e o `lidos === 0` mais abaixo.
+  {
     let maior = { file: null, bytes: 0 };
     let avisados = 0;
     let lidos = 0;

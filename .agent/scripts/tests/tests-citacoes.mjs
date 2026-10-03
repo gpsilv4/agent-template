@@ -14,7 +14,9 @@
  * pasta, acusava 13 citacoes correctas.
  */
 import { pathToFileURL } from "url";
-import { test, writeF, readF } from "./harness/test-harness.mjs";
+import { test, writeF, readF, registarResultado } from "./harness/test-harness.mjs";
+import { guardCitacoes } from "../guards/citacoes.mjs";
+import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -31,6 +33,10 @@ export const entryPoint = "test-guards.mjs";
 const citaEm = (dir, texto) => writeF(dir, ".agent/rules/exemplo-citacao.md", `# Exemplo\n\n${texto}\n`);
 
 export function registar() {
+  // #192: sem rules nem workflows o guard tem de DIZER que nao correu (chamado diretamente).
+  const vazio = correDireto(guardCitacoes, { listDir: () => [] });
+  registarResultado("G20: sem instrucoes da SKIP visivel", vazio.includes("SKIP  Guard 20 (citacoes de ficheiro)") ? [] : [`saiu: ${vazio}`]);
+
   // --- O estado limpo do repo ------------------------------------------------
   test("G20: o repo como esta passa — todas as citacoes resolvem", null, {
     code: 0,

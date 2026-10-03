@@ -12,7 +12,7 @@
  */
 import { mkdirSync, rmSync, writeFileSync, readFileSync, readdirSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD } from "./harness/test-harness.mjs";
+import { test, file, readF, writeF, patchSettings, listWorkflowRows, dropLinesContaining, GUARD, sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -345,8 +345,33 @@ export function registar() {
 
   test("G4: ficheiro de termos banidos ausente da SKIP visivel", (dir) => {
     // O Guard 4 varre ficheiros da lista BANNED; um que nao exista tem de dizer, nao calar.
-    rmSync(file(dir, "src/docs/agent-guide.md"));
-  }, { code: 0, includes: ["SKIP", "agent-guide"] });
+    // A versao anterior apagava o `agent-guide.md`, que NAO esta nos `LIVING_DOCS`, com o `BANNED`
+    // vazio do template — o guard nem chegava a este ramo, e `["SKIP", "agent-guide"]` casava outra
+    // linha: apagar o SKIP passava verde (#192, `--skips`). Um termo que nao casa nada e um
+    // documento vivo que nao existe levam-no ao ramo sem trazer avisos.
+    const g = readF(dir, GUARD)
+      .replace(/const BANNED = \[[\s\S]*?\];/, 'const BANNED = [{ re: /termo-que-nao-existe-192/g, msg: "x" }];')
+      .replace("const LIVING_DOCS = [", 'const LIVING_DOCS = [\n  "nao-existe-192.md",');
+    if (!g.includes("nao-existe-192.md") || !g.includes("termo-que-nao-existe-192")) throw new Error("nao encontrei BANNED e LIVING_DOCS no GUARD");
+    writeF(dir, GUARD, g);
+  }, { code: 0, includes: ["SKIP  Guard 4 em nao-existe-192.md — ficheiro nao encontrado"] });
+
+  // Sem guards do projeto declarados, o guard tem de o DIZER. O `skips-congelados` permite este
+  // SKIP mas nao o exige (de proposito), e apaga-lo passava verde (#192). `registarResultado` e nao
+  // `test`: num derivado esvaziar `GUARDS` deixa os guards dele orfaos, e o exit depende disso.
+  {
+    const dir = sandbox();
+    try {
+      const cfg = ".agent/scripts/config/guards-do-projeto.mjs";
+      const c = readF(dir, cfg).replace(/export const GUARDS = \[[\s\S]*?\];/, "export const GUARDS = [];");
+      writeF(dir, cfg, c);
+      const out = runGuard(dir).out ?? "";
+      registarResultado("guards do projeto: nenhum declarado da SKIP visivel",
+        out.includes("SKIP  guards do projeto — nenhum declarado") ? [] : ["o SKIP nao saiu"], out);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
 
   test("G6: sem .claude/commands da SKIP visivel", (dir) => {
     rmSync(file(dir, ".claude/commands"), { recursive: true, force: true });

@@ -11,7 +11,7 @@ import { pathToFileURL } from "url";
 // A lista real, para os testes nao a duplicarem a mao.
 const PONTEIROS_1D = ["AGENTS.md", ".cursor/rules/project.mdc", ".github/copilot-instructions.md"];
 import { join } from "path";
-import { test, file, readF, writeF } from "./harness/test-harness.mjs";
+import { test, file, readF, writeF, sandbox, runGuard, registarResultado } from "./harness/test-harness.mjs";
 import { bootstrapado } from "./harness/projeto-derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -187,6 +187,30 @@ export function registar() {
     writeF(dir, "GEMINI.md", gemini);
   }, { code: 1, includes: ["contexto carregado", "> 48000"] });
 
+  // A faixa do MEIO (36 000 a 48 000): NOTE, sem reprovar. E a linha "dos quais", que sai
+  // sempre que ha contexto e nenhum teste exigia — apaga-las passava verde (#192, `--skips`).
+  // `registarResultado` e nao `test`: um ficheiro novo em `.agent/context/` faz o Guard 21 avisar
+  // no template e SALTAR num derivado, logo o exit depende de onde corre (`TP3`). Afirmam-se so
+  // as tres linhas NOTE, que saem nos dois.
+  {
+    const dir = sandbox();
+    try {
+      const atual = readF(dir, "CLAUDE.md").split("\n").filter((l) => l.startsWith("@.agent/context/"))
+        .reduce((s, l) => s + Buffer.byteLength(readF(dir, l.slice(1)), "utf8"), 0);
+      const falta = Math.max(0, 40000 - atual);
+      // Dois ficheiros abaixo do limite por ficheiro, pela mesma razao do teste de cima (`TP1`).
+      for (const n of ["meio1", "meio2"]) writeF(dir, `.agent/context/${n}.md`, `# ${n}\n\n${"x".repeat(Math.ceil(falta / 2))}`);
+      writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md") + "\n@.agent/context/meio1.md\n@.agent/context/meio2.md\n");
+      writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md") + "\n@./.agent/context/meio1.md\n@./.agent/context/meio2.md\n");
+      const out = runGuard(dir).out ?? "";
+      const faltam = ["NOTE  contexto carregado = ", "(perto do limite 48000)", "NOTE    ...dos quais rules + CLAUDE.md = "].filter((s) => !out.includes(s));
+      registarResultado("G1c: contexto perto do maximo da NOTE, e diz quanto pesam as rules",
+        [...faltam.map((s) => `faltou "${s}"`), ...(out.includes("> 48000") ? ["passou o maximo em vez de ficar perto"] : [])], out);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   test("G1c: engordar uma RULE nao dispara o 1c (dispara o Guard 1, que e o dono)", (dir) => {
     // O controlo do ponto anterior: sem ele, o 1c podia continuar a somar as rules e o teste
     // acima passava igual.
@@ -214,7 +238,9 @@ export function registar() {
     const alvo = ".agent/rules/core-rules.md";
     const atual = readF(dir, alvo).length;
     if (atual < 11500) appendFileSync(file(dir, alvo), "x".repeat(11600 - atual));
-  }, { code: 0, includes: ["NOTE", "perto do limite"] });
+    // A linha INTEIRA do Guard 1: "perto do limite" sozinho tambem casava a NOTE dos workflows
+    // (1e), que o repo imprime sempre — o teste passava sem esta (#192, `--skips`).
+  }, { code: 0, anyOut: ["NOTE  .agent/rules/core-rules.md = ", "bytes (perto do limite 12000)"] });
 
   test("G1c: sem @import de .agent/context/ da SKIP visivel", (dir) => {
     // Os DOIS espelhos: mexer so no CLAUDE.md quebra o Guard 2 e o teste falharia por um

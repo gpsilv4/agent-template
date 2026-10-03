@@ -10,7 +10,9 @@
  */
 import { readdirSync, rmSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF } from "./harness/test-harness.mjs";
+import { test, file, readF, writeF, registarResultado } from "./harness/test-harness.mjs";
+import { guardAntiPatternEvidence } from "../guards/anti-patterns.mjs";
+import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -26,6 +28,14 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 export const entryPoint = "test-guards.mjs";
 
 export function registar() {
+  // #192: um catalogo sem nenhum `TPn` tem de o DIZER. Chamado diretamente: pelo verificador
+  // completo, tirar todas as entradas deixava as citacoes `TPn` do repo inteiro a reprovar.
+  const semEntradas = correDireto(guardAntiPatternEvidence, {
+    read: (p) => (p.endsWith("anti-patterns-template.md") ? "# Template\n\nSem entradas.\n" : "# Porque\n"),
+  });
+  registarResultado("G18: catalogo do template sem entradas da SKIP visivel",
+    semEntradas.includes("SKIP  Guard 18 — o catalogo do template nao tem entradas") ? [] : [`saiu: ${semEntradas}`]);
+
   // --- Guard 15: as referencias a anti-padroes resolvem -------------------------
   // Uma citacao errada e pior do que nenhuma: manda o leitor a uma entrada REAL com outro
   // significado, e nada no ecra a denuncia. Aconteceu num projeto derivado, ao trazer os
