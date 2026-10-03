@@ -367,6 +367,9 @@ jobs:
           grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
           if [ "$rc" -eq 0 ]; then
             node .agent/scripts/mutation-sweep.mjs
+            # E os `skip()`/`note()`, completos (#192): ~3 min, e um guard que deixa de dizer que
+            # nao correu e o `TP2`. Completos e nao `--diff`: o portao nao depende do mapa.
+            node .agent/scripts/mutation-sweep.mjs --skips
           elif [ "$rc" -eq 1 ]; then
             echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
           else

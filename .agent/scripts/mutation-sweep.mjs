@@ -122,8 +122,8 @@ const modoDiff = process.argv.includes("--diff");
 // comentarios e **"todo o skip e visivel"**: um guard que deixa de ANUNCIAR que nao correu
 // e o `TP2` em forma pura, e nada media se isso era possivel. Este modo mede.
 //
-// Fica fora do CI e fora da varredura normal: corre-se a mao, ao mexer nos guards. O que
-// devolve nao e um veredicto de "esta mal" — e a lista dos sitios que ninguem observa.
+// Fora da varredura normal, mas no CI como um passo seu, completo, desde que ficou a 100%
+// (#192): um sitio novo sem teste reprova o PR que o traz.
 const modoSkips = process.argv.includes("--skips");
 const SINAL_SKIPS = /(?<![\w.$])(?:skip|note)\(/;
 

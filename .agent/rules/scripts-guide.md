@@ -45,7 +45,7 @@
 |---|---|---|
 | **Local, a trabalhar** | `node .agent/scripts/mutation-sweep.mjs --diff` | So os alvos que este branch tocou. Minutos em vez de dezenas deles |
 | **Local, excepcao** | a completa, sem flags | **So** ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs` (porque: `scripts-guide-why.md` § "Porque a varredura completa e a excepcao local, e nao o habito") |
-| **CI** | a completa, sem flags | Nao muda. O CI e o **portao** |
+| **CI** | a completa, e a completa com `--skips` | O CI e o **portao** |
 
 A varredura corre em **8 processos** (ou o numero de cores, o que for menor), cada um com a **sua
 copia do repo** — a copia por worker nao e detalhe. `--workers=1` devolve o sequencial, para
