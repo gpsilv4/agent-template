@@ -39,7 +39,7 @@ import { cpSync, mkdirSync, readdirSync, readFileSync, writeFileSync, rmSync, ex
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
-import { ehDerivado } from "./lib/derivado.mjs";
+import { ehDerivado, rulesGeradasDe } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { leOuNull } from "./lib/ficheiros.mjs";
 import { foraDoTemplate } from "./lib/fora-do-template.mjs";
@@ -47,7 +47,6 @@ import { comandosDoCI, correNaBateria } from "./lib/medida-upgrade.mjs";
 import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "./lib/derivado-maduro.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
-
 
 
 /** Tipos que a Fase 2.1 do BOOTSTRAP manda varrer. Se esta lista ficar curta, sobram
@@ -62,14 +61,6 @@ const substituivel = (rel, nome) =>
 /** `{{args}}` e um placeholder dos command templates do Gemini, nao do bootstrap. */
 const PLACEHOLDER = /\{\{(?!args\})[A-Z_]+\}\}/g;
 
-/** O que a Fase 2.2 do BOOTSTRAP manda GERAR. Derivado do proprio BOOTSTRAP.md para nao
- *  envelhecer: se alguem acrescentar um ficheiro gerado a tabela 2.2, esta lista segue. */
-function rulesGeradas() {
-  const b = leOuNull(join(ROOT, ".agent/BOOTSTRAP.md"));
-  if (b === null) return [];
-  const seccao = b.split(/^### 2\.2 /m)[1]?.split(/^### 2\.3 /m)[0] ?? "";
-  return [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
-}
 
 
 // Num derivado esta promessa nao se pode verificar: o que o script configura ja esta configurado.
@@ -270,7 +261,7 @@ if (leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) === null) {
   process.exit(0);
 }
 
-const geradas = rulesGeradas();
+const geradas = rulesGeradasDe(leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")));
 if (geradas.length === 0) {
   fatal("nao derivei nenhuma rule gerada da seccao 2.2 do BOOTSTRAP.md — o formato mudou?");
 }

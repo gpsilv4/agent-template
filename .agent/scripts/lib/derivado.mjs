@@ -21,3 +21,18 @@
  */
 export const ehDerivado = (ler) =>
   ler(".agent/.template-version") !== null || ler(".agent/BOOTSTRAP.md") === null;
+
+/**
+ * As rules que a Fase 2.2 do `BOOTSTRAP.md` manda GERAR, lidas da propria tabela para nao
+ * envelhecer: um ficheiro gerado que entre la, entra aqui.
+ *
+ * Estava escrita a mao no `simulate-derived.mjs` e no `lib/projeto-de-ontem.mjs`, e a fixture
+ * `bootstrapado()` ia levar a terceira copia (#190) — o `TP8`.
+ *
+ * @param {string | null} bootstrap  o texto do `BOOTSTRAP.md` (o do HEAD, ou o de uma tag)
+ * @returns {string[]} caminhos relativos; vazio quando nao ha ficheiro ou a seccao mudou de forma
+ */
+export function rulesGeradasDe(bootstrap) {
+  const seccao = bootstrap?.split(/^### 2\.2 /m)[1]?.split(/^### 2\.3 /m)[0] ?? "";
+  return [...new Set([...seccao.matchAll(/`(\.agent\/rules\/[a-z-]+\.md)`/g)].map((m) => m[1]))];
+}
