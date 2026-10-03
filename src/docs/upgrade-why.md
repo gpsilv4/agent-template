@@ -436,3 +436,16 @@ Agora, num derivado, a falta e WARN nos dois guards. Um projeto que nunca as ger
 dois avisos no primeiro `/upgrade` que traga esta versao. E o comportamento pretendido, e
 resolve-se gerando-as. Um projeto que as dispense de proposito tira os `@import` dos pontos de
 entrada: os dois guards so avisam de uma rule que o `CLAUDE.md` importa.
+
+## Porque uma entrada propria na `CONTAGENS` passa a pedir teste (#183)
+
+O `surface-patterns.mjs` e do template, mas a `CONTAGENS` e do projeto: o bootstrap manda
+acrescentar-lhe o vocabulario dele (`check(`, `assertThat(`), e o upgrade preserva-a. Desde o #183
+a varredura de mutacao desliga cada entrada das tabelas e reprova se nenhum teste o notar,
+porque 17 de 47 podiam ser apagadas com a suite verde.
+
+**O que isto pede a um derivado:** cada entrada que ele tenha acrescentado precisa de um teste que
+a exija, num `tests-surface-*.mjs` dele. O upgrade nunca apaga esse ficheiro, e a descoberta
+encontra-o. Sem o teste, o primeiro PR que toque em `.agent/scripts/` depois do upgrade da
+`INCOMPLETA` na varredura do CI, a nomear a linha. A §2b nao o mostra antes, porque a bateria
+dela nao corre a varredura (minutos).

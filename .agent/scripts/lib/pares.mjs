@@ -20,7 +20,7 @@ import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
 // verificador inteiro (o mesmo silencio que este repo passou a sessao a eliminar).
 //
 // `sinal` casa a chamada que faz o verificador reprovar; `neutro` e o que a substitui para
-// a DESLIGAR sem quebrar a sintaxe.
+// a DESLIGAR sem quebrar a sintaxe. Numa TABELA de padroes o sitio e a entrada (ver as do #183).
 //
 // O que isto mede, exatamente: se **algum teste nota a falta daquele aviso**. Para os pares
 // `warn(`/`flag(` o `neutro` faz a mensagem DESAPARECER — nao e a variante do `TP1` em que a
@@ -302,6 +302,26 @@ const PARES_DO_TEMPLATE = [
     // anunciava cobertura completa a medir metade. Ver a nota no cabecalho do `fatal`.
     sinal: /(?<![\w.$])(?:warn|fatal)\(/,
     neutro: "(() => {})(",
+  },
+  // As TABELAS da superficie (#183): aqui o "sitio" e uma entrada, e nao uma chamada. Desligar
+  // cada uma deixava 17 de 47 com a suite verde, e uma entrada nova nascia sem teste. O sinal tem
+  // comprimento ZERO e fica logo antes do regex; o neutro insere `/(?!)/ || `, que deixa a entrada
+  // a nunca casar e o JavaScript valido (`{ re: /(?!)/ || /x/ }`, `/(?!)/ || /x/i,`).
+  {
+    alvo: ".agent/scripts/lib/surface-patterns.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<=^\s+(?:\{\s*)?(?:re:\s*)?)(?=\/(?![\/*]))/,
+    neutro: "/(?!)/ || ",
+  },
+  // Os GLOBS do proprio verificador: uma segunda entrada para o mesmo alvo, com outro sinal. A
+  // `config/superficie-de-teste.mjs` fica de fora de proposito: os globs dela nao tem teste do
+  // template (parte C do #183). No `--skips` o sinal e o mesmo para todos os pares, logo este alvo
+  // mede o seu `note(` duas vezes: uma corrida a mais, sem falso vermelho.
+  {
+    alvo: ".agent/scripts/check-test-surface.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<=^\s+)(?=\/(?![\/*]))/,
+    neutro: "/(?!)/ || ",
   },
   {
     // A baseline e a exigencia de superficie, extraidas do `check-test-surface.mjs` quando ele

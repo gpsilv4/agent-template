@@ -10,7 +10,10 @@
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join, dirname } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git } from "./harness/test-surface-harness.mjs";
+import { readFileSync } from "fs";
+import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
+import { CONTAGENS, MARCAS } from "../lib/surface-patterns.mjs";
+import { PARES } from "../lib/pares.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -36,6 +39,19 @@ const muda = (dir, rel, antes, depois) => {
 };
 
 export function registar() {
+  // A varredura encontra as entradas pela FORMA (`{ re: /.../`, o `re` primeiro). Uma entrada
+  // escrita de outra maneira (`{ msg: "x", re: /y/ }`) nao era sitio e entrava sem teste e sem
+  // aviso. Contar os sitios contra as entradas exportadas fecha isso (#183).
+  {
+    const rel = ".agent/scripts/lib/surface-patterns.mjs";
+    const par = PARES.find((p) => p.alvo === rel);
+    const linhas = readFileSync(join(ROOT, rel), "utf8").split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l));
+    const sitios = par ? linhas.filter((l) => par.sinal.test(l)).length : -1;
+    const entradas = CONTAGENS.length + MARCAS.length;
+    registarResultado("cobertura: a varredura ve TODAS as entradas das tabelas (forma `{ re: ... }`)",
+      sitios === entradas ? [] : [par ? `${sitios} sitio(s) para ${entradas} entrada(s) — ha uma entrada noutra forma` : `sem par para ${rel} em PARES`]);
+  }
+
   // --- Contagens que so uma entrada mede -----------------------------------------
   test("cobertura: apagar um `def test_` (python) baixa a contagem", (dir) =>
     muda(dir, "tests/test_a.py", "def test_um():\n    pass\n\ndef test_dois():\n    pass\n", "def test_um():\n    pass\n"),
