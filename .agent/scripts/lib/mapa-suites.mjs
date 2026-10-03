@@ -14,19 +14,8 @@
  * mostra sai daqui montada. Guardar as duas coisas lado a lado era a mesma duplicacao a entrar
  * outra vez, um nivel abaixo.
  *
- * OS MODULOS `tests-*.mjs` NAO CASAM REGRA, e e deliberado. Reportado duas rondas seguidas
- * (T-J, observacao secundaria): mexer num deles nao gera obrigacao de verificar nada. Fica
- * assim, e a razao e que as tres saidas sao piores do que a lacuna:
- *   - uma regra unica para o `test-guards.mjs` manda **3 dos 14** para uma suite que nao os
- *     mede (o `tests-upgrade-motor` e os dois `tests-surface-*` pertencem a outras) — que e
- *     exactamente o defeito que a regra do `pares.mjs` aqui em cima existe para evitar;
- *   - a lista a mao e uma segunda copia do `export const entryPoint` que cada modulo ja
- *     declara (`TP8`), e envelhece: cresceu de 9 para 12 entre a ronda 4 e hoje;
- *   - deriva-la obrigava este mapa a LER ficheiros. Ele e puro de proposito — `comandoDe()`
- *     recebe o caminho e nao o conteudo — e e importado por um hook que tem de ser barato.
- * O que se perde e so o aviso LOCAL: a rede mecanica ja existe, porque o `lib/registo.mjs`
- * falha fechado num modulo sem `registar()` e o CI corre os entry points que os descobrem
- * todos. Custo `M` para um lembrete — nao se paga. Escrito para nao voltar a ser levantado.
+ * Os modulos `tests-*.mjs` casam regra (mais abaixo), espelhando o `entryPoint` que cada um
+ * declara. Um teste do mapa compara as duas coisas, e outro exige regra para todo o ficheiro.
  *
  * CONFIGURAR AO PROJETO: e esta a tabela que um projeto derivado adapta. A **ordem importa** —
  * a primeira regra que casa e a que vale.
@@ -66,7 +55,8 @@ export const SUITES = [
   //
   // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
-  { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  // A `config/superficie-de-teste.mjs` decide que globs contam como teste: muda o que ele mede (#188).
+  { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness|config\/superficie-de-teste)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A baseline saiu do verificador quando ele chegou a 499 linhas, e traz a sua suite. Leva
   // TAMBEM a do ficheiro de origem: mexer aqui muda o que ele mede, e essa e a afirmacao
   // que so a suite dele faz.

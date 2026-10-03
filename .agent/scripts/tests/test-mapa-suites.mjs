@@ -197,10 +197,12 @@ test("todo o harness casa uma regra no mapa", () => {
 // A rede que apanha a proxima migracao: TODO o ficheiro de `tests/` casa regra. Os dois testes
 // acima olham para familias (`tests-*`, harnesses); este nao deixa nada de fora, e teria
 // apanhado o buraco de 28 em 32 no dia em que ele nasceu.
-test("todo o ficheiro de tests/ casa uma regra no mapa", () => {
+test("todo o ficheiro de tests/ e config/ casa uma regra no mapa", () => {
   const problemas = [];
   let total = 0;
-  for (const dir of [".agent/scripts/tests", ".agent/scripts/tests/harness"]) {
+  // E a `config/`: uma config sem regra muda o que um verificador mede sem obrigar a correr a
+  // suite dele — foi o caso da `superficie-de-teste.mjs` (#188).
+  for (const dir of [".agent/scripts/tests", ".agent/scripts/tests/harness", ".agent/scripts/config"]) {
     for (const f of readdirSync(dir).filter((n) => n.endsWith(".mjs"))) {
       total++;
       if (regraDe(`${dir}/${f}`) === null) problemas.push(`${dir}/${f}`);
