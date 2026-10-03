@@ -31,7 +31,22 @@ na copia.
 Um SKIP nao e um achado, e exigir um teste por cada um seria estreito de mais para o valor.
 Mas a regra que este repo repete em dezenas de comentarios e **"todo o skip e visivel"**: um
 guard que deixa de ANUNCIAR que nao correu e o `TP2` em forma pura, e nada media se isso era
-possivel. O modo `--skips` mede — fora do CI, corrido a mao ao mexer nos guards.
+possivel. O modo `--skips` mede.
+
+**No CI desde o #192, completo.** Medido a 2026-10-03: 17 de 56 sitios a descoberto, e tres
+deles tinham nascido nos PRs imediatamente anteriores — fora do CI, o numero so subia. Cinco dos
+17 tinham teste, mas fraco: a frase exigida tambem saia noutra linha que o repo imprime sempre.
+
+Depois de os cobrir (55/55), o `--skips` completo levou **181 s** localmente. A primeira versao
+corria so `--diff --skips`, a pensar que o completo custava 10 minutos (custava, com os 17 a
+reprovar). O leitor independente apontou o que isso partia: o portao passava a depender do
+`lib/mapa-suites.mjs` — um caminho que o mapa nao conhece ficava verde —, e a base do diff nao
+resolvia num derivado cujo principal nao se chame `main`. E e o mesmo principio da secao abaixo:
+no CI o unico custo e tempo de maquina.
+
+**O que o `/upgrade` nao traz sozinho.** A §2b compara os comandos do CI pelo **script**, sem os
+argumentos: um derivado que ja tenha o passo da varredura nao ve que o template acrescentou
+`--skips`. A tabela do `upgrade.md` (linha do `.github/workflows/*`) manda traze-lo a mao.
 
 
 ## Guard 16 (MCP): porque verifica a configuracao e nao o comportamento
