@@ -67,11 +67,13 @@ const CONFIG_CONTAVEIS = [
   /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i,
   /(^|\/)mutation-sweep\.mjs$/,
   // Os instrumentos de medida tambem: o glob de prefixo exige `test`/`tests` no INICIO do
-  // nome, logo os `check-*.mjs`, os `guards/*.mjs` e o harness ficavam fora da superficie
+  // nome, logo os `check-*.mjs` e os `guards/*.mjs` ficavam fora da superficie
   // congelada — e desligar um aviso deles enfraquece a verificacao sem tocar num teste.
   /(^|\/)check-[^/]+\.mjs$/,
   /(^|\/)guards\/[^/]+\.mjs$/,
-  /(^|\/)test-harness\.mjs$/,
+  // O harness nao tem linha propria: `test-harness.mjs` ja casa o glob de prefixo
+  // (`tests?[-_]`), e a superficie e a UNIAO das listas. Uma entrada que outra cobre nao se
+  // pode testar — desliga-la nunca muda nada (#183, medido).
   // Os HOOKS, pela mesmissima razao que os `check-*` e os `guards/*` acima: sao codigo de
   // enforcement, e desligar uma decisao deles enfraquece a rede sem tocar num teste. Ficavam
   // de fora porque os globs de teste so apanham `.claude/hooks/tests/` (a pasta `tests/`) —
@@ -86,10 +88,9 @@ const CONFIG_CONTAVEIS = [
   // O `.githooks/` nao tem extensao (o git exige o nome exato do evento), logo nao ha sufixo
   // por onde o apanhar.
   /(^|\/)\.githooks\/[^/]+$/,
-  // As tabelas de padroes deste verificador. Sem esta linha, extrai-las para um ficheiro
-  // proprio tirava-as da superficie congelada, e apagar metade delas — que e desligar o
-  // detetor — nao mexia em nenhuma contagem vigiada.
-  /(^|\/)surface-patterns\.mjs$/,
+  // As tabelas de padroes deste verificador (`lib/surface-patterns.mjs`) ficam na superficie
+  // pelo glob de `lib/` abaixo. Tinham linha propria de antes de se mudarem para la — redundante
+  // desde entao, e por isso impossivel de testar (#183).
   // `lib/`: os modulos partilhados. A mesma lacuna, encontrada ao extrair a tabela `PARES`
   // para `lib/pares.mjs` — a extracao lia-se como perda de 19 pares porque o destino nao
   // estava na superficie. E ja valia antes disso para o `lib/registo.mjs`, que **e** o
@@ -122,8 +123,8 @@ const definePadroes = (f) => /(^|\/)surface-patterns\.mjs$/.test(f);
 
 // As tabelas de padroes — `CONTAGENS` (o que nao pode descer) e `MARCAS` (o que nao pode
 // aparecer) — vivem em `surface-patterns.mjs`: sao dados, nao decisoes, e eram metade deste
-// ficheiro, que passou o flag das 500 linhas. Esse ficheiro esta em `CONFIG_CONTAVEIS` abaixo,
-// logo continua na superficie congelada: apagar metade das tabelas e desligar o detetor.
+// ficheiro, que passou o flag das 500 linhas. O glob de `lib/` em `CONFIG_CONTAVEIS` (acima)
+// mantem-no na superficie congelada: apagar metade das tabelas e desligar o detetor.
 
 function git(args) {
   // `core.quotepath=false`: sem isto o git escapa caminhos nao-ASCII
