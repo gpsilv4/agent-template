@@ -387,7 +387,8 @@ senao ele mede zero e passa:
   falhas sem tocar num teste.
 - **`CONTAGENS`** — os nomes com que o projeto declara um teste e uma assercao. Se usas um
   harness proprio (`check(`, `assertThat(`), acrescenta-o: e o que impede esvaziar uma suite
-  sem deixar nenhuma marca de `skip` para tras.
+  sem deixar nenhuma marca de `skip` para tras. **Cada entrada acrescentada leva um teste** num
+  `tests-surface-*.mjs` teu: a varredura de mutacao desliga-a e reprova se nada o notar.
 
 > **Como confirmar que nao mede zero**: apaga uma suite (sem commitar) e corre
 > `node .agent/scripts/check-test-surface.mjs`. Tem de dizer **`APAGADO`** e sair `!= 0`.

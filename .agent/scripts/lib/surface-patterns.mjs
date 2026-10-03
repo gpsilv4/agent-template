@@ -16,6 +16,12 @@
  *
  * Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que os nomes contados sejam
  * os que o projeto **usa** para declarar um teste e uma assercao.
+ *
+ * **Cada entrada tem de ter um teste que a exija** (#183). Tem par em `PARES` — nao pelos avisos,
+ * que continua sem ter, mas pelas ENTRADAS: a varredura desliga cada uma e reprova se nenhum teste
+ * o notar. Uma entrada que o projeto acrescente leva o seu teste num `tests-surface-*.mjs` dele
+ * (o `/upgrade` nunca o apaga, e a descoberta encontra-o). Escrever cada entrada na forma
+ * `{ re: /.../, ... }`, com o `re` primeiro: e por ai que a varredura a encontra.
  */
 
 // O que **nao pode descer**: apagar assercoes ou casos de teste enfraquece a superficie sem
