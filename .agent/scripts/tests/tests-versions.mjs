@@ -64,6 +64,23 @@ export function registar() {
       'const CHECKS = [{ name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+)/g, files: [".agent/rules/core-rules.md"] },\n];'));
   }, { code: 0, includes: ["SKIP  Guards de versoes de dependencias — sem package.json"] });
 
+  // Os dois ramos DENTRO de uma `CHECKS` preenchida: dependencia ausente do `package.json`, e
+  // ficheiro citado que nao existe. Ninguem os exigia (#192, `--skips`).
+  const comCheck = (dir, files) => {
+    writeF(dir, GUARD_VERSOES, readF(dir, GUARD_VERSOES).replace(LISTA,
+      `const CHECKS = [{ name: "Next.js", pkg: "next", pattern: /Next\\.js\\s+(\\d+)/g, files: ${JSON.stringify(files)} },\n];`));
+  };
+  test("Guards de deps: dependencia fora do package.json da SKIP visivel", (dir) => {
+    comCheck(dir, [".agent/rules/core-rules.md"]);
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3", dependencies: {} }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# Changelog\n\n## [v1.2.3] - x\n");
+  }, { code: 0, synthetic: true, anyOut: ["SKIP  Next.js — nao esta no package.json"] });
+  test("Guards de deps: ficheiro citado ausente da SKIP visivel", (dir) => {
+    comCheck(dir, ["nao-existe-192.md"]);
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3", dependencies: { next: "15.0.0" } }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# Changelog\n\n## [v1.2.3] - x\n");
+  }, { code: 0, synthetic: true, anyOut: ["SKIP  nao-existe-192.md — nao encontrado"] });
+
   // --- Guard 3 (versao do package.json vs CHANGELOG) ------------------------------
   // Viviam INLINE no `test-guards.mjs`. A varredura poe o modulo dono do alvo a correr primeiro
   // (#156), e o dono do `guards/versions.mjs` e ESTE modulo pela convencao — mas so tinha os dois

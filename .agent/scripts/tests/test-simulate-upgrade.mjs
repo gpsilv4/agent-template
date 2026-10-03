@@ -141,6 +141,21 @@ test("tag cujo archive sai VAZIO, REPROVA", () => {
   }
 });
 
+// A varredura conta para a lista do CI mas NAO corre na simulacao (minutos; mede as suites). Tem
+// de o DIZER: em silencio, quem le a Fase 2 verde julga que ela tambem passou. O stub reprova,
+// e e isso que prova que nao correu (#192, `--skips`).
+test("a varredura do CI nao corre na simulacao, e a NOTE di-lo", () => {
+  const r = pontaAPonta({
+    ".github/workflows/ci.yml": "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n      - run: node .agent/scripts/mutation-sweep.mjs\n",
+    ".agent/scripts/mutation-sweep.mjs": 'console.log("  WARN  a varredura correu"); process.exit(1);\n',
+  });
+  try {
+    return exige(r, { codigo: 0, inclui: ["NOTE  .agent/scripts/mutation-sweep.mjs nao corre na simulacao"], exclui: ["a varredura correu"] });
+  } finally {
+    rmSync(r.dir, { recursive: true, force: true });
+  }
+});
+
 test("template sintetico completo: o simulador corre ate ao fim", () => {
   const r = pontaAPonta();
   try {

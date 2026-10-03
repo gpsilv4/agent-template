@@ -331,7 +331,9 @@ export function registar() {
           ".agent/scripts/mutation-sweep.mjs": imprime("  WARN  a varredura correu"),
         },
       }),
-      { codigo: 0, inclui: ["mutation-sweep.mjs", "COMENTADA", "nao corre"], exclui: ["a varredura correu"] }
+      // As DUAS NOTE: a do passo ausente ("COMENTADA") e a de que a varredura nao corre aqui. So
+      // `"nao corre"` casava a primeira, e apagar a segunda passava verde (#192, `--skips`).
+      { codigo: 0, inclui: ["mutation-sweep.mjs", "COMENTADA", "conta(m) na comparacao mas nao corre(m) aqui"], exclui: ["a varredura correu"] }
     ));
 
   // O job SEGUINTE nao e do `guard-tests`: o `split` levava todos os que vinham depois.

@@ -11,7 +11,8 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF, registarResultado } from "./harness/test-harness.mjs";
-import { TETOS } from "../guards/sizes.mjs";
+import { TETOS, guardFileSizes } from "../guards/sizes.mjs";
+import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -62,6 +63,14 @@ function prepara(dir, c) {
 }
 
 export function registar() {
+  // #192: o "nao ha nada" so se alcanca com o guard chamado diretamente — pelo verificador
+  // completo havia sempre `.mjs` em `.agent/scripts`, porque e la que ele vive.
+  const vazio = correDireto(guardFileSizes, { listTree: () => [] });
+  registarResultado("G17: sem nenhum .mjs da SKIP visivel", vazio.includes("SKIP  Guard 17 (tamanho de ficheiro)") ? [] : [`saiu: ${vazio}`]);
+  const semHooks = correDireto(guardFileSizes, { listTree: (p) => (p === ".claude/hooks" ? null : []) });
+  registarResultado("G17: uma pasta ausente da NOTE a dizer que ficou fora do alcance",
+    semHooks.includes("NOTE  Guard 17: .claude/hooks nao existe(m)") ? [] : [`saiu: ${semHooks}`]);
+
   // #186: com `TETOS = {}` (ou so com entradas que nao se podem truncar), a escolha cai na
   // sintetica em vez de rebentar ao carregar. E com uma entrada utilizavel, usa a real.
   registarResultado("G17: sem cobaia em TETOS, a suite usa uma sintetica e nao rebenta", [

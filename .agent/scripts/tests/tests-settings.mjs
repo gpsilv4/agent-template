@@ -218,6 +218,12 @@ for (const rule of [
   }, { code: 0 });
 }
 
+// O `code: 0` do ciclo de cima diz que nao reprova; nao diz que AVISA. A NOTE de um so token
+// desconhecido podia ser apagada com a suite verde (#192, `--skips`).
+test("G11: um so token desconhecido da NOTE a pedir que se fixe mais", (dir) => {
+  patchSettings(dir, (c) => c.permissions.allow.push("Bash(ls:*)"));
+}, { code: 0, includes: ["NOTE  .claude/settings.json: `Bash(ls:*)` pre-aprova quaisquer argumentos de `ls`"] });
+
 // Ramos acrescentados na ronda 5 — descobertos pela varredura de mutacao, que revelou
 // que eu os tinha escrito sem teste (o proprio TP1 a acontecer).
 test("G11: caminho fora do projeto e apanhado", (dir) => {
@@ -265,7 +271,9 @@ test("G11b: hook em disco que ninguem registou avisa", (dir) => {
 // A VALVULA, e o que a torna diferente de um interruptor: exige a razao escrita.
 test("G11b: hook com `@opt-in: <razao>` passa, e diz porque", (dir) => {
   writeF(dir, ".claude/hooks/manual.mjs", "// @opt-in: so corre em auditorias, liga-se a mao\n");
-}, { code: 0, includes: ["opt-in"], excludes: ["manual.mjs existe mas NAO esta"] });
+  // A NOTE inteira: `["opt-in"]` casava o SKIP da `CHECKS` ("... vazia (opt-in)"), que o repo
+  // imprime sempre — apagar a NOTE passava verde (#192, `--skips`).
+}, { code: 0, includes: ["NOTE  manual.mjs nao esta registado, e declara-se opt-in: so corre em auditorias"], excludes: ["manual.mjs existe mas NAO esta"] });
 
 // O CONTRA-CASO DA VALVULA: a marca PELADA nao chega. Sem isto, a valvula era um interruptor
 // de silencio — escreve-se `@opt-in` e o guard cala-se, que e o caminho facil que o `TETOS` do

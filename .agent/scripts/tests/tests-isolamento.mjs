@@ -14,7 +14,9 @@
  * Sem o segundo, um guard que avisasse sempre passava metade destes testes.
  */
 import { pathToFileURL } from "url";
-import { test, writeF } from "./harness/test-harness.mjs";
+import { test, writeF, registarResultado } from "./harness/test-harness.mjs";
+import { guardIsolamento } from "../guards/isolamento.mjs";
+import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -32,6 +34,11 @@ export const entryPoint = "test-guards.mjs";
 const suite = (dir, nome, corpo) => writeF(dir, `.agent/scripts/${nome}`, corpo);
 
 export function registar() {
+  // #192: sem suites o guard tem de DIZER que nao correu. Chamado diretamente: pelo verificador
+  // completo, tirar as suites todas levava o repo inteiro a reprovar por outras razoes.
+  const vazio = correDireto(guardIsolamento, { listTree: () => [] });
+  registarResultado("G19: sem suites da SKIP visivel", vazio.includes("SKIP  Guard 19 (isolamento das suites)") ? [] : [`saiu: ${vazio}`]);
+
   // --- O estado limpo do repo ------------------------------------------------
   test("G19: o repo como esta passa — as suites reais sao isoladas", null, {
     code: 0,
