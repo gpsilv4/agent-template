@@ -20,113 +20,8 @@
  *   node .agent/scripts/tests/test-backlog.mjs
  */
 
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync } from "fs";
-import { execFileSync } from "child_process";
-import { tmpdir } from "os";
-import { fileURLToPath } from "url";
-import { dirname, resolve, join } from "path";
-
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
-
-// --- A fixture valida -------------------------------------------------------
-// Contas que ela codifica (o checker tem de chegar exatamente a estas):
-//   Bugs     B1 Pendente + B2 A Fazer (ativo) + B3 Concluido (arquivo) -> 3,1,1,1,0
-//   UX       UX1 Pendente (ativo)                                      -> 1,1,0,0,0
-//   Tecnica  T1 Concluido (arquivo)                                    -> 1,0,0,1,0
-//   Features F1 Cancelado (arquivo)                                    -> 1,0,0,0,1
-//   Global   total 6 | pend 2 | afazer 1 | concl 2 | canc 1
-//   countable = 6 - 1 = 5;  2/5 = 40%;  round(2/5*20) = 8 blocos
-const BAR = "████████____________"; // 8 preenchidos, 12 vazios
-
-const ACTIVE_OK = `# Backlog
-
-## Progresso Geral
-
-\`${BAR}\` **40%** (2/5 concluidos)
-
-**Proximo:** B2
-
-## Resumo
-
-| Seccao | Total | Pendente | A Fazer | Concluido | Cancelado |
-|--------|-------|----------|---------|-----------|-----------|
-| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |
-| Melhorias UX | 1 | 1 | 0 | 0 | 0 |
-| Divida Tecnica | 1 | 0 | 0 | 1 | 0 |
-| Features Futuras | 1 | 0 | 0 | 0 | 1 |
-| **Total** | **6** | **2** | **1** | **2** | **1** |
-
-## 1. Bugs / Violacoes de Regras
-
-| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina afetada |
-|----|--------|---------|-------------|------------|---------|----------------|
-| B1 | Pendente | algo | a.ts | Media | S | X |
-| B2 | A Fazer | outra coisa | b.ts | Alta | M | Y |
-
-## 2. Melhorias UX
-
-| ID | Estado | Melhoria | Detalhe | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| UX1 | Pendente | melhorar algo | detalhe | S | Z |
-
-## 3. Divida Tecnica / Code Quality
-
-| ID | Estado | Issue | Detalhe | Esforco | Ficheiro(s) |
-|----|--------|-------|---------|---------|-------------|
-| | | | | | |
-
-## 4. Features Futuras
-
-| ID | Estado | Feature | Impacto | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| | | | | | |
-`;
-
-const ARCHIVE_OK = `# Backlog Archive
-
-## Historico (Fechados)
-
-| ID | Tipo | Descricao | Estado | Sprint | Versao | Data |
-|----|------|-----------|--------|--------|--------|------|
-| B3 | Bug | bug fechado | Concluido | S1 | v0.1.0 | 2026-01-01 |
-| T1 | Tecnica | divida paga | Concluido | S1 | v0.1.0 | 2026-01-01 |
-| F1 | Feature | feature abandonada | Cancelado | S1 | v0.1.0 | 2026-01-02 |
-
-## Sprints Fechados (Indice)
-
-| Sprint | Descricao | Versao |
-|--------|-----------|--------|
-| S1 | primeiro | v0.1.0 |
-`;
-
-function sandbox() {
-  const dir = mkdtempSync(join(tmpdir(), "backlog-test-"));
-  mkdirSync(join(dir, ".agent/context"), { recursive: true });
-  mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
-  // O checker ancora em <script>/../.. — copiado para ca, ROOT passa a ser o sandbox.
-  copyFileSync(CHECKER, join(dir, ".agent/scripts/check-backlog.mjs"));
-  writeFileSync(join(dir, ".agent/context/backlog.md"), ACTIVE_OK);
-  writeFileSync(join(dir, ".agent/context/backlog-archive.md"), ARCHIVE_OK);
-  return dir;
-}
-
-const f = (dir, p) => join(dir, p);
-const readF = (dir, p) => readFileSync(f(dir, p), "utf8");
-const writeF = (dir, p, c) => writeFileSync(f(dir, p), c);
-
-function run(dir, cwd) {
-  try {
-    const out = execFileSync("node", [f(dir, ".agent/scripts/check-backlog.mjs")], {
-      cwd: cwd ?? dir,
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-    return { code: 0, out };
-  } catch (err) {
-    return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
-  }
-}
+import { mkdirSync, rmSync } from "fs";
+import { ACTIVE_OK, ARCHIVE_OK, BAR, sandbox, f, readF, writeF, run } from "./harness/test-backlog-harness.mjs";
 
 let passed = 0;
 const failures = [];
@@ -171,6 +66,23 @@ function test(name, mutate, expect) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+
+/** Imprime o resumo e sai: 1 se algum teste falhou. */
+function resumo() {
+  console.log("");
+  console.log(`  ${passed} passaram, ${failures.length} falharam.`);
+  console.log("");
+  if (failures.length) {
+    for (const { name, out } of failures) {
+      console.log(`--- output de "${name}" ---`);
+      console.log(out);
+    }
+    console.log("  Ha testes do backlog checker a falhar.\n");
+    process.exit(1);
+  }
+  console.log("  Todos os testes do backlog checker passaram.\n");
+}
+
 
 console.log("\n=== Testes do Backlog Checker ===\n");
 
@@ -445,6 +357,31 @@ test("Estrutura: item numa tabela fora de qualquer seccao avisa", (dir) => {
     "\n## Notas soltas\n\n| ID | Estado | Nota |\n|----|--------|------|\n| B9 | Pendente | orfao |\n");
 }, { code: 1, includes: ['item "B9" esta numa tabela que nenhuma seccao reconhecida cobre'] });
 
+// --- O plano de sprints e o `Proximo:` apontam para items ABERTOS (#191) -------
+// Os dois davam OK: o ID do sprint vive na segunda coluna (depois de `Ordem`), e o `Proximo:`
+// nunca era lido. Ao fechar um item a linha sai do sprint e o `Proximo:` passa ao seguinte.
+const ATIVO = ".agent/context/backlog.md";
+test("Sprint: ID que nao existe em nenhuma tabela avisa", (dir) => {
+  writeF(dir, ATIVO, readF(dir, ATIVO).replace("| 2 | UX1 | melhorar algo | S | B2 |", "| 2 | ZZ99 | fantasma | S | B2 |"));
+}, { code: 1, includes: ['"Sprint 2 — o que esta aberto" lista "ZZ99", que nao existe'] });
+
+test("Sprint: item ja FECHADO que ficou no sprint avisa", (dir) => {
+  writeF(dir, ATIVO, readF(dir, ATIVO).replace("| 2 | UX1 | melhorar algo | S | B2 |", "| 2 | B3 | bug fechado | S | — |"));
+}, { code: 1, includes: ['lista "B3", que esta fechado'] });
+
+test("Proximo: ID que nao existe avisa", (dir) => {
+  writeF(dir, ATIVO, readF(dir, ATIVO).replace("**Proximo:** B2", "**Proximo:** QQ42"));
+}, { code: 1, includes: ['**Proximo:** aponta para "QQ42", que nao existe'] });
+
+// O CONTROLO do "so o primeiro": texto livre que cita outro ID depois do alvo nao e um alvo.
+test("Proximo: texto livre que cita outros IDs depois do alvo nao avisa", (dir) => {
+  writeF(dir, ATIVO, readF(dir, ATIVO).replace("**Proximo:** B2", "**Proximo:** o **B2** — depois do ZZ99 que caiu, subiu de S a M"));
+}, { code: 0, excludes: ["  WARN  "] });
+
+test("Seccoes: o cabecalho sem numero continua a ser encontrado (pelo nome)", (dir) => {
+  writeF(dir, ATIVO, readF(dir, ATIVO).replace("## 1. Bugs / Violacoes de Regras", "## Bugs / Violacoes de Regras"));
+}, { code: 0, excludes: ["  WARN  "] });
+
 // --- Template vazio: nao pode rebentar nem inventar avisos -------------------
 test("backlog vazio (estado do template) passa sem avisos", (dir) => {
   writeF(dir, ".agent/context/backlog.md",
@@ -456,21 +393,13 @@ test("backlog vazio (estado do template) passa sem avisos", (dir) => {
              // 6/2/1/2/1 com zero items estaria a afirmar um backlog inconsistente.
              .replace("| **Total** | **6** | **2** | **1** | **2** | **1** |",
                       "| **Total** | **0** | **0** | **0** | **0** | **0** |")
-             .replace(`\`${BAR}\` **40%** (2/5 concluidos)`, "`____________________` **0%** (0/0 concluidos)"));
+             .replace(`\`${BAR}\` **40%** (2/5 concluidos)`, "`____________________` **0%** (0/0 concluidos)")
+             // O `Proximo:` e o plano de sprints tambem esvaziam: apontar para `B2` sem B2 e o
+             // proprio defeito que o #191 passou a apanhar.
+             .replace("**Proximo:** B2", "**Proximo:** (nenhum item definido)")
+             .replace(/^\| \d \| (B2|UX1) \|.*$/gm, "| | | | | |"));
   writeF(dir, ".agent/context/backlog-archive.md",
     ARCHIVE_OK.replace(/^\| (B3|T1|F1) \|.*$/gm, "| | | | | | | |"));
 }, { code: 0, includes: ["Backlog vazio (template) — nada a validar"], excludes: ["  WARN  "] });
 
-// --- Resumo ------------------------------------------------------------------
-console.log("");
-console.log(`  ${passed} passaram, ${failures.length} falharam.`);
-console.log("");
-if (failures.length) {
-  for (const { name, out } of failures) {
-    console.log(`--- output de "${name}" ---`);
-    console.log(out);
-  }
-  console.log("  Ha testes do backlog checker a falhar.\n");
-  process.exit(1);
-}
-console.log("  Todos os testes do backlog checker passaram.\n");
+resumo();

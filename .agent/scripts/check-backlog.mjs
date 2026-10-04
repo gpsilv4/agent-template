@@ -155,10 +155,12 @@ if (archiveRaw === null) {
 // casar por nome em vez de por posicao. Ao renomear uma seccao num projeto derivado,
 // atualizar aqui e no `backlog.md` em simultaneo (o guard avisa se divergirem).
 const SECTIONS = [
-  { key: "Bugs", resumo: "Bugs / Violacoes de Regras", re: /^##\s*1\./, tipos: ["bug", "bugs"] },
-  { key: "UX", resumo: "Melhorias UX", re: /^##\s*2\./, tipos: ["ux"] },
-  { key: "Divida Tecnica", resumo: "Divida Tecnica", re: /^##\s*3\./, tipos: ["tecnica", "divida tecnica", "tech"] },
-  { key: "Features", resumo: "Features Futuras", re: /^##\s*4\./, tipos: ["feature", "features"] },
+  // Pelo NOME, a seguir a um numero opcional (#191): o numero do heading nao e da regra, e a
+  // `process-rules` manda actualizar pelo nome. Renumerar ou reordenar ja nao parte nada.
+  { key: "Bugs", resumo: "Bugs / Violacoes de Regras", re: /^##\s*(?:\d+\.\s*)?Bugs\b/i, tipos: ["bug", "bugs"] },
+  { key: "UX", resumo: "Melhorias UX", re: /^##\s*(?:\d+\.\s*)?Melhorias UX\b/i, tipos: ["ux"] },
+  { key: "Divida Tecnica", resumo: "Divida Tecnica", re: /^##\s*(?:\d+\.\s*)?Divida Tecnica\b/i, tipos: ["tecnica", "divida tecnica", "tech"] },
+  { key: "Features", resumo: "Features Futuras", re: /^##\s*(?:\d+\.\s*)?Features Futuras\b/i, tipos: ["feature", "features"] },
 ];
 
 const counts = {};
@@ -167,6 +169,7 @@ for (const { key } of SECTIONS) {
 }
 
 const allIds = new Map(); // id -> [origens]
+const abertos = new Set(); // ids Pendente/A Fazer nas tabelas por tipo
 const trackId = (id, origem) => {
   if (!id) return;
   if (!allIds.has(id)) allIds.set(id, []);
@@ -195,6 +198,7 @@ for (const { key, re } of SECTIONS) {
     const estado = norm(cells[1]);
     trackId(id, `${key} (ativo)`);
     if (OPEN_STATES.includes(estado)) {
+      abertos.add(id);
       counts[key][estado]++;
       counts[key].total++;
     } else if (CLOSED_STATES.includes(estado)) {
@@ -229,7 +233,7 @@ const contados = new Set(allIds.keys());
 for (const cells of tableRows(active)) {
   const id = idDe(cells[0]);
   if (ID_LIKE.test(id) && !contados.has(id)) {
-    warn(`${ACTIVE}: item "${id}" esta numa tabela que nenhuma seccao reconhecida cobre — verificar os cabecalhos \`## 1.\`..\`## 4.\``);
+    warn(`${ACTIVE}: item "${id}" esta numa tabela que nenhuma seccao reconhecida cobre — verificar os cabecalhos das quatro seccoes`);
   }
 }
 
@@ -255,6 +259,32 @@ for (const cells of tableRows(section(archive, /^##\s*Historico/i))) {
     warn(`Arquivo: item "${id}" tem Estado invalido ("${cells[3]}") — deve ser Concluido ou Cancelado`);
   }
 }
+
+// 2b) O plano de sprints e o `Proximo:` apontam para items ABERTOS (#191). Ao fechar um item a
+//     linha dele SAI do sprint, e o `Proximo:` passa ao seguinte (`backlog-method.md`) — logo um
+//     ID que la fique e um esquecimento, e um que nao existe e uma gralha. Os dois davam OK: o ID
+//     do sprint vive na SEGUNDA coluna (depois de `Ordem`), e a rede de "tabela que nenhuma
+//     seccao cobre" so le a primeira.
+const fechados = new Set([...allIds].filter(([, o]) => o.includes("arquivo")).map(([id]) => id));
+const porque = (id) =>
+  abertos.has(id) ? null : fechados.has(id) ? "esta fechado (vive no backlog-archive.md)" : "nao existe em nenhuma tabela por tipo";
+const linhasAtivo = active.split("\n");
+linhasAtivo.forEach((titulo, i) => {
+  if (!/^#{2,4}\s*Sprint\b/i.test(titulo)) return;
+  const fim = linhasAtivo.findIndex((l, j) => j > i && /^#{1,6}\s/.test(l));
+  const seccao = linhasAtivo.slice(i + 1, fim < 0 ? undefined : fim).join("\n");
+  const iId = (tableHeader(seccao) ?? []).indexOf("id");
+  if (iId < 0) return;
+  for (const cells of tableRows(seccao)) {
+    const id = idDe(cells[iId] ?? "");
+    const p = ID_LIKE.test(id) ? porque(id) : null;
+    if (p) warn(`${ACTIVE}: "${titulo.replace(/^#+\s*/, "")}" lista "${id}", que ${p}`);
+  }
+});
+// So o PRIMEIRO ID da linha: e para la que ela aponta, e o resto e texto livre que pode citar outros.
+const proximo = /^\*\*Pr[oó]ximo:\*\*(.*)$/im.exec(active)?.[1] ?? "";
+const alvo = proximo.split(/[^A-Za-z0-9]+/).find((w) => ID_LIKE.test(w));
+if (alvo && porque(alvo)) warn(`${ACTIVE}: **Proximo:** aponta para "${alvo}", que ${porque(alvo)}`);
 
 // 3) Duplicados de ID (um item vive num so sitio)
 for (const [id, origens] of allIds) {
