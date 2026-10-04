@@ -21,7 +21,10 @@ Follow the workflows in `.agent/workflows/`:
 | Large or ambiguous ticket | `/grill` -> `/plan` -> implement -> `/review` |
 | Bug fix | `/debug` -> implement -> `/review` |
 | Refactor | `/refactor` -> implement -> `/review` |
+| UI change | its type's flow, then `/design-review` after `/review` |
 | Full sprint | implement all -> `/review` -> `/deploy` |
+| Milestone (end of sprint, pre-release) | `/audit` -> backlog proposals, approved first |
+| Product strategy | `/market-scan` -> backlog proposals, approved first |
 
 ## Dependencies and the lockfile
 

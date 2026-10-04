@@ -159,7 +159,7 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 
 ```
 1. (todos os tickets do sprint feitos, cada um ate ao /review)
-2. relatorio de fecho de sprint (6 pontos — ver process-rules.md)
+2. relatorio de fecho de sprint (6 pontos — ver backlog-method.md, "Ao concluir um sprint")
 3. /deploy    -> checklist completo + gate de CI antes de mergear
 4. merge para main -> deploy de producao
 5. verificacao manual em prod + tag da versao
