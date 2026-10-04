@@ -139,15 +139,18 @@ const FECHADO_PELA_CABECA = [
  *   CONTORNO  — exige escrever alguma coisa de proposito para fugir a verificacao
  */
 const ABERTO = [
-  // --- Normalizacao de caminho: o caminho esta la, escrito de outra maneira ----
-  ["DESCUIDO", "`../` pelo meio", `cp /tmp/x .agent/scripts/../../.claude/hooks/y.mjs`],
-  ["DESCUIDO", "barra dupla", "cp /tmp/x .claude//hooks/y.mjs"],
-  ["DESCUIDO", "`/./` pelo meio", "cp /tmp/x .claude/./hooks/y.mjs"],
-  ["DESCUIDO", "caminho absoluto", "cp /tmp/x /Users/g/proj/.claude/hooks/y.mjs"],
-  ["DESCUIDO", "til", "cp /tmp/x ~/proj/.claude/hooks/y.mjs"],
-  // --- Directorio de trabalho: o segmento que escreve nao tem o caminho -------
-  ["DESCUIDO", "`cd` noutro segmento", "cd .claude/hooks && cp /tmp/x y.mjs"],
-  ["DESCUIDO", "`cd` em subshell", "(cd .claude/hooks && cp /tmp/x y.mjs)"],
+  // A normalizacao de caminho e o `cd` fecharam no #185: estao em `FECHADO_PELO_CAMINHO`. Ficam
+  // estas formas, medidas pelo leitor independente do #185:
+  ["DESCUIDO", "`cd` com o directorio entre aspas", `cd ".claude/hooks" && cp /tmp/x y.mjs`],
+  ["DESCUIDO", "nome nu sem ponto, com o directorio dentro da fronteira", "cd .githooks && git rm commit-msg"],
+  ["DESCUIDO", "`cd` por `$HOME`", "cd $HOME/proj/.claude/hooks && cp /tmp/x y.mjs"],
+  ["DESCUIDO", "glob com o directorio dentro da fronteira", "cd .claude/hooks && rm *"],
+  ["DESCUIDO", "`git clean` sem argumento, dentro da fronteira", "cd .claude/hooks && git clean -fdx"],
+  ["DESCUIDO", "`git stash -u` dentro da fronteira", "cd .claude/hooks && git stash -u"],
+  ["DESCUIDO", "a pasta-mae inteira", "rm -rf .claude"],
+  ["DESCUIDO", "chavetas", "rm -rf .claude/{hooks,settings.json}"],
+  ["DESCUIDO", "`cd -` de volta a fronteira", "cd .claude/hooks; cd /tmp; cd -; cp /tmp/x y.mjs"],
+  ["DESCUIDO", "nome nu num ciclo dentro da fronteira", "while read f; do cd .claude/hooks; rm -rf lib; done"],
   // --- Aridade do julgamento: so o PRIMEIRO segmento que toca e julgado -------
   ["DESCUIDO", "prefixar com uma leitura desarma o verbo", `cat .claude/settings.json && cp /tmp/x ${H}`],
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
@@ -170,7 +173,6 @@ const ABERTO = [
 const FALSO_POSITIVO = [
   ["`for` a encabecar", `for f in ${F}; do cat $f; done`],
   ["atribuicao de ambiente", `FOO=1 node ${S}`],
-  ["`cd` para uma subpasta da fronteira", `cd .claude/hooks/tests && node test-hooks.mjs`],
 ];
 
 /**
@@ -181,10 +183,12 @@ const FALSO_POSITIVO = [
  * coisa nenhuma, e uma regressao que reponha a negacao passa com a suite verde (`TP4`). Aqui a
  * assercao inverte-se: exige-se que PASSEM.
  *
- * Os que FICARAM em `FALSO_POSITIVO` — `for`, `cd` e a atribuicao — nao e por esquecimento:
- * cada um e uma classe propria, com o contra-exemplo medido que o tira deste ambito.
+ * Os que FICARAM em `FALSO_POSITIVO` — `for` e a atribuicao — nao e por esquecimento: cada um e
+ * uma classe propria, com o contra-exemplo medido que o tira deste ambito. O do `cd` saiu no #185:
+ * o `cd` deixou de contar como segmento que toca, e o que corre depois e julgado no sitio certo.
  */
 const CORRIGIDO = [
+  ["`cd` para uma subpasta da fronteira", `cd .claude/hooks/tests && node test-hooks.mjs`],
   ["`if` a encabecar o segmento", `if grep -q FRONTEIRA ${F}; then echo ok; fi`],
   ["`time`", `time node ${S}`],
   ["`timeout`", `timeout 60 node ${S}`],
@@ -192,7 +196,82 @@ const CORRIGIDO = [
   ["`command`", `command cat ${F}`],
 ];
 
+/**
+ * FECHADOS pelo #185: o caminho estava la, escrito de outra maneira, ou o segmento que escreve
+ * corria noutro directorio. Nasceram em `ABERTO`. O contexto e FIXO — a raiz, o `cwd` e a home
+ * do hook real vem do `contextoFronteira()`, e aqui nao dependem da maquina (`TP3`).
+ */
+const CTX = { raiz: "/Users/g/proj", cwd: "/Users/g/proj", prefixo: "", home: "/Users/g" };
+const CP = "verbo-nao-e-leitura:cp";
+const FECHADO_PELO_CAMINHO = [
+  ["`../` pelo meio", "cp /tmp/x .agent/scripts/../../.claude/hooks/y.mjs", CTX, CP],
+  ["barra dupla", "cp /tmp/x .claude//hooks/y.mjs", CTX, CP],
+  ["`/./` pelo meio", "cp /tmp/x .claude/./hooks/y.mjs", CTX, CP],
+  ["caminho absoluto", "cp /tmp/x /Users/g/proj/.claude/hooks/y.mjs", CTX, CP],
+  ["til", "cp /tmp/x ~/proj/.claude/hooks/y.mjs", CTX, CP],
+  ["`$PWD`", "cp /tmp/x $PWD/.claude/hooks/y.mjs", CTX, CP],
+  ["`cd` noutro segmento", "cd .claude/hooks && cp /tmp/x y.mjs", CTX, CP],
+  ["`cd` em subshell", "(cd .claude/hooks && cp /tmp/x y.mjs)", CTX, CP],
+  ["`cwd` numa subpasta, `../` para a fronteira", "cp /tmp/x ../.claude/hooks/y.mjs", { ...CTX, cwd: "/Users/g/proj/.agent", prefixo: ".agent" }, CP],
+  // Do leitor independente do #185 — o mais grave ja passava ANTES: a pasta sem a barra final.
+  ["apagar a pasta inteira", "rm -rf .claude/hooks", {}, "verbo-nao-e-leitura:rm"],
+  ["apagar o `.githooks`", "rm -rf .githooks", {}, "verbo-nao-e-leitura:rm"],
+  ["mover a pasta", "mv .claude/hooks /tmp/h", {}, "verbo-nao-e-leitura:mv"],
+  // O texto CITADO nao passa pela normalizacao: aqui so o regex com a pasta sem barra o apanha.
+  ["apagar a pasta, citado e executado", `eval "rm -rf .claude/hooks"`, {}, "citado-mas-executado"],
+  ["`cd` e apagar o `.`", "cd .claude/hooks && rm -rf .", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` e `find . -delete`", "cd .claude/hooks && find . -delete", CTX, "find-que-escreve"],
+  ["`cd` acima e `git rm` da pasta", "cd .claude && git rm -r hooks", CTX, "git-que-escreve"],
+  ["`cd` e `git rm` de um ficheiro", "cd .claude/hooks && git rm x.mjs", CTX, "git-que-escreve"],
+  ["`cd` e `git checkout -- .`", "cd .claude/hooks && git checkout main -- .", CTX, "git-que-escreve"],
+  ["`cwd` dentro da fronteira e `git rm`", "git rm x.mjs", { ...CTX, cwd: "/Users/g/proj/.claude/hooks", prefixo: ".claude/hooks" }, "git-que-escreve"],
+  ["o `cwd` por symlink da raiz", "cp /tmp/x .claude//hooks/y.mjs", { raiz: "/private/tmp/p", cwd: "/tmp/p", prefixo: "", home: "/Users/g" }, CP],
+  ["`$(...)` dentro da subshell nao a fecha", "(cd .claude/hooks && echo $(date) && cp /tmp/x y.mjs)", CTX, CP],
+  ["uma subshell com redireccao fecha", "cd .claude/hooks && (cd /tmp && ls) >/dev/null && cp /tmp/x y.mjs", CTX, CP],
+  // O `cd` atras de uma cabeca ou de `then`/`do` segue-se pelo verbo REAL (o `resto()`).
+  ["`cd` dentro de um `if`", "if cd .claude/hooks; then cp /tmp/x y.mjs; fi", CTX, CP],
+  ["`builtin cd`", "builtin cd .claude/hooks && cp /tmp/x y.mjs", CTX, CP],
+  ["`cd` depois de `then`", "if true; then cd .claude/hooks; cp /tmp/x y.mjs; fi", CTX, CP],
+  ["`$(a; b)` dentro da subshell nao a fecha", "(cd .claude/hooks && echo $(date; true) && cp /tmp/x y.mjs)", CTX, CP],
+  ["redireccao sem espaco", "echo x >.claude/settings.json", {}, "redireciona"],
+];
+
+/** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
+ *  foram negados pela primeira versao — o directorio dentro da fronteira fazia de qualquer palavra
+ *  nua um caminho. */
+const DENTRO = { ...CTX, cwd: "/Users/g/proj/.claude/hooks", prefixo: ".claude/hooks" };
+const CONTROLO_CAMINHO = [
+  ["`../` para fora do repo", "cp /tmp/x ../.claude/hooks/y.mjs", CTX],
+  ["absoluto noutro repo", "cp /tmp/x /Users/g/outro/.claude/hooks/y.mjs", CTX],
+  ["`cd` para fora da fronteira, e depois escrever", "cd /tmp && cp a b", CTX],
+  ["a subshell repoe o directorio", "(cd .claude/hooks && ls) && cp /tmp/a b", CTX],
+  ["`cd` para a fronteira, e depois LER", "cd .claude/hooks && cat y.mjs", CTX],
+  ["ler pelo caminho absoluto", "cat /Users/g/proj/.claude/settings.json", CTX],
+  ["`timeout 60` a correr a suite", "cd .claude/hooks && timeout 60 node tests/test-hooks.mjs", CTX],
+  ["`sleep 1` e ler", "cd .claude/hooks && sleep 1 && cat x", CTX],
+  ["atribuicao e ler", "cd .claude/hooks && X=y cat a", CTX],
+  ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
+  ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
+  ["`cwd` dentro: `npm`", "npm run lint", DENTRO],
+  ["pasta com outro nome que comeca igual", "rm -rf .claude/hooks-old", {}],
+  // A primeira versao refeita negava estas leituras pelo `cd` atras de uma cabeca.
+  ["`if cd` e LER", "if cd .claude/hooks; then cat y; fi", CTX],
+  ["`builtin cd` e LER", "builtin cd .claude/hooks && cat y", CTX],
+  ["`command cd` e LER", "command cd .claude/hooks && cat y", CTX],
+  ["`time cd` e LER", "time cd .claude/hooks && cat y", CTX],
+];
+
 export function registar({ test, eq }) {
+  for (const [nome, comando, ctx, rotulo] of FECHADO_PELO_CAMINHO) {
+    test(`inventario/caminho: ${nome}`, () => {
+      eq(porqueAltera(comando, ctx), rotulo, `"${comando}" tinha de ser negado por ${rotulo} (#185)`);
+    });
+  }
+  for (const [nome, comando, ctx] of CONTROLO_CAMINHO) {
+    test(`inventario/caminho (controlo): ${nome}`, () => {
+      eq(porqueAltera(comando, ctx), null, `"${comando}" nao toca a fronteira e foi negado (#185)`);
+    });
+  }
   for (const [nome, comando, rotulo] of FECHADO) {
     test(`inventario/fechado: ${nome}`, () => {
       eq(porqueAltera(comando), rotulo, `"${comando}" tinha de ser negado por ${rotulo}`);
