@@ -101,17 +101,25 @@ export function pedacosDe(visivel) {
 
 /** Os interiores das substituicoes `$(...)`, `<(...)` e `>(...)`, as aninhadas incluidas. O que la
  *  esta CORRE, e o verbo de fora (`echo`, `cat`) nao diz nada sobre ele: `cd <fronteira> && echo
- *  $(rm -rf *)` passava. A aritmetica `$((...))` nao e comando e fica de fora. */
+ *  $(rm -rf *)` passava. A aritmetica `$((...))` nao e comando e fica de fora — so quando fecha em
+ *  `))` colados, como no bash: `$((rm x) )` e uma substituicao, e corre.
+ *
+ *  UMA passagem, com uma pilha, e sem recursao: a primeira versao era recursiva, e 8000 `$(`
+ *  aninhados rebentavam a pilha — a excepcao caia no `catch` do hook, que sai com 0 (permite).
+ *  Medido pela leitura do c004591. Parenteses por fechar vao ate ao fim do texto. */
 export function substituicoes(t) {
-  const fora = [];
+  const fecho = new Map();
+  const pilha = [];
   for (let k = 0; k < t.length; k++) {
-    if (!"$<>".includes(t[k]) || t[k + 1] !== "(" || (t[k] === "$" && t[k + 2] === "(")) continue;
-    let fundo = 1;
-    let j = k + 2;
-    for (; j < t.length && fundo; j++) fundo += t[j] === "(" ? 1 : t[j] === ")" ? -1 : 0;
-    const dentro = t.slice(k + 2, fundo ? j : j - 1);
-    fora.push(dentro, ...substituicoes(dentro));
-    k = j - 1;
+    if (t[k] === "(") pilha.push(k);
+    else if (t[k] === ")" && pilha.length) fecho.set(pilha.pop(), k);
+  }
+  const fim = (k) => fecho.get(k) ?? t.length;
+  const fora = [];
+  for (let k = 1; k < t.length; k++) {
+    if (t[k] !== "(" || !"$<>".includes(t[k - 1])) continue;
+    if (t[k - 1] === "$" && t[k + 1] === "(" && fim(k + 1) === fim(k) - 1) continue; // aritmetica
+    fora.push(t.slice(k + 1, fim(k)));
   }
   return fora;
 }
@@ -121,22 +129,41 @@ const FECHOS = new Set(["fi", "done", "esac", "}"]);
 
 /** Verbos que NAO escrevem ficheiros, sem o marcador: com ele, a leitura de todos os dias depois
  *  de um `cd` para a fronteira era negada (`| sort | uniq -c`, `|| true`, `|| exit 1`). Medido pela
- *  leitura do commit. `sort` e `uniq` escrevem com `-o` e com um segundo operando — ai levam-no. */
+ *  leitura do commit. `sort` e `uniq` escrevem — ver `FILTROS`. */
 const SEM_MARCADOR = new Set([
   ...FECHOS, "set", "export", "true", "false", ":", "exit", "return", "sleep", "wait", "break",
-  "continue", "shift", "read", "tr", "cut", "column", "sort", "uniq",
+  "continue", "shift", "read", "tr", "cut", "column", "date", "pwd",
 ]);
 
-/** O segmento leva o directorio? Pelo verbo depois das atribuicoes e de `while`/`until`/`{` — que
- *  abrem e nao sao o comando. Uma substituicao leva-o SEMPRE: o que corre la dentro e julgado. */
-function levaMarcador(seg, toks) {
+/** `sort` e `uniq` so dispensam o marcador com flags CONHECIDAS — uma allowlist, e nao "sem `-o`":
+ *  `--out=`, `--o` (o getopt aceita abreviaturas), `"-o"` e `uniq - <saida>` escreviam e passavam
+ *  (leitura do c004591). `valor`: a flag que leva o token seguinte. `uniq` escreve no 2.o operando. */
+const FILTROS = {
+  sort: { flag: /^-[bdfghiMnRrsuVz]*(?:[kt][\w.,:]*)?$/, valor: /^-[a-zA-Z]*[kt]$/, operandos: Infinity },
+  uniq: { flag: /^-[cdDiu]*(?:[fs]\d*)?$/, valor: /^-[a-zA-Z]*[fs]$/, operandos: 1 },
+};
+function filtroSeguro({ flag, valor, operandos }, args) {
+  let n = 0;
+  for (let j = 0; j < args.length; j++) {
+    const t = args[j];
+    if (/["'\\]/.test(t)) return false;
+    if (t === "-" || !t.startsWith("-")) n++;
+    else if (!flag.test(t)) return false;
+    else if (valor.test(t)) j++;
+  }
+  return n <= operandos;
+}
+
+/** O segmento leva o directorio — PODE escrever? Pelo verbo depois das atribuicoes e de `while`/
+ *  `until`/`{`, que abrem e nao sao o comando. Uma substituicao leva-o SEMPRE: o que corre la
+ *  dentro e julgado. Exportado: o `porqueAltera` usa o mesmo criterio nos interiores. */
+export function levaMarcador(seg, toks) {
   if (/[$<>]\(/.test(seg)) return true;
   let i = 0;
   while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || /^\w+=/.test(toks[i]))) i++;
   const v = toks[i];
   if (v === undefined || v.startsWith("#")) return false;
-  if (v === "sort") return toks.slice(i + 1).some((t) => /^-[^-]*o|^--output/.test(t));
-  if (v === "uniq") return toks.slice(i + 1).filter((t) => !t.startsWith("-")).length > 1;
+  if (FILTROS[v]) return !filtroSeguro(FILTROS[v], toks.slice(i + 1));
   return !SEM_MARCADOR.has(v);
 }
 

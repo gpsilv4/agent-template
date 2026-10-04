@@ -150,6 +150,9 @@ const ABERTO = [
   // `semCitacoes` apaga-o como se fosse texto; e um relativo dentro da crase nao segue o `cd`.
   ["DESCUIDO", "`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
   ["DESCUIDO", "relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
+  // A mesma classe com um verbo que dispensa o marcador (leitura do c004591): o `semCitacoes` apaga
+  // a crase antes de o `levaMarcador` a ver. Fecha com a classe, nao a parte.
+  ["DESCUIDO", "crase num verbo sem marcador, depois de um `cd`", "cd .githooks && true `cp /tmp/evil pre-commit`"],
   // Da leitura do a8cfbd4: o `$(...)` ENTRE ASPAS DUPLAS corre, e o `semCitacoes` apaga-o como
   // texto. O que esta fora de aspas ja e julgado (`substituicoes`); este ja passava no `main`.
   ["DESCUIDO", "`$(...)` entre aspas duplas", "cd .claude/hooks && echo \"$(rm -rf *)\""],
@@ -296,6 +299,22 @@ const FECHADO_PELO_CAMINHO = [
   ["`export` com `$(...)` que apaga", "cd .claude/hooks && export X=$(rm -rf *)", CTX, "verbo-nao-e-leitura:export"],
   ["`sleep` com `$(...)` que apaga", "cd .claude/hooks && sleep $(rm -rf *)", CTX, "verbo-nao-e-leitura:sleep"],
   ["`tee` a jusante", "cd .claude/hooks && cat x | tee y", CTX, "verbo-nao-e-leitura:tee"],
+  // Da leitura do c004591. O `sort`/`uniq` so dispensam o marcador com flags CONHECIDAS: estas
+  // formas escreviam (medido no `sort` do macOS) e passavam com o "sem `-o`".
+  ["`sort --out=`", "cd .githooks && sort --out=pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
+  ["`sort --o` abreviado", "cd .githooks && echo hi | sort --o pre-commit", CTX, "verbo-nao-e-leitura:sort"],
+  ["`sort \"-o\"` entre aspas", "cd .githooks && sort \"-o\" pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
+  ["`sort --compress-program`", "cd .githooks && sort -S1K --compress-program=sh /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
+  ["`uniq -` com saida", "cd .githooks && cat /tmp/evil | uniq - pre-commit", CTX, "verbo-nao-e-leitura:uniq"],
+  ["`uniq -- -` com saida", "cd .githooks && printf x | uniq -- - commit-msg", CTX, "verbo-nao-e-leitura:uniq"],
+  ["`sort -o` dentro de `$(...)`", "cd .claude/hooks && echo $(sort -o x y)", CTX, "verbo-nao-e-leitura:sort"],
+  // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
+  ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
+  ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
+  // Sem tecto, 8000 `$(` aninhados rebentavam a pilha, e o `catch` do hook permitia o comando
+  // INTEIRO — o `cp` para a fronteira, e um `git push --force`, que estivesse ao lado.
+  ["substituicoes aninhadas a mais", `false && cat .claude/hooks/x ${"$(".repeat(8000)}true${")".repeat(8000)}; cp /tmp/e .githooks/pre-commit`, CTX, "substituicoes-demais"],
+  ["uma excepcao a analisar nega", "cp /tmp/x .claude/hooks/y.mjs", { get prefixo() { throw new Error("contexto avariado"); } }, "erro-ao-analisar"],
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
@@ -324,6 +343,13 @@ const CONTROLO_CAMINHO = [
   ["`$((...))` nao e comando", "cd .claude/hooks && echo $((1+2))", CTX],
   ["`<(...)` que le", "diff <(git show main:.claude/hooks/x.mjs) .claude/hooks/x.mjs", CTX],
   ["`$(...)` que le", "wc -l $(git ls-files .claude/hooks)", CTX],
+  // Da leitura do c004591: o interior de uma substituicao julga-se pelo criterio do marcador.
+  ["`<(sort ...)`", "diff <(sort .claude/hooks/a.mjs) <(sort .claude/hooks/b.mjs)", CTX],
+  ["`$(ls | sort)`", "cd .claude/hooks && wc -l $(ls | sort)", CTX],
+  ["`$(... | tr ...)`", "cat .claude/hooks/x $(echo a | tr a b)", CTX],
+  ["`$(date)`", "cd .claude/hooks && echo $(date +%s) && ls", CTX],
+  ["`sort` com flags de valor", "cd .claude/hooks && ls | sort -t , -k 2 | sort -rn -k1", CTX],
+  ["`uniq -c` e `-f 1`", "cd .claude/hooks && ls | uniq -c | uniq -f 1", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],

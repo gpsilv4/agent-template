@@ -29,7 +29,7 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { normalizaCaminhos, pedacosDe, substituicoes } from "./caminhos.mjs";
+import { levaMarcador, normalizaCaminhos, pedacosDe, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
 export { contextoFronteira } from "./caminhos.mjs";
 
@@ -246,6 +246,21 @@ const nega = (rotulo) => rotulo;
  * @returns {string|null} o rotulo da condicao que nega, ou `null` se o comando passa
  */
 export function porqueAltera(texto, ctx = {}) {
+  // Uma excepcao a analisar NEGA. Sem isto caia no `catch` do hook, que sai com 0 — e permitia o
+  // comando inteiro, o `git push --force` incluido (8000 `$(` aninhados, leitura do c004591).
+  try {
+    return julga(texto, ctx);
+  } catch {
+    return nega("erro-ao-analisar");
+  }
+}
+
+/** Substituicoes a mais num comando que toca a fronteira: nega sem as abrir. Nenhum comando de
+ *  trabalho chega perto, e abrir cada uma custa o texto que a envolve — milhares aninhadas sao
+ *  segundos, e um hook lento e um hook que se desliga. */
+const MAX_SUBSTITUICOES = 64;
+
+function julga(texto, ctx) {
   const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
   const opaco = OPACO.test(texto);
   const inline = CODIGO_INLINE.test(texto);
@@ -284,14 +299,15 @@ export function porqueAltera(texto, ctx = {}) {
   // o produto das duas.
   // Os parenteses de uma subshell nao sao parte do verbo: `(cd X && ...)` dava o verbo `(cd`.
   // E o que corre DENTRO de cada `$(...)`/`<(...)` de um segmento que toca e julgado como um
-  // segmento seu: `cat <f> $(rm -rf <f>)` passava pelo `cat` (ja no `main`).
-  const interiores = tocam.flatMap(substituicoes).flatMap((i) =>
-    pedacosDe(i).pedacos.filter((p) => typeof p !== "string").map(([a, b]) => i.slice(a, b))
-  );
-  const semCabeca = [
-    ...tocam.map((s) => resto(s.replace(/[()]/g, " "))),
-    ...interiores.map((s) => resto(s.replace(/[()]/g, " "))).filter((t) => t.length),
-  ];
+  // segmento seu: `cat <f> $(rm -rf <f>)` passava pelo `cat` (ja no `main`). Pelo criterio do
+  // marcador: um interior que nao escreve (`$(ls | sort)`, `$(date)`) nao conta.
+  if ((alvo.match(/[$<>]\(/g) ?? []).length > MAX_SUBSTITUICOES) return nega("substituicoes-demais");
+  const interiores = tocam
+    .flatMap(substituicoes)
+    .flatMap((i) => pedacosDe(i).pedacos.filter((p) => typeof p !== "string").map(([a, b]) => i.slice(a, b)))
+    .map((s) => [s, resto(s.replace(/[()]/g, " "))])
+    .filter(([s, toks]) => toks.length && levaMarcador(s, toks));
+  const semCabeca = [...tocam.map((s) => resto(s.replace(/[()]/g, " "))), ...interiores.map(([, toks]) => toks)];
   const normaliza = (toks) =>
     toks.length === 0 ? "" : [toks[0].replace(/^.*\//, ""), ...toks.slice(1)].join(" ");
   const restoTexto = semCabeca.map(normaliza).join("\n");
