@@ -6,7 +6,7 @@ Checklist obrigatoria antes de fazer deploy do {{PROJECT_NAME}}.
 
 ```
 Desenvolvimento local (codigo local + {{BACKEND}} STAGING)
-  -> branch feature -> {{HOSTING}} Preview URL (automatico)
+  -> branch feature -> {{HOSTING}} Preview URL (se o hosting a gerar por branch)
   -> migracoes testadas em staging
         |
 Producao (main branch + {{BACKEND}} PROD)
@@ -15,6 +15,18 @@ Producao (main branch + {{BACKEND}} PROD)
 ```
 
 > **Regra:** Nunca aplicar migracoes diretamente em producao sem testar em staging primeiro.
+
+---
+
+## 0. O sprint esta completo?
+
+- [ ] **Todos os items do sprint fechados** — o `/deploy` corre por sprint, nao por ticket
+  (`process-rules.md`, "Fluxo de Trabalho por Tipo"). Um item fechado **sai** do `backlog.md`:
+  verificar que nenhum item do sprint ficou la aberto, que estao todos no Historico do
+  `backlog-archive.md` com `Sprint` = `S<n>`, e que o `check-backlog.mjs` sai 0. Se faltar algum,
+  **parar aqui** e dize-lo.
+- [ ] **Relatorio de fecho do sprint apresentado** (os 6 pontos de `.agent/rules/backlog-method.md`,
+  "Ao concluir um sprint") e aprovado, antes de seguir.
 
 ---
 
@@ -106,15 +118,16 @@ npm run test:security
 # Auditoria de dependencias
 npm run test:audit
 
-# Ou tudo junto
+# Ou tudo junto (unit + E2E + security + audit)
 npm run test:all
 ```
 
-### Fase 2 — Preview (antes do merge para main)
+### Fase 2 — Preview (antes do merge para main; so se o hosting gerar uma)
 
 ```bash
-# `PLAYWRIGHT_BASE_URL` assume Playwright. Noutro runner (Cypress: `CYPRESS_baseUrl`,
-# WebdriverIO, Vitest browser), trocar pela variavel equivalente.
+# `PLAYWRIGHT_BASE_URL` assume Playwright, e SO muda o alvo se o `playwright.config` a ler em
+# `use.baseURL` — sem isso corre contra outro alvo e sai verde. Confirmar antes de confiar.
+# Noutro runner (Cypress: `CYPRESS_baseUrl`, WebdriverIO, Vitest browser), a variavel equivalente.
 PLAYWRIGHT_BASE_URL=<preview-url> npm run test:e2e
 PLAYWRIGHT_BASE_URL=<preview-url> npm run test:security
 npm run test:audit

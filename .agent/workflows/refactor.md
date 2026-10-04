@@ -15,7 +15,7 @@ Workflow para refactoring que garante seguranca e nao introduz regressoes no {{P
 
 - Consultar `.agent/context/backlog.md` seccao 3 (Divida Tecnica) — o refactor pode ja estar registado
 - Se existir: referenciar o ID e seguir dependencias do sprint
-- Se nao existir: apos refactor, propor registo do item no Historico (ja concluido) em `backlog-archive.md`
+- Se nao existir: apos refactor, propor registo do item ja concluido — o procedimento "item que nasce fechado" do `.agent/rules/backlog-method.md`
 
 ## 3. Identificar Alvos
 

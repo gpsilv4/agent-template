@@ -133,8 +133,8 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 1. /plan      -> definir o que fazer, criar branch, aguardar aprovacao
 2. (implementar codigo)
 3. /review    -> antes de fazer commit (build, logica, mobile, seguranca)
-4. commit + git push -> Preview URL automaticamente
-5. /e2e-tests -> correr testes E2E contra a Preview URL
+4. commit + git push -> Preview URL (se o hosting a gerar por branch)
+5. /e2e-tests -> correr testes E2E contra a Preview URL, ou localmente
 6. /security-tests -> correr testes de seguranca
 ```
 

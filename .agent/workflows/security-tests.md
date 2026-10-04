@@ -38,7 +38,7 @@ npm run test:security
 # Auditoria de dependencias
 npm run test:audit
 
-# Tudo junto (E2E + seguranca)
+# Tudo junto (unit + E2E + security + audit — a definicao do BOOTSTRAP.md)
 npm run test:all
 ```
 
@@ -56,7 +56,8 @@ npm run test:all
 - Headers presentes tambem em API routes
 
 ### 3.2 Cookie Security
-- Cookies de sessao devem ter `SameSite=Lax`
+- Cookies de sessao com `SameSite=Lax` **ou** `Strict` — o `Strict` e mais restrito, nao e um
+  erro a corrigir. Reprovar `SameSite=None` sem `Secure`
 - Verificar flags `HttpOnly` e `Secure` conforme o backend
 
 ### 3.3 XSS / Injection
@@ -76,7 +77,7 @@ npm run test:all
 
 ### 3.6 CSRF Prevention
 - APIs criticas rejeitam requests sem autenticacao
-- Cookies auth usam `SameSite=Lax`
+- Cookies auth usam `SameSite=Lax` ou `Strict` (ver 3.2)
 
 ### 3.7 Rate Limiting Resilience
 - Requests rapidos simultaneos nao causam crashes (status < 500)

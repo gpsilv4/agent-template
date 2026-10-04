@@ -37,12 +37,13 @@ risco.
 
 ## 3. Correr
 
-- `npm run test:e2e` — headless, arranca o servidor sozinho. **E este o comando cujo exit
-  code decide.**
+- `npm run test:e2e` — headless. Arranca o servidor sozinho **se** o `playwright.config` do
+  projeto tiver `webServer` (o template nao traz nenhum). **E este o comando cujo exit code decide.**
 - `npm run test:e2e:ui` — modo interativo, para investigar.
 - `npm run test:e2e:headed` — browser visivel.
-- Contra uma preview: `PLAYWRIGHT_BASE_URL=<url> npm run test:e2e` (timeouts maiores
-  automaticamente).
+- Contra uma preview: `PLAYWRIGHT_BASE_URL=<url> npm run test:e2e` — **so** muda o alvo se o
+  `playwright.config` ler a variavel em `use.baseURL` (e os timeouts, se os ligar a ela). Sem
+  isso corre contra outro alvo e sai verde: confirmar antes de confiar.
 
 > **Nunca filtrar o sumario** (`| tail`, `| grep`). A linha que interessa costuma ser a que se
 > corta, e um resumo filtrado ja escondeu falhas neste repo (ver `/review` §9).

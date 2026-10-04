@@ -10,7 +10,7 @@ Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinh
 
 - Consultar `.agent/context/backlog.md` — o bug pode ja estar registado (seccao 1: Bugs)
 - Se existir: referenciar o ID e seguir o sprint sugerido
-- Se nao existir: apos correcao, propor registo do item no Historico (ja concluido) em `backlog-archive.md`
+- Se nao existir: apos correcao, propor registo do item ja concluido — o procedimento "item que nasce fechado" do `.agent/rules/backlog-method.md`
 
 ## 1. Reproduzir
 
