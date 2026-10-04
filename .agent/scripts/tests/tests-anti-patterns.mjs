@@ -8,10 +8,11 @@
  * significado, e nada no ecra a denuncia. Aconteceu num projeto derivado, ao trazer os
  * scripts do template num upgrade.
  */
-import { readdirSync, rmSync } from "fs";
+import { readdirSync, rmSync, readFileSync } from "fs";
+import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, file, readF, writeF, registarResultado } from "./harness/test-harness.mjs";
-import { guardAntiPatternEvidence } from "../guards/anti-patterns.mjs";
+import { test, file, readF, writeF, registarResultado, ROOT } from "./harness/test-harness.mjs";
+import { guardAntiPatternEvidence, guardAntiPatternRefs } from "../guards/anti-patterns.mjs";
 import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -28,6 +29,27 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 export const entryPoint = "test-guards.mjs";
 
 export function registar() {
+  // #187: um prefixo no ficheiro do OUTRO, sem colisao, avisa. Com os ficheiros REAIS e uma linha a
+  // mais, chamados directamente — sem copia do repo.
+  const real = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return null; } };
+  const comLinha = (alvo, linha) => (rel) => (rel === alvo ? (real(rel) ?? "") + `\n${linha}\n` : real(rel));
+  const listDir = (d, ext) => { try { return readdirSync(join(ROOT, d)).filter((n) => n.endsWith(ext)).map((n) => n.slice(0, -ext.length)); } catch { return null; } };
+  const ap = "AP" + "9", tp = "TP" + "99";
+  for (const [nome, alvo, linha, id] of [
+    ["um AP no catalogo do template", ".agent/rules/anti-patterns-template.md", `## ${ap} — x`, ap],
+    ["um TP no ficheiro do projeto", ".agent/rules/anti-patterns.md", `### ${tp} — x`, tp],
+  ]) {
+    const out = correDireto(guardAntiPatternRefs, { read: comLinha(alvo, linha), listDir });
+    registarResultado(`G15: ${nome} avisa, mesmo sem colisao`,
+      out.includes(`WARN  ${alvo}: ${id} tem o prefixo do outro ficheiro`) ? [] : [`saiu: ${out.split("\n").filter((l) => l.startsWith("WARN")).join(" | ") || "nenhum WARN"}`]);
+  }
+  // O CONTROLO: os ficheiros reais, cada prefixo no seu, nao dao este aviso.
+  {
+    const out = correDireto(guardAntiPatternRefs, { read: real, listDir });
+    registarResultado("G15: os ficheiros reais nao tem prefixo no sitio errado",
+      out.includes("tem o prefixo do outro ficheiro") ? [out.split("\n").filter((l) => l.includes("prefixo do outro")).join(" | ")] : []);
+  }
+
   // #192: um catalogo sem nenhum `TPn` tem de o DIZER. Chamado diretamente: pelo verificador
   // completo, tirar todas as entradas deixava as citacoes `TPn` do repo inteiro a reprovar.
   const semEntradas = correDireto(guardAntiPatternEvidence, {
@@ -272,7 +294,8 @@ export function registar() {
     writeF(dir, DEF_PROJETO, [
       "# Anti-Padroes",
       "",
-      "## TP1 — entrada montada pela fixture",
+      // `AP` e nao `TP`: este e o ficheiro do PROJETO, e um `TP` aqui ja e um aviso proprio (#187).
+      `## ${"AP" + "1"} — entrada montada pela fixture`,
       "",
       "<!-- Exemplo por remover. A linha de fecho foi apagada a mao, logo daqui para baixo",
       "     esta tudo comentado — incluindo a citacao morta da linha seguinte.",
