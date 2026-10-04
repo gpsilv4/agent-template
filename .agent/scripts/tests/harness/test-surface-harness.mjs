@@ -18,6 +18,8 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
 // O modo fail-fast lido do MESMO sitio que o motor escreve (#157, `TP8`).
 import { FAIL_FAST } from "./relatorio.mjs";
+import { TEST_GLOBS_DO_PROJETO, CONFIG_GLOBS_DO_PROJETO } from "../../config/superficie-de-teste.mjs";
+import { ehDerivado } from "../../lib/derivado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
@@ -166,7 +168,24 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   process.exit(1);
 }
 
-export { test, sandbox, commit, corre, git, ROOT, CHECKER };
+/**
+ * Regista os testes de UM glob por omissao da `config/superficie-de-teste.mjs` — so se la estiver.
+ *
+ * A config e do PROJETO: cada derivado adapta-a, e o `/upgrade` nunca a substitui. Um teste fixo
+ * para um glob do template reprovava num derivado que o tivesse mudado (`TP3`). Por isso o glob
+ * chaveia-se pelo TEXTO: presente, correm os testes; ausente num DERIVADO, SKIP visivel (o teste
+ * passa a ser dele, e nada o verifica — a linha SKIP e o unico aviso); ausente no TEMPLATE, FAIL,
+ * porque um default em falta e defeito. A primeira versao saltava sempre, e desligar um glob (que
+ * lhe muda o texto) lia-se como "adaptado": 7 de 8 a descoberto, com a suite verde (#183).
+ */
+function seOGlobExistir(glob, nome, regista) {
+  if ([...TEST_GLOBS_DO_PROJETO, ...CONFIG_GLOBS_DO_PROJETO].map(String).includes(glob)) return regista();
+  const ler = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return null; } };
+  if (ehDerivado(ler)) console.log(`  SKIP  ${nome} — glob ${glob} adaptado pelo projeto: o teste e dele (tests-surface-*.mjs)`);
+  else registarResultado(nome, [`o glob por omissao ${glob} saiu da config do TEMPLATE — repor, ou mudar este teste com ele`]);
+}
+
+export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir };
 
 /** Imprime o resumo e sai. Ver a nota no cabecalho sobre porque vive aqui. */
 export function resumo() {
