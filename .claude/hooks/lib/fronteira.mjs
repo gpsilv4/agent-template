@@ -80,8 +80,7 @@ export function contextoFronteira(cwd = process.cwd()) {
   let raiz = cwd;
   let prefixo;
   try {
-    // `--show-prefix` da o `cwd` RELATIVO a raiz sem comparar strings: o `--show-toplevel` devolve
-    // o realpath (`/tmp/p` vira `/private/tmp/p`), e a comparacao textual desligava tudo (#185).
+    // `--show-prefix`: o `cwd` relativo a raiz sem comparar strings (o toplevel e o realpath).
     const [topo, pre] = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], {
       cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000,
     }).split("\n");
@@ -93,9 +92,8 @@ export function contextoFronteira(cwd = process.cwd()) {
   return { raiz, cwd, prefixo, home: homedir() };
 }
 
-/** Um caminho escrito, relativo a raiz do repo — ou `null` se cair FORA dele (ou for incerto).
- *  `~` e `$PWD` expandem-se; `..`, `//` e `/./` colapsam; um absoluto perde o prefixo da raiz (ou
- *  o do `cwd`, que pode ser um symlink da raiz). O `$PWD` e o directorio CORRENTE, depois dos `cd`. */
+/** Um caminho escrito, relativo a raiz — ou `null` se cair FORA (ou for incerto). `~` e `$PWD`
+ *  (o directorio corrente) expandem-se; `..`, `//`, `/./` colapsam; um absoluto perde a raiz. */
 function relativo(tok, dir, ctx) {
   let t = tok;
   if (ctx.home && (t === "~" || t.startsWith("~/"))) t = ctx.home + t.slice(1);
@@ -133,34 +131,28 @@ function mascaraSubstituicoes(t) {
   const c = t.split("");
   let fundo = 0;
   for (let k = 0; k < c.length; k++) {
-    if (c[k] === "$" && c[k + 1] === "(") {
-      fundo++;
-      c[k] = c[k + 1] = "_";
-      k++;
-    } else if (fundo) {
-      if (c[k] === "(") fundo++;
-      else if (c[k] === ")") fundo--;
-      c[k] = "_";
-    }
+    if (c[k] === "$" && c[k + 1] === "(") (fundo++, (c[k] = c[k + 1] = "_"), k++);
+    else if (fundo) (c[k] === "(" ? fundo++ : c[k] === ")" ? fundo-- : 0), (c[k] = "_");
   }
   return c.join("");
 }
 
-/** Este segmento so muda de directorio? Pelo verbo REAL, depois das cabecas — o texto cru nao via
- *  o `cd` de `if cd X`, `builtin cd X`, `command cd X` ou `time cd X`. */
+/** Este segmento so muda de directorio? Pelo verbo REAL, depois das cabecas (`if cd X`, `builtin
+ *  cd X`) — e SEM redireccao nem substituicao: `cd /tmp > <fronteira>` trunca o ficheiro, e o
+ *  `$(...)`/crase de `cd $(rm <fronteira>)` corre (a terceira leitura do #185 apanhou os dois). */
 const soMudaDeDirectorio = (s) =>
-  ["cd", "pushd", "popd"].includes((resto(mascaraSubstituicoes(s).replace(/[()]/g, " "))[0] ?? "").replace(/^.*\//, ""));
+  !/[<>`]|\$\(/.test(s) &&
+  ["cd", "pushd", "popd"].includes((resto(s.replace(/[()]/g, " "))[0] ?? "").replace(/^.*\//, ""));
 
-/** Reescreve, na forma canonica, os caminhos que DAO na fronteira (#185).
- *
- *  O `FRONTEIRA` olha para o texto, e so reconhecia os caminhos escritos de uma forma: relativos
- *  a raiz, com `./` opcional. `../`, `//`, `/./`, absoluto, `$PWD`, `~` e um `cd` noutro segmento
- *  passavam — o caminho estava la, escrito de outra maneira. Aqui resolve-se cada argumento contra
- *  o directorio em que o segmento corre (o `cwd`, mais os `cd` anteriores, com subshell a repor) e,
- *  **so se o resultado for fronteira**, escreve-se na forma que o resto do ficheiro ja reconhece.
- *  O primeiro token do segmento e as flags nunca se tocam; com o directorio dentro da fronteira,
- *  so os tokens com forma de caminho. Os segmentos de `for` ficam como estavam (classe propria).
- *  O que fica de fora esta no `ABERTO` do inventario. */
+/** Separadores de segmento. O `do`/`then` so quando e PALAVRA de shell: com `\b`, `x-do` e
+ *  `x.then` partiam o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`. */
+const SEPARADOR = /(?:&&|\|\||[;|\n])+|(?<![^\s;&|(])(?:do|then)(?![^\s;&|)])/g;
+
+/** Reescreve, na forma canonica, os caminhos que DAO na fronteira (#185): `../`, `//`, `/./`,
+ *  absoluto, `$PWD`, `~` e um `cd` noutro segmento passavam. Cada argumento resolve-se contra o
+ *  directorio do segmento (`cwd`, `cd`/`pushd`/`popd`, subshells) e so se reescreve se der na
+ *  fronteira. Nunca o verbo nem as flags; dentro da fronteira, so o que tem forma de caminho; os
+ *  `for` ficam como estavam. O que fica de fora esta no `ABERTO` do inventario. */
 function normalizaCaminhos(visivel, ctx = {}) {
   const subshell = [];
   const pushd = [];
@@ -170,7 +162,7 @@ function normalizaCaminhos(visivel, ctx = {}) {
   const masc = mascaraSubstituicoes(visivel);
   const pedacos = [];
   let ini = 0;
-  for (const m of masc.matchAll(/(?:&&|\|\||[;|\n])+|\bdo\b|\bthen\b/g)) {
+  for (const m of masc.matchAll(SEPARADOR)) {
     pedacos.push([ini, m.index], m[0]);
     ini = m.index + m[0].length;
   }
@@ -199,8 +191,9 @@ function normalizaCaminhos(visivel, ctx = {}) {
       } else if (toks[0] !== "for") {
         const dentro = formaCanonica(dir) !== null;
         let primeiro = true;
-        out = seg.replace(/(^|[\s=(>])([^\s=()<>|;&]+)/g, (m, pre, tok) => {
-          if (primeiro) {
+        out = seg.replace(/(^|[\s=(>])([^\s=()<>|;&]+)/g, (m, pre, tok, off) => {
+          // Um alvo de redireccao nunca e o verbo: `cd <fronteira> && > x.mjs` saltava o `x.mjs`.
+          if (primeiro && !/[<>]\s*$/.test(seg.slice(0, off + pre.length))) {
             primeiro = false;
             return m;
           }
@@ -388,12 +381,16 @@ export function porqueAltera(texto, ctx = {}) {
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
   if (!FRONTEIRA.test(visivel)) {
     if (!FRONTEIRA.test(texto)) return null;
-    return opaco || inline ? nega("citado-mas-executado") : null;
+    // A crase EXECUTA (fora de aspas simples e de heredoc), e o `semCitacoes` trata-a como aspas:
+    // `` cd `rm -rf <fronteira>` `` passava. E a mesma porta do `$(...)`, noutra sintaxe.
+    const crases = (texto.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " ")
+      .replace(/'(?:[^'\\]|\\.)*'/g, " ").match(/`[^`]*`/g) ?? []).some((c) => FRONTEIRA.test(` ${c.slice(1, -1)}`));
+    return opaco || inline || crases ? nega("citado-mas-executado") : null;
   }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
   // comando e o "verbo" do segmento seguinte e um pedaco do padrao de procura.
-  const segmentos = visivel.split(/(?:&&|\|\||[;|\n])+|\bdo\b|\bthen\b/);
+  const segmentos = visivel.split(SEPARADOR);
   // Um `cd`/`pushd`/`popd` so muda de directorio: o que corre DEPOIS ja e julgado com o directorio
   // novo (`normalizaCaminhos`, #185). Contado aqui, era o primeiro segmento a tocar e, como o verbo
   // so se julga no primeiro, `cd .claude/hooks && cp x y.mjs` passava pelo `cd`.

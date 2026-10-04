@@ -234,6 +234,16 @@ const FECHADO_PELO_CAMINHO = [
   ["`cd` depois de `then`", "if true; then cd .claude/hooks; cp /tmp/x y.mjs; fi", CTX, CP],
   ["`$(a; b)` dentro da subshell nao a fecha", "(cd .claude/hooks && echo $(date; true) && cp /tmp/x y.mjs)", CTX, CP],
   ["redireccao sem espaco", "echo x >.claude/settings.json", {}, "redireciona"],
+  // Da terceira leitura do #185. Os quatro primeiros eram REGRESSOES da versao refeita: o segmento
+  // do `cd` saia inteiro do `tocam` e levava a redireccao e o `$(...)` que estavam nele.
+  ["`cd` com redireccao para a fronteira", "cd /tmp > .claude/settings.json", CTX, "verbo-nao-e-leitura:cd"],
+  ["`cd` com redireccao sem espaco", "cd /tmp >.claude/settings.json", CTX, "verbo-nao-e-leitura:cd"],
+  ["`popd` com redireccao", "popd > .githooks/pre-commit", CTX, "verbo-nao-e-leitura:popd"],
+  ["`cd` com `$(...)` que escreve", "cd /tmp $(rm .claude/settings.json)", CTX, "verbo-nao-e-leitura:cd"],
+  ["`do` dentro de uma palavra nao separa", "rm -rf x-do cat .claude/hooks", CTX, "verbo-nao-e-leitura:rm"],
+  ["`then` dentro de uma palavra nao separa", "rm -rf x.then cat .claude/hooks", CTX, "verbo-nao-e-leitura:rm"],
+  ["redireccao nua depois de um `cd`", "cd .claude/hooks && > x.mjs", CTX, "verbo-nao-e-leitura:>"],
+  ["crase que executa", "cd `rm -rf .claude/hooks`", CTX, "citado-mas-executado"],
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
@@ -259,6 +269,11 @@ const CONTROLO_CAMINHO = [
   ["`builtin cd` e LER", "builtin cd .claude/hooks && cat y", CTX],
   ["`command cd` e LER", "command cd .claude/hooks && cat y", CTX],
   ["`time cd` e LER", "time cd .claude/hooks && cat y", CTX],
+  // A crase so EXECUTA fora de aspas simples e de heredoc; e um `do` num nome de ficheiro nao parte.
+  ["crase num heredoc citado", "cat <<'EOF'\n`rm .claude/hooks/x`\nEOF", CTX],
+  ["crase entre aspas simples", "echo 'a `rm .claude/hooks/x`'", CTX],
+  ["`-do` num nome de ficheiro", "cat .claude/hooks/x-do", CTX],
+  ["`cd` para a fronteira e redireccionar para fora", "cd .claude/hooks && cat x.mjs > /tmp/y", CTX],
 ];
 
 export function registar({ test, eq }) {
