@@ -42,6 +42,15 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 4. Decidir com o utilizador em que sprint colocar (ou num sprint futuro)
 5. Atualizar os contadores na tabela "Resumo" (Total +1, Pendente +1)
 
+**Ao registar um item que nasce fechado** (um bug ou refactor resolvido sem ter sido item —
+o caso que o `/debug` e o `/refactor` mandam registar):
+1. Escolher o ID como num item novo (o proximo da seccao do seu Tipo, verificando os DOIS ficheiros)
+2. **Nao** passa pelo `backlog.md`: vai direto para o "Historico (Fechados)" em
+   `backlog-archive.md`, com `Estado` = `Concluido`, o `Tipo`, a descricao, a versao e a data.
+   `Sprint` = `S<n>` se aconteceu durante um sprint, senao `—`
+3. Atualizar o "Resumo" (Total +1, Concluido +1) na linha do Tipo **e** na linha `**Total**`, e a
+   linha Progresso Geral (barra, `%` e `X/Y`). Validar com o `check-backlog.mjs`
+
 **Ao iniciar um item:**
 1. Correr a **Fase 0** do Metodo de Trabalho por Ticket (explicar e esperar aprovacao)
 2. Na tabela da seccao, mudar `Estado` de `Pendente` para `A Fazer`

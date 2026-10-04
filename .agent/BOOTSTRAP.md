@@ -422,7 +422,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **review.md**: Adaptar secao de logica de negocio (placeholder -> regras reais)
 - **design-review.md**: Substituir `{{QUALITY_TIER}}`; ajustar criterios a UI lib e ao tier escolhido. Se o projeto nao tem UI, o workflow fica inativo (documentar).
 - **debug.md**: Adaptar secao de pitfalls comuns (placeholder -> pitfalls reais)
-- **e2e-tests.md / security-tests.md**: substituir `{{TEST_FRAMEWORK}}` e adaptar os comandos concretos (instalacao de browser/runner, `test:ui`/`test:headed`, `PLAYWRIGHT_BASE_URL`, ZAP) se o framework nao for Playwright.
+- **e2e-tests.md / security-tests.md**: substituir `{{TEST_FRAMEWORK}}` e adaptar os comandos concretos (instalacao de browser/runner, `test:e2e:ui`/`test:e2e:headed`, `PLAYWRIGHT_BASE_URL`, ZAP) se o framework nao for Playwright.
 
 > **Idiomas de toolchain nao sao placeholders.** Os workflows assumem `npm`/`npx tsc`/`npm run lint|build` e Playwright como default. O sweep de placeholders da Fase 3 **nao** apanha estes — se o projeto usa pnpm/yarn/bun, nao e TypeScript, ou usa outro runner de testes, **adaptar manualmente** os comandos em todos os workflows (e no `ci.yml`). O `ci.yml` ja e resiliente (salta typecheck/lint/build/test se o tsconfig/script nao existir), mas a prosa dos workflows precisa de revisao humana.
 

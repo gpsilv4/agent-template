@@ -14,7 +14,7 @@ Guia para configurar o ambiente de desenvolvimento do {{PROJECT_NAME}}.
 ## Arquitetura de Ambientes
 
 ```
-.env.local (staging)     ->  npm run dev  ->  localhost:3000
+.env.local (staging)     ->  npm run dev  ->  URL local (ver o `dev`)
                                                |
                                     {{BACKEND}} STAGING
 
