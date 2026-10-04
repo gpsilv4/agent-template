@@ -11,7 +11,7 @@
  *   node .agent/scripts/tests/test-test-surface.mjs
  */
 
-import { test, commit, git, resumo, contagem } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, resumo, contagem, seOGlobExistir } from "./harness/test-surface-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -43,10 +43,14 @@ test("deteta @pytest.mark.skip", (dir) => {
   commit(dir, "py");
 }, { code: 1, includes: ["tests/test_x.py", "marca pytest"] });
 
+// O glob do `vitest.config` e da config do PROJETO: os dois testes dele so correm se ela o tiver
+// (`seOGlobExistir`, #183). Fixos, reprovavam num derivado que o tirasse.
+const RUNNER_JS = "/(^|\\/)(vitest|jest|playwright|cypress|karma)\\.config\\.[cm]?[jt]s$/i";
+seOGlobExistir(RUNNER_JS, "deteta alteracao a configuracao do runner (estreitar o include)", () =>
 test("deteta alteracao a configuracao do runner (estreitar o include)", (dir) => {
   writeFileSync(join(dir, "vitest.config.ts"), 'export default { test: { include: ["tests/so-este.test.js"] } };\n');
   commit(dir, "config");
-}, { code: 1, includes: ["vitest.config.ts", "configuracao do runner alterada"] });
+}, { code: 1, includes: ["vitest.config.ts", "configuracao do runner alterada"] }));
 
 test("alteracao a codigo de producao NAO e enfraquecimento", (dir) => {
   mkdirSync(join(dir, "src"), { recursive: true });
@@ -399,12 +403,13 @@ test("pyproject: estreitar o testpaths E enfraquecimento", (dir) => {
 
 // --- Os quatro que faltavam da terceira leitura -------------------------------
 
+seOGlobExistir(RUNNER_JS, "untracked: um config novo que estreita a selecao NAO escapa", () =>
 test("untracked: um config novo que estreita a selecao NAO escapa", (dir) => {
   // `git diff` nao lista nao-rastreados, logo isto passava sem aviso enquanto nao fosse ao
   // `git add` — e a afirmacao "compara com a arvore de trabalho" so valia para rastreados.
   writeFileSync(join(dir, "vitest.config.ts"), 'export default { test: { include: ["tests/so-um.test.js"] } };\n');
   // de proposito SEM git add
-}, { code: 1, includes: ["vitest.config.ts"] });
+}, { code: 1, includes: ["vitest.config.ts"] }));
 
 test("blob da baseline ausente REPROVA (e nao trata o ficheiro como novo)", (dir) => {
   // Apagar o objeto do blob: o `git diff` tambem precisa dele para comparar, logo falha

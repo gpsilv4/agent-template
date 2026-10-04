@@ -384,7 +384,8 @@ senao ele mede zero e passa:
   `test-*.mjs`/`tests-*.mjs`. Se a tua stack nomeia de outra forma, acrescenta.
 - **`CONFIG_GLOBS`** — a configuracao que **seleciona** os testes (`vitest.config.ts`,
   `pytest.ini`, ...). Congelar so os testes nao basta: estreitar o `include` do runner remove
-  falhas sem tocar num teste.
+  falhas sem tocar num teste. Os globs do template ja tem teste, e saltam (`SKIP`) se os mudares.
+  Um glob teu leva o seu num `tests-surface-*.mjs`: nada o verifica, o `SKIP` e o unico aviso.
 - **`CONTAGENS`** — os nomes com que o projeto declara um teste e uma assercao. Se usas um
   harness proprio (`check(`, `assertThat(`), acrescenta-o: e o que impede esvaziar uma suite
   sem deixar nenhuma marca de `skip` para tras. **Cada entrada acrescentada leva um teste** num

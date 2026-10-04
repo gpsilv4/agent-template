@@ -7,11 +7,10 @@
  *
  * NAO e um entry point: o `test-test-surface.mjs` descobre-o em disco e chama `registar()`.
  */
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { pathToFileURL } from "url";
-import { readFileSync } from "fs";
-import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, registarResultado, ROOT, seOGlobExistir } from "./harness/test-surface-harness.mjs";
 import { CONTAGENS, MARCAS } from "../lib/surface-patterns.mjs";
 import { PARES } from "../lib/pares.mjs";
 
@@ -89,5 +88,26 @@ export function registar() {
     test(`cobertura: apagar ${rel} e detetado (${porque})`, (dir) =>
       muda(dir, rel, 'export const x = 1;\nif (x) throw new Error("x");\n', null),
     { code: 1, includes: [`${rel}: ficheiro da superficie de teste APAGADO`] });
+  }
+
+  // --- Os globs da `config/` (parte C do #183) -----------------------------------------
+  // Chaveados pelo texto (`seOGlobExistir`, no harness): a config e do projeto. Cada caminho e
+  // apanhado SO pelo glob que o caso cobre. O oitavo (`vitest|jest|...config`) tem os seus dois
+  // testes no `test-test-surface.mjs`, atras do mesmo filtro.
+  const APAGAR = (rel) => ({ antes: 'export const x = 1;\nif (x) throw new Error("x");\n', depois: null, msg: `${rel}: ficheiro da superficie de teste APAGADO` });
+  const MUDAR = (rel) => ({ antes: "[cfg]\na = 1\n", depois: "[cfg]\na = 2\n", msg: rel, tambem: "configuracao do runner alterada" });
+  for (const [glob, rel, caso] of [
+    ["/(^|\\/)(tests?|__tests__|spec|e2e)\\//i", "spec/a.mjs", APAGAR],
+    ["/\\.(test|spec)\\.[cm]?[jt]sx?$/i", "src/a.test.js", APAGAR],
+    ["/_test\\.py$/i", "src/a_test.py", APAGAR],
+    ["/(^|\\/)test_[^/]+\\.py$/i", "src/test_a.py", APAGAR],
+    ["/(^|\\/)(conftest|factories)\\.py$/i", "conftest.py", MUDAR],
+    ["/(^|\\/)(pytest\\.ini|tox\\.ini)$/i", "pytest.ini", MUDAR],
+    ["/(^|\\/)\\.mocharc\\./i", ".mocharc.json", MUDAR],
+  ]) {
+    const nome = `cobertura (config): ${rel}`;
+    const c = caso(rel);
+    seOGlobExistir(glob, nome, () =>
+      test(nome, (dir) => muda(dir, rel, c.antes, c.depois), { code: 1, includes: [c.msg, ...(c.tambem ? [c.tambem] : [])] }));
   }
 }

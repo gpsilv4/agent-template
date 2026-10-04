@@ -314,8 +314,9 @@ const PARES_DO_TEMPLATE = [
     neutro: "/(?!)/ || ",
   },
   // Os GLOBS do proprio verificador: uma segunda entrada para o mesmo alvo, com outro sinal. A
-  // `config/superficie-de-teste.mjs` fica de fora de proposito: os globs dela nao tem teste do
-  // template (parte C do #183). No `--skips` o sinal e o mesmo para todos os pares, logo este alvo
+  // `config/superficie-de-teste.mjs` fica FORA de proposito: os globs dela sao do projeto, e um par
+  // exigiria ao template um teste para cada um. Os que ainda sao os do template tem teste chaveado
+  // pelo texto (`tests-surface-cobertura.mjs`); os do projeto, testa-os ele (parte C do #183). No `--skips` o sinal e o mesmo para todos os pares, logo este alvo
   // mede o seu `note(` duas vezes: uma corrida a mais, sem falso vermelho.
   {
     alvo: ".agent/scripts/check-test-surface.mjs",
