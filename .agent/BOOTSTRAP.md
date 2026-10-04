@@ -525,8 +525,9 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 ### Checklist
 
 - [ ] Todos os `{{PLACEHOLDER}}` foram substituidos? O **Guard 13** verifica-o automaticamente
-  (`node .agent/scripts/check-doc-versions.mjs`) a partir do momento em que o `business-logic.md`
-  existe — antes disso salta, porque no template os placeholders sao esperados. O sweep manual
+  (`node .agent/scripts/check-doc-versions.mjs`) a partir do momento em que o marcador
+  `.agent/.template-version` existe (§2.0) — antes disso salta, porque no template os
+  placeholders sao esperados. O sweep manual
   abaixo continua util para ver as linhas exatas, e deve devolver **zero**:
 
   ```bash

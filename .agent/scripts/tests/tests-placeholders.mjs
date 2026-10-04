@@ -9,12 +9,14 @@
  */
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
-import { test, readF, writeF, file } from "./harness/test-harness.mjs";
+import { test, readF, writeF, file, registarResultado } from "./harness/test-harness.mjs";
 // A receita do "bootstrap concluido" — os placeholders substituidos E o marcador escrito, que
 // andam sempre juntos. Estava aqui e no `tests-context-virgem.mjs`, a concordar a mao: a lista
 // de extensoes ja divergiu uma vez (faltava o `.mdc` nas DUAS, e a regra do Cursor ficava com o
 // placeholder para sempre). Agora e uma so (`TP8`).
 import { bootstrapado } from "./harness/projeto-derivado.mjs";
+import { guardPlaceholders } from "../guards/placeholders.mjs";
+import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -36,6 +38,12 @@ const ph = (nome) => "{" + "{" + nome + "}" + "}";
 export const entryPoint = "test-guards.mjs";
 
 export function registar() {
+  // #208: num derivado, zero ficheiros lidos AVISA — dava "OK (0 ficheiros verificados)". Chamado
+  // directamente com o disco vazio: pelo verificador completo ha sempre ficheiros para ler.
+  const vazio = correDireto(guardPlaceholders, { ehDerivado: () => true, listDir: () => [] });
+  registarResultado("G13: derivado sem nenhum ficheiro lido avisa, e nao da OK",
+    vazio.includes("WARN  Guard 13: nenhum dos ficheiros-alvo foi lido") && !vazio.includes("OK  ") ? [] : [`saiu: ${vazio}`]);
+
   // --- Guard 13: placeholders esquecidos -------------------------------------
   // O teste controla a sua PROPRIA pre-condicao: garante que o marcador de bootstrap NAO
   // existe. A versao anterior passava `null` como mutacao e assumia o estado do repo —

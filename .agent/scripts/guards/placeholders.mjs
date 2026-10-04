@@ -114,14 +114,14 @@ export function alvosPlaceholders(listDir) {
 
 export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado }) {
   if (!ehDerivado()) {
-    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version)");
+    skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version, e com o BOOTSTRAP.md)");
     return 0;
   }
 
   const alvos = alvosPlaceholders(listDir);
 
   let ficheirosComSobras = 0;
-  let lidos = 0; // >= 1 garantido: ver a nota no fim
+  let lidos = 0;
   for (const f of alvos) {
     if (DOCUMENTAM.has(f)) continue;
     const c = read(f);
@@ -135,11 +135,13 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     }
   }
 
-  // Nao ha ramo para "nenhum ficheiro lido": o discriminador exige
-  // `.agent/rules/business-logic.md`, e esse ficheiro esta na propria lista de alvos, logo
-  // `lidos` e sempre >= 1 quando se chega aqui. A varredura de mutacao apanhou-o como ramo
-  // morto — um `warn` inalcancavel da a aparencia de uma rede que nao existe.
-  if (ficheirosComSobras === 0) {
+  // ZERO ficheiros lidos nao e "sem placeholders" (#208). Dizia que o ramo era impossivel porque
+  // o discriminador exigia o `business-logic.md`, que esta na lista de alvos; o discriminador
+  // passou a ser o `ehDerivado()` (marcador, ou BOOTSTRAP.md ausente), e a garantia caiu com ele.
+  // Sem este ramo, o guard dava "OK ... (0 ficheiros verificados)" sem ter lido nada (`TP2`).
+  if (lidos === 0) {
+    warn("Guard 13: nenhum dos ficheiros-alvo foi lido — nao verifiquei placeholder nenhum");
+  } else if (ficheirosComSobras === 0) {
     ok(`sem placeholders esquecidos (${lidos} ficheiros verificados)`);
   }
   return 1;
