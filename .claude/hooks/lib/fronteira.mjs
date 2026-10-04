@@ -29,9 +29,9 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { execFileSync } from "child_process";
-import { homedir } from "os";
-import { posix } from "path";
+import { normalizaCaminhos, pedacosDe } from "./caminhos.mjs";
+// O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
+export { contextoFronteira } from "./caminhos.mjs";
 
 /** Os caminhos que constituem a fronteira, **em forma de dados**.
  *
@@ -74,69 +74,6 @@ const FRONTEIRA = new RegExp(
     ")"
 );
 
-/** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
- *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
-export function contextoFronteira(cwd = process.cwd()) {
-  let raiz = cwd;
-  let prefixo;
-  try {
-    // `--show-prefix`: o `cwd` relativo a raiz sem comparar strings (o toplevel e o realpath).
-    const [topo, pre] = execFileSync("git", ["rev-parse", "--show-toplevel", "--show-prefix"], {
-      cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 2000,
-    }).split("\n");
-    raiz = topo || cwd;
-    prefixo = (pre ?? "").replace(/\/$/, "");
-  } catch {
-    // Fora de um repo: a raiz e o proprio `cwd`. Um caminho absoluto fora dele fica por resolver.
-  }
-  return { raiz, cwd, prefixo, home: homedir() };
-}
-
-/** Um caminho escrito, relativo a raiz — ou `null` se cair FORA (ou for incerto). `~` e `$PWD`
- *  (o directorio corrente) expandem-se; `..`, `//`, `/./` colapsam; um absoluto perde a raiz. */
-function relativo(tok, dir, ctx) {
-  let t = tok;
-  if (ctx.home && (t === "~" || t.startsWith("~/"))) t = ctx.home + t.slice(1);
-  if (/^\$\{?PWD\}?(?=\/|$)/.test(t)) {
-    if (dir === null) return null;
-    t = `${dir || "."}${t.replace(/^\$\{?PWD\}?/, "")}`;
-  }
-  if (t.startsWith("/")) {
-    const r = posix.normalize(t);
-    for (const [base, rel] of [[ctx.raiz, ""], [ctx.cwd, ctx.prefixo]]) {
-      if (!base || rel === undefined) continue;
-      const b = posix.normalize(base).replace(/\/$/, "");
-      if (r === b) return rel;
-      if (r.startsWith(`${b}/`)) return posix.normalize(posix.join(rel || ".", r.slice(b.length + 1)));
-    }
-    return null;
-  }
-  if (dir === null) return null;
-  const r = posix.normalize(posix.join(dir || ".", t));
-  if (r === ".." || r.startsWith("../")) return null;
-  return r === "." ? "" : r;
-}
-
-/** A forma que o `FRONTEIRA` reconhece, ou `null`. Uma pasta sai COM a barra (#185). */
-const formaCanonica = (p) =>
-  p === null ? null : ehCaminhoFronteira(p) ? p : ehCaminhoFronteira(`${p}/`) ? `${p}/` : null;
-
-/** Forma de caminho: barra, `.` inicial, extensao com letras, `~` ou `$PWD`. Com o directorio
- *  DENTRO da fronteira so estes se resolvem: `timeout 60` ou o `rm` de `git rm` nao sao caminhos. */
-const COM_FORMA_DE_CAMINHO = /\/|^\.|\.[A-Za-z]\w*$|^~|^\$\{?PWD/;
-
-/** O texto com cada `$(...)` equilibrado trocado por `_`, do MESMO comprimento: os indices batem
- *  com o original, e o que esta la dentro deixa de partir segmentos ou fechar parenteses. */
-function mascaraSubstituicoes(t) {
-  const c = t.split("");
-  let fundo = 0;
-  for (let k = 0; k < c.length; k++) {
-    if (c[k] === "$" && c[k + 1] === "(") (fundo++, (c[k] = c[k + 1] = "_"), k++);
-    else if (fundo) (c[k] === "(" ? fundo++ : c[k] === ")" ? fundo-- : 0), (c[k] = "_");
-  }
-  return c.join("");
-}
-
 /** Este segmento so muda de directorio? Pelo verbo REAL, depois das cabecas (`if cd X`, `builtin
  *  cd X`) — e SEM redireccao nem substituicao: `cd /tmp > <fronteira>` trunca o ficheiro, e o
  *  `$(...)`/crase de `cd $(rm <fronteira>)` corre (a terceira leitura do #185 apanhou os dois). */
@@ -144,71 +81,6 @@ function mascaraSubstituicoes(t) {
 const soMudaDeDirectorio = (s) =>
   !/[<>`]|\$\(/.test(s.replace(/\d*[<>]{1,2}&?\s*(?:\/dev\/null\b|&\d)/g, " ")) &&
   ["cd", "pushd", "popd"].includes((resto(s.replace(/[()]/g, " "))[0] ?? "").replace(/^.*\//, ""));
-
-/** Separadores de segmento. O `do`/`then` so em POSICAO DE COMANDO (depois de um separador): com
- *  `\b`, `x-do` partia o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`; e como
- *  argumento (`grep -r then <fronteira>`) negava uma leitura. */
-const SEPARADOR = /(?:&&|\|\||[;|\n])+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
-
-/** Reescreve, na forma canonica, os caminhos que DAO na fronteira (#185): `../`, `//`, `/./`,
- *  absoluto, `$PWD`, `~` e um `cd` noutro segmento passavam. Cada argumento resolve-se contra o
- *  directorio do segmento (`cwd`, `cd`/`pushd`/`popd`, subshells) e so se reescreve se der na
- *  fronteira. Nunca o verbo nem as flags; dentro da fronteira, so o que tem forma de caminho; os
- *  `for` ficam como estavam. O que fica de fora esta no `ABERTO` do inventario. */
-function normalizaCaminhos(visivel, ctx = {}) {
-  const subshell = [];
-  const pushd = [];
-  let dir = ctx.prefixo !== undefined ? ctx.prefixo : ctx.cwd && ctx.raiz ? relativo(ctx.cwd, "", ctx) : "";
-  // A ESTRUTURA le-se com cada `$(...)` mascarado: um `$(a; b)` partia-se no `;`, e o `)` orfao
-  // fechava a subshell de fora antes do tempo. Os pedacos reescritos sao os do texto original.
-  const masc = mascaraSubstituicoes(visivel);
-  const pedacos = [];
-  let ini = 0;
-  for (const m of masc.matchAll(SEPARADOR)) {
-    pedacos.push([ini, m.index], m[0]);
-    ini = m.index + m[0].length;
-  }
-  pedacos.push([ini, masc.length]);
-  return pedacos
-    .map((p) => {
-      if (typeof p === "string") return p; // um separador
-      const seg = visivel.slice(p[0], p[1]);
-      const segM = masc.slice(p[0], p[1]);
-      let fecha = 0;
-      for (const c of segM) {
-        if (c === "(") subshell.push(dir);
-        else if (c === ")") fecha++;
-      }
-      // O verbo depois das cabecas e das palavras de shell (`if`, `builtin`, `command`, `time`):
-      // `if cd X; then cp ...` mudava de directorio sem o normalizador dar por isso.
-      const toks = resto(segM.replace(/[()]/g, " "));
-      let out = seg;
-      if (toks[0] === "cd" || toks[0] === "pushd") {
-        if (toks[0] === "pushd") pushd.push(dir);
-        // Sem argumento vai para a home; `-` e o anterior: incerto, fica FORA (nada se reescreve).
-        const alvo = toks.slice(1).find((t) => t === "-" || !t.startsWith("-"));
-        dir = alvo && alvo !== "-" ? relativo(alvo, dir, ctx) : null;
-      } else if (toks[0] === "popd") {
-        dir = pushd.length ? pushd.pop() : null;
-      } else if (toks[0] !== "for") {
-        const dentro = formaCanonica(dir) !== null;
-        let primeiro = true;
-        out = seg.replace(/(^|[\s=(>])([^\s=()<>|;&]+)/g, (m, pre, tok, off) => {
-          // Um alvo de redireccao nunca e o verbo: `cd <fronteira> && > x.mjs` saltava o `x.mjs`.
-          if (primeiro && !/[<>]\s*$/.test(seg.slice(0, off + pre.length))) {
-            primeiro = false;
-            return m;
-          }
-          if (tok.startsWith("-") || (dentro && !COM_FORMA_DE_CAMINHO.test(tok))) return m;
-          const c = formaCanonica(relativo(tok, dir, ctx));
-          return c !== null && c !== tok ? pre + c : m;
-        });
-      }
-      for (; fecha > 0 && subshell.length; fecha--) dir = subshell.pop();
-      return out;
-    })
-    .join("");
-}
 
 /** Verbos que apenas LEEM. Tudo o que nao esta aqui e tratado como escrita. */
 const LEITURA = new Set([
@@ -289,7 +161,7 @@ const FLAGS_COM_VALOR = {
  *
  *  @param {string} segmento um segmento que toca a fronteira
  *  @returns {string[]} os tokens restantes; `[]` se o segmento era so cabecas */
-function resto(segmento) {
+export function resto(segmento) {
   let toks = segmento.trim().split(/\s+/).filter(Boolean);
   let cabeca = null;
   for (;;) {
@@ -395,10 +267,10 @@ export function porqueAltera(texto, ctx = {}) {
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
   // comando e o "verbo" do segmento seguinte e um pedaco do padrao de procura.
-  const segmentos = visivel.split(SEPARADOR);
+  const segmentos = pedacosDe(visivel).pedacos.filter((p) => typeof p !== "string").map(([a, b]) => visivel.slice(a, b));
   // Um `cd`/`pushd`/`popd` so muda de directorio: o que corre DEPOIS ja e julgado com o directorio
-  // novo (`normalizaCaminhos`, #185). Contado aqui, era o primeiro segmento a tocar e, como o verbo
-  // so se julga no primeiro, `cd .claude/hooks && cp x y.mjs` passava pelo `cd`.
+  // novo (`normalizaCaminhos`, #185). Contado aqui, era o primeiro segmento a tocar e, quando o
+  // verbo so se julgava no primeiro, `cd .claude/hooks && cp x y.mjs` passava pelo `cd`.
   const tocam = segmentos.filter((s) => FRONTEIRA.test(s) && !soMudaDeDirectorio(s));
   if (tocam.length === 0) return null;
 
@@ -410,12 +282,17 @@ export function porqueAltera(texto, ctx = {}) {
   // sao UM defeito multiplicado por {cabecas consumidas} x {formas de invocar por caminho}.
   // O corpus escrito a mao contara 5, porque tinha as duas metades em grupos separados e nunca
   // o produto das duas.
-  // O `(` de uma subshell nao e parte do verbo: `(cd X && ...)` dava o verbo `(cd`.
-  const semCabeca = tocam.map((s) => resto(s.replace(/^\s*\(+/, "")));
+  // Os parenteses de uma subshell nao sao parte do verbo: `(cd X && ...)` dava o verbo `(cd`.
+  const semCabeca = tocam.map((s) => resto(s.replace(/[()]/g, " ")));
   const normaliza = (toks) =>
     toks.length === 0 ? "" : [toks[0].replace(/^.*\//, ""), ...toks.slice(1)].join(" ");
   const restoTexto = semCabeca.map(normaliza).join("\n");
-  const primeiro = (semCabeca[0][0] ?? "").replace(/^.*\//, "");
+  // O verbo de CADA segmento que toca, e nao so o do primeiro: `cat <f>; rm <f>` passava pela leitura
+  // a frente, e o #185, ao fazer tocar mais leituras (a pasta sem barra, os caminhos reescritos),
+  // alargou isso a `ls .claude/hooks; rm -rf .claude/hooks/`. O primeiro que nao le e o que nega.
+  const primeiro =
+    semCabeca.map((t) => (t[0] ?? "").replace(/^.*\//, "")).find((v) => !LEITURA.has(v)) ??
+    (semCabeca[0][0] ?? "").replace(/^.*\//, "");
   const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
   // O `inline` avalia-se sobre os segmentos que TOCAM a fronteira, e nao sobre o comando
   // inteiro. Duas leituras legitimas eram negadas por causa do alcance largo, as duas medidas

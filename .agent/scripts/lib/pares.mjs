@@ -364,6 +364,17 @@ const PARES_DO_TEMPLATE = [
     neutro: "return false",
   },
   {
+    // A terceira peca (#185): os caminhos escritos de outra maneira. Nao nega — reescreve, e o
+    // `fronteira.mjs` nega pelo texto reescrito. O sinal e `formaCanonica(`: o sitio que diz "isto
+    // da na fronteira". O neutro devolve `null` (FORA): cada mutacao deixa uma forma de escrever o
+    // caminho, ou o directorio de um `cd`, por reconhecer. A definicao e uma `const` atribuida,
+    // e `formaCanonica =` nao casa.
+    alvo: ".claude/hooks/lib/caminhos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])formaCanonica\(/,
+    neutro: "((x) => null)(",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e

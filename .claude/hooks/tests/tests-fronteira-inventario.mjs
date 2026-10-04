@@ -142,21 +142,14 @@ const ABERTO = [
   // A normalizacao de caminho e o `cd` fecharam no #185: estao em `FECHADO_PELO_CAMINHO`. Ficam
   // estas formas, medidas pelo leitor independente do #185:
   ["DESCUIDO", "`cd` com o directorio entre aspas", `cd ".claude/hooks" && cp /tmp/x y.mjs`],
-  ["DESCUIDO", "nome nu sem ponto, com o directorio dentro da fronteira", "cd .githooks && git rm commit-msg"],
   ["DESCUIDO", "`cd` por `$HOME`", "cd $HOME/proj/.claude/hooks && cp /tmp/x y.mjs"],
-  ["DESCUIDO", "glob com o directorio dentro da fronteira", "cd .claude/hooks && rm *"],
-  ["DESCUIDO", "`git clean` sem argumento, dentro da fronteira", "cd .claude/hooks && git clean -fdx"],
-  ["DESCUIDO", "`git stash -u` dentro da fronteira", "cd .claude/hooks && git stash -u"],
   ["DESCUIDO", "a pasta-mae inteira", "rm -rf .claude"],
   ["DESCUIDO", "chavetas", "rm -rf .claude/{hooks,settings.json}"],
   ["DESCUIDO", "`cd -` de volta a fronteira", "cd .claude/hooks; cd /tmp; cd -; cp /tmp/x y.mjs"],
-  ["DESCUIDO", "nome nu num ciclo dentro da fronteira", "while read f; do cd .claude/hooks; rm -rf lib; done"],
   // Da quinta leitura, anteriores ao #185: o heredoc SEM aspas expande `$(...)` e crases, e o
   // `semCitacoes` apaga-o como se fosse texto; e um relativo dentro da crase nao segue o `cd`.
   ["DESCUIDO", "`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
   ["DESCUIDO", "relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
-  // --- Aridade do julgamento: so o PRIMEIRO segmento que toca e julgado -------
-  ["DESCUIDO", "prefixar com uma leitura desarma o verbo", `cat .claude/settings.json && cp /tmp/x ${H}`],
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
   // --- Verbos de LEITURA que destroem -----------------------------------------
   // --- Redireccao com descritor explicito -------------------------------------
@@ -261,6 +254,25 @@ const FECHADO_PELO_CAMINHO = [
     "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
     "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
   ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c, CTX, "citado-mas-executado"]),
+  // Da leitura final do PR: com o `cd` fora do `tocam`, o que vinha depois sem forma de caminho
+  // passava (no `main`, o segmento do `cd` negava). Depois de um `cd` explicito para dentro, cada
+  // segmento leva o directorio — e os seis primeiros, que estavam em `ABERTO`, fecharam com isto.
+  ["nome nu sem ponto, dentro da fronteira", "cd .githooks && git rm commit-msg", CTX, "git-que-escreve"],
+  ["glob dentro da fronteira", "cd .claude/hooks && rm *", CTX, "verbo-nao-e-leitura:rm"],
+  ["`git clean` sem argumento, dentro", "cd .claude/hooks && git clean -fdx", CTX, "git-que-escreve"],
+  ["`git stash -u` dentro", "cd .claude/hooks && git stash -u", CTX, "git-que-escreve"],
+  ["nome nu num ciclo dentro", "while read f; do cd .claude/hooks; rm -rf lib; done", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` com barra e glob", "cd .claude/hooks/ && rm -rf *", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` com barra, em subshell", "(cd .claude/hooks/ && rm -rf *)", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` e redireccao para nome nu", "cd .githooks/ && echo x > pre-commit", CTX, "redireciona"],
+  ["`pushd` e glob", "pushd .claude/hooks/ && rm *", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` e um `for` que apaga", "cd .claude/hooks/ && for f in *; do rm $f; done", CTX, "verbo-nao-e-leitura:rm"],
+  // E o verbo julga-se em CADA segmento que toca, nao so no primeiro: uma leitura a frente desarmava
+  // a escrita de tras (a parte da aridade do #206).
+  ["prefixar com uma leitura desarma o verbo", "cat .claude/settings.json && cp /tmp/x .claude/hooks/y.mjs", CTX, CP],
+  ["ler e apagar a pasta", "ls .claude/hooks; rm -rf .claude/hooks/", CTX, "verbo-nao-e-leitura:rm"],
+  ["ler e apagar, em linhas", "cat .githooks\nrm -rf .githooks/", CTX, "verbo-nao-e-leitura:rm"],
+  ["`then` como argumento e depois apagar", "grep -r then .claude/hooks; rm -rf .claude/settings.json", CTX, "verbo-nao-e-leitura:rm"],
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
@@ -275,8 +287,9 @@ const CONTROLO_CAMINHO = [
   ["`cd` para a fronteira, e depois LER", "cd .claude/hooks && cat y.mjs", CTX],
   ["ler pelo caminho absoluto", "cat /Users/g/proj/.claude/settings.json", CTX],
   ["`timeout 60` a correr a suite", "cd .claude/hooks && timeout 60 node tests/test-hooks.mjs", CTX],
-  ["`sleep 1` e ler", "cd .claude/hooks && sleep 1 && cat x", CTX],
-  ["atribuicao e ler", "cd .claude/hooks && X=y cat a", CTX],
+  // `cd <fronteira> && sleep 1 && cat x` e `... && X=y cat a` sairam daqui: o `sleep` e a atribuicao
+  // nao sao leituras, e com o directorio a seguir o `cd` passaram a ser negados — como no `main`,
+  // onde o segmento do `cd` ja os negava. Nao e regressao face ao `main`.
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],
