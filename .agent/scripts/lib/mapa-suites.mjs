@@ -30,6 +30,8 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
   { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs")], only: "check-backlog" },
+  // O harness dele (#191): decide o veredicto dos testes, e a fixture e o que eles medem.
+  { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
