@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP11) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP12) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -60,23 +60,13 @@
 ## TP4 — O loop que fica verde enfraquecendo o teste
 
 - **Origem**: o desenho de um loop de correcao automatica num projeto real.
-- **Anti-padrao**: um loop com o objetivo _"ficar verde"_ tem uma **solucao degenerada** —
-  enfraquecer o teste em vez de corrigir o codigo. Por ordem de subtileza: apagar a assercao;
-  `it.skip`/`xit`/`@pytest.mark.skip`; e **estreitar a selecao do runner** (`include`,
-  `testMatch`, `-k`), que remove falhas sem tocar em nenhum ficheiro de teste.
-- **Correto**: **retirar a capacidade**, nao pedir contencao. Veredicto pelo **exit code** do
-  runner (nunca por regex sobre o output); congelar os testes **e a config** do runner; nao
-  arrancar sem falha inicial; perguntar ao **git** o que mudou e **abortar** se o git falhar;
-  contagem que nao desce e *skipped* que nao sobem; procurar marcas so na superficie congelada.
-- **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>` — compara
-  contagens contra a baseline e reprova se a superficie foi enfraquecida.
-
-> **Limite honesto**: e um passo a correr, nao uma barreira — a autoridade que o agente nao
-> alcanca e o **CI**. E as contagens medem **volume, nao forca**: trocar assercoes por triviais
-> (`eq(1, 1)`) nao move nenhuma contagem. Nao substitui ler o diff. O invariante e sobre o
-> **total** da superficie e nao por ficheiro: uma extracao (o que este ficheiro manda fazer
-> acima das 500 linhas) baixa a contagem na origem sem perder nada, e um gate que a reprova
-> ensina a ignorar o gate.
+- **Anti-padrao**: com o objetivo _"ficar verde"_, enfraquecer o teste em vez de corrigir o
+  codigo: apagar a assercao, `it.skip`/`xit`, ou **estreitar a selecao do runner** (`include`,
+  `-k`), que remove falhas sem tocar em nenhum teste.
+- **Correto**: **retirar a capacidade**, nao pedir contencao: veredicto pelo exit code, testes
+  **e** config do runner congelados, contagens que nao descem, abortar se o git falhar.
+- **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>`. E um passo e
+  nao uma barreira (essa e o CI), e mede volume e nao forca — os limites estao no `-why`.
 
 ## TP5 — `.trim()` no output de um comando cujas colunas significam algo
 
@@ -110,37 +100,24 @@
 ## TP7 — Ramo inalcancavel, justificado por prosa em vez de medido
 
 - **Origem**: o ramo "ninguem cita" do Guard 15 (`guards/anti-patterns.mjs`).
-- **Anti-padrao**: nao poder testar um ramo e **escrever a razao** ao lado em vez de procurar o
-  invariante que o impede. A razao escrita costuma estar errada, e faz o leitor seguinte pensar
-  que noutro sitio o ramo dispara. Causa proxima tipica: o mesmo input lido com **normalizacoes
-  diferentes** nos dois lados de uma contagem. Segunda ordem: um ramo que so e alcancavel
-  reescrevendo o codigo-fonte do verificador nao esta testado, esta encenado.
-- **Correto**: ramo sem teste possivel e defeito **do codigo**, nao do teste. Duas leituras do
-  mesmo input usam o **mesmo helper** — e ao limpar um input antes de contar, preservar os `\n`
-  se a mensagem citar numeros de linha.
-- **Detecao em review**: a varredura de mutacao nao ve isto (um `note()` nao e sitio de aviso, e
-  um falso positivo e invisivel para ela). Sinal grosseiro:
-  `git grep -nE "inalcancavel|codigo morto" -- .agent .claude`; cada ocorrencia paga um
-  **controlo negativo por ramo** — desligar a correcao e exigir vermelho.
+- **Anti-padrao**: um ramo que nao se consegue testar, com a **razao escrita** ao lado em vez do
+  invariante que o impede. A razao costuma estar errada; causa tipica: o mesmo input lido com
+  **normalizacoes diferentes** nos dois lados de uma contagem.
+- **Correto**: ramo sem teste possivel e defeito **do codigo**: as duas leituras usam o **mesmo
+  helper**, ou o ramo sai.
+- **Detecao em review**: `git grep -nE "inalcancavel|codigo morto" -- .agent .claude`; cada
+  ocorrencia paga um **controlo negativo** (desligar a correcao e exigir vermelho).
 
 ## TP8 — Duas copias da mesma regra, a concordar a mao
 
 - **Origem**: cinco ocorrencias numa so sessao, todas diferentes a olho e iguais por dentro.
-- **Anti-padrao**: reimplementar (ou re-escrever por extenso) uma regra que ja existe noutro
-  ficheiro, e contar com que as duas se mantenham iguais. A copia **nao falha onde esta
-  testada** — falha na copia que ninguem sabe que e uma copia, e costuma so aparecer numa
-  **fronteira**, meses depois, com a mensagem a apontar para o sintoma e nao para a causa.
-  (As seis formas medidas estao tabeladas no `-why`.)
-- **Correto**: **derivar, nao duplicar.** Quem define a regra exporta-a; quem precisa dela
-  importa-a. Quando o import nao pode ser estatico (o ficheiro pode legitimamente faltar, e a
-  ausencia e para reportar), import dinamico **depois** do guarda de existencia. Em testes, a
-  lista deriva-se do disco ou da mesma fonte que o codigo usa — nunca se escreve a segunda vez.
-- **Detecao em review**: a varredura de mutacao **nao ve isto** — as duas copias estao ambas
-  cobertas pelas suas suites, e e a divergencia entre elas que ninguem mede. Sinais grosseiros:
-  `git grep -nE "\\.split\\(.\\\\n.\\)\\.length|> 500" -- .agent .claude` (uma constante ou uma
-  formula repetida fora de quem a define), e, ao rever um diff, a pergunta directa: **este valor
-  ja existe noutro sitio?** Se sim, importar. Cada copia nova paga um teste na **fronteira** —
-  e nas fronteiras que as duas divergem.
+- **Anti-padrao**: re-escrever uma regra que ja existe noutro ficheiro e contar com que as duas
+  se mantenham iguais. A copia falha onde ninguem sabe que e copia: numa **fronteira**, meses
+  depois, com a mensagem a apontar para o sintoma.
+- **Correto**: **derivar, nao duplicar.** Quem define exporta, quem precisa importa; em testes,
+  a lista deriva-se do disco ou da mesma fonte que o codigo usa.
+- **Detecao em review**: a varredura nao o ve (as duas copias estao cobertas). Ao rever um diff:
+  **este valor ja existe noutro sitio?** Os sinais grosseiros estao no `-why`.
 
 ## TP9 — Teste que pergunta por um caminho fixo que mudou de sitio
 
@@ -171,3 +148,15 @@
 - **Correto**: `x="$(cmd)"`, depois `grep -q X <<<"$x" || rc=$?` (1 = sem match, 2 = erro).
   `printf "$x" |` nao resolve: o builtin leva o mesmo SIGPIPE.
 - **Detecao em review**: `git grep -nE '\|\s*grep\s+-[a-zA-Z]*q' -- '*.yml' '*.sh' '*.mjs'`.
+
+## TP12 — Copiar do disco o que o git ignora
+
+- **Origem**: o `/upgrade` num derivado real (#174, R7-D): os `RELATORIO-*.md` ignorados pelo
+  git do template aterraram na copia do projeto, e chaves e `node_modules/` iam pelo mesmo caminho.
+- **Anti-padrao**: percorrer a arvore do template com `cpSync`/`andaFicheiros` e levar tudo o que
+  esta no disco. O disco de quem mantem o template tem o que o git dele ignora.
+- **Correto**: perguntar ao git — `foraDoTemplate()` (`lib/fora-do-template.mjs`) — e reprovar se
+  ele nao responder ("nao ignora nada" nao e "nao consegui perguntar", `TP2`).
+- **Detecao em review**: `git grep -nE "cpSync\(|andaFicheiros\(" -- .agent/scripts`: cada sitio
+  que le a raiz do TEMPLATE passa pelo filtro, ou e excepcao escrita (a copia de trabalho do
+  `mutation-sweep.mjs`). Os que andam na copia do consumidor nao sao este caso.

@@ -201,6 +201,18 @@ por uma razao diferente, e cada uma sozinha bastava:
 O **fim** da condicao e tao importante como o principio: sem o `$`, `== 'pull_request' && false`
 era excluido — sabotagem pura escrita como se fosse o gate legitimo.
 
+**O que saiu do catalogo (#180).** A entrada do catalogo ficou com as quatro linhas; o resto
+vive aqui.
+
+- **O resto do Correto:** nao arrancar sem falha inicial; *skipped* que nao sobem; procurar marcas
+  so na superficie congelada.
+- **Limite honesto:** e um passo a correr, nao uma barreira — a autoridade que o agente nao alcanca
+  e o **CI**. E as contagens medem **volume, nao forca**: trocar assercoes por triviais
+  (`eq(1, 1)`) nao move nenhuma contagem. Nao substitui ler o diff. O invariante e sobre o
+  **total** da superficie e nao por ficheiro: uma extracao (o que a regra das 500 linhas manda
+  fazer) baixa a contagem na origem sem perder nada, e um gate que a reprova ensina a ignorar o
+  gate.
+
 ---
 
 ## TP5 — `.trim()` no output de um comando cujas colunas significam algo
@@ -298,6 +310,14 @@ teste, tenha a prosa que tiver.
   contagem desse ramo a documentacao**, deixando as citacoes em codigo a contar para a
   deteccao de citacoes mortas, que e o que o guard realmente protege.
 
+**O que saiu do catalogo (#180).**
+
+- **Segunda ordem:** um ramo que so e alcancavel reescrevendo o codigo-fonte do verificador nao
+  esta testado, esta encenado.
+- **Ao limpar um input antes de contar**, preservar os `\n` se a mensagem citar numeros de linha.
+- **A varredura de mutacao nao ve isto:** um `note()` nao e sitio de aviso, e um falso positivo e
+  invisivel para ela.
+
 ## TP8 — Duas copias da mesma regra, a concordar a mao
 
 Seis ocorrencias. Sao diferentes a olho e sao a mesma coisa por dentro:
@@ -364,6 +384,16 @@ depois do guarda de existencia.
 
 A licao secundaria: eliminar uma duplicacao nao pode custar um caminho de recusa. Se custar, a
 forma esta errada — nao o objectivo.
+
+**O que saiu do catalogo (#180).**
+
+- **Import dinamico:** quando o import nao pode ser estatico (o ficheiro pode legitimamente faltar,
+  e a ausencia e para reportar), import dinamico **depois** do guarda de existencia.
+- **Sinais grosseiros:** `git grep -nE "\\.split\\(.\\\\n.\\)\\.length|> 500" -- .agent .claude`
+  (uma constante ou uma formula repetida fora de quem a define).
+- **Cada copia nova paga um teste na fronteira** — e nas fronteiras que as duas divergem. A
+  varredura nao o ve porque as duas copias estao ambas cobertas pelas suas suites, e e a
+  divergencia entre elas que ninguem mede.
 
 ---
 
@@ -477,3 +507,26 @@ migracao — que e exactamente o PR onde a varredura mais importa.
 depois `printf '%s\n' "$x" | grep -q`, com o comentario "o `printf` e builtin". Correr a
 correcao antes de confiar no comentario mostrou o mesmo "nao aplicavel": num pipe o builtin
 corre num **subshell** e leva o SIGPIPE como qualquer processo. O here-string tira o pipe.
+
+---
+
+## TP12 — Copiar do disco o que o git ignora
+
+**Origem**: o `/upgrade` num derivado real (#174, R7-D). A historia, as duas camadas do filtro e os
+cuidados que o leitor independente encontrou estao no `upgrade-why.md` (§ "Porque o que o git do
+template IGNORA nao se copia"). Aqui fica o que faz disto um anti-padrao e nao um bug pontual.
+
+O motor do upgrade copia do **disco** do template de proposito: um ficheiro novo ainda por
+commitar tem de contar como do template. Mas o disco de quem mantem o template tem tambem o que o
+git dele ignora — relatorios, `settings.local.json`, chaves, `node_modules/` —, e um
+`cpSync`/`andaFicheiros` que so salta `.git` leva tudo. O `.env` escapava por acaso, porque a
+extensao nao passava noutro filtro: por acaso, nao por desenho.
+
+**A excepcao escrita.** A varredura de mutacao copia a arvore de trabalho inteira para um
+`tmpdir` seu (`mutation-sweep.mjs`), e e de proposito: precisa das alteracoes por commitar para
+medir o diff em curso, apaga a copia no fim, e nunca escreve num projeto. O `grep` de detecao
+mostra-a; a decisao de a manter esta no #180.
+
+**Ficou fora do catalogo durante uma ronda** porque o catalogo estava a 31 bytes do tecto do
+Guard 1e. Entrou quando as entradas maiores (`TP4`, `TP7`, `TP8`) foram condensadas ao formato de
+quatro linhas, com o resto movido para as secoes delas aqui.
