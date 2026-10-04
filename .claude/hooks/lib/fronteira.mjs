@@ -29,7 +29,7 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { normalizaCaminhos, pedacosDe } from "./caminhos.mjs";
+import { normalizaCaminhos, pedacosDe, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
 export { contextoFronteira } from "./caminhos.mjs";
 
@@ -283,7 +283,15 @@ export function porqueAltera(texto, ctx = {}) {
   // O corpus escrito a mao contara 5, porque tinha as duas metades em grupos separados e nunca
   // o produto das duas.
   // Os parenteses de uma subshell nao sao parte do verbo: `(cd X && ...)` dava o verbo `(cd`.
-  const semCabeca = tocam.map((s) => resto(s.replace(/[()]/g, " ")));
+  // E o que corre DENTRO de cada `$(...)`/`<(...)` de um segmento que toca e julgado como um
+  // segmento seu: `cat <f> $(rm -rf <f>)` passava pelo `cat` (ja no `main`).
+  const interiores = tocam.flatMap(substituicoes).flatMap((i) =>
+    pedacosDe(i).pedacos.filter((p) => typeof p !== "string").map(([a, b]) => i.slice(a, b))
+  );
+  const semCabeca = [
+    ...tocam.map((s) => resto(s.replace(/[()]/g, " "))),
+    ...interiores.map((s) => resto(s.replace(/[()]/g, " "))).filter((t) => t.length),
+  ];
   const normaliza = (toks) =>
     toks.length === 0 ? "" : [toks[0].replace(/^.*\//, ""), ...toks.slice(1)].join(" ");
   const restoTexto = semCabeca.map(normaliza).join("\n");

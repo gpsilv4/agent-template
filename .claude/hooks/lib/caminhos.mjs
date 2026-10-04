@@ -99,8 +99,46 @@ export function pedacosDe(visivel) {
   return { masc, pedacos };
 }
 
+/** Os interiores das substituicoes `$(...)`, `<(...)` e `>(...)`, as aninhadas incluidas. O que la
+ *  esta CORRE, e o verbo de fora (`echo`, `cat`) nao diz nada sobre ele: `cd <fronteira> && echo
+ *  $(rm -rf *)` passava. A aritmetica `$((...))` nao e comando e fica de fora. */
+export function substituicoes(t) {
+  const fora = [];
+  for (let k = 0; k < t.length; k++) {
+    if (!"$<>".includes(t[k]) || t[k + 1] !== "(" || (t[k] === "$" && t[k + 2] === "(")) continue;
+    let fundo = 1;
+    let j = k + 2;
+    for (; j < t.length && fundo; j++) fundo += t[j] === "(" ? 1 : t[j] === ")" ? -1 : 0;
+    const dentro = t.slice(k + 2, fundo ? j : j - 1);
+    fora.push(dentro, ...substituicoes(dentro));
+    k = j - 1;
+  }
+  return fora;
+}
+
 /** Fechos de bloco: nao sao comandos, e o marcador do directorio nao lhes vai. */
 const FECHOS = new Set(["fi", "done", "esac", "}"]);
+
+/** Verbos que NAO escrevem ficheiros, sem o marcador: com ele, a leitura de todos os dias depois
+ *  de um `cd` para a fronteira era negada (`| sort | uniq -c`, `|| true`, `|| exit 1`). Medido pela
+ *  leitura do commit. `sort` e `uniq` escrevem com `-o` e com um segundo operando — ai levam-no. */
+const SEM_MARCADOR = new Set([
+  ...FECHOS, "set", "export", "true", "false", ":", "exit", "return", "sleep", "wait", "break",
+  "continue", "shift", "read", "tr", "cut", "column", "sort", "uniq",
+]);
+
+/** O segmento leva o directorio? Pelo verbo depois das atribuicoes e de `while`/`until`/`{` — que
+ *  abrem e nao sao o comando. Uma substituicao leva-o SEMPRE: o que corre la dentro e julgado. */
+function levaMarcador(seg, toks) {
+  if (/[$<>]\(/.test(seg)) return true;
+  let i = 0;
+  while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || /^\w+=/.test(toks[i]))) i++;
+  const v = toks[i];
+  if (v === undefined || v.startsWith("#")) return false;
+  if (v === "sort") return toks.slice(i + 1).some((t) => /^-[^-]*o|^--output/.test(t));
+  if (v === "uniq") return toks.slice(i + 1).filter((t) => !t.startsWith("-")).length > 1;
+  return !SEM_MARCADOR.has(v);
+}
 
 /** Reescreve, na forma canonica, os caminhos que DAO na fronteira. Cada argumento resolve-se contra
  *  o directorio do segmento (`cwd`, `cd`/`pushd`/`popd`, subshells). Nunca o verbo nem as flags;
@@ -109,8 +147,9 @@ const FECHOS = new Set(["fi", "done", "esac", "}"]);
  *  Depois de um `cd` EXPLICITO para dentro da fronteira, cada segmento seguinte leva o directorio
  *  no fim, para TOCAR a fronteira e o verbo ser julgado: `cd .claude/hooks && rm -rf *` passava
  *  (o `*` nao tem forma de caminho), e no `main` era o segmento do `cd` que o negava. Uma leitura
- *  continua a passar, porque o verbo e de leitura. So pelo `cd` do proprio comando: com o `cwd`
- *  ja la dentro, nada muda face ao `main`. */
+ *  continua a passar, porque o verbo e de leitura; o que nao escreve nem leva marcador
+ *  (`levaMarcador`). So pelo `cd` do proprio comando: com o `cwd` ja la dentro, nada muda face ao
+ *  `main`. */
 export function normalizaCaminhos(visivel, ctx = {}) {
   const subshell = [];
   const pushd = [];
@@ -153,7 +192,7 @@ export function normalizaCaminhos(visivel, ctx = {}) {
           const c = formaCanonica(relativo(tok, dir, ctx));
           return c !== null && c !== tok ? pre + c : m;
         });
-        if (dentro && dir !== dirInicial && toks.length && !FECHOS.has(toks[0])) out = `${out} ${dentro}`;
+        if (dentro && dir !== dirInicial && levaMarcador(seg, toks)) out = `${out} ${dentro}`;
       }
       for (; fecha > 0 && subshell.length; fecha--) dir = subshell.pop();
       return out;

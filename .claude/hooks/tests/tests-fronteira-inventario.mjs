@@ -150,6 +150,9 @@ const ABERTO = [
   // `semCitacoes` apaga-o como se fosse texto; e um relativo dentro da crase nao segue o `cd`.
   ["DESCUIDO", "`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
   ["DESCUIDO", "relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
+  // Da leitura do a8cfbd4: o `$(...)` ENTRE ASPAS DUPLAS corre, e o `semCitacoes` apaga-o como
+  // texto. O que esta fora de aspas ja e julgado (`substituicoes`); este ja passava no `main`.
+  ["DESCUIDO", "`$(...)` entre aspas duplas", "cd .claude/hooks && echo \"$(rm -rf *)\""],
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
   // --- Verbos de LEITURA que destroem -----------------------------------------
   // --- Redireccao com descritor explicito -------------------------------------
@@ -170,6 +173,9 @@ const ABERTO = [
 const FALSO_POSITIVO = [
   ["`for` a encabecar", `for f in ${F}; do cat $f; done`],
   ["atribuicao de ambiente", `FOO=1 node ${S}`],
+  // A mesma classe, depois de um `cd` para a fronteira (#185): o segmento leva o directorio e o
+  // `resto()` nunca consome uma atribuicao — falha FECHADO, de proposito.
+  ["atribuicao de ambiente, depois de um `cd` para a fronteira", "cd .claude/hooks && X=y cat a"],
 ];
 
 /**
@@ -273,6 +279,23 @@ const FECHADO_PELO_CAMINHO = [
   ["ler e apagar a pasta", "ls .claude/hooks; rm -rf .claude/hooks/", CTX, "verbo-nao-e-leitura:rm"],
   ["ler e apagar, em linhas", "cat .githooks\nrm -rf .githooks/", CTX, "verbo-nao-e-leitura:rm"],
   ["`then` como argumento e depois apagar", "grep -r then .claude/hooks; rm -rf .claude/settings.json", CTX, "verbo-nao-e-leitura:rm"],
+  // Da leitura do a8cfbd4: o que corre DENTRO de `$(...)`/`<(...)` e julgado (`substituicoes`). Os
+  // dois primeiros o `main` negava pelo `cd`; os outros ja passavam no `main`.
+  ["`cd` e `$(...)` que apaga", "cd .claude/hooks/ && echo $(rm -rf *)", CTX, "verbo-nao-e-leitura:rm"],
+  ["`cd` e `<(...)` que apaga", "cd .claude/hooks/ && cat <(rm -rf *)", CTX, "verbo-nao-e-leitura:rm"],
+  ["`$(...)` que apaga a fronteira", "echo $(rm -rf .claude/hooks/)", CTX, "verbo-nao-e-leitura:rm"],
+  ["ler e `$(...)` que apaga", "cat .claude/hooks/x.mjs $(rm -rf .claude/hooks/)", CTX, "verbo-nao-e-leitura:rm"],
+  ["`$(...)` aninhado", "cat .claude/hooks/x $(echo $(rm y))", CTX, "verbo-nao-e-leitura:rm"],
+  ["`$(...)` com `git rm`", "echo $(git rm .claude/hooks/x)", CTX, "git-que-escreve"],
+  // O marcador fica fora do que nao escreve, mas nao destes: `sort -o`, `uniq in out`, um `while`
+  // ou `{` cujo comando escreve, e um verbo inofensivo com uma substituicao dentro.
+  ["`sort -o` dentro", "cd .claude/hooks && sort -o x y", CTX, "verbo-nao-e-leitura:sort"],
+  ["`uniq` com saida dentro", "cd .claude/hooks && uniq a b", CTX, "verbo-nao-e-leitura:uniq"],
+  ["`while` cujo comando apaga", "cd .claude/hooks && while rm x; do :; done", CTX, "verbo-nao-e-leitura:while"],
+  ["chavetas que apagam", "cd .claude/hooks && { rm x; }", CTX, "verbo-nao-e-leitura:{"],
+  ["`export` com `$(...)` que apaga", "cd .claude/hooks && export X=$(rm -rf *)", CTX, "verbo-nao-e-leitura:export"],
+  ["`sleep` com `$(...)` que apaga", "cd .claude/hooks && sleep $(rm -rf *)", CTX, "verbo-nao-e-leitura:sleep"],
+  ["`tee` a jusante", "cd .claude/hooks && cat x | tee y", CTX, "verbo-nao-e-leitura:tee"],
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
@@ -287,9 +310,20 @@ const CONTROLO_CAMINHO = [
   ["`cd` para a fronteira, e depois LER", "cd .claude/hooks && cat y.mjs", CTX],
   ["ler pelo caminho absoluto", "cat /Users/g/proj/.claude/settings.json", CTX],
   ["`timeout 60` a correr a suite", "cd .claude/hooks && timeout 60 node tests/test-hooks.mjs", CTX],
-  // `cd <fronteira> && sleep 1 && cat x` e `... && X=y cat a` sairam daqui: o `sleep` e a atribuicao
-  // nao sao leituras, e com o directorio a seguir o `cd` passaram a ser negados — como no `main`,
-  // onde o segmento do `cd` ja os negava. Nao e regressao face ao `main`.
+  ["`sleep 1` e ler", "cd .claude/hooks && sleep 1 && cat x", CTX],
+  // `cd <fronteira> && X=y cat a` saiu daqui para `FALSO_POSITIVO`: e a classe da atribuicao.
+  // Da leitura do a8cfbd4: o marcador negava estas, que o `main` deixava passar (sem a barra).
+  ["`| sort | uniq -c`", "cd .claude/hooks && node tests/test-hooks.mjs | sort | uniq -c", CTX],
+  ["`|| true`", "cd .claude/hooks && node a.mjs | grep -c ok || true", CTX],
+  ["`|| exit 1` num ciclo", "cd .claude/hooks && for f in tests/*.mjs; do node $f || exit 1; done", CTX],
+  ["filtros", "cd .claude/hooks && node a.mjs | tr a b | cut -d: -f1 | column -t", CTX],
+  ["`| while read`", "cd .claude/hooks && node a.mjs | while read l; do echo $l; done", CTX],
+  ["`status=$?`", "cd .claude/hooks && node a.mjs; status=$?", CTX],
+  ["`set -e` e `export`", "cd .claude/hooks && set -e && export X=1 && node tests/a.mjs", CTX],
+  ["linha de comentario", "cd .claude/hooks\n# nota\nls", CTX],
+  ["`$((...))` nao e comando", "cd .claude/hooks && echo $((1+2))", CTX],
+  ["`<(...)` que le", "diff <(git show main:.claude/hooks/x.mjs) .claude/hooks/x.mjs", CTX],
+  ["`$(...)` que le", "wc -l $(git ls-files .claude/hooks)", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],
