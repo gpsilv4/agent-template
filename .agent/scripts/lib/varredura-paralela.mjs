@@ -39,9 +39,9 @@ import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE
 
 /** Quantos processos em paralelo, a partir do que o utilizador pediu.
  *
- *  Medido neste repo: a curva satura a ~3,9x e o gargalo **nao e CPU** — cada teste faz `mkdtemp`
- *  mais a copia de ~150 ficheiros, logo e metadata de filesystem, que mais cores nao compram.
- *  Acima de 8 paga-se oversubscricao por ~7% de ganho.
+ *  Medido neste repo: a curva satura a ~3,9x, e o gargalo **e CPU** — a 8 workers a varredura
+ *  consome 743% (0,93 por worker, sem espera ociosa). Acima de 8 paga-se contencao por ~7% de
+ *  ganho. A medicao, e a frase anterior que a contradizia: `scripts-guide-why.md`.
  *
  *  `1` devolve o comportamento sequencial por inteiro, e existe para quem precise de comparar um
  *  resultado sem mudar mais nada. */
