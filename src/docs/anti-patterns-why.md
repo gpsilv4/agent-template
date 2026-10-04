@@ -56,7 +56,9 @@ mecanica repetida.
 
 O Guard 15 continua a ler os dois prefixos e a reprovar a colisao. Nao por a forma antiga poder
 voltar, mas porque sobra uma forma nova: a entrada escrita no ficheiro do prefixo errado, que e
-o que um `/upgrade` desatento faz ao acrescentar onde devia substituir.
+o que um `/upgrade` desatento faz ao acrescentar onde devia substituir. Ate ao #187 so a colisao
+a apanhava: um `AP` sozinho no catalogo do template passava calado, e o upgrade seguinte, que
+substitui esse catalogo por inteiro, apagava-o.
 
 ---
 

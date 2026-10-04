@@ -15,8 +15,8 @@
 > reescrita. Antes de os prefixos se separarem, um derivado real ficou com quatro numeros a
 > significar duas coisas cada — e nada no ecra o denunciava.
 >
-> **Cada prefixo no seu ficheiro.** O Guard 15 reprova o mesmo ID definido nos DOIS: uma
-> entrada `TP` escrita aqui, ou uma `AP` escrita no ficheiro do template.
+> **Cada prefixo no seu ficheiro.** O Guard 15 reprova uma entrada `TP` escrita aqui, ou uma
+> `AP` escrita no ficheiro do template — e o mesmo ID definido nos DOIS.
 
 ## Formato de cada entrada
 

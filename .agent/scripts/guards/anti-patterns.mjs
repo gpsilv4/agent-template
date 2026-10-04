@@ -177,9 +177,9 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
   // Nao e teorico: antes de os prefixos se separarem, um derivado real tinha QUATRO
   // anti-padroes proprios com os mesmos numeros de quatro do template — quatro IDs com dois
   // significados cada. (Escritos aqui por extenso seriam eles proprios citacoes, e o guard
-  // varre este ficheiro.) Os prefixos tornaram essa forma impossivel; o que sobra, e que este
-  // ramo continua a apanhar, e a entrada escrita no ficheiro do prefixo errado — que e
-  // exactamente o que um `/upgrade` desatento faz. O `simulate-derived.mjs`
+  // varre este ficheiro.) Os prefixos tornaram essa forma impossivel; o que sobra e a entrada
+  // escrita no ficheiro do prefixo errado — o que um `/upgrade` desatento faz. Com colisao, apanha-a
+  // este ramo; sem ela, o seguinte (#187). O `simulate-derived.mjs`
   // nao o apanha porque o derivado que ele constroi nao escreve anti-padroes proprios: e um
   // defeito do dia 100, nao do dia 1.
   if (porFicheiro.length > 1) {
@@ -198,6 +198,19 @@ export function guardAntiPatternRefs({ read, warn, ok, skip, note, listDir }) {
           `Mover a entrada para o ficheiro do seu prefixo, ou renumerar (ver o cabecalho de ` +
           `anti-patterns.md)`
       );
+    }
+  }
+
+  // PREFIXO NO FICHEIRO ERRADO, mesmo sem colisao (#187). Os dois textos que o prometiam — o
+  // cabecalho do `anti-patterns.md` e este guard — so tinham a colisao por tras: um `AP` sozinho
+  // no catalogo do template, ou um `TP` sozinho no do projeto, passavam calados. O `/upgrade`
+  // substitui o catalogo do template por inteiro, logo um `AP` la escrito perde-se no seguinte.
+  const PREFIXO_DE = { [AP_FILES[0]]: "AP", [AP_FILES[1]]: "TP" };
+  for (const [f, ns] of porFicheiro) {
+    const certo = PREFIXO_DE[f];
+    for (const id of ns.filter((n) => certo && !n.startsWith(certo))) {
+      const destino = Object.keys(PREFIXO_DE).find((k) => id.startsWith(PREFIXO_DE[k]));
+      warn(`${f}: ${id} tem o prefixo do outro ficheiro — mover para ${destino ?? "o ficheiro do seu prefixo"}`);
     }
   }
 
@@ -310,8 +323,8 @@ export function guardAntiPatternEvidence({ read, warn, ok, skip }) {
   const naRule = [...semHtml(rule).matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]);
   const noWhy = new Set([...why.matchAll(new RegExp(CABECALHO_AP.source, "gm"))].map((m) => m[1]));
 
-  // So o prefixo do TEMPLATE. Um `APn` que alguem escreva neste ficheiro ja e reprovado pela
-  // deteccao de colisao la em cima — nao e aqui que se diz isso outra vez.
+  // So o prefixo do TEMPLATE. Um `APn` que alguem escreva neste ficheiro ja e reprovado pelo Guard
+  // 15 (prefixo no ficheiro errado, #187) — nao e aqui que se diz isso outra vez.
   const doTemplate = naRule.filter((id) => id.startsWith("TP"));
   if (doTemplate.length === 0) {
     skip("Guard 18 — o catalogo do template nao tem entradas");
