@@ -429,7 +429,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 > **Why multiple entry files?** Claude Code parses `@file`, Gemini's Memory Import Processor needs a relative prefix (`@./file`), and `AGENTS.md` is the tool-neutral cross-tool entry. All share the same source of truth in `.agent/` — only syntax/entry differs.
 >
-> An earlier version of this line claimed Gemini needs `@[file]` brackets. That form appears nowhere in the Gemini CLI docs, and `check-doc-versions.mjs` normalised it — so the guard was defending the wrong syntax. **Still unverified in a live Gemini CLI**: run `/memory show` in a clone to confirm what it actually loads.
+> An earlier version of this line claimed Gemini needs `@[file]` brackets. That form appears nowhere in the Gemini CLI docs, and `check-doc-versions.mjs` normalised it — so the guard was defending the wrong syntax. **Verified** with `@google/gemini-cli` 0.59.0 (#40): the `@./` form is honoured — the two `ENOENT` lines it prints on an un-bootstrapped template prove it (see `BOOTSTRAP.md`). The bare `@x` form (no `./`) is still unverified, and the guard accepts it.
 
 ### The `.claude/` layer works with other agents too
 

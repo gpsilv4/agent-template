@@ -75,7 +75,10 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 | Ticket feature | `/plan` -> implementar -> `/review` |
 | Ticket `L`, ou `M` ambiguo | `/grill` -> `/plan` -> implementar -> `/review` |
 | Ticket refactor | `/refactor` -> implementar -> `/review` |
+| Ticket com UI | o fluxo do tipo dele, e `/design-review` depois do `/review` |
 | Sprint completo | implementar todos -> `/review` -> `/deploy` |
+| Milestone (fim de sprint, pre-release) | `/audit` -> propostas de backlog, com aprovacao |
+| Estrategia de produto | `/market-scan` -> propostas de backlog, com aprovacao |
 
 - O `/deploy` so corre quando o sprint esta completo — tickets individuais fazem commit no branch mas nao deploy
 

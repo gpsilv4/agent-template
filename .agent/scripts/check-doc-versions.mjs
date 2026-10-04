@@ -173,9 +173,9 @@ guardsRun += guardBudgets({ read, warn, note, ok, skip, listDir, ehDerivado });
 // coisa — paridade textual lida como paridade funcional, que e o `TP2`. O guard defendia a
 // sintaxe errada como invariante.
 //
-// POR VERIFICAR (a unica medicao que fecha isto): abrir o Gemini CLI num clone e correr
-// `/memory show`, para ver o que ele de facto carregou. Ate la, a forma documentada e a
-// aposta certa; a anterior era uma aposta errada com um guard a defende-la.
+// VERIFICADO com o `@google/gemini-cli` 0.59.0 (#40): a forma `@./` e honrada — os dois `ENOENT`
+// que ele imprime num template por estrear sao a prova (`BOOTSTRAP.md`). Fica por verificar a forma
+// `@x` sem `./`, que o `normalize` abaixo aceita (#195).
 const claude = readMeaningful("CLAUDE.md");
 const gemini = readMeaningful("GEMINI.md");
 if (claude !== null && gemini !== null) {
