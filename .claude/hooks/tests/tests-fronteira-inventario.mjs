@@ -308,6 +308,14 @@ const FECHADO_PELO_CAMINHO = [
   ["`uniq -` com saida", "cd .githooks && cat /tmp/evil | uniq - pre-commit", CTX, "verbo-nao-e-leitura:uniq"],
   ["`uniq -- -` com saida", "cd .githooks && printf x | uniq -- - commit-msg", CTX, "verbo-nao-e-leitura:uniq"],
   ["`sort -o` dentro de `$(...)`", "cd .claude/hooks && echo $(sort -o x y)", CTX, "verbo-nao-e-leitura:sort"],
+  // Da leitura do 65a7fdd: `-tt` e `-t` com valor colado, e o `-o` seguinte escreve; um `$O` expande
+  // para uma flag; e uma redireccao de saida dentro de `$(...)` com verbo inofensivo.
+  ["`sort -tt -o`", "cd .githooks && sort -tt -o pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
+  ["`sort -rtk -o`", "cd .githooks && sort -rtk -o pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
+  ["`$(sort -tt -o <fronteira>)`", "cat /tmp/x $(sort -tt -o .claude/settings.json /tmp/a)", CTX, "verbo-nao-e-leitura:sort"],
+  ["`sort $O`", "cd .githooks && O=-o && sort $O pre-commit /tmp/e", CTX, "verbo-nao-e-leitura:sort"],
+  ["`$(true 1>...)`", "cat /tmp/x $(true 1>.claude/settings.json)", CTX, "verbo-nao-e-leitura:true"],
+  ["`$(: 1>...)` depois de um `cd`", "cd .githooks && echo $(: 1>pre-commit)", CTX, "verbo-nao-e-leitura::"],
   // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
   ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
   ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
@@ -350,6 +358,9 @@ const CONTROLO_CAMINHO = [
   ["`$(date)`", "cd .claude/hooks && echo $(date +%s) && ls", CTX],
   ["`sort` com flags de valor", "cd .claude/hooks && ls | sort -t , -k 2 | sort -rn -k1", CTX],
   ["`uniq -c` e `-f 1`", "cd .claude/hooks && ls | uniq -c | uniq -f 1", CTX],
+  ["opcoes longas e `-w`", "cd .claude/hooks && ls | sort --reverse | uniq --count | uniq -c -w 5", CTX],
+  ["`2>/dev/null` e `2>&1` antes do `sort`", "cd .claude/hooks && node t.mjs 2>/dev/null | sort && node t.mjs 2>&1 | sort -n", CTX],
+  ["`2>/dev/null` no proprio `sort`", "cd .claude/hooks && ls | sort -n 2>/dev/null || true >&2", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],

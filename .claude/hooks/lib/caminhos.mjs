@@ -138,15 +138,22 @@ const SEM_MARCADOR = new Set([
 /** `sort` e `uniq` so dispensam o marcador com flags CONHECIDAS — uma allowlist, e nao "sem `-o`":
  *  `--out=`, `--o` (o getopt aceita abreviaturas), `"-o"` e `uniq - <saida>` escreviam e passavam
  *  (leitura do c004591). `valor`: a flag que leva o token seguinte. `uniq` escreve no 2.o operando. */
+//  O `valor` so com letras SEM argumento antes: `-tt -o X` e `-t` com o valor `t` colado, e o `-o X`
+//  a seguir escreve — com `[a-zA-Z]*` o `-o` era saltado como valor (leitura do 65a7fdd).
 const FILTROS = {
-  sort: { flag: /^-[bdfghiMnRrsuVz]*(?:[kt][\w.,:]*)?$/, valor: /^-[a-zA-Z]*[kt]$/, operandos: Infinity },
-  uniq: { flag: /^-[cdDiu]*(?:[fs]\d*)?$/, valor: /^-[a-zA-Z]*[fs]$/, operandos: 1 },
+  sort: {
+    flag: /^-[bdfghiMnRrsuVz]*(?:[kt][\w.,:]*)?$|^--(?:reverse|numeric-sort|unique|ignore-case|stable|human-numeric-sort|version-sort)$/,
+    valor: /^-[bdfghiMnRrsuVz]*[kt]$/,
+    operandos: Infinity,
+  },
+  uniq: { flag: /^-[cdDiu]*(?:[fsw]\d*)?$|^--(?:count|repeated|unique|ignore-case)$/, valor: /^-[cdDiu]*[fsw]$/, operandos: 1 },
 };
 function filtroSeguro({ flag, valor, operandos }, args) {
   let n = 0;
   for (let j = 0; j < args.length; j++) {
     const t = args[j];
-    if (/["'\\]/.test(t)) return false;
+    // Aspas, barra e o que EXPANDE: `O=-o; sort $O <saida>` escrevia — o `$O` contava como operando.
+    if (/["'\\$*?[{~]/.test(t)) return false;
     if (t === "-" || !t.startsWith("-")) n++;
     else if (!flag.test(t)) return false;
     else if (valor.test(t)) j++;
@@ -159,6 +166,9 @@ function filtroSeguro({ flag, valor, operandos }, args) {
  *  dentro e julgado. Exportado: o `porqueAltera` usa o mesmo criterio nos interiores. */
 export function levaMarcador(seg, toks) {
   if (/[$<>]\(/.test(seg)) return true;
+  // Uma redireccao de SAIDA escreve, seja qual for o verbo: `$(true 1>.claude/settings.json)` era
+  // descartado como interior inofensivo. As inofensivas (`2>/dev/null`, `>&2`) nao contam.
+  if (/>/.test(seg.replace(/\d*>{1,2}&?\s*(?:\/dev\/null\b|&\d)/g, " "))) return true;
   let i = 0;
   while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || /^\w+=/.test(toks[i]))) i++;
   const v = toks[i];
