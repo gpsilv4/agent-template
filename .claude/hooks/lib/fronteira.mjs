@@ -140,13 +140,15 @@ function mascaraSubstituicoes(t) {
 /** Este segmento so muda de directorio? Pelo verbo REAL, depois das cabecas (`if cd X`, `builtin
  *  cd X`) — e SEM redireccao nem substituicao: `cd /tmp > <fronteira>` trunca o ficheiro, e o
  *  `$(...)`/crase de `cd $(rm <fronteira>)` corre (a terceira leitura do #185 apanhou os dois). */
+//  Sem contar as redireccoes INOFENSIVAS (`2>/dev/null`, `>&2`): `cd X 2>/dev/null && cat y` e leitura.
 const soMudaDeDirectorio = (s) =>
-  !/[<>`]|\$\(/.test(s) &&
+  !/[<>`]|\$\(/.test(s.replace(/\d*[<>]{1,2}&?\s*(?:\/dev\/null\b|&\d)/g, " ")) &&
   ["cd", "pushd", "popd"].includes((resto(s.replace(/[()]/g, " "))[0] ?? "").replace(/^.*\//, ""));
 
-/** Separadores de segmento. O `do`/`then` so quando e PALAVRA de shell: com `\b`, `x-do` e
- *  `x.then` partiam o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`. */
-const SEPARADOR = /(?:&&|\|\||[;|\n])+|(?<![^\s;&|(])(?:do|then)(?![^\s;&|)])/g;
+/** Separadores de segmento. O `do`/`then` so em POSICAO DE COMANDO (depois de um separador): com
+ *  `\b`, `x-do` partia o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`; e como
+ *  argumento (`grep -r then <fronteira>`) negava uma leitura. */
+const SEPARADOR = /(?:&&|\|\||[;|\n])+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
 
 /** Reescreve, na forma canonica, os caminhos que DAO na fronteira (#185): `../`, `//`, `/./`,
  *  absoluto, `$PWD`, `~` e um `cd` noutro segmento passavam. Cada argumento resolve-se contra o
@@ -381,10 +383,13 @@ export function porqueAltera(texto, ctx = {}) {
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
   if (!FRONTEIRA.test(visivel)) {
     if (!FRONTEIRA.test(texto)) return null;
-    // A crase EXECUTA (fora de aspas simples e de heredoc), e o `semCitacoes` trata-a como aspas:
-    // `` cd `rm -rf <fronteira>` `` passava. E a mesma porta do `$(...)`, noutra sintaxe.
+    // A crase EXECUTA fora de aspas simples e de heredoc: `` cd `rm -rf <fronteira>` `` passava. Julga-se
+    // como COMANDO — um caminho so (o markdown de uma mensagem de commit) nao escreve nada.
     const crases = (texto.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " ")
-      .replace(/'(?:[^'\\]|\\.)*'/g, " ").match(/`[^`]*`/g) ?? []).some((c) => FRONTEIRA.test(` ${c.slice(1, -1)}`));
+      .replace(/'(?:[^'\\]|\\.)*'/g, " ").match(/`[^`]*`/g) ?? []).some((c) => {
+      const dentro = c.slice(1, -1).trim();
+      return !FRONTEIRA.test(` ${dentro.split(/\s+/)[0]}`) && porqueAltera(dentro, ctx) !== null;
+    });
     return opaco || inline || crases ? nega("citado-mas-executado") : null;
   }
 

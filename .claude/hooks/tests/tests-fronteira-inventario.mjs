@@ -244,6 +244,8 @@ const FECHADO_PELO_CAMINHO = [
   ["`then` dentro de uma palavra nao separa", "rm -rf x.then cat .claude/hooks", CTX, "verbo-nao-e-leitura:rm"],
   ["redireccao nua depois de um `cd`", "cd .claude/hooks && > x.mjs", CTX, "verbo-nao-e-leitura:>"],
   ["crase que executa", "cd `rm -rf .claude/hooks`", CTX, "citado-mas-executado"],
+  ["crase em aspas duplas que escreve", "git commit -m \"x `rm -rf .claude/hooks`\"", CTX, "citado-mas-executado"],
+  ["`cd` com `2>/dev/null` e ESCREVER", "cd .claude/hooks 2>/dev/null && cp /tmp/x y.mjs", CTX, CP],
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo
@@ -274,6 +276,11 @@ const CONTROLO_CAMINHO = [
   ["crase entre aspas simples", "echo 'a `rm .claude/hooks/x`'", CTX],
   ["`-do` num nome de ficheiro", "cat .claude/hooks/x-do", CTX],
   ["`cd` para a fronteira e redireccionar para fora", "cd .claude/hooks && cat x.mjs > /tmp/y", CTX],
+  // Da quarta leitura: tres leituras comuns que a terceira correccao passou a negar.
+  ["`cd` com `2>/dev/null` e LER", "cd .claude/hooks 2>/dev/null && cat fronteira.mjs", CTX],
+  ["`pushd`/`popd` em silencio e LER", "pushd .claude/hooks > /dev/null && ls; popd > /dev/null", CTX],
+  ["crase em aspas duplas a citar um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\"", CTX],
+  ["`then` como argumento", "grep -r then .claude/hooks", CTX],
 ];
 
 export function registar({ test, eq }) {
