@@ -151,6 +151,10 @@ const ABERTO = [
   ["DESCUIDO", "chavetas", "rm -rf .claude/{hooks,settings.json}"],
   ["DESCUIDO", "`cd -` de volta a fronteira", "cd .claude/hooks; cd /tmp; cd -; cp /tmp/x y.mjs"],
   ["DESCUIDO", "nome nu num ciclo dentro da fronteira", "while read f; do cd .claude/hooks; rm -rf lib; done"],
+  // Da quinta leitura, anteriores ao #185: o heredoc SEM aspas expande `$(...)` e crases, e o
+  // `semCitacoes` apaga-o como se fosse texto; e um relativo dentro da crase nao segue o `cd`.
+  ["DESCUIDO", "`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
+  ["DESCUIDO", "relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
   // --- Aridade do julgamento: so o PRIMEIRO segmento que toca e julgado -------
   ["DESCUIDO", "prefixar com uma leitura desarma o verbo", `cat .claude/settings.json && cp /tmp/x ${H}`],
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
@@ -246,6 +250,17 @@ const FECHADO_PELO_CAMINHO = [
   ["crase que executa", "cd `rm -rf .claude/hooks`", CTX, "citado-mas-executado"],
   ["crase em aspas duplas que escreve", "git commit -m \"x `rm -rf .claude/hooks`\"", CTX, "citado-mas-executado"],
   ["`cd` com `2>/dev/null` e ESCREVER", "cd .claude/hooks 2>/dev/null && cp /tmp/x y.mjs", CTX, CP],
+  // Da quinta leitura: a isencao da crase so vale para UM caminho sozinho. Com o atalho do primeiro
+  // token, o resto do conteudo corria — e o `rm` corre mesmo que o primeiro comando falhe.
+  ...[
+    "echo `.claude/hooks/x.mjs; rm -rf .claude/hooks`",
+    "`.githooks/x && rm .githooks/y`",
+    "echo \"`.claude/hooks/x.mjs > .claude/settings.json`\"",
+    "echo `.githooks/pre-commit | tee .githooks/pre-commit`",
+    "echo `.claude/settings.json\nrm -rf .claude/hooks`",
+    "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
+    "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
+  ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c, CTX, "citado-mas-executado"]),
 ];
 
 /** Os CONTROLOS do #185: a normalizacao nao pode negar o que nao toca a fronteira. Os de baixo

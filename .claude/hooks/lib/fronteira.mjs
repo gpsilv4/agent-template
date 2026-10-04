@@ -383,12 +383,12 @@ export function porqueAltera(texto, ctx = {}) {
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
   if (!FRONTEIRA.test(visivel)) {
     if (!FRONTEIRA.test(texto)) return null;
-    // A crase EXECUTA fora de aspas simples e de heredoc: `` cd `rm -rf <fronteira>` `` passava. Julga-se
-    // como COMANDO — um caminho so (o markdown de uma mensagem de commit) nao escreve nada.
+    // A crase EXECUTA fora de aspas simples e de heredoc: `` cd `rm -rf <fronteira>` `` passava. So um
+    // CAMINHO SOZINHO (o markdown de uma mensagem de commit) fica isento — `` `<f>; rm -rf <f>` `` nao.
     const crases = (texto.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " ")
       .replace(/'(?:[^'\\]|\\.)*'/g, " ").match(/`[^`]*`/g) ?? []).some((c) => {
       const dentro = c.slice(1, -1).trim();
-      return !FRONTEIRA.test(` ${dentro.split(/\s+/)[0]}`) && porqueAltera(dentro, ctx) !== null;
+      return FRONTEIRA.test(` ${dentro}`) && !/^[^\s;&|<>`$()]+$/.test(dentro);
     });
     return opaco || inline || crases ? nega("citado-mas-executado") : null;
   }
