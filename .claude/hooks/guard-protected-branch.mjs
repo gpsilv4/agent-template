@@ -447,8 +447,7 @@ try {
   const payload = ler();
   const cmd = payload?.tool_input?.command;
   if (typeof cmd !== "string" || !cmd.trim()) process.exit(0);
-  // Grande demais para verificar: um hook que excede o timeout PERMITE (docs do Claude Code), e
-  // nenhum comando de trabalho chega perto. Nega antes de qualquer analise (#224).
+  // Grande demais para verificar (#224): um hook que excede o timeout PERMITE (docs do Claude Code).
   if (cmd.length > MAX_COMANDO) negar(`Comando com mais de ${MAX_COMANDO} caracteres: grande demais para verificar. Conteudo grande vai por ficheiro (ferramenta Write).`);
 
   // Corpos de heredoc saem: uma mensagem de commit que cite `push --force` nao e um push.
@@ -461,7 +460,8 @@ try {
   // segmento proprio, em vez de descartado.
   const corposExecutaveis = [];
   const texto = cmd.replace(
-    /^([^\n]*?)<<-?\s*(['"]?)(\w+)\2([\s\S]*?)^\s*\3\s*$/gm,
+    // `[\t ]`, nao `\s` (#224): o `\s` casa o `\n`, e um `<<TAG` sem terminador era quadratico.
+    /^([^\n]*?)<<-?[\t ]*(['"]?)(\w+)\2([\s\S]*?)^[\t ]*\3[\t ]*$/gm,
     (_todo, preambulo, _q, _tag, corpo) => {
       // O preambulo e o que esta ANTES do `<<` na mesma linha: e ele que diz quem recebe.
       // Quem recebe o corpo pode estar ANTES do `<<` (`bash -s <<EOF`) ou **depois do

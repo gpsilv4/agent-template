@@ -72,4 +72,17 @@ export function registar({ test, corre, repo, eq, contem }) {
       eq(r.decisao, "deny", "o force-push tem de ser negado");
       eq(ms < TECTO_MS, true, `a analise levou ${ms} ms — voltou a ser quadratica? (era ~7 s)`);
     }));
+
+  // O regex dos heredocs tinha `\s` no terminador, que casa o `\n`: cada `<<TAG` sem terminador
+  // percorria as linhas em branco ate ao fim, e ~19k caracteres passavam dos 600 s — ABAIXO do
+  // tecto. Apanhado pela leitura independente do PR #226.
+  test(`tamanho: heredocs sem terminador com linhas em branco respondem em menos de ${TECTO_MS} ms (#224)`, () =>
+    comRepo((d) => {
+      const cmd = `git push --force origin main\n${"a<<EOF\n".repeat(400)}${"\n".repeat(8000)}`;
+      const t0 = Date.now();
+      const r = corre({ tool_input: { command: cmd }, cwd: d });
+      const ms = Date.now() - t0;
+      eq(r.decisao, "deny", "o force-push tem de ser negado");
+      eq(ms < TECTO_MS, true, `a analise levou ${ms} ms — o regex dos heredocs voltou a ser quadratico? (era ~0.5 s por <<)`);
+    }));
 }
