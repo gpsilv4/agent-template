@@ -65,9 +65,10 @@ export function ehCaminhoFronteira(caminho) {
  *  Uma PASTA casa com ou sem a barra final (#185): sem ela, `rm -rf .claude/hooks` e
  *  `mv .claude/hooks /tmp/h` passavam — apagar a pasta inteira era o caso mais grave, e o regex so
  *  via `.claude/hooks/`. O fim do token tem de ser fim mesmo, para `.claude/hooks-old` nao contar.
- *  E o `>` tambem abre um caminho: `echo x >.claude/settings.json`, sem espaco, passava. */
+ *  E o `>` tambem abre um caminho: `echo x >.claude/settings.json`, sem espaco, passava. Tal como o
+ *  `|`, o `&` e o `!` de `>|`, `>&` e `>!` colados ao caminho (#206, leitura do a995596). */
 const FRONTEIRA = new RegExp(
-  "(?:^|[\\s\"'`=(>])(?:\\./)?(?:" +
+  "(?:^|[\\s\"'`=(>|&!])(?:\\./)?(?:" +
     CAMINHOS_FRONTEIRA.map((f) =>
       f.endsWith("/") ? `${f.slice(0, -1).replace(/[.]/g, "\\.")}(?:/|(?=[\\s;|&)>"'\`]|$))` : f.replace(/[.]/g, "\\.")
     ).join("|") +
@@ -86,7 +87,7 @@ const soMudaDeDirectorio = (s) =>
 const LEITURA = new Set([
   "cat", "bat", "less", "more", "head", "tail", "wc", "grep", "rg", "egrep", "fgrep", "awk",
   "sed", "jq", "diff", "cmp", "md5", "md5sum", "shasum", "sha256sum", "file", "stat", "ls",
-  "find", "realpath", "dirname", "basename", "node", "test", "wl-copy", "pbcopy", "echo", "printf",
+  "find", "realpath", "dirname", "basename", "node", "test", "[", "[[", "wl-copy", "pbcopy", "echo", "printf",
   // `git` le e encena; o destrutivo dele ja e tratado pela lista SEGUROS do hook. Sem ele,
   // `git diff .claude/settings.json` era negado — e e precisamente o que se quer poder correr.
   "git",
@@ -99,6 +100,12 @@ const semCitacoes = (t) =>
   t
     .replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " <<HEREDOC ")
     .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, ' "" ');
+
+/** O alvo de uma redireccao ENTRE ASPAS e um caminho, nao texto: `echo x > ".claude/settings.json"`
+ *  passava, porque o `semCitacoes` o apagava (#206, leitura do 81e5942). Tirar as aspas a um alvo
+ *  simples (sem espacos nem expansoes) antes de tudo o resto; no corpo de outras aspas, o
+ *  `semCitacoes` apaga-o na mesma. */
+const desaspaAlvos = (t) => t.replace(/(>&?[|!]?\s*)(["'])([^"'\s$`\\]*)\2/g, "$1$3");
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
 //  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).
@@ -268,7 +275,7 @@ export function porqueAltera(texto, ctx = {}) {
 const MAX_SUBSTITUICOES = 64;
 
 function julga(texto, ctx) {
-  const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
+  const visivel = normalizaCaminhos(semCitacoes(desaspaAlvos(texto)), ctx);
   const opaco = OPACO.test(texto);
   const inline = CODIGO_INLINE.test(texto);
 
@@ -380,7 +387,11 @@ function julga(texto, ctx) {
           ? /^\s*(?:rm|mv|restore|checkout|clean|stash|config|apply|reset)\b/.test(resto)
           : sub === "node" && /^\s*(?:-e|-p|--eval|--print|-r|--require)\b/.test(resto);
       }));
-  const redireciona = /(?:^|[^>\d])>{1,2}&?\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
+  // Com DESCRITOR (#206): `2> <fronteira>`, `1>`, `2>>` e `>|` escrevem. O `[^>\d]` antigo existia para
+  // nao confundir o `2>&1` — que continua a nao casar, porque depois do `&` vem um digito e nao um caminho.
+  // O `>!` e o `>|` do zsh (o shell do Bash tool) tambem escrevem por cima do `noclobber`, e o
+  // `>&!`/`>>&|` tambem (leitura do 81e5942).
+  const redireciona = /(?:^|[^>])>{1,2}&?[|!]?&?\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
 
   // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
   // porque e essa a condicao a relaxar se a negacao for indevida. Varias podem ser verdade ao

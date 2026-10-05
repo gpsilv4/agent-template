@@ -158,12 +158,12 @@ const ABERTO = [
   ["DESCUIDO", "`$(...)` entre aspas duplas", "cd .claude/hooks && echo \"$(rm -rf *)\""],
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
   // --- Verbos de LEITURA que destroem -----------------------------------------
-  // --- Redireccao com descritor explicito -------------------------------------
-  // O `[^>\d]` do regex existe para nao confundir `2>&1`, e exclui qualquer descritor.
-  ["DESCUIDO", "redireccao `2>`", "node /tmp/x 2> .claude/settings.json"],
-  ["DESCUIDO", "redireccao `1>`", "node /tmp/x 1> .githooks/commit-msg"],
+  // A redireccao com descritor (`2>`, `1>`) fechou no #206: esta em `FECHADO_PELO_CAMINHO`.
   // --- Contorno: exige escrever algo de proposito -----------------------------
   ["CONTORNO", "indireccao por variavel", "D=.claude; cp /tmp/x $D/hooks/y.mjs"],
+  // Da leitura do a995596: uma barra a partir o caminho (#223 — a classe do contorno). As aspas vazias
+  // (`>""<caminho>`) fecharam com as aspas no alvo, e estao em `FECHADO_PELO_CAMINHO`.
+  ["CONTORNO", "barra a escapar o caminho", "cat /tmp/x >\\.claude/settings.json"],
   ["CONTORNO", "`script -c` re-interpreta uma string", `script -c "rm ${H}" /tmp/log`],
   ["CONTORNO", "`ssh` com o comando em aspas", `ssh host "rm ${H}"`],
 ];
@@ -333,6 +333,8 @@ const FECHADO_PELO_CAMINHO = [
   ["`>&2x` depois de um `cd`", "cd .claude/hooks && true >&2x", CTX, "verbo-nao-e-leitura:true"],
   ["`>&1x` numa leitura", "cd .claude/hooks && cat a >&1x", CTX, "redireciona"],
   ["`>&<fronteira>`", "cat .claude/hooks/x >&.claude/hooks/y", CTX, "redireciona"],
+  // As redireccoes do #206 (descritor, `>|`/`>!`, colado, alvo entre aspas) vivem no seu ficheiro:
+  // `tests-fronteira-redireccoes.mjs`.
   // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
   ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
   ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
