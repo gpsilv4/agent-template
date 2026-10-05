@@ -161,6 +161,9 @@ const ABERTO = [
   // A redireccao com descritor (`2>`, `1>`) fechou no #206: esta em `FECHADO_PELO_CAMINHO`.
   // --- Contorno: exige escrever algo de proposito -----------------------------
   ["CONTORNO", "indireccao por variavel", "D=.claude; cp /tmp/x $D/hooks/y.mjs"],
+  // Da leitura do a995596: aspas vazias ou uma barra a partir o caminho (#223 — a classe do contorno).
+  ["CONTORNO", "aspas vazias antes do caminho", "cat /tmp/x >\"\".claude/settings.json"],
+  ["CONTORNO", "barra a escapar o caminho", "cat /tmp/x >\\.claude/settings.json"],
   ["CONTORNO", "`script -c` re-interpreta uma string", `script -c "rm ${H}" /tmp/log`],
   ["CONTORNO", "`ssh` com o comando em aspas", `ssh host "rm ${H}"`],
 ];
@@ -338,6 +341,19 @@ const FECHADO_PELO_CAMINHO = [
   ["redireccao `2>` sem espaco", "node /tmp/x 2>.claude/settings.json", CTX, "redireciona"],
   ["redireccao `>|`", "echo x >| .claude/settings.json", CTX, "redireciona"],
   ["`2>` depois de um `cd`", "cd .githooks && node x 2> pre-commit", CTX, "redireciona"],
+  // Da leitura do a995596. Um `>` ESCAPADO antes do `|` e literal, e o `|` e um pipe: o separador novo
+  // deixava o `rm` escondido atras do `echo` (regressao face ao `main`).
+  ["`\\>|` e um pipe", "echo \\>|rm -rf .claude/hooks/", CTX, "verbo-nao-e-leitura:rm"],
+  ["`a\\>|` e um pipe", "echo a\\>|cp /tmp/x .claude/settings.json", CTX, "verbo-nao-e-leitura:cp"],
+  // O `>!` do zsh (o shell do Bash tool), e `>|`/`>&` colados ao caminho — ja passavam no `main`.
+  ["`>!` do zsh", "echo x >! .claude/settings.json", CTX, "redireciona"],
+  ["`2>!` e `>>!`", "echo x 2>! .claude/settings.json; echo y >>! .claude/settings.json", CTX, "redireciona"],
+  ["`>!` colado", "echo x >!.claude/settings.json", CTX, "redireciona"],
+  ["`>|` colado", "cat /tmp/x >|.claude/settings.json", CTX, "redireciona"],
+  ["`2>|` colado", "cat /tmp/x 2>|.claude/settings.json", CTX, "redireciona"],
+  ["`>&` colado", "echo x >&.githooks/pre-commit", CTX, "redireciona"],
+  ["`>|` colado depois de um `cd`", "cd .githooks && echo x >|pre-commit", CTX, "redireciona"],
+  ["`>!` colado depois de um `cd`", "cd .githooks && echo x >!pre-commit", CTX, "redireciona"],
   // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
   ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
   ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
@@ -385,6 +401,8 @@ const CONTROLO_CAMINHO = [
   ["`2>&1` e `>&2-` a correr da fronteira", "node .claude/hooks/tests/x.mjs 2>&1 >&2-", CTX],
   ["`2>/tmp/log` a correr da fronteira", "node .claude/hooks/tests/x.mjs 2>/tmp/log", CTX],
   ["`2>&1 > /tmp/y` a ler da fronteira", "cat .claude/hooks/x 2>&1 > /tmp/y", CTX],
+  ["`>|` para fora a correr da fronteira", "node .claude/hooks/a.mjs >| /tmp/y", CTX],
+  ["`>|` sem espaco e um alvo, nao um pipe", "cat x>|rm", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],

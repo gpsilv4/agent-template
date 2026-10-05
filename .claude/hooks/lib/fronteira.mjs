@@ -65,9 +65,10 @@ export function ehCaminhoFronteira(caminho) {
  *  Uma PASTA casa com ou sem a barra final (#185): sem ela, `rm -rf .claude/hooks` e
  *  `mv .claude/hooks /tmp/h` passavam — apagar a pasta inteira era o caso mais grave, e o regex so
  *  via `.claude/hooks/`. O fim do token tem de ser fim mesmo, para `.claude/hooks-old` nao contar.
- *  E o `>` tambem abre um caminho: `echo x >.claude/settings.json`, sem espaco, passava. */
+ *  E o `>` tambem abre um caminho: `echo x >.claude/settings.json`, sem espaco, passava. Tal como o
+ *  `|`, o `&` e o `!` de `>|`, `>&` e `>!` colados ao caminho (#206, leitura do a995596). */
 const FRONTEIRA = new RegExp(
-  "(?:^|[\\s\"'`=(>])(?:\\./)?(?:" +
+  "(?:^|[\\s\"'`=(>|&!])(?:\\./)?(?:" +
     CAMINHOS_FRONTEIRA.map((f) =>
       f.endsWith("/") ? `${f.slice(0, -1).replace(/[.]/g, "\\.")}(?:/|(?=[\\s;|&)>"'\`]|$))` : f.replace(/[.]/g, "\\.")
     ).join("|") +
@@ -382,7 +383,8 @@ function julga(texto, ctx) {
       }));
   // Com DESCRITOR (#206): `2> <fronteira>`, `1>`, `2>>` e `>|` escrevem. O `[^>\d]` antigo existia para
   // nao confundir o `2>&1` — que continua a nao casar, porque depois do `&` vem um digito e nao um caminho.
-  const redireciona = /(?:^|[^>])>{1,2}\|?&?\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
+  // O `>!` e o `>|` do zsh (o shell do Bash tool) tambem escrevem por cima do `noclobber`.
+  const redireciona = /(?:^|[^>])>{1,2}[|!]?&?\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
 
   // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
   // porque e essa a condicao a relaxar se a negacao for indevida. Varias podem ser verdade ao

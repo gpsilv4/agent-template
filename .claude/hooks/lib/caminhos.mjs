@@ -81,8 +81,10 @@ function mascaraSubstituicoes(t) {
 /** Separadores de segmento. O `do`/`then` so em POSICAO DE COMANDO (depois de um separador): com
  *  `\b`, `x-do` partia o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`; e como
  *  argumento (`grep -r then <fronteira>`) negava uma leitura. */
-//  O `|` de `>|` (escrever por cima do `noclobber`) e da redireccao, nao um pipe (#206).
-export const SEPARADOR = /(?:&&|\|\||[;\n]|(?<!>)\|)+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
+//  O `|` de `>|` (escrever por cima do `noclobber`) e da redireccao, nao um pipe (#206). So com um `>`
+//  NAO escapado: em `echo \>|rm -rf <f>` o `\>` e literal e o `|` e um pipe — sem isto o `rm` ficava
+//  escondido atras do `echo` (leitura do a995596).
+export const SEPARADOR = /(?:&&|\|\||[;\n]|(?<!(?<!\\)>)\|)+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
 
 /** Os pedacos de um comando, partidos pelo `SEPARADOR` sobre o texto com os `$(...)` MASCARADOS:
  *  `[ini, fim]` para cada segmento, e a string para cada separador. Uma so leitura da estrutura,
@@ -202,10 +204,11 @@ export function normalizaCaminhos(visivel, ctx = {}) {
       } else if (toks[0] !== "for") {
         const dentro = formaCanonica(dir);
         let primeiro = true;
-        // `>&` tambem abre um alvo: `>&1x` e o `&>1x` do bash, e escreve `1x` (leitura do 024753a).
-        out = seg.replace(/(^|[\s=(>]|>&)([^\s=()<>|;&]+)/g, (m, pre, tok, off) => {
+        // `>&` tambem abre um alvo: `>&1x` e o `&>1x` do bash, e escreve `1x` (leitura do 024753a). E o
+        // `>|` (noclobber) e o `>!` do zsh, colados ao nome (leitura do a995596).
+        out = seg.replace(/(^|[\s=(>]|>[&|!])([^\s=()<>|;&!]+)/g, (m, pre, tok, off) => {
           // Um alvo de redireccao nunca e o verbo, e resolve-se sempre: `> pre-commit` e um caminho.
-          const redir = /[<>]&?\s*$/.test(seg.slice(0, off + pre.length));
+          const redir = /[<>][&|!]?\s*$/.test(seg.slice(0, off + pre.length));
           if (primeiro && !redir) {
             primeiro = false;
             return m;
