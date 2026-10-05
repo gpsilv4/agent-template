@@ -129,37 +129,16 @@ const FECHOS = new Set(["fi", "done", "esac", "}"]);
 
 /** Verbos que NAO escrevem ficheiros, sem o marcador: com ele, a leitura de todos os dias depois
  *  de um `cd` para a fronteira era negada (`| sort | uniq -c`, `|| true`, `|| exit 1`). Medido pela
- *  leitura do commit. `sort` e `uniq` escrevem — ver `FILTROS`. */
+ *  leitura do commit. So entra um verbo que nao escreve ficheiros com NENHUMA flag.
+ *
+ *  O `sort` e o `uniq` NAO entram, e e deliberado: escrevem (`-o`, o 2.o operando), e uma allowlist
+ *  das flags deles teve um buraco novo em cada uma de tres leituras seguidas — `--out=`, `--o`
+ *  abreviado, `"-o"`, `uniq - <saida>`, `-tt -o`, `$O`. Depois de um `cd` para a fronteira, `| sort`
+ *  e negado: e um falso positivo raro, e o `main` ja o negava com a barra final. */
 const SEM_MARCADOR = new Set([
   ...FECHOS, "set", "export", "true", "false", ":", "exit", "return", "sleep", "wait", "break",
   "continue", "shift", "read", "tr", "cut", "column", "date", "pwd",
 ]);
-
-/** `sort` e `uniq` so dispensam o marcador com flags CONHECIDAS — uma allowlist, e nao "sem `-o`":
- *  `--out=`, `--o` (o getopt aceita abreviaturas), `"-o"` e `uniq - <saida>` escreviam e passavam
- *  (leitura do c004591). `valor`: a flag que leva o token seguinte. `uniq` escreve no 2.o operando. */
-//  O `valor` so com letras SEM argumento antes: `-tt -o X` e `-t` com o valor `t` colado, e o `-o X`
-//  a seguir escreve — com `[a-zA-Z]*` o `-o` era saltado como valor (leitura do 65a7fdd).
-const FILTROS = {
-  sort: {
-    flag: /^-[bdfghiMnRrsuVz]*(?:[kt][\w.,:]*)?$|^--(?:reverse|numeric-sort|unique|ignore-case|stable|human-numeric-sort|version-sort)$/,
-    valor: /^-[bdfghiMnRrsuVz]*[kt]$/,
-    operandos: Infinity,
-  },
-  uniq: { flag: /^-[cdDiu]*(?:[fsw]\d*)?$|^--(?:count|repeated|unique|ignore-case)$/, valor: /^-[cdDiu]*[fsw]$/, operandos: 1 },
-};
-function filtroSeguro({ flag, valor, operandos }, args) {
-  let n = 0;
-  for (let j = 0; j < args.length; j++) {
-    const t = args[j];
-    // Aspas, barra e o que EXPANDE: `O=-o; sort $O <saida>` escrevia — o `$O` contava como operando.
-    if (/["'\\$*?[{~]/.test(t)) return false;
-    if (t === "-" || !t.startsWith("-")) n++;
-    else if (!flag.test(t)) return false;
-    else if (valor.test(t)) j++;
-  }
-  return n <= operandos;
-}
 
 /** O segmento leva o directorio — PODE escrever? Pelo verbo depois das atribuicoes e de `while`/
  *  `until`/`{`, que abrem e nao sao o comando. Uma substituicao leva-o SEMPRE: o que corre la
@@ -173,7 +152,6 @@ export function levaMarcador(seg, toks) {
   while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || /^\w+=/.test(toks[i]))) i++;
   const v = toks[i];
   if (v === undefined || v.startsWith("#")) return false;
-  if (FILTROS[v]) return !filtroSeguro(FILTROS[v], toks.slice(i + 1));
   return !SEM_MARCADOR.has(v);
 }
 

@@ -179,6 +179,11 @@ const FALSO_POSITIVO = [
   // A mesma classe, depois de um `cd` para a fronteira (#185): o segmento leva o directorio e o
   // `resto()` nunca consome uma atribuicao — falha FECHADO, de proposito.
   ["atribuicao de ambiente, depois de um `cd` para a fronteira", "cd .claude/hooks && X=y cat a"],
+  // O `sort` e o `uniq` nao dispensam o marcador (#185): escrevem, e a allowlist das flags deles teve
+  // um buraco novo em cada uma de tres leituras. Negar estas e o preco aceite — ver `SEM_MARCADOR`.
+  ["`| sort | uniq -c` depois de um `cd` para a fronteira", "cd .claude/hooks && node tests/test-hooks.mjs | sort | uniq -c"],
+  ["`<(sort ...)` da fronteira", "diff <(sort .claude/hooks/a.mjs) <(sort .claude/hooks/b.mjs)"],
+  ["`$(ls | sort)` depois de um `cd` para a fronteira", "cd .claude/hooks && wc -l $(ls | sort)"],
 ];
 
 /**
@@ -299,8 +304,8 @@ const FECHADO_PELO_CAMINHO = [
   ["`export` com `$(...)` que apaga", "cd .claude/hooks && export X=$(rm -rf *)", CTX, "verbo-nao-e-leitura:export"],
   ["`sleep` com `$(...)` que apaga", "cd .claude/hooks && sleep $(rm -rf *)", CTX, "verbo-nao-e-leitura:sleep"],
   ["`tee` a jusante", "cd .claude/hooks && cat x | tee y", CTX, "verbo-nao-e-leitura:tee"],
-  // Da leitura do c004591. O `sort`/`uniq` so dispensam o marcador com flags CONHECIDAS: estas
-  // formas escreviam (medido no `sort` do macOS) e passavam com o "sem `-o`".
+  // Das leituras do c004591 e do 65a7fdd: estas formas escreviam (medido no `sort` do macOS) e
+  // passavam com uma allowlist das flags. O `sort`/`uniq` deixaram de dispensar o marcador.
   ["`sort --out=`", "cd .githooks && sort --out=pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
   ["`sort --o` abreviado", "cd .githooks && echo hi | sort --o pre-commit", CTX, "verbo-nao-e-leitura:sort"],
   ["`sort \"-o\"` entre aspas", "cd .githooks && sort \"-o\" pre-commit /tmp/evil", CTX, "verbo-nao-e-leitura:sort"],
@@ -340,7 +345,6 @@ const CONTROLO_CAMINHO = [
   ["`sleep 1` e ler", "cd .claude/hooks && sleep 1 && cat x", CTX],
   // `cd <fronteira> && X=y cat a` saiu daqui para `FALSO_POSITIVO`: e a classe da atribuicao.
   // Da leitura do a8cfbd4: o marcador negava estas, que o `main` deixava passar (sem a barra).
-  ["`| sort | uniq -c`", "cd .claude/hooks && node tests/test-hooks.mjs | sort | uniq -c", CTX],
   ["`|| true`", "cd .claude/hooks && node a.mjs | grep -c ok || true", CTX],
   ["`|| exit 1` num ciclo", "cd .claude/hooks && for f in tests/*.mjs; do node $f || exit 1; done", CTX],
   ["filtros", "cd .claude/hooks && node a.mjs | tr a b | cut -d: -f1 | column -t", CTX],
@@ -352,15 +356,10 @@ const CONTROLO_CAMINHO = [
   ["`<(...)` que le", "diff <(git show main:.claude/hooks/x.mjs) .claude/hooks/x.mjs", CTX],
   ["`$(...)` que le", "wc -l $(git ls-files .claude/hooks)", CTX],
   // Da leitura do c004591: o interior de uma substituicao julga-se pelo criterio do marcador.
-  ["`<(sort ...)`", "diff <(sort .claude/hooks/a.mjs) <(sort .claude/hooks/b.mjs)", CTX],
-  ["`$(ls | sort)`", "cd .claude/hooks && wc -l $(ls | sort)", CTX],
   ["`$(... | tr ...)`", "cat .claude/hooks/x $(echo a | tr a b)", CTX],
   ["`$(date)`", "cd .claude/hooks && echo $(date +%s) && ls", CTX],
-  ["`sort` com flags de valor", "cd .claude/hooks && ls | sort -t , -k 2 | sort -rn -k1", CTX],
-  ["`uniq -c` e `-f 1`", "cd .claude/hooks && ls | uniq -c | uniq -f 1", CTX],
-  ["opcoes longas e `-w`", "cd .claude/hooks && ls | sort --reverse | uniq --count | uniq -c -w 5", CTX],
-  ["`2>/dev/null` e `2>&1` antes do `sort`", "cd .claude/hooks && node t.mjs 2>/dev/null | sort && node t.mjs 2>&1 | sort -n", CTX],
-  ["`2>/dev/null` no proprio `sort`", "cd .claude/hooks && ls | sort -n 2>/dev/null || true >&2", CTX],
+  ["`2>/dev/null` e `2>&1` antes de um filtro", "cd .claude/hooks && node t.mjs 2>/dev/null | cut -c1-80 && node t.mjs 2>&1 | tr a b", CTX],
+  ["`2>/dev/null` no proprio filtro", "cd .claude/hooks && ls | tr a b 2>/dev/null || true >&2", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],
