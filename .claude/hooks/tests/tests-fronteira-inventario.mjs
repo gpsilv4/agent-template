@@ -321,6 +321,18 @@ const FECHADO_PELO_CAMINHO = [
   ["`sort $O`", "cd .githooks && O=-o && sort $O pre-commit /tmp/e", CTX, "verbo-nao-e-leitura:sort"],
   ["`$(true 1>...)`", "cat /tmp/x $(true 1>.claude/settings.json)", CTX, "verbo-nao-e-leitura:true"],
   ["`$(: 1>...)` depois de um `cd`", "cd .githooks && echo $(: 1>pre-commit)", CTX, "verbo-nao-e-leitura::"],
+  // Da leitura do 024753a. Uma funcao ou um `trap` correm o corpo noutro sitio: o verbo escrito deixa
+  // de dizer o que corre (`true(){ rm; }` sombreia o `true` isento). E `>&<nome>` escreve `<nome>`.
+  ["funcao com o nome de um verbo isento", "true(){ rm -rf *; }; cd .claude/hooks && true", CTX, "execucao-adiada"],
+  ["`function` com o nome de um verbo isento", "function date { rm -rf *; }; cd .claude/hooks && date", CTX, "execucao-adiada"],
+  ["funcao definida depois do `cd`", "cd .claude/hooks && tr() { rm -rf *; } && tr a b", CTX, "execucao-adiada"],
+  ["funcao com o nome de uma leitura", "cat(){ rm -rf .claude/hooks; }; cat .claude/hooks/x", CTX, "execucao-adiada"],
+  ["`trap` antes do `cd`", "trap \"rm -rf *\" EXIT; cd .claude/hooks", CTX, "execucao-adiada"],
+  ["`trap` dentro de um `if`", "if true; then trap \"rm *\" EXIT; fi; cd .claude/hooks", CTX, "execucao-adiada"],
+  ["`trap` com a fronteira citada", "trap \"rm .claude/hooks/x\" EXIT; ls", CTX, "citado-mas-executado"],
+  ["`>&2x` depois de um `cd`", "cd .claude/hooks && true >&2x", CTX, "verbo-nao-e-leitura:true"],
+  ["`>&1x` numa leitura", "cd .claude/hooks && cat a >&1x", CTX, "redireciona"],
+  ["`>&<fronteira>`", "cat .claude/hooks/x >&.claude/hooks/y", CTX, "redireciona"],
   // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
   ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
   ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
@@ -360,6 +372,10 @@ const CONTROLO_CAMINHO = [
   ["`$(date)`", "cd .claude/hooks && echo $(date +%s) && ls", CTX],
   ["`2>/dev/null` e `2>&1` antes de um filtro", "cd .claude/hooks && node t.mjs 2>/dev/null | cut -c1-80 && node t.mjs 2>&1 | tr a b", CTX],
   ["`2>/dev/null` no proprio filtro", "cd .claude/hooks && ls | tr a b 2>/dev/null || true >&2", CTX],
+  // Da leitura do 024753a: o `function` como ARGUMENTO nao define nada, e um descritor nao e ficheiro.
+  ["`function` como argumento", "grep -n function .claude/hooks/lib/fronteira.mjs", CTX],
+  ["descritores `2>&1` e `>&2-`", "cd .claude/hooks && node t.mjs 2>&1 >&2- | cat", CTX],
+  ["`</dev/null` no `cd`", "cd .claude/hooks </dev/null && cat x", CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],

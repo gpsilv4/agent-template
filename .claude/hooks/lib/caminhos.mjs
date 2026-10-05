@@ -124,6 +124,11 @@ export function substituicoes(t) {
   return fora;
 }
 
+/** `2>/dev/null`, `>&2`, `2>&1`: redireccoes que nao escrevem ficheiro nenhum. Com FIM de palavra:
+ *  `>&2x` e o `&>2x` do bash — cria o ficheiro `2x` — e o `&\d` sem ancora apagava-o como
+ *  inofensivo (leitura do 024753a). Partilhado com o `soMudaDeDirectorio` do `fronteira.mjs`. */
+export const REDIRECCAO_INOFENSIVA = /\d*[<>]{1,2}&?\s*(?:\/dev\/null|&\d+-?)(?=$|[\s;|&)<>])/g;
+
 /** Fechos de bloco: nao sao comandos, e o marcador do directorio nao lhes vai. */
 const FECHOS = new Set(["fi", "done", "esac", "}"]);
 
@@ -147,7 +152,7 @@ export function levaMarcador(seg, toks) {
   if (/[$<>]\(/.test(seg)) return true;
   // Uma redireccao de SAIDA escreve, seja qual for o verbo: `$(true 1>.claude/settings.json)` era
   // descartado como interior inofensivo. As inofensivas (`2>/dev/null`, `>&2`) nao contam.
-  if (/>/.test(seg.replace(/\d*>{1,2}&?\s*(?:\/dev\/null\b|&\d)/g, " "))) return true;
+  if (/>/.test(seg.replace(REDIRECCAO_INOFENSIVA, " "))) return true;
   let i = 0;
   while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || /^\w+=/.test(toks[i]))) i++;
   const v = toks[i];
@@ -196,13 +201,16 @@ export function normalizaCaminhos(visivel, ctx = {}) {
       } else if (toks[0] !== "for") {
         const dentro = formaCanonica(dir);
         let primeiro = true;
-        out = seg.replace(/(^|[\s=(>])([^\s=()<>|;&]+)/g, (m, pre, tok, off) => {
+        // `>&` tambem abre um alvo: `>&1x` e o `&>1x` do bash, e escreve `1x` (leitura do 024753a).
+        out = seg.replace(/(^|[\s=(>]|>&)([^\s=()<>|;&]+)/g, (m, pre, tok, off) => {
           // Um alvo de redireccao nunca e o verbo, e resolve-se sempre: `> pre-commit` e um caminho.
-          const redir = /[<>]\s*$/.test(seg.slice(0, off + pre.length));
+          const redir = /[<>]&?\s*$/.test(seg.slice(0, off + pre.length));
           if (primeiro && !redir) {
             primeiro = false;
             return m;
           }
+          // Um descritor (`2>&1`, `>&2-`) nao e ficheiro nenhum.
+          if (pre === ">&" && /^\d+-?$|^-$/.test(tok)) return m;
           if (tok.startsWith("-") || (dentro && !redir && !COM_FORMA_DE_CAMINHO.test(tok))) return m;
           const c = formaCanonica(relativo(tok, dir, ctx));
           return c !== null && c !== tok ? pre + c : m;

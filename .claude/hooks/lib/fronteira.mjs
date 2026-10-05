@@ -29,7 +29,7 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { levaMarcador, normalizaCaminhos, pedacosDe, substituicoes } from "./caminhos.mjs";
+import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
 export { contextoFronteira } from "./caminhos.mjs";
 
@@ -79,7 +79,7 @@ const FRONTEIRA = new RegExp(
  *  `$(...)`/crase de `cd $(rm <fronteira>)` corre (a terceira leitura do #185 apanhou os dois). */
 //  Sem contar as redireccoes INOFENSIVAS (`2>/dev/null`, `>&2`): `cd X 2>/dev/null && cat y` e leitura.
 const soMudaDeDirectorio = (s) =>
-  !/[<>`]|\$\(/.test(s.replace(/\d*[<>]{1,2}&?\s*(?:\/dev\/null\b|&\d)/g, " ")) &&
+  !/[<>`]|\$\(/.test(s.replace(REDIRECCAO_INOFENSIVA, " ")) &&
   ["cd", "pushd", "popd"].includes((resto(s.replace(/[()]/g, " "))[0] ?? "").replace(/^.*\//, ""));
 
 /** Verbos que apenas LEEM. Tudo o que nao esta aqui e tratado como escrita. */
@@ -101,7 +101,14 @@ const semCitacoes = (t) =>
     .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, ' "" ');
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
-const OPACO = /\b(?:eval|xargs)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
+//  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).
+const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
+
+/** Execucao ADIADA: uma funcao definida, ou um `trap`, corre o corpo noutro sitio — depois de um
+ *  `cd` para a fronteira, ou com o nome de um verbo isento (`true(){ rm -rf *; }; cd <f> && true`).
+ *  O verbo escrito deixa de dizer o que corre; num comando que toque a fronteira, nega. */
+//  Em POSICAO DE COMANDO: `grep -n function <f>` e um argumento, e era negado.
+const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|[\w.:-]+\s*\(\s*\))/;
 
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
@@ -282,6 +289,8 @@ function julga(texto, ctx) {
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
   // comando e o "verbo" do segmento seguinte e um pedaco do padrao de procura.
+  // Antes do `tocam`: o segmento do `cd` sai dele, e e o `cd` que leva o corpo para a fronteira.
+  if (ADIADA.test(visivel)) return nega("execucao-adiada");
   const segmentos = pedacosDe(visivel).pedacos.filter((p) => typeof p !== "string").map(([a, b]) => visivel.slice(a, b));
   // Um `cd`/`pushd`/`popd` so muda de directorio: o que corre DEPOIS ja e julgado com o directorio
   // novo (`normalizaCaminhos`, #185). Contado aqui, era o primeiro segmento a tocar e, quando o
@@ -371,7 +380,7 @@ function julga(texto, ctx) {
           ? /^\s*(?:rm|mv|restore|checkout|clean|stash|config|apply|reset)\b/.test(resto)
           : sub === "node" && /^\s*(?:-e|-p|--eval|--print|-r|--require)\b/.test(resto);
       }));
-  const redireciona = /(?:^|[^>\d])>{1,2}\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
+  const redireciona = /(?:^|[^>\d])>{1,2}&?\s*(?:\.\/)?(?:\.claude|\.githooks)\//.test(alvo) || /\btee\b/.test(alvo);
 
   // A ORDEM E A DA DECISAO, nao a de importancia: quem le quer saber o que disparou PRIMEIRO,
   // porque e essa a condicao a relaxar se a negacao for indevida. Varias podem ser verdade ao
