@@ -81,7 +81,8 @@ function mascaraSubstituicoes(t) {
 /** Separadores de segmento. O `do`/`then` so em POSICAO DE COMANDO (depois de um separador): com
  *  `\b`, `x-do` partia o comando e `rm -rf x-do cat <fronteira>` era julgado pelo `cat`; e como
  *  argumento (`grep -r then <fronteira>`) negava uma leitura. */
-export const SEPARADOR = /(?:&&|\|\||[;|\n])+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
+//  O `|` de `>|` (escrever por cima do `noclobber`) e da redireccao, nao um pipe (#206).
+export const SEPARADOR = /(?:&&|\|\||[;\n]|(?<!>)\|)+|(?<=(?:^|[;\n&|(])\s*)(?:do|then)(?![^\s;&|)])/g;
 
 /** Os pedacos de um comando, partidos pelo `SEPARADOR` sobre o texto com os `$(...)` MASCARADOS:
  *  `[ini, fim]` para cada segmento, e a string para cada separador. Uma so leitura da estrutura,
