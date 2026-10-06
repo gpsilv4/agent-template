@@ -150,8 +150,6 @@ const limpo = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
  *  token, o verbo passa a ser DESCONHECIDO e falha fechado. */
 const OPACO = "\u0000opaco\u0000";
 
-/** O indice `i` cai dentro de um par de aspas ainda aberto? Varre do inicio, porque o estado
- *  de aspas nao e local. Uma barra invertida escapa o caractere seguinte. */
 /** A primeira palavra do texto e um wrapper que volta a interpretar o que recebe? Se sim, o
  *  que esta dentro de aspas E codigo e tem de partir; se nao, e um argumento literal. */
 function comandoOpaco(txt) {
@@ -159,15 +157,18 @@ function comandoOpaco(txt) {
   return WRAPPERS_OPACOS.has(primeira);
 }
 
-function dentroDeAspas(txt, i) {
+/** Para cada indice: cai dentro de um par de aspas aberto? UMA passagem (#224): perguntar indice a
+ *  indice relia do inicio, e 200k parenteses eram 60 s — e um hook que excede o timeout PERMITE. */
+function zonasCitadas(txt) {
+  const z = new Uint8Array(txt.length + 1);
   let aspa = null;
-  for (let k = 0; k < i; k++) {
+  for (let k = 0; k < txt.length; k++) {
+    z[k] = aspa !== null;
     const c = txt[k];
-    if (c === "\\") { k++; continue; }
-    if (aspa) { if (c === aspa) aspa = null; }
-    else if (c === "'" || c === '"') aspa = c;
+    if (c === "\\") { z[k + 1] = z[k]; k++; continue; } // a barra escapa o seguinte
+    if (aspa) { if (c === aspa) aspa = null; } else if (c === "'" || c === '"') aspa = c;
   }
-  return aspa !== null;
+  return z;
 }
 
 function segmentos(texto) {
@@ -187,8 +188,8 @@ function segmentos(texto) {
       return ` ${OPACO} `;
     });
   }
-  const partir = (x) =>
-    x
+  const partir = (x0) => {
+    const x = x0
       // Redireções: `>out.txt git commit` e forma valida de shell, e partir no `>` fazia o
       // segmento comecar em `out.txt` — nao havia invocacao nenhuma. O destino e consumido.
       //
@@ -197,28 +198,21 @@ function segmentos(texto) {
       // verbo era `make`/`npm`. Cinco bypasses medidos, entre eles um `push --force`. O alvo
       // de uma redireção nunca contem um separador de shell — enumera-los aqui e o que
       // impede o consumo de atravessar a fronteira do comando.
-      .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ")
-      // Separadores. `;`, `&`, `|` e newline partem SEMPRE, mesmo dentro de aspas: e o que
-      // mantem `eval "a; git commit"` negado, e falhar fechado ali vale mais do que a
-      // precisao. Mas `(`/`)`/`{`/`}` **so partem fora de aspas** — tratá-los como separador
-      // dentro de uma string fazia `echo "(git push --force)"` e
-      // `python3 -c "print('git push --force')"` serem NEGADOS, sem branch nenhum onde
-      // passassem (o force-push e avaliado antes do branch). Medido: bloqueou duas chamadas
-      // legitimas de um revisor. Negar trabalho legitimo custa tanto como deixar passar.
-      // `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o comando que
-      // as abre nao e um wrapper opaco. `eval "a; git commit"` tem de partir (o shell volta a
-      // interpretar a string); `echo "a; git push --force"` e
-      // `rg "build && git push --force" docs/` nao — ali o texto e um ARGUMENTO, nunca corre,
-      // e nega-los bloqueia trabalho de leitura. Medido tres vezes numa so sessao, incluindo
-      // um `grep` cuja string de pesquisa citava um comando.
-      .replace(/[;&|\n]+/g, (m, i, txt) => (dentroDeAspas(txt, i) && !comandoOpaco(txt) ? m : "\n"))
-      .replace(/[(){}]/g, (m, i, txt) => (dentroDeAspas(txt, i) ? m : "\n"))
-      .split("\n")
-      .map((seg) => seg.trim())
-      .filter(Boolean);
+      .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ");
+    const [z1, opaco] = [zonasCitadas(x), comandoOpaco(x)]; // uma vez por texto, nao por separador
+    const y = x
+      // Separadores. `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o
+      // comando nao e um wrapper opaco: `eval "a; git commit"` parte (o shell reinterpreta a
+      // string); `echo "a; git push --force"` e `rg "build && git push --force" docs/` nao — o
+      // texto e um ARGUMENTO, e nega-los bloqueava leitura (medido tres vezes numa sessao).
+      // `(`/`)`/`{`/`}` so partem fora de aspas: `echo "(git push --force)"` e
+      // `python3 -c "print('git push --force')"` eram NEGADOS (medido: dois de um revisor).
+      .replace(/[;&|\n]+/g, (m, i) => (z1[i] && !opaco ? m : "\n"));
+    const z2 = zonasCitadas(y);
+    return y.replace(/[(){}]/g, (m, i) => (z2[i] ? m : "\n")).split("\n").map((seg) => seg.trim()).filter(Boolean);
+  };
   return [...partir(t), ...internos.flatMap(partir)];
 }
-
 
 /** As invocacoes de `git` de um comando, cada uma com o seu verbo (ou `null` se nao se
  *  conseguir determinar — e um `null` conta como NAO seguro). */
@@ -433,6 +427,8 @@ function branchDe(dir) {
   }
 }
 
+const MAX_COMANDO = 100_000;
+
 /** Nega, no formato que o Claude Code entende. */
 function negar(razao) {
   console.log(
@@ -451,6 +447,8 @@ try {
   const payload = ler();
   const cmd = payload?.tool_input?.command;
   if (typeof cmd !== "string" || !cmd.trim()) process.exit(0);
+  // Grande demais para verificar (#224): um hook que excede o timeout PERMITE (docs do Claude Code).
+  if (cmd.length > MAX_COMANDO) negar(`Comando com mais de ${MAX_COMANDO} caracteres: grande demais para verificar. Conteudo grande vai por ficheiro (ferramenta Write).`);
 
   // Corpos de heredoc saem: uma mensagem de commit que cite `push --force` nao e um push.
   // As aspas NAO saem — retira-las em bloco foi o que fez `eval "git commit"` escapar. Aqui
@@ -462,7 +460,8 @@ try {
   // segmento proprio, em vez de descartado.
   const corposExecutaveis = [];
   const texto = cmd.replace(
-    /^([^\n]*?)<<-?\s*(['"]?)(\w+)\2([\s\S]*?)^\s*\3\s*$/gm,
+    // `[\t ]`, nao `\s` (#224): o `\s` casa o `\n`, e um `<<TAG` sem terminador era quadratico.
+    /^([^\n]*?)<<-?[\t ]*(['"]?)(\w+)\2([\s\S]*?)^[\t ]*\3[\t ]*$/gm,
     (_todo, preambulo, _q, _tag, corpo) => {
       // O preambulo e o que esta ANTES do `<<` na mesma linha: e ele que diz quem recebe.
       // Quem recebe o corpo pode estar ANTES do `<<` (`bash -s <<EOF`) ou **depois do
