@@ -120,6 +120,11 @@ const EXECUTADO_EM_TEXTO = [
   ["`$'...'` dentro de `$(...)`", "echo \"$(echo $'\\'')\" ; rm .claude/hooks/x ; echo \"'\""],
   // Um delimitador de heredoc com `+` ou `:` tambem e um delimitador.
   ["delimitador com `+`", "cat <<'END+X'\nit's\nEND+X\nrm -rf .claude/hooks\necho ok #'"],
+  // O que NAO e heredoc nao engole as linhas seguintes (leitura do c4c0de7).
+  ["`<<` aritmetico nao e heredoc", "echo $((1<<$n))\nrm -rf .claude/hooks\n$n"],
+  ["`<<=` aritmetico nao e heredoc", "((a<<=2))\nrm -rf .claude/hooks\n=2"],
+  ["here-string `<<<` nao e heredoc", "cat <<<$x\nrm -rf .claude/hooks\n$x"],
+  ["here-string `<<<` sem `$`", "cat <<<x\nrm -rf .claude/hooks\nx"],
 ];
 
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que

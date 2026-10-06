@@ -267,7 +267,9 @@ export function normalizaCaminhos(visivel, ctx = {}) {
  *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
 export const semCitacoes = (t) =>
   desaspa(
-    t.replace(/<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
+    // Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
+    // nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
+    t.replace(/(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
       ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`)
   ).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
 

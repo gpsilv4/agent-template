@@ -163,6 +163,10 @@ const ABERTO = [
   // exigem montar a estrutura de proposito.
   ["CONTORNO", "`<<` citado lido como heredoc", "echo '<<EOF'\nrm -rf .claude/hooks\nEOF"],
   ["CONTORNO", "`case` dentro de `$(...)`", `echo "$(case a in a) rm .claude/hooks/x;; esac)"`],
+  // Da terceira leitura do PR #231, ja no `main`: um `\)` ou `\(` escapado dentro do `$(...)` conta
+  // no seguidor de directorios; e `$$'` e lido como um `$'` ANSI-C.
+  ["CONTORNO", "parentese escapado dentro de `$(...)`", `(cd .claude/hooks; echo "$(echo \\))"; rm -rf *)`],
+  ["CONTORNO", "`$$'` lido como ANSI-C", "echo $$'\\'; rm -rf .claude/hooks; echo 'x'"],
   ["CONTORNO", "`script -c` re-interpreta uma string", `script -c "rm ${H}" /tmp/log`],
   ["CONTORNO", "`ssh` com o comando em aspas", `ssh host "rm ${H}"`],
 ];
