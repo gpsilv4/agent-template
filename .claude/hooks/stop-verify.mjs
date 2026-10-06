@@ -45,43 +45,9 @@ import { ehCaminhoFronteira } from "./lib/fronteira.mjs";
  *  Este hook e so-Claude-Code; o mapa nao. Por isso o mapa esta la e este importa-o, e nao ao
  *  contrario — um script que qualquer agente corre nao pode depender de `.claude/`. */
 
-/** Caminhos de um `git status --porcelain -z`.
- *
- *  `-z` e obrigatorio, nao cosmetico: SEM ele o git **cita** os caminhos que tenham espacos
- *  ou bytes nao-ASCII (`?? ".agent/guards/caf\303\251.mjs"`), e o `slice(3)` entrega a aspa
- *  e os escapes octais ao matcher — nenhuma regra casa e a divida e sub-reportada em
- *  SILENCIO, que e o defeito que este hook existe para evitar. Medido: 1 de 3 ficheiros
- *  vistos. E a segunda cara do `TP5` (o `.trim()` foi a primeira).
- *
- *  Com `-z` as entradas vem separadas por NUL e os caminhos crus. Renomeacoes e copias
- *  ocupam DUAS entradas (`R  novo\0antigo\0`): a segunda e um caminho nu, sem coluna de
- *  estado, logo um `slice(3)` cego comia-lhe 3 caracteres. Por isso sao consumidas ao par.
- *
- *  (Existe uma copia desta funcao em `session-context.mjs` — sao dois hooks independentes
- *  e o template evita acoplar um ao outro; se mudar aqui, mudar la.) */
-function caminhosPorcelain(saida) {
-  const entradas = saida.split("\0").filter(Boolean);
-  const caminhos = [];
-  for (let i = 0; i < entradas.length; i++) {
-    const estado = entradas[i].slice(0, 2);
-    // O APAGADO vai junto, com o facto de o ser. Quem decide o que fazer com ele e o consumidor,
-    // e sao decisoes diferentes: um ficheiro apagado ainda **deve** a suite que o cobria (apagar
-    // `lib/pares.mjs` exige o `test-pares.mjs` mais do que modifica-lo), e apagar um ficheiro da
-    // FRONTEIRA e o afrouxamento mais forte que ha — calar isso era o oposto do que o aviso quer.
-    //
-    // Deitar o caminho fora aqui foi a primeira versao desta correcao, e afrouxava as duas
-    // coisas de uma vez. O contra-caso que eu tinha (o mesmo ficheiro MODIFICADO continua a
-    // gerar divida) nao lhe tocava: o defeito estava no ramo do APAGADO, nao no do modificado.
-    //
-    // Pelo ESTADO que o git da, e nao com um `existsSync`: os caminhos do porcelain sao
-    // relativos a raiz do repo e o hook pode correr de uma subpasta, logo um teste ao disco
-    // responderia sobre o sitio errado. O git ja sabe o que apagou.
-    caminhos.push({ caminho: entradas[i].slice(3), apagado: estado.includes("D") });
-    // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado.
-    if (estado[0] === "R" || estado[0] === "C") i++;
-  }
-  return caminhos;
-}
+// O parser do `git status --porcelain -z` vive numa so copia (A3 do #195): estava aqui e no
+// `session-context.mjs`, e as duas ja tinham divergido.
+import { caminhosPorcelain } from "./lib/porcelain.mjs";
 
 try {
   // `--untracked-files=all` e obrigatorio: sem ele o git **colapsa diretorios** nao

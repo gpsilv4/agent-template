@@ -20,31 +20,9 @@
 
 import { execFileSync } from "child_process";
 
-/** Caminhos de um `git status --porcelain -z`.
- *
- *  `-z` e obrigatorio, nao cosmetico: SEM ele o git **cita** os caminhos que tenham espacos
- *  ou bytes nao-ASCII (`?? ".agent/guards/caf\303\251.mjs"`), e o `slice(3)` entrega a aspa
- *  e os escapes octais ao matcher — nenhuma regra casa e a divida e sub-reportada em
- *  SILENCIO, que e o defeito que o `stop-verify` existe para evitar. Medido: 1 de 3 ficheiros
- *  vistos. E a segunda cara do `TP5` (o `.trim()` foi a primeira).
- *
- *  Com `-z` as entradas vem separadas por NUL e os caminhos crus. Renomeacoes e copias
- *  ocupam DUAS entradas (`R  novo\0antigo\0`): a segunda e um caminho nu, sem coluna de
- *  estado, logo um `slice(3)` cego comia-lhe 3 caracteres. Por isso sao consumidas ao par.
- *
- *  (Existe uma copia desta funcao em `stop-verify.mjs` — sao dois hooks independentes
- *  e o template evita acoplar um ao outro; se mudar aqui, mudar la.) */
-function caminhosPorcelain(saida) {
-  const entradas = saida.split("\0").filter(Boolean);
-  const caminhos = [];
-  for (let i = 0; i < entradas.length; i++) {
-    const estado = entradas[i].slice(0, 2);
-    caminhos.push(entradas[i].slice(3));
-    // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado.
-    if (estado[0] === "R" || estado[0] === "C") i++;
-  }
-  return caminhos;
-}
+// O parser do `git status --porcelain -z` vive numa so copia (A3 do #195), partilhada com o
+// `stop-verify.mjs`. Aqui so interessa o caminho.
+import { caminhosPorcelain } from "./lib/porcelain.mjs";
 
 const MAX_FICHEIROS = 12; // acima disto, so a contagem — a lista deixa de informar
 
@@ -82,7 +60,7 @@ linhas.push(
 // `--untracked-files=all`: sem ele o git colapsa diretorios nao rastreados e a contagem de
 // "por commitar" fica errada — um ficheiro novo em pasta nova conta como 1 (a pasta).
 const porcelain = tenta(() => git(["status", "--porcelain", "--untracked-files=all", "-z"]), "");
-const sujos = porcelain ? caminhosPorcelain(porcelain) : [];
+const sujos = porcelain ? caminhosPorcelain(porcelain).map((e) => e.caminho) : [];
 if (sujos.length === 0) {
   linhas.push("Arvore de trabalho limpa.");
 } else if (sujos.length <= MAX_FICHEIROS) {

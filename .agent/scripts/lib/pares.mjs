@@ -384,6 +384,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O parser do `git status --porcelain -z` (A3 do #195), partilhado pelo `stop-verify` e pelo
+    // `session-context`. Nao nega nem avisa: o seu sinal e o caminho que ENTREGA — mutado, um hook
+    // deixa de ver os ficheiros tocados, e a divida desaparece em silencio.
+    alvo: ".claude/hooks/lib/porcelain.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])caminhos\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e
