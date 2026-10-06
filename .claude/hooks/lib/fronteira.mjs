@@ -70,7 +70,7 @@ export function ehCaminhoFronteira(caminho) {
 //  E as pastas-MAE de uma entrada (#223), derivadas da lista: `rm -rf .claude` apaga os hooks, e
 //  `.claude/{hooks,settings.json}` expande para eles. So o TOKEN inteiro (`.claude`, `.claude/`) ou
 //  seguido de `{`: `.claude/commands/x.md` nao e fronteira, e escrever la e trabalho normal.
-const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
+export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
   const partes = f.replace(/\/$/, "").split("/");
   return partes.slice(1).map((_, i) => partes.slice(0, i + 1).join("/"));
 }))];
@@ -98,6 +98,7 @@ const LEITURA = new Set([
   "cat", "bat", "less", "more", "head", "tail", "wc", "grep", "rg", "egrep", "fgrep", "awk",
   "sed", "jq", "diff", "cmp", "md5", "md5sum", "shasum", "sha256sum", "file", "stat", "ls",
   "find", "realpath", "dirname", "basename", "node", "test", "[", "[[", "wl-copy", "pbcopy", "echo", "printf",
+  "du", "tree",
   // `git` le e encena; o destrutivo dele ja e tratado pela lista SEGUROS do hook. Sem ele,
   // `git diff .claude/settings.json` era negado — e e precisamente o que se quer poder correr.
   "git",
@@ -106,20 +107,36 @@ const LEITURA = new Set([
 /** Corpos de heredoc e conteudo entre aspas sao TEXTO, nao argumentos. Substituidos por vazio
  *  antes de procurar a fronteira: e o que separa "escrever um ficheiro que a menciona" de
  *  "escrever a fronteira". O comprimento nao interessa aqui — so a presenca. */
+//  Os caminhos citados perdem as aspas ENTRE os dois passos (`desaspa`): depois dos heredocs, cujo
+//  texto pode ter apostrofos soltos, e antes de o resto citado ser apagado.
 const semCitacoes = (t) =>
-  t
-    .replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " <<HEREDOC ")
+  desaspa(t.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " <<HEREDOC "))
     .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, ' "" ');
 
-/** O alvo de uma redireccao ENTRE ASPAS e um caminho, nao texto: `echo x > ".claude/settings.json"`
- *  passava, porque o `semCitacoes` o apagava (#206, leitura do 81e5942). Tirar as aspas a um alvo
- *  simples (sem espacos nem expansoes) antes de tudo o resto; no corpo de outras aspas, o
- *  `semCitacoes` apaga-o na mesma. */
-//  E o caminho de um `cd`/`pushd` (#223): `cd ".claude/hooks" && cp x y.mjs` passava pelo mesmo motivo.
-const desaspaAlvos = (t) =>
-  t
-    .replace(/(>&?[|!]?\s*)(["'])([^"'\s$`\\]*)\2/g, "$1$3")
-    .replace(/(\b(?:cd|pushd)\s+(?:(?:-[PLe@]+|--)\s+)*)(["'])([^"'\s$`\\]*)\2/g, "$1$3");
+/** Um CAMINHO entre aspas e um caminho, nao texto: `echo x > ".claude/settings.json"` (#206),
+ *  `cd ".claude/hooks"` e `rm -rf ".claude"` (#223) passavam, porque o `semCitacoes` os apagava.
+ *  Uma string SIMPLES (sem espacos nem expansoes, salvo um `$HOME`/`$PWD` inicial) perde as aspas
+ *  se for o alvo de uma redireccao, ou se tiver um caminho da fronteira; o resto continua texto.
+ *
+ *  Percorre as aspas como o shell, e nao por regex: a versao com regex emparelhava a aspa que FECHA
+ *  uma string com a que abre a seguinte, e `echo "a cd ";>.claude/settings.json;"z"` juntava as
+ *  duas numa so — e o `>` que trunca o settings desaparecia com elas (leitura do 2f7235a). */
+function desaspa(t) {
+  let out = "";
+  for (let k = 0; k < t.length; ) {
+    const c = t[k];
+    if (c === "\\") { out += t.slice(k, k + 2); k += 2; continue; }
+    if (c !== '"' && c !== "'") { out += c; k++; continue; }
+    let j = k + 1;
+    while (j < t.length && t[j] !== c) j += c === '"' && t[j] === "\\" ? 2 : 1;
+    const dentro = t.slice(k + 1, j);
+    const simples = /^(?:\$\{?(?:HOME|PWD)\}?)?[^\s"'$`\\]*$/.test(dentro);
+    const caminho = /[<>][&|!]?\s*$/.test(out) || /\.claude|\.githooks/.test(dentro);
+    out += simples && caminho ? dentro : t.slice(k, j + 1);
+    k = j + 1;
+  }
+  return out;
+}
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
 //  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).
@@ -129,8 +146,9 @@ const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/
  *  `cd` para a fronteira, ou com o nome de um verbo isento (`true(){ rm -rf *; }; cd <f> && true`).
  *  O verbo escrito deixa de dizer o que corre; num comando que toque a fronteira, nega. */
 //  Em POSICAO DE COMANDO: `grep -n function <f>` e um argumento, e era negado. O `alias` e a mesma
-//  classe (#223): `alias cat='rm -rf'; cat <f>` sombreia uma leitura.
-const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|alias\s|[\w.:-]+\s*\(\s*\))/;
+//  classe (#223): `alias cat='rm -rf'; cat <f>` sombreia uma leitura — tambem com `\alias`,
+//  `builtin alias` ou `command alias` (as cabecas consomem-se, e o `\` impedia o casamento).
+const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|(?:\\|(?:builtin|command)\s+)?alias\s|[\w.:-]+\s*\(\s*\))/;
 
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
@@ -290,7 +308,7 @@ export function porqueAltera(texto, ctx = {}) {
 const MAX_SUBSTITUICOES = 64;
 
 function julga(texto, ctx) {
-  const visivel = normalizaCaminhos(semCitacoes(desaspaAlvos(texto)), ctx);
+  const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
   const opaco = OPACO.test(texto);
   const inline = CODIGO_INLINE.test(texto);
 
@@ -345,9 +363,9 @@ function julga(texto, ctx) {
   // O verbo de CADA segmento que toca, e nao so o do primeiro: `cat <f>; rm <f>` passava pela leitura
   // a frente, e o #185, ao fazer tocar mais leituras (a pasta sem barra, os caminhos reescritos),
   // alargou isso a `ls .claude/hooks; rm -rf .claude/hooks/`. O primeiro que nao le e o que nega.
-  const primeiro =
-    semCabeca.map((t) => (t[0] ?? "").replace(/^.*\//, "")).find((v) => !LEITURA.has(v)) ??
-    (semCabeca[0][0] ?? "").replace(/^.*\//, "");
+  // A barra FINAL sai antes do nome base: `D=.claude/` (a pasta-mae reescrita) dava um rotulo vazio.
+  const verbo = (t) => (t[0] ?? "").replace(/\/+$/, "").replace(/^.*\//, "");
+  const primeiro = semCabeca.map(verbo).find((v) => !LEITURA.has(v)) ?? verbo(semCabeca[0]);
   const editaNoSitio = /\b(?:sed|perl|ruby|python3?)\b[^\n]*\s-[a-zA-Z]*i\b/.test(alvo);
   // O `inline` avalia-se sobre os segmentos que TOCAM a fronteira, e nao sobre o comando
   // inteiro. Duas leituras legitimas eram negadas por causa do alcance largo, as duas medidas

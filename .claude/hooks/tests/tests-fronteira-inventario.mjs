@@ -160,6 +160,9 @@ const ABERTO = [
   // A forma `D=.claude; cp ... $D/hooks/...` fechou no #223, de passagem: a atribuicao contem a
   // pasta-mae inteira. Parte-se o nome e volta a passar — e um contorno, e regista-se.
   ["CONTORNO", "indireccao por variavel", "D=.cla; cp /tmp/x ${D}ude/hooks/y.mjs"],
+  // Sair da raiz e voltar pelo nome da pasta (`cd ..` e o repo de outra maneira): o `cd ..` deixa o
+  // directorio por saber, e ninguem o escreve por habito para apagar a fronteira (#223).
+  ["CONTORNO", "sair da raiz e voltar pelo nome", "cd .. && rm -rf proj/.claude"],
   // O `cd -` volta ao directorio anterior: ninguem o escreve por habito para escrever la (#223).
   ["CONTORNO", "`cd -` de volta a fronteira", "cd .claude/hooks; cd /tmp; cd -; cp /tmp/x y.mjs"],
   // Da leitura do a995596: uma barra a partir o caminho (#223 — a classe do contorno). As aspas vazias
@@ -336,19 +339,8 @@ const FECHADO_PELO_CAMINHO = [
   ["`>&<fronteira>`", "cat .claude/hooks/x >&.claude/hooks/y", CTX, "redireciona"],
   // As redireccoes do #206 (descritor, `>|`/`>!`, colado, alvo entre aspas) vivem no seu ficheiro:
   // `tests-fronteira-redireccoes.mjs`.
-  // #223: os DESCUIDO baratos de `ABERTO`. Pôr aspas num caminho e habito (como no alvo de uma
-  // redireccao, #206); o `$HOME` e o `~`; e as pastas-MAE da fronteira (`rm -rf .claude` apaga os
-  // hooks) — so o token inteiro ou com `{`, para escrever em `.claude/commands/` continuar a passar.
-  ["`cd` com o directorio entre aspas", `cd ".claude/hooks" && cp /tmp/x y.mjs`, CTX, CP],
-  ["`cd` entre aspas simples", "cd '.githooks' && rm pre-commit", CTX, "verbo-nao-e-leitura:rm"],
-  ["`cd` por `$HOME`", "cd $HOME/proj/.claude/hooks && cp /tmp/x y.mjs", CTX, CP],
-  ["`${HOME}` no caminho", "cp /tmp/x ${HOME}/proj/.claude/hooks/y.mjs", CTX, CP],
-  ["a pasta-mae inteira", "rm -rf .claude", CTX, "verbo-nao-e-leitura:rm"],
-  ["a pasta-mae com barra", "mv .claude/ /tmp/c", CTX, "verbo-nao-e-leitura:mv"],
-  ["chavetas", "rm -rf .claude/{hooks,settings.json}", CTX, "verbo-nao-e-leitura:rm"],
-  ["atribuicao com a pasta-mae", "D=.claude; cp /tmp/x $D/hooks/y.mjs", CTX, "verbo-nao-e-leitura:D=.claude"],
-  // O `alias` sombreia um verbo de leitura — a classe das funcoes do #222, e fecha da mesma forma.
-  ["`alias` que sombreia uma leitura", "shopt -s expand_aliases; alias cat='rm -rf'; cat .claude/hooks", CTX, "execucao-adiada"],
+  // Os DESCUIDO que o #223 fechou (aspas, `$HOME`, pastas-mae, `alias`) vivem no seu ficheiro:
+  // `tests-fronteira-descuidos.mjs`.
   // `$((cmd) )` NAO e aritmetica — so fecha em `))` colados — e corre (ja passava no `main`).
   ["`$((cmd) )` e substituicao", "cat .claude/hooks/x $((rm -rf .claude/hooks/y) )", CTX, "verbo-nao-e-leitura:rm"],
   ["`$((cmd); ...)` depois de um `cd`", "cd .claude/hooks && echo $((rm -rf *); true)", CTX, "verbo-nao-e-leitura:rm"],
@@ -392,11 +384,6 @@ const CONTROLO_CAMINHO = [
   ["`function` como argumento", "grep -n function .claude/hooks/lib/fronteira.mjs", CTX],
   ["descritores `2>&1` e `>&2-`", "cd .claude/hooks && node t.mjs 2>&1 >&2- | cat", CTX],
   ["`</dev/null` no `cd`", "cd .claude/hooks </dev/null && cat x", CTX],
-  // #223: a pasta-mae so conta como token inteiro — o resto do `.claude` e trabalho normal.
-  ["ler a pasta-mae", "ls -la .claude/ && find .claude -name '*.md' && git add .claude", CTX],
-  ["escrever em `.claude/commands/`", "mkdir -p .claude/agents && cp /tmp/x .claude/commands/x.md", CTX],
-  ["`alias` como argumento", "grep -r alias .claude/hooks", CTX],
-  ["`cd` entre aspas para fora", `cd "/tmp/a b" && rm x`, CTX],
   ["`pushd`/`popd` repoem", "pushd .claude/hooks; popd; cp /tmp/a b", CTX],
   ["`cwd` dentro: `gh`", "gh pr view 220", DENTRO],
   ["`cwd` dentro: `npm`", "npm run lint", DENTRO],

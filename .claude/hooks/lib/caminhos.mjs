@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { ehCaminhoFronteira, resto } from "./fronteira.mjs";
+import { ehCaminhoFronteira, MAES, resto } from "./fronteira.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
@@ -61,8 +61,17 @@ function relativo(tok, dir, ctx) {
 }
 
 /** A forma que o `FRONTEIRA` reconhece, ou `null`. Uma pasta sai COM a barra. */
-const formaCanonica = (p) =>
-  p === null ? null : ehCaminhoFronteira(p) ? p : ehCaminhoFronteira(`${p}/`) ? `${p}/` : null;
+const formaCanonica = (p) => {
+  if (p === null) return null;
+  if (ehCaminhoFronteira(p)) return p;
+  if (ehCaminhoFronteira(`${p}/`)) return `${p}/`;
+  // Uma pasta-MAE (#223), e um glob no primeiro nome dentro dela (`.claude/*`, `.claude/h*`): sem
+  // isto, so o texto `.claude` contava, e `~/proj/.claude`, `.claude/.` ou `cd .claude && rm -rf *`
+  // passavam (leitura do 2f7235a). `.claude/commands/x.md` nao e a mae, e continua livre.
+  const q = p.replace(/\/$/, "");
+  const mae = MAES.find((m) => q === m || (q.startsWith(`${m}/`) && /^[^/]*[*?[]/.test(q.slice(m.length + 1))));
+  return mae ? `${mae}/` : null;
+};
 
 /** Forma de caminho: barra, `.` inicial, extensao com letras, `~` ou `$PWD`. Com o directorio
  *  DENTRO da fronteira so estes se resolvem: `timeout 60` ou o `rm` de `git rm` nao sao caminhos. */
