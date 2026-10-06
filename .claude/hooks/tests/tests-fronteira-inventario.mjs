@@ -158,6 +158,11 @@ const ABERTO = [
   // Da leitura do a995596: uma barra a partir o caminho (#223 — a classe do contorno). As aspas vazias
   // (`>""<caminho>`) fecharam com as aspas no alvo, e estao em `FECHADO_PELO_CAMINHO`.
   ["CONTORNO", "barra a escapar o caminho", "cat /tmp/x >\\.claude/settings.json"],
+  // Da segunda leitura do PR #231 (#229), ja no `main`: um `<<` DENTRO de aspas lido como heredoc
+  // (a regex corre antes das aspas), e o `)` de um padrao de `case` a fechar o `$(...)`. Os dois
+  // exigem montar a estrutura de proposito.
+  ["CONTORNO", "`<<` citado lido como heredoc", "echo '<<EOF'\nrm -rf .claude/hooks\nEOF"],
+  ["CONTORNO", "`case` dentro de `$(...)`", `echo "$(case a in a) rm .claude/hooks/x;; esac)"`],
   ["CONTORNO", "`script -c` re-interpreta uma string", `script -c "rm ${H}" /tmp/log`],
   ["CONTORNO", "`ssh` com o comando em aspas", `ssh host "rm ${H}"`],
 ];

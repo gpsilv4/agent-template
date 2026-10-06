@@ -110,6 +110,16 @@ const EXECUTADO_EM_TEXTO = [
   ["`$(git rev-parse --show-toplevel)` no caminho", `rm "$(git rev-parse --show-toplevel)/.claude/settings.json"`],
   ["`$(pwd)` no caminho", `rm -rf "$(pwd)/.claude/hooks"`],
   ["`$(pwd)` no alvo de uma redireccao", `echo x > "$(pwd)/.claude/settings.json"`],
+  // Da segunda leitura do PR #231. O de dentro corre numa SUBSHELL: um `cd` la dentro nao muda o
+  // directorio de quem chamou — despejado como linha nua, mudava-o, e o resto passava.
+  ["`cd` dentro de `\"$(...)\"` nao muda o directorio", `cd .claude/hooks && node t.mjs "$(cd ../.. && pwd)" && cp /tmp/x y.mjs`],
+  ["`cd` dentro de `\"$(...)\"` e um `rm` a seguir", `cd .claude/hooks && echo "$(cd /tmp)" && rm y.mjs`],
+  ["`cd` dentro de `\"$(...)\"` numa subshell", `(cd .claude/hooks; echo "$(cd /tmp)"; rm x.mjs)`],
+  ["`cd` no corpo de um heredoc sem aspas", "cd .claude/hooks\ncat <<EOF\n$(cd /tmp)\nEOF\nrm y.mjs"],
+  // `$'...'` dentro de `$(...)` tem escapes: `$'\\''` nao abre aspas.
+  ["`$'...'` dentro de `$(...)`", "echo \"$(echo $'\\'')\" ; rm .claude/hooks/x ; echo \"'\""],
+  // Um delimitador de heredoc com `+` ou `:` tambem e um delimitador.
+  ["delimitador com `+`", "cat <<'END+X'\nit's\nEND+X\nrm -rf .claude/hooks\necho ok #'"],
 ];
 
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que
@@ -161,6 +171,7 @@ const PERMITIDAS = [
   // O de dentro le-se pelas mesmas regras de aspas: o `|` de um padrao citado nao parte nada.
   ["um padrao com `|` dentro de `$(...)`", `gh pr comment 1 --body "$(grep -E "a|b" .claude/hooks/x)"`],
   ["um padrao com `|` dentro de uma crase", 'echo `grep "a|b" .claude/hooks/x`'],
+  ["`cd` para a fronteira dentro de `\"$(...)\"`, e um `rm` fora", `echo "$(cd .claude/hooks)" ; rm y.mjs`],
 ];
 
 /** Negados de proposito — o preco aceite, e nao um defeito por corrigir. Afirma-se a NEGACAO: se

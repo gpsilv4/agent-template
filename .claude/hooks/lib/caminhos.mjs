@@ -267,8 +267,8 @@ export function normalizaCaminhos(visivel, ctx = {}) {
  *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
 export const semCitacoes = (t) =>
   desaspa(
-    t.replace(/<<-?[\t ]*(\\?)(['"]?)([\w.-]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
-      ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n${x}`).join("")}`)
+    t.replace(/<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
+      ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`)
   ).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
 
 /** O indice do `)` que fecha o `$(` em `s[k]`, a ler as aspas de DENTRO como o shell: dentro de um
@@ -278,6 +278,8 @@ function fimSubst(s, k) {
   for (let j = k + 2; j < s.length; j++) {
     const c = s[j];
     if (c === "\\") j++;
+    // `$'...'` tem escapes: `$'\''` nao abre aspas (leitura do a6abe1d).
+    else if (c === "$" && s[j + 1] === "'") for (j += 2; j < s.length && s[j] !== "'"; j += s[j] === "\\" ? 2 : 1);
     else if (c === "'") j = s.indexOf("'", j + 1) < 0 ? s.length : s.indexOf("'", j + 1);
     else if (c === '"') j = fimAspasDuplas(s, j);
     else if (c === "$" && s[j + 1] === "(") j = fimSubst(s, j);
@@ -348,7 +350,9 @@ function desaspa(t) {
   // que viesse a seguir mudava o directorio em que o de dentro era julgado.
   let pendentes = [];
   const despeja = () => {
-    if (pendentes.length) out += `${pendentes.map((x) => `\n${x}`).join("")}\n`;
+    // Como SUBSHELL, que e o que e: um `cd` la dentro nao muda o directorio de quem chamou, e
+    // despejado como linha nua mudava-o para o resto do comando (leitura do a6abe1d).
+    if (pendentes.length) out += `${pendentes.map((x) => `\n(${x})`).join("")}\n`;
     pendentes = [];
   };
   for (let k = 0; k < t.length; ) {
