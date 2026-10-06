@@ -182,7 +182,8 @@ gh pr create --fill     # then merge once CI is green
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary,
     │   │                          and that every hook on disk is wired to the `hooks` key
-    │   │                          (an unwired hook looks exactly like a working one)
+    │   │                          (an unwired hook looks exactly like a working one); what
+    │   │                          `ci.yml` runs is in `allow`; agents declare `tools:`
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guard series 12: counts cited in prose, recomputed
     │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap

@@ -108,7 +108,15 @@
       "Bash(node .agent/scripts/mutation-sweep.mjs --only=guards)",
       "Bash(node .agent/scripts/mutation-sweep.mjs --only=check-doc)",
       "Bash(node .agent/scripts/mutation-sweep.mjs --only=check-backlog)",
-      "Bash(node .agent/scripts/mutation-sweep.mjs --skips)"
+      "Bash(node .agent/scripts/mutation-sweep.mjs --skips)",
+      "Bash(node .agent/scripts/simulate-upgrade.mjs)",
+      "Bash(node .agent/scripts/mutation-sweep.mjs --diff)",
+      "Bash(node .agent/scripts/tests/test-baseline-superficie.mjs)",
+      "Bash(node .agent/scripts/tests/test-codigo-morto.mjs)",
+      "Bash(node .agent/scripts/tests/test-derivado-maduro.mjs)",
+      "Bash(node .agent/scripts/tests/test-mapa-suites.mjs)",
+      "Bash(node .agent/scripts/tests/test-simulate-upgrade.mjs)",
+      "Bash(node .agent/scripts/tests/test-tmp-limpo.mjs)"
     ]
   },
   "hooks": {

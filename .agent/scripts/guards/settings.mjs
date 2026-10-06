@@ -15,7 +15,7 @@
  */
 
 /** @returns {number} guards executados (0 se o ficheiro nao existe) */
-export function guardSettings({ read, warn, ok, note, skip, listDir }) {
+export function guardSettings({ read, warn, ok, note, skip, listDir, ehDerivado = () => false }) {
   let guardsRun = 0;
 
 // --- Guard 11: sanidade do .claude/settings.json ---
@@ -357,6 +357,57 @@ if (settingsRaw === null) {
         }
       }
       hooksVistos = hooksNoDisco.length;
+    }
+
+    // O que FALTA no `allow` (#193). O guard so via o que estava a MAIS: sete scripts que o CI corre,
+    // e que as regras mandam correr, pediam aprovacao a cada uso — o `simulate-upgrade` entre eles,
+    // passo obrigatorio antes de cada push. Um script novo no `ci.yml` sem entrada no `allow` avisa.
+    // Casa a entrada exacta, ou um prefixo `Bash(<comando>:*)`; as linhas comentadas nao correm.
+    // Reprova no TEMPLATE, onde o `ci.yml` e o `allow` sao do mesmo dono. Num DERIVADO e nota: o
+    // `ci.yml` dele e outro, e um script pode estar fora do `allow` de proposito (no `ask`) — um
+    // vermelho que so se resolve editando o `settings.json` a mao ensina a ignorar o guard.
+    const ci = read(".github/workflows/ci.yml");
+    if (ci !== null) {
+      const exactos = new Set(allow.filter((a) => typeof a === "string"));
+      const prefixos = [...exactos].map((a) => /^Bash\((.*):\*\)$/.exec(a)?.[1]).filter(Boolean);
+      const executavel = ci.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+      const corridos = new Set([...executavel.matchAll(/node \.agent\/scripts\/[^\s"'`;&|]+(?: --?[a-z][\w=-]*)*/g)].map((m) => m[0]));
+      for (const c of corridos) {
+        if (!exactos.has(`Bash(${c})`) && !prefixos.some((p) => c.startsWith(p))) {
+          const msg = `o \`ci.yml\` corre \`${c}\`, que nao esta no \`allow\` — pede aprovacao a cada uso (#193)`;
+          if (ehDerivado()) note(`${SETTINGS_PATH}: ${msg}`);
+          else flag(msg);
+        }
+      }
+    }
+
+    // E o `tools:` dos agentes (S-05 do #195) — como NOTA, nunca vermelho: o Claude Code nao respeita
+    // o campo (ver o cabecalho do `code-reviewer.md`), e omiti-lo e legitimo (o agente herda todas as
+    // ferramentas). E documentacao da intencao; uma lista fixa de nomes de um produto externo envelhece.
+    const AGENTS_DIR = ".claude/agents";
+    const FERRAMENTAS = new Set([
+      "Read", "Grep", "Glob", "LS", "Bash", "BashOutput", "KillShell", "Edit", "MultiEdit", "Write",
+      "NotebookRead", "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Task", "TodoWrite", "TodoRead",
+      "Skill", "SlashCommand", "ExitPlanMode",
+    ]);
+    for (const nome of listDir(AGENTS_DIR, ".md") ?? []) {
+      const texto = (read(`${AGENTS_DIR}/${nome}.md`) ?? "").replace(/^﻿/, "").replace(/\r\n/g, "\n");
+      const cabeca = /^---\n([\s\S]*?)\n---/.exec(texto)?.[1] ?? "";
+      const linha = /^tools:[ \t]*(.*)$/m.exec(cabeca)?.[1];
+      if (linha === undefined) {
+        note(`${AGENTS_DIR}/${nome}.md nao declara \`tools:\` no cabecalho — herda todas as ferramentas (#195)`);
+        continue;
+      }
+      // Em linha (`Read, Grep`, `[Read, Grep]`, `"Read, Grep"`) ou em lista YAML (`- Read`).
+      const lista = linha.trim()
+        ? linha.replace(/^\s*\[|\]\s*$/g, "").replace(/["']/g, "")
+        : (/^tools:[ \t]*\n((?:[ \t]*-[ \t]*.+\n?)+)/m.exec(cabeca)?.[1] ?? "").replace(/^[ \t]*-[ \t]*/gm, "").replace(/\n/g, ",");
+      for (const t of lista.match(/[^,(]+(?:\([^)]*\))?/g) ?? []) {
+        const ferramenta = t.trim().replace(/\(.*\)$/, "");
+        if (ferramenta && !FERRAMENTAS.has(ferramenta) && !ferramenta.startsWith("mcp__")) {
+          note(`${AGENTS_DIR}/${nome}.md declara \`${t.trim()}\` em \`tools:\`, que nao e uma ferramenta que este guard conheca (#195)`);
+        }
+      }
     }
 
     // O VEREDICTO do guard, depois de TUDO o que ele mede. A frase nomeia as duas coisas
