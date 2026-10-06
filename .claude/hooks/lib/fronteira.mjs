@@ -29,7 +29,7 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, substituicoes } from "./caminhos.mjs";
+import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, semCitacoes, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
 export { contextoFronteira } from "./caminhos.mjs";
 
@@ -104,56 +104,8 @@ const LEITURA = new Set([
   "git",
 ]);
 
-/** Corpos de heredoc e conteudo entre aspas sao TEXTO, nao argumentos. Substituidos por vazio
- *  antes de procurar a fronteira: e o que separa "escrever um ficheiro que a menciona" de
- *  "escrever a fronteira". O comprimento nao interessa aqui — so a presenca. */
-//  Os caminhos citados perdem as aspas ENTRE os dois passos (`desaspa`): depois dos heredocs, cujo
-//  texto pode ter apostrofos soltos, e antes de o resto citado ser apagado.
-//  O RESTO DA LINHA do `<<` fica visivel: `cat <<'EOF' > .claude/hooks/x.mjs` e a forma mais
-//  habitual de um agente escrever um ficheiro, e o `> <fronteira>` era apagado com o corpo (leitura
-//  do 355ae97). As crases apagam-se no fim; as aspas, o `desaspa` ja as tratou.
-const semCitacoes = (t) =>
-  desaspa(t.replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n[\s\S]*?^[\t ]*\2[\t ]*$/gm, " <<HEREDOC $3"))
-    .replace(/`(?:[^`\\]|\\.)*`/g, ' "" ');
-
-/** Um CAMINHO entre aspas e um caminho, nao texto: `echo x > ".claude/settings.json"` (#206),
- *  `cd ".claude/hooks"` e `rm -rf ".claude"` (#223) passavam, porque o `semCitacoes` os apagava.
- *  Uma string SIMPLES (sem espacos nem expansoes, salvo um `$HOME`/`$PWD` inicial) perde as aspas
- *  se for o alvo de uma redireccao, ou se tiver um caminho da fronteira; o resto continua texto.
- *
- *  Percorre as aspas como o shell, e nao por regex: a versao com regex emparelhava a aspa que FECHA
- *  uma string com a que abre a seguinte, e `echo "a cd ";>.claude/settings.json;"z"` juntava as
- *  duas numa so — e o `>` que trunca o settings desaparecia com elas (leitura do 2f7235a). */
-//  E faz tambem o APAGAMENTO do resto citado, e salta os comentarios: com a regex antiga a apagar
-//  depois, as duas leituras discordavam — o `'` de `# it's` emparelhava com o de outro comentario e
-//  escondia um `rm` entre os dois, e `'a\'` era lido com escape, que o shell nao tem (leitura do
-//  355ae97). UMA passagem, linear: o "alvo de redireccao" vem dos dois ultimos caracteres visiveis,
-//  e nao de reler o texto todo a cada string. Uma string SIMPLES nao tem metacaracteres: com `|`
-//  la dentro (`grep -E ".claude/hooks|.githooks"`) e um padrao, e sem aspas o `|` partia o comando.
-function desaspa(t) {
-  let out = "";
-  let ultimo = "";
-  let penultimo = "";
-  const visto = (s) => {
-    for (const ch of s) if (!/\s/.test(ch)) [penultimo, ultimo] = [ultimo, ch];
-  };
-  for (let k = 0; k < t.length; ) {
-    const c = t[k];
-    if (c === "\\") { out += t.slice(k, k + 2); visto(t.slice(k, k + 2)); k += 2; continue; }
-    if (c === "#" && (k === 0 || /[\s;&|(]/.test(t[k - 1]))) { while (k < t.length && t[k] !== "\n") k++; continue; }
-    if (c !== '"' && c !== "'") { out += c; visto(c); k++; continue; }
-    let j = k + 1;
-    while (j < t.length && t[j] !== c) j += c === '"' && t[j] === "\\" ? 2 : 1;
-    const dentro = t.slice(k + 1, j);
-    const simples = /^(?:\$\{?(?:HOME|PWD)\}?)?[^\s"'$`\\;&|<>()]*$/.test(dentro);
-    const alvo = "<>".includes(ultimo) || ("&|!".includes(ultimo) && "<>".includes(penultimo));
-    const fica = simples && (alvo || /\.claude|\.githooks/.test(dentro)) ? dentro : ' "" ';
-    out += fica;
-    visto(fica);
-    k = j + 1;
-  }
-  return out;
-}
+// O texto citado — o que e texto, o que e caminho e o que o shell executa — le-se em
+// `lib/caminhos.mjs` (`semCitacoes`). Saiu daqui quando este ficheiro chegou as 500 linhas (#229).
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
 //  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).

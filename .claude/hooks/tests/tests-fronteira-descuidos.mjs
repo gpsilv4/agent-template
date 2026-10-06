@@ -69,6 +69,28 @@ const NEGADAS = [
   ["glob de um caracter", "rm .claude/?ooks", RM],
 ];
 
+/** #229 — o que o shell EXECUTA dentro de texto citado: `$(...)` e crases entre aspas duplas, num
+ *  heredoc sem aspas, e a crase fora de aspas, que passou a ser julgada como um `$(...)`. Afirma-se
+ *  a NEGACAO, e nao o rotulo: ele e o do verbo de la de dentro, e muda com a forma. */
+const EXECUTADO_EM_TEXTO = [
+  ["`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
+  ["crase num heredoc sem aspas", "cat <<EOF > /tmp/x\n`rm -rf .claude/hooks`\nEOF"],
+  ["`$(...)` entre aspas duplas, depois de um `cd`", `cd .claude/hooks && echo "$(rm -rf *)"`],
+  ["crase entre aspas duplas", "echo \"x `rm -rf .claude/hooks` y\""],
+  ["relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
+  ["crase num verbo sem marcador, depois de um `cd`", "cd .githooks && true `cp /tmp/evil pre-commit`"],
+  // Da quinta leitura do #185: a isencao da crase so vale para UM caminho sozinho.
+  ...[
+    "echo `.claude/hooks/x.mjs; rm -rf .claude/hooks`",
+    "`.githooks/x && rm .githooks/y`",
+    "echo \"`.claude/hooks/x.mjs > .claude/settings.json`\"",
+    "echo `.githooks/pre-commit | tee .githooks/pre-commit`",
+    "echo `.claude/settings.json\nrm -rf .claude/hooks`",
+    "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
+    "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
+  ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c]),
+];
+
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que
  *  nao e um caminho continua texto. */
 const PERMITIDAS = [
@@ -97,6 +119,14 @@ const PERMITIDAS = [
   ["um `rm` no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com rm -rf .claude/hooks\nEOF"],
   // Um glob que nao pode casar nenhum nome da fronteira nao e a pasta-mae.
   ["glob de extensao na pasta-mae", "cp .claude/*.md /tmp/ && rm .claude/*.bak"],
+  // #229: o que nao EXECUTA continua texto — aspas simples, heredocs com aspas, escapes, e uma crase
+  // que e so um caminho.
+  ["`$(...)` entre aspas simples", "echo 'a $(rm .claude/hooks/x)'"],
+  ["`$(...)` num heredoc com aspas", "cat <<'EOF'\n$(rm .claude/settings.json)\nEOF"],
+  ["crase no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com `rm -rf .claude/hooks`\nEOF"],
+  ["`\\$(` escapado em aspas duplas", `echo "\\$(rm .claude/settings.json)"`],
+  ["crase que e so um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\""],
+  ["`$(date)` em aspas duplas, a ler da fronteira", `cat .claude/hooks/x | grep "$(date)"`],
 ];
 
 /** Negados de proposito — o preco aceite, e nao um defeito por corrigir. Afirma-se a NEGACAO: se
@@ -113,12 +143,20 @@ const FALSOS_POSITIVOS_ACEITES = [
   ["`mkdir` da pasta-mae", "mkdir -p .claude"],
   // Uma string simples com um caminho da fronteira e um caminho — mesmo num titulo sem espacos.
   ["titulo do `gh` que e so um caminho", `gh pr create --title ".claude/hooks" --body "x"`],
+  // Uma crase dentro de aspas duplas numa mensagem CORRE de facto (`npm test` corre antes do commit):
+  // num comando que toca a fronteira, e julgada — e o `npm` nao e uma leitura (#229).
+  ["crase numa mensagem de commit que toca a fronteira", "git commit -m \"docs: corre `npm test` antes\" -- .claude/hooks/x.mjs"],
 ];
 
 export function registar({ test, eq }) {
   for (const [nome, comando, rotulo] of NEGADAS) {
     test(`descuido: ${nome}`, () => {
       eq(porqueAltera(comando, CTX), rotulo, `"${comando}" tinha de ser negado por ${rotulo} (#223)`);
+    });
+  }
+  for (const [nome, comando] of EXECUTADO_EM_TEXTO) {
+    test(`citado-executado: ${nome}`, () => {
+      eq(porqueAltera(comando, CTX) !== null, true, `"${comando}" executa dentro de texto citado e passou (#229)`);
     });
   }
   for (const [nome, comando] of PERMITIDAS) {

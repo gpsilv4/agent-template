@@ -248,3 +248,79 @@ export function normalizaCaminhos(visivel, ctx = {}) {
     })
     .join("");
 }
+
+/** O texto citado, como o shell o le. Corpos de heredoc e conteudo entre aspas sao TEXTO, nao
+ *  argumentos — e o que separa "escrever um ficheiro que menciona a fronteira" de "escrever a
+ *  fronteira". Mas tres coisas la dentro nao sao texto:
+ *  - um CAMINHO entre aspas (`rm -rf ".claude"`, `> ".claude/settings.json"`) — `desaspa` (#206, #223);
+ *  - o que o shell EXECUTA: `$(...)` e crases entre aspas duplas e num heredoc SEM aspas — `executados` (#229);
+ *  - o RESTO DA LINHA do `<<`: `cat <<'EOF' > .claude/hooks/x.mjs` e a forma mais habitual de um
+ *    agente escrever um ficheiro, e o `> <fronteira>` era apagado com o corpo (#223).
+ *  Os heredocs saem primeiro: o texto deles pode ter apostrofos soltos. Uma crase fora de aspas e
+ *  um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
+export const semCitacoes = (t) =>
+  desaspa(
+    t.replace(/<<-?\s*(['"]?)(\w+)\1([^\n]*)\n([\s\S]*?)^[\t ]*\2[\t ]*$/gm, (_m, aspa, _tag, linha, corpo) =>
+      ` <<HEREDOC ${linha}${aspa ? "" : executados(corpo)}`)
+  ).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m) || ' "" ');
+
+/** O que o shell EXECUTA dentro de um texto que expande (aspas duplas, heredoc sem aspas): os
+ *  `$(...)` equilibrados e as crases, sem os escapados. Devolvidos como `$(...)` visiveis, para o
+ *  `substituicoes()` os julgar como qualquer outro (#229). Uma crase que e so um CAMINHO (o
+ *  markdown de uma mensagem de commit) nao e comando, e fica de fora. */
+function executados(s) {
+  const fora = [];
+  for (let k = 0; k < s.length; k++) {
+    if (s[k] === "\\") { k++; continue; }
+    if (s[k] === "$" && s[k + 1] === "(" && s[k + 2] !== "(") {
+      let fundo = 1;
+      let j = k + 2;
+      for (; j < s.length && fundo; j++) fundo += s[j] === "(" ? 1 : s[j] === ")" ? -1 : 0;
+      fora.push(` $(${s.slice(k + 2, fundo ? j : j - 1)}) `);
+      k = j - 1;
+    } else if (s[k] === "`") {
+      let j = k + 1;
+      while (j < s.length && s[j] !== "`") j += s[j] === "\\" ? 2 : 1;
+      const dentro = s.slice(k + 1, j).trim();
+      if (!/^[^\s;&|<>`$()]+$/.test(dentro)) fora.push(` $(${dentro}) `);
+      k = j;
+    }
+  }
+  return fora.join("");
+}
+
+/** As aspas percorridas como o shell, numa so passagem: uma string SIMPLES (sem espacos nem
+ *  metacaracteres nem expansoes, salvo um `$HOME`/`$PWD` inicial) perde as aspas se for o alvo de
+ *  uma redireccao ou tiver um caminho da fronteira; o resto citado e apagado, e os comentarios saltam.
+ *
+ *  Nao por regex: a versao com regex emparelhava a aspa que FECHA uma string com a que abre a
+ *  seguinte (`echo "a cd ";>.claude/settings.json;"z"` escondia o `>`), e com o apagamento feito
+ *  noutro passo as duas leituras discordavam — o `'` de `# it's` emparelhava com o de outro
+ *  comentario e escondia um `rm`, e `'a\'` era lido com um escape que o shell nao tem. Linear: o
+ *  alvo de redireccao vem dos dois ultimos caracteres visiveis. Com `|` dentro, uma string e um
+ *  padrao (`grep -E ".claude/hooks|.githooks"`), e sem aspas o `|` partia o comando. */
+function desaspa(t) {
+  let out = "";
+  let ultimo = "";
+  let penultimo = "";
+  const visto = (s) => {
+    for (const ch of s) if (!/\s/.test(ch)) [penultimo, ultimo] = [ultimo, ch];
+  };
+  for (let k = 0; k < t.length; ) {
+    const c = t[k];
+    if (c === "\\") { out += t.slice(k, k + 2); visto(t.slice(k, k + 2)); k += 2; continue; }
+    if (c === "#" && (k === 0 || /[\s;&|(]/.test(t[k - 1]))) { while (k < t.length && t[k] !== "\n") k++; continue; }
+    if (c !== '"' && c !== "'") { out += c; visto(c); k++; continue; }
+    let j = k + 1;
+    while (j < t.length && t[j] !== c) j += c === '"' && t[j] === "\\" ? 2 : 1;
+    const dentro = t.slice(k + 1, j);
+    const simples = /^(?:\$\{?(?:HOME|PWD)\}?)?[^\s"'$`\\;&|<>()]*$/.test(dentro);
+    const alvo = "<>".includes(ultimo) || ("&|!".includes(ultimo) && "<>".includes(penultimo));
+    // Entre aspas DUPLAS, o que o shell executa fica visivel a seguir (#229); as simples nao expandem.
+    const fica = simples && (alvo || /\.claude|\.githooks/.test(dentro)) ? dentro : ` ""${c === '"' ? executados(dentro) : ""} `;
+    out += fica;
+    visto(fica);
+    k = j + 1;
+  }
+  return out;
+}

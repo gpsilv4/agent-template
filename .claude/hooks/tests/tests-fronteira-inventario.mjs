@@ -141,18 +141,8 @@ const FECHADO_PELA_CABECA = [
 const ABERTO = [
   // O criterio de corte vive no `hooks-guide.md` (#223): um DESCUIDO fecha-se; um CONTORNO
   // regista-se e nao se persegue; uma classe que volta sempre com mais uma forma ganha issue proprio.
-  // O `cd` entre aspas, por `$HOME`, a pasta-mae e as chavetas fecharam no #223
-  // (`FECHADO_PELO_CAMINHO`). Ficam as quatro formas de um comando que corre dentro de texto citado
-  // — uma CLASSE, nao quatro casos: fecham juntas no #229.
-  // O heredoc SEM aspas expande `$(...)` e crases, e o `semCitacoes` apaga-o como se fosse texto.
-  ["DESCUIDO", "`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
-  ["DESCUIDO", "relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
-  // A mesma classe com um verbo que dispensa o marcador (leitura do c004591): o `semCitacoes` apaga
-  // a crase antes de o `levaMarcador` a ver. Fecha com a classe, nao a parte.
-  ["DESCUIDO", "crase num verbo sem marcador, depois de um `cd`", "cd .githooks && true `cp /tmp/evil pre-commit`"],
-  // Da leitura do a8cfbd4: o `$(...)` ENTRE ASPAS DUPLAS corre, e o `semCitacoes` apaga-o como
-  // texto. O que esta fora de aspas ja e julgado (`substituicoes`); este ja passava no `main`.
-  ["DESCUIDO", "`$(...)` entre aspas duplas", "cd .claude/hooks && echo \"$(rm -rf *)\""],
+  // Os DESCUIDO fecharam no #223 e no #229 (o comando que corre dentro de texto citado): estao em
+  // `tests-fronteira-descuidos.mjs`. Ficam os contornos.
   // --- Ancoragem: regexes presos ao inicio do segmento ------------------------
   // --- Verbos de LEITURA que destroem -----------------------------------------
   // A redireccao com descritor (`2>`, `1>`) fechou no #206: esta em `FECHADO_PELO_CAMINHO`.
@@ -258,20 +248,12 @@ const FECHADO_PELO_CAMINHO = [
   ["`do` dentro de uma palavra nao separa", "rm -rf x-do cat .claude/hooks", CTX, "verbo-nao-e-leitura:rm"],
   ["`then` dentro de uma palavra nao separa", "rm -rf x.then cat .claude/hooks", CTX, "verbo-nao-e-leitura:rm"],
   ["redireccao nua depois de um `cd`", "cd .claude/hooks && > x.mjs", CTX, "verbo-nao-e-leitura:>"],
-  ["crase que executa", "cd `rm -rf .claude/hooks`", CTX, "citado-mas-executado"],
-  ["crase em aspas duplas que escreve", "git commit -m \"x `rm -rf .claude/hooks`\"", CTX, "citado-mas-executado"],
+  // Desde o #229 a crase e julgada como um `$(...)`: o rotulo e o do verbo de la de dentro.
+  ["crase que executa", "cd `rm -rf .claude/hooks`", CTX, "verbo-nao-e-leitura:cd"],
+  ["crase em aspas duplas que escreve", "git commit -m \"x `rm -rf .claude/hooks`\"", CTX, "verbo-nao-e-leitura:rm"],
   ["`cd` com `2>/dev/null` e ESCREVER", "cd .claude/hooks 2>/dev/null && cp /tmp/x y.mjs", CTX, CP],
-  // Da quinta leitura: a isencao da crase so vale para UM caminho sozinho. Com o atalho do primeiro
-  // token, o resto do conteudo corria — e o `rm` corre mesmo que o primeiro comando falhe.
-  ...[
-    "echo `.claude/hooks/x.mjs; rm -rf .claude/hooks`",
-    "`.githooks/x && rm .githooks/y`",
-    "echo \"`.claude/hooks/x.mjs > .claude/settings.json`\"",
-    "echo `.githooks/pre-commit | tee .githooks/pre-commit`",
-    "echo `.claude/settings.json\nrm -rf .claude/hooks`",
-    "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
-    "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
-  ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c, CTX, "citado-mas-executado"]),
+  // As sete "crase com um caminho e mais um comando" da quinta leitura vivem em
+  // `tests-fronteira-descuidos.mjs` (#229): o rotulo passou a depender da forma, e o que se afirma e a negacao.
   // Da leitura final do PR: com o `cd` fora do `tocam`, o que vinha depois sem forma de caminho
   // passava (no `main`, o segmento do `cd` negava). Depois de um `cd` explicito para dentro, cada
   // segmento leva o directorio — e os seis primeiros, que estavam em `ABERTO`, fecharam com isto.
