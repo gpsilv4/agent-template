@@ -43,7 +43,9 @@
  */
 
 import { execFileSync } from "child_process";
-import { readFileSync } from "fs";
+import { isMainThread, workerData } from "worker_threads";
+// A analise corre neste ficheiro num worker com PRAZO; o principal so espera (lib/resposta, #227).
+import { comPrazo, negar } from "./lib/resposta.mjs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA } from "./lib/verbos-git.mjs";
@@ -129,14 +131,6 @@ const SUBVERBO_FLAGS_COM_VALOR = new Set([
 
 /** Flags globais do `git` que consomem o argumento seguinte. */
 const GIT_FLAGS_COM_VALOR = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"]);
-
-function ler() {
-  try {
-    return JSON.parse(readFileSync(0, "utf8"));
-  } catch {
-    return null;
-  }
-}
 
 /** Um token sem aspas nem escapes: `'git'`, `"git"` e `g\i\t` sao todos `git`. E o que
  *  desmonta a ofuscacao por aspas (`git comm""it`) sem precisar de a prever. */
@@ -405,8 +399,9 @@ function seguro(inv) {
  *  `pushd`. Sem nenhuma pista, o `cwd` do proprio hook — nunca lista vazia, que PERMITIA. */
 function diretorios(cmd, cwd) {
   const dirs = [];
+  // O caminho para nos separadores (#227): o `\S+` levava o `;` de `cd <repo>; git commit` (fuga).
   for (const m of cmd.matchAll(/(?:-C|--git-dir=?|--work-tree=?)\s*("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
-  for (const m of cmd.matchAll(/(?:^|[;&|(\n]\s*)(?:cd|pushd)\s+("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
+  for (const m of cmd.matchAll(/(?:^|[;&|(\n]\s*)(?:cd|pushd)\s+("[^"]+"|'[^']+'|[^\s;&|()]+)/g)) dirs.push(limpo(m[1]));
   if (cwd) dirs.push(cwd);
   // O filtro corre ANTES do fallback: com ele depois, um comando cuja unica pista de
   // diretorio comece por `-` (`git commit -C -m x`) e sem `cwd` no payload dava lista vazia
@@ -428,23 +423,10 @@ function branchDe(dir) {
 }
 
 const MAX_COMANDO = 100_000;
-
-/** Nega, no formato que o Claude Code entende. */
-function negar(razao) {
-  console.log(
-    JSON.stringify({
-      hookSpecificOutput: {
-        hookEventName: "PreToolUse",
-        permissionDecision: "deny",
-        permissionDecisionReason: razao,
-      },
-    })
-  );
-  process.exit(0);
-}
+const MAX_DIRETORIOS = 50; // cada directorio distinto e um `git`: 9k eram 44 s (leitura do #226)
 
 try {
-  const payload = ler();
+  const payload = isMainThread ? await comPrazo(import.meta.url) : workerData;
   const cmd = payload?.tool_input?.command;
   if (typeof cmd !== "string" || !cmd.trim()) process.exit(0);
   // Grande demais para verificar (#224): um hook que excede o timeout PERMITE (docs do Claude Code).
@@ -497,7 +479,9 @@ try {
   const perigosas = invs.filter((inv) => !seguro(inv));
   if (!perigosas.length) process.exit(0);
 
-  for (const dir of diretorios(texto, payload?.cwd)) {
+  const dirs = diretorios(texto, payload?.cwd);
+  if (dirs.length > MAX_DIRETORIOS) negar(`O comando muda para mais de ${MAX_DIRETORIOS} directorios: demasiados para verificar o branch de cada um. Partir o comando.`);
+  for (const dir of dirs) {
     const br = branchDe(dir);
     if (ehProtegido(br)) {
       const v = perigosas.map((p) => p.verbo ?? "(nao identificado)").join(", ");

@@ -10,8 +10,9 @@
  * antes de qualquer analise. Os tempos sao generosos de proposito — o que se afirma e a ORDEM de
  * grandeza (antes: ~15 s com 99k caracteres; depois: dezenas de ms), nao um numero de maquina.
  */
+import { spawnSync } from "child_process";
 import { rmSync } from "fs";
-import { pathToFileURL } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -84,5 +85,70 @@ export function registar({ test, corre, repo, eq, contem }) {
       const ms = Date.now() - t0;
       eq(r.decisao, "deny", "o force-push tem de ser negado");
       eq(ms < TECTO_MS, true, `a analise levou ${ms} ms — o regex dos heredocs voltou a ser quadratico? (era ~0.5 s por <<)`);
+    }));
+
+  // --- O PRAZO (#227): perseguir cada caminho lento e uma corrida sem fim; esgotado o prazo, nega.
+  // O `corre` do entry point nao passa ambiente: o prazo encurta-se aqui, por `GUARD_PRAZO_MS`.
+  const HOOK = fileURLToPath(new URL("../guard-protected-branch.mjs", import.meta.url));
+  const correComPrazo = (cmd, prazoMs, cwd) => {
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify({ tool_input: { command: cmd }, cwd }),
+      encoding: "utf8",
+      env: { ...process.env, GUARD_PRAZO_MS: String(prazoMs) },
+    });
+    const d = r.stdout.trim() ? JSON.parse(r.stdout).hookSpecificOutput ?? {} : {};
+    return { decisao: d.permissionDecision ?? "allow", razao: d.permissionDecisionReason ?? "" };
+  };
+  // Uma leitura (seria PERMITIDA) que leva ~5 s: `2>&` repetido e quadratico no `porqueAltera`.
+  const LENTO = `echo x ${"2>&".repeat(20_000)}`;
+
+  test("prazo: uma analise que passa do prazo e NEGADA, e dentro do prazo (#227)", () =>
+    comRepo((d) => {
+      const t0 = Date.now();
+      const r = correComPrazo(LENTO, 300, d);
+      const ms = Date.now() - t0;
+      eq(r.decisao, "deny", "passado o prazo, o guard tem de negar — um hook em timeout PERMITE");
+      contem(r.razao, "demasiado lento", "a razao tem de dizer porque");
+      eq(ms < TECTO_MS, true, `levou ${ms} ms — o prazo era de 300 ms`);
+    }));
+
+  test("prazo: um comando longo e rapido passa pelo worker e e PERMITIDO (#227)", () =>
+    comRepo((d) => eq(correComPrazo(`echo ${"a".repeat(10_000)}`, 5000, d).decisao, "allow", "uma leitura rapida passa")));
+
+  test("prazo: o worker passa a negacao ao processo principal (#227)", () =>
+    comRepo((d) => {
+      const r = correComPrazo(`git push --force origin main ${"a ".repeat(5000)}`, 5000, d);
+      eq(r.decisao, "deny", "o force-push decidido no worker tem de chegar como negacao");
+      contem(r.razao, "Force-push", "a razao do worker tem de chegar inteira");
+    }));
+
+  test("diretorios: mais de 50 directorios distintos e negado (#227)", () =>
+    comRepo((d) => {
+      const cmd = `${Array.from({ length: 51 }, (_, i) => `cd /tmp/d${i}`).join("; ")}; git commit -m x`;
+      const r = corre({ tool_input: { command: cmd }, cwd: d });
+      eq(r.decisao, "deny", "51 directorios tem de ser negado");
+      contem(r.razao, "directorios", "a razao tem de dizer porque");
+    }));
+
+  // A FUGA que este teste dos 51 revelou (ja no `main`): o caminho do `cd` era `\S+`, e levava o `;`
+  // colado — `cd <repo-em-main>; git commit` verificava o branch de `<repo>;`, que nao e repo nenhum.
+  for (const [nome, sep] of [["`;` colado ao caminho", "; "], ["`;` e outro `cd` antes", "; cd /tmp; cd "]]) {
+    test(`diretorios: ${nome} nao esconde um repo em main (#227)`, () => {
+      const f = repo("feature/x");
+      const m = repo("main");
+      try {
+        const cmd = sep.startsWith(";") && sep.includes("cd") ? `cd /tmp${sep}${m}; git commit -m x` : `cd ${m}${sep}git commit -m x`;
+        eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);
+      } finally {
+        rmSync(f, { recursive: true, force: true });
+        rmSync(m, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("diretorios: 50 directorios ainda se verificam um a um (#227)", () =>
+    comRepo((d) => {
+      const cmd = `${Array.from({ length: 49 }, (_, i) => `cd /tmp/d${i}`).join("; ")}; git commit -m x`;
+      eq(corre({ tool_input: { command: cmd }, cwd: d }).decisao, "allow", "49 + o cwd = 50 passa (feature/x nao e protegido)");
     }));
 }
