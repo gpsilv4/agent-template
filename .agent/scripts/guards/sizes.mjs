@@ -49,16 +49,14 @@ export const TETOS = {
   // 696 -> 670: os casos do `stop-verify` sairam para `tests/tests-stop.mjs`, quando a catraca
   // exigiu a divisao ao acrescentar os do ficheiro apagado. Foi o ramo da folga a reclamar as 26.
   ".claude/hooks/tests/test-hooks.mjs": 670,
-  // 668 -> 590 (tabelas de verbos) -> 554 (verificacao da fronteira) -> 517 (a tabela
-  // FORMA_EXIGIDA, que e politica e nao motor) -> 516 (#224: a analise de aspas linear e o tecto
-  // de tamanho, pagos com um comentario duplicado). RE-CONGELA a cada descida, senao a catraca
-  // deixava a folga recuperada por recuperar.
-  ".claude/hooks/guard-protected-branch.mjs": 516,
   // 525 -> 510 -> **entrada removida**. A catraca chegou ao fim: ao extrair a receita do
   // "bootstrap concluido" para `tests/harness/projeto-derivado.mjs` (era a TERCEIRA copia da
   // mesma coisa, `TP8`), o ficheiro caiu para 494 e passou a caber no limite. O proprio guard
   // mandou tirar a entrada — "a excecao sobreviveu ao problema" — e e para isto que a catraca
   // serve: uma isencao permanente teria deixado o ficheiro voltar aos 510 sem uma palavra.
+  //
+  // `guard-protected-branch.mjs`: 668 -> 590 -> 554 -> 517 -> 516 -> **entrada removida** (#227).
+  // A entrada, a saida e o prazo da analise sairam para `lib/resposta.mjs`, e o hook caiu para 500.
 };
 
 // O `mutation-sweep.mjs` esteve nesta lista (505 linhas) e SAIU: a tabela `PARES` — 186

@@ -375,6 +375,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "((x) => null)(",
   },
   {
+    // A entrada, a saida e o PRAZO do guard (#227). Os sitios de chamada de `negar(` sao dois: o
+    // prazo esgotado, e a negacao que o worker passa ao processo principal. Mutado um, o guard
+    // permite o que devia negar. A definicao (`export function negar(`) nao conta.
+    alvo: ".claude/hooks/lib/resposta.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])(?<!function\s)negar\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e

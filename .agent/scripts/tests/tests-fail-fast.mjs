@@ -231,7 +231,8 @@ export function registar() {
     let partiu = false;
     try {
       for (const p of [".claude", ".agent/scripts"]) cpSync(join(raiz, p), join(dir, p), { recursive: true });
-      const hook = join(dir, ".claude", "hooks", "guard-protected-branch.mjs");
+      // A resposta do guard (o `deny`) vive em `lib/resposta.mjs` desde o #227 — e la que se parte.
+      const hook = join(dir, ".claude", "hooks", "lib", "resposta.mjs");
       const src = readFileSync(hook, "utf8");
       const partido = src.replace(`permissionDecision: "deny"`, `permissionDecision: "allow"`);
       partiu = partido !== src;
