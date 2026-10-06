@@ -59,6 +59,14 @@ const NEGADAS = [
   ["`alias` que sombreia uma leitura", "shopt -s expand_aliases\nalias cat='rm -rf'\ncat .claude/hooks", "execucao-adiada"],
   ["`\\alias`", "\\alias ls='rm -rf'\nls .claude/hooks", "execucao-adiada"],
   ["`builtin alias`", "builtin alias ls='rm -rf'\nls .claude/hooks", "execucao-adiada"],
+  // Da segunda leitura do PR #230 (ja passavam no `main`). O resto da linha do `<<` e comando — a
+  // forma mais habitual de um agente escrever um ficheiro; e as aspas leem-se numa so passagem.
+  ["heredoc com a redireccao na mesma linha", "cat <<'EOF' > .claude/hooks/x.mjs\nx\nEOF", "redireciona"],
+  ["heredoc sem aspas com a redireccao", "cat <<EOF > .claude/settings.json\n{}\nEOF", "redireciona"],
+  ["apostrofos em comentarios nao escondem o meio", "echo x # it's\nrm -rf .claude/hooks # it's", RM],
+  ["`'a\\'` nao tem escape em aspas simples", "echo 'a\\' ; rm -rf .claude/hooks ; echo '\\b'", RM],
+  ["glob que casa `hooks` e `settings`", "rm -rf .claude/[hs]*", RM],
+  ["glob de um caracter", "rm .claude/?ooks", RM],
 ];
 
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que
@@ -80,6 +88,15 @@ const PERMITIDAS = [
   ["texto citado que nao e caminho continua texto", `git grep "stash" .claude/hooks`],
   ["`.claude` dentro de um padrao do `sed`", `sed -i "s/.claude/x/" /tmp/f`],
   ["apostrofo num heredoc com aspas", "cat <<'EOF'\nit's .claude/hooks\nEOF"],
+  // Um padrao com metacaracteres e um padrao, e nao um caminho: sem aspas, o `|` partia o comando.
+  ["alternancia num `grep`", `grep -n ".claude/hooks|.githooks" README.md`],
+  ["alternancia num `rg`, aspas simples", "rg '.githooks|.claude' -l"],
+  ["grupo num `grep -E`", `grep -E "(.claude|.githooks)/" -r src`],
+  ["`>` dentro de um padrao", `grep -n ">.claude/hooks" x.md`],
+  ["comentario no fim de uma leitura", "node .claude/hooks/tests/test-hooks.mjs # corre a suite"],
+  ["um `rm` no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com rm -rf .claude/hooks\nEOF"],
+  // Um glob que nao pode casar nenhum nome da fronteira nao e a pasta-mae.
+  ["glob de extensao na pasta-mae", "cp .claude/*.md /tmp/ && rm .claude/*.bak"],
 ];
 
 /** Negados de proposito — o preco aceite, e nao um defeito por corrigir. Afirma-se a NEGACAO: se
@@ -94,6 +111,8 @@ const FALSOS_POSITIVOS_ACEITES = [
   ["`for` sobre as pastas", "for d in .agent .claude; do ls $d; done"],
   ["`git grep` por uma palavra de sub-verbo", "git grep -n checkout -- .agent .claude"],
   ["`mkdir` da pasta-mae", "mkdir -p .claude"],
+  // Uma string simples com um caminho da fronteira e um caminho — mesmo num titulo sem espacos.
+  ["titulo do `gh` que e so um caminho", `gh pr create --title ".claude/hooks" --body "x"`],
 ];
 
 export function registar({ test, eq }) {
