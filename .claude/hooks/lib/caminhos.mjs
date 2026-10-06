@@ -38,6 +38,8 @@ export function contextoFronteira(cwd = process.cwd()) {
 function relativo(tok, dir, ctx) {
   let t = tok;
   if (ctx.home && (t === "~" || t.startsWith("~/"))) t = ctx.home + t.slice(1);
+  // O `$HOME` e o `~` escrito de outra maneira (#223): `cd $HOME/proj/.claude/hooks` passava.
+  if (ctx.home && /^\$\{?HOME\}?(?=\/|$)/.test(t)) t = ctx.home + t.replace(/^\$\{?HOME\}?/, "");
   if (/^\$\{?PWD\}?(?=\/|$)/.test(t)) {
     if (dir === null) return null;
     t = `${dir || "."}${t.replace(/^\$\{?PWD\}?/, "")}`;

@@ -67,11 +67,21 @@ export function ehCaminhoFronteira(caminho) {
  *  via `.claude/hooks/`. O fim do token tem de ser fim mesmo, para `.claude/hooks-old` nao contar.
  *  E o `>` tambem abre um caminho: `echo x >.claude/settings.json`, sem espaco, passava. Tal como o
  *  `|`, o `&` e o `!` de `>|`, `>&` e `>!` colados ao caminho (#206, leitura do a995596). */
+//  E as pastas-MAE de uma entrada (#223), derivadas da lista: `rm -rf .claude` apaga os hooks, e
+//  `.claude/{hooks,settings.json}` expande para eles. So o TOKEN inteiro (`.claude`, `.claude/`) ou
+//  seguido de `{`: `.claude/commands/x.md` nao e fronteira, e escrever la e trabalho normal.
+const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
+  const partes = f.replace(/\/$/, "").split("/");
+  return partes.slice(1).map((_, i) => partes.slice(0, i + 1).join("/"));
+}))];
 const FRONTEIRA = new RegExp(
   "(?:^|[\\s\"'`=(>|&!])(?:\\./)?(?:" +
-    CAMINHOS_FRONTEIRA.map((f) =>
-      f.endsWith("/") ? `${f.slice(0, -1).replace(/[.]/g, "\\.")}(?:/|(?=[\\s;|&)>"'\`]|$))` : f.replace(/[.]/g, "\\.")
-    ).join("|") +
+    [
+      ...CAMINHOS_FRONTEIRA.map((f) =>
+        f.endsWith("/") ? `${f.slice(0, -1).replace(/[.]/g, "\\.")}(?:/|(?=[\\s;|&)>"'\`]|$))` : f.replace(/[.]/g, "\\.")
+      ),
+      ...MAES.map((m) => `${m.replace(/[.]/g, "\\.")}(?:/?(?=[\\s;|&)>"'\`]|$)|/\\{)`),
+    ].join("|") +
     ")"
 );
 
@@ -105,7 +115,11 @@ const semCitacoes = (t) =>
  *  passava, porque o `semCitacoes` o apagava (#206, leitura do 81e5942). Tirar as aspas a um alvo
  *  simples (sem espacos nem expansoes) antes de tudo o resto; no corpo de outras aspas, o
  *  `semCitacoes` apaga-o na mesma. */
-const desaspaAlvos = (t) => t.replace(/(>&?[|!]?\s*)(["'])([^"'\s$`\\]*)\2/g, "$1$3");
+//  E o caminho de um `cd`/`pushd` (#223): `cd ".claude/hooks" && cp x y.mjs` passava pelo mesmo motivo.
+const desaspaAlvos = (t) =>
+  t
+    .replace(/(>&?[|!]?\s*)(["'])([^"'\s$`\\]*)\2/g, "$1$3")
+    .replace(/(\b(?:cd|pushd)\s+(?:(?:-[PLe@]+|--)\s+)*)(["'])([^"'\s$`\\]*)\2/g, "$1$3");
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
 //  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).
@@ -114,8 +128,9 @@ const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/
 /** Execucao ADIADA: uma funcao definida, ou um `trap`, corre o corpo noutro sitio — depois de um
  *  `cd` para a fronteira, ou com o nome de um verbo isento (`true(){ rm -rf *; }; cd <f> && true`).
  *  O verbo escrito deixa de dizer o que corre; num comando que toque a fronteira, nega. */
-//  Em POSICAO DE COMANDO: `grep -n function <f>` e um argumento, e era negado.
-const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|[\w.:-]+\s*\(\s*\))/;
+//  Em POSICAO DE COMANDO: `grep -n function <f>` e um argumento, e era negado. O `alias` e a mesma
+//  classe (#223): `alias cat='rm -rf'; cat <f>` sombreia uma leitura.
+const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|alias\s|[\w.:-]+\s*\(\s*\))/;
 
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
 const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
