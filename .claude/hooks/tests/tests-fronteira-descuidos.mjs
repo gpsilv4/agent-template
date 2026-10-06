@@ -69,6 +69,64 @@ const NEGADAS = [
   ["glob de um caracter", "rm .claude/?ooks", RM],
 ];
 
+/** #229 — o que o shell EXECUTA dentro de texto citado: `$(...)` e crases entre aspas duplas, num
+ *  heredoc sem aspas, e a crase fora de aspas, que passou a ser julgada como um `$(...)`. Afirma-se
+ *  a NEGACAO, e nao o rotulo: ele e o do verbo de la de dentro, e muda com a forma. */
+const EXECUTADO_EM_TEXTO = [
+  ["`$(...)` num heredoc sem aspas", "cat <<EOF\n$(rm .claude/settings.json)\nEOF"],
+  ["crase num heredoc sem aspas", "cat <<EOF > /tmp/x\n`rm -rf .claude/hooks`\nEOF"],
+  ["`$(...)` entre aspas duplas, depois de um `cd`", `cd .claude/hooks && echo "$(rm -rf *)"`],
+  ["crase entre aspas duplas", "echo \"x `rm -rf .claude/hooks` y\""],
+  ["relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
+  ["crase num verbo sem marcador, depois de um `cd`", "cd .githooks && true `cp /tmp/evil pre-commit`"],
+  // Da quinta leitura do #185: a isencao da crase so vale para UM caminho sozinho.
+  ...[
+    "echo `.claude/hooks/x.mjs; rm -rf .claude/hooks`",
+    "`.githooks/x && rm .githooks/y`",
+    "echo \"`.claude/hooks/x.mjs > .claude/settings.json`\"",
+    "echo `.githooks/pre-commit | tee .githooks/pre-commit`",
+    "echo `.claude/settings.json\nrm -rf .claude/hooks`",
+    "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
+    "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
+  ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c]),
+  // Da leitura do 193a9a9. Dentro de um `$(...)` abre-se um contexto de aspas NOVO: o `)` ou o `"`
+  // citados la dentro nao fecham nada, e o `rm` corre (medido em bash e zsh).
+  ["aspas dentro de `$(...)` em aspas duplas", `echo "$(echo "x"; rm -rf .claude/hooks)"`],
+  ["`)` citado dentro de `$(...)`", `echo "$(echo ")"; rm -rf .claude/hooks)"`],
+  ["`)` em aspas simples dentro de `$(...)`", `echo "$(echo ')'; rm -rf .claude/hooks)"`],
+  ["aspas aninhadas depois de um `cd`", `cd .claude/hooks && echo "$(echo "x"; rm -rf *)"`],
+  // Um `(` CITADO dentro do `$(...)` nao abre nada: contado, a substituicao nunca fechava e engolia o
+  // `rm` que vem DEPOIS dela — e que corre.
+  ["`(` citado dentro de `$(...)` nao engole o resto", `echo "$(echo "(")"; rm -rf .claude/hooks`],
+  // O de dentro julga-se no directorio do comando de fora, e nao no do `cd` seguinte.
+  ["`cd` a seguir nao muda o directorio do de dentro", `cd .claude/hooks && echo "$(rm -rf *)" ; cd /tmp`],
+  ["dentro de uma subshell", `(cd .claude && echo "$(rm *)") && ls`],
+  // Pre-existentes: o delimitador `\\EOF` ou com `-` nao casava, e o corpo era lido como comando — um
+  // apostrofo la dentro desemparelhava o resto; e o `$'...'` (ANSI-C) tem escapes.
+  ["delimitador `\\EOF`", "cat <<\\EOF > /tmp/x\nit's\nEOF\nrm -rf .claude/hooks # '"],
+  ["delimitador com `-`", "cat <<'END-X' > /tmp/x\nit's\nEND-X\nrm -rf .claude/hooks # '"],
+  ["`$'...'` com `\\'`", "echo $'x\\' y'; rm -rf .claude/hooks; echo 'z'"],
+  // `"$(pwd)/..."` e `"$(git rev-parse --show-toplevel)/..."` sao caminhos, escritos por um comando.
+  ["`$(git rev-parse --show-toplevel)` no caminho", `rm "$(git rev-parse --show-toplevel)/.claude/settings.json"`],
+  ["`$(pwd)` no caminho", `rm -rf "$(pwd)/.claude/hooks"`],
+  ["`$(pwd)` no alvo de uma redireccao", `echo x > "$(pwd)/.claude/settings.json"`],
+  // Da segunda leitura do PR #231. O de dentro corre numa SUBSHELL: um `cd` la dentro nao muda o
+  // directorio de quem chamou — despejado como linha nua, mudava-o, e o resto passava.
+  ["`cd` dentro de `\"$(...)\"` nao muda o directorio", `cd .claude/hooks && node t.mjs "$(cd ../.. && pwd)" && cp /tmp/x y.mjs`],
+  ["`cd` dentro de `\"$(...)\"` e um `rm` a seguir", `cd .claude/hooks && echo "$(cd /tmp)" && rm y.mjs`],
+  ["`cd` dentro de `\"$(...)\"` numa subshell", `(cd .claude/hooks; echo "$(cd /tmp)"; rm x.mjs)`],
+  ["`cd` no corpo de um heredoc sem aspas", "cd .claude/hooks\ncat <<EOF\n$(cd /tmp)\nEOF\nrm y.mjs"],
+  // `$'...'` dentro de `$(...)` tem escapes: `$'\\''` nao abre aspas.
+  ["`$'...'` dentro de `$(...)`", "echo \"$(echo $'\\'')\" ; rm .claude/hooks/x ; echo \"'\""],
+  // Um delimitador de heredoc com `+` ou `:` tambem e um delimitador.
+  ["delimitador com `+`", "cat <<'END+X'\nit's\nEND+X\nrm -rf .claude/hooks\necho ok #'"],
+  // O que NAO e heredoc nao engole as linhas seguintes (leitura do c4c0de7).
+  ["`<<` aritmetico nao e heredoc", "echo $((1<<$n))\nrm -rf .claude/hooks\n$n"],
+  ["`<<=` aritmetico nao e heredoc", "((a<<=2))\nrm -rf .claude/hooks\n=2"],
+  ["here-string `<<<` nao e heredoc", "cat <<<$x\nrm -rf .claude/hooks\n$x"],
+  ["here-string `<<<` sem `$`", "cat <<<x\nrm -rf .claude/hooks\nx"],
+];
+
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que
  *  nao e um caminho continua texto. */
 const PERMITIDAS = [
@@ -97,6 +155,28 @@ const PERMITIDAS = [
   ["um `rm` no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com rm -rf .claude/hooks\nEOF"],
   // Um glob que nao pode casar nenhum nome da fronteira nao e a pasta-mae.
   ["glob de extensao na pasta-mae", "cp .claude/*.md /tmp/ && rm .claude/*.bak"],
+  // #229: o que nao EXECUTA continua texto — aspas simples, heredocs com aspas, escapes, e uma crase
+  // que e so um caminho.
+  ["`$(...)` entre aspas simples", "echo 'a $(rm .claude/hooks/x)'"],
+  ["`$(...)` num heredoc com aspas", "cat <<'EOF'\n$(rm .claude/settings.json)\nEOF"],
+  ["crase no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com `rm -rf .claude/hooks`\nEOF"],
+  ["`\\$(` escapado em aspas duplas", `echo "\\$(rm .claude/settings.json)"`],
+  ["crase que e so um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\""],
+  ["`$(date)` em aspas duplas, a ler da fronteira", `cat .claude/hooks/x | grep "$(date)"`],
+  // O que corre dentro de aspas e julgado A PARTE: o verbo de fora, que so recebe o texto, nao e
+  // julgado por uma leitura la dentro (leitura do 193a9a9 — era o passo de publicar a suite).
+  ["publicar um ficheiro da fronteira", `gh issue create --title x --body "$(cat .claude/hooks/README.md)"`],
+  ["publicar o resultado da suite", `gh pr comment 1 --body "$(node .claude/hooks/tests/test-hooks.mjs 2>&1 | tail -5)"`],
+  ["a lista da fronteira como argumento", `npx eslint "$(git ls-files .claude/hooks)"`],
+  ["copiar para um temporario", `cat .claude/hooks/x.mjs > "$(mktemp)"`],
+  ["o corpo de um PR por heredoc", "gh pr create --body \"$(cat <<'EOF'\nTexto com `.claude/hooks` e $(x)\nEOF\n)\""],
+  ["aspas aninhadas que leem", `echo "$(git log -1 --format="%h")" .claude/hooks/x`],
+  ["uma crase numa mensagem que toca a fronteira", "git commit -m \"docs: corre `npm test` antes\" -- .claude/hooks/x.mjs"],
+  ["o corpo de `<<\\EOF` e literal", "cat <<\\EOF\n$(rm .claude/settings.json)\nEOF"],
+  // O de dentro le-se pelas mesmas regras de aspas: o `|` de um padrao citado nao parte nada.
+  ["um padrao com `|` dentro de `$(...)`", `gh pr comment 1 --body "$(grep -E "a|b" .claude/hooks/x)"`],
+  ["um padrao com `|` dentro de uma crase", 'echo `grep "a|b" .claude/hooks/x`'],
+  ["`cd` para a fronteira dentro de `\"$(...)\"`, e um `rm` fora", `echo "$(cd .claude/hooks)" ; rm y.mjs`],
 ];
 
 /** Negados de proposito — o preco aceite, e nao um defeito por corrigir. Afirma-se a NEGACAO: se
@@ -119,6 +199,11 @@ export function registar({ test, eq }) {
   for (const [nome, comando, rotulo] of NEGADAS) {
     test(`descuido: ${nome}`, () => {
       eq(porqueAltera(comando, CTX), rotulo, `"${comando}" tinha de ser negado por ${rotulo} (#223)`);
+    });
+  }
+  for (const [nome, comando] of EXECUTADO_EM_TEXTO) {
+    test(`citado-executado: ${nome}`, () => {
+      eq(porqueAltera(comando, CTX) !== null, true, `"${comando}" executa dentro de texto citado e passou (#229)`);
     });
   }
   for (const [nome, comando] of PERMITIDAS) {

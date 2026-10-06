@@ -40,6 +40,11 @@ function relativo(tok, dir, ctx) {
   if (ctx.home && (t === "~" || t.startsWith("~/"))) t = ctx.home + t.slice(1);
   // O `$HOME` e o `~` escrito de outra maneira (#223): `cd $HOME/proj/.claude/hooks` passava.
   if (ctx.home && /^\$\{?HOME\}?(?=\/|$)/.test(t)) t = ctx.home + t.replace(/^\$\{?HOME\}?/, "");
+  // `$__RAIZ__` e o `"$(git rev-parse --show-toplevel)"` que o `desaspa` reconheceu (#229).
+  if (/^\$__RAIZ__(?=\/|$)/.test(t)) {
+    if (!ctx.raiz) return null;
+    t = ctx.raiz + t.slice("$__RAIZ__".length);
+  }
   if (/^\$\{?PWD\}?(?=\/|$)/.test(t)) {
     if (dir === null) return null;
     t = `${dir || "."}${t.replace(/^\$\{?PWD\}?/, "")}`;
@@ -247,4 +252,147 @@ export function normalizaCaminhos(visivel, ctx = {}) {
       return out;
     })
     .join("");
+}
+
+/** O texto citado, como o shell o le. Corpos de heredoc e conteudo entre aspas sao TEXTO, nao
+ *  argumentos — e o que separa "escrever um ficheiro que menciona a fronteira" de "escrever a
+ *  fronteira". Mas tres coisas la dentro nao sao texto:
+ *  - um CAMINHO entre aspas (`rm -rf ".claude"`, `> ".claude/settings.json"`) — `desaspa` (#206, #223);
+ *  - o que o shell EXECUTA: `$(...)` e crases entre aspas duplas e num heredoc SEM aspas — `executados` (#229);
+ *  - o RESTO DA LINHA do `<<`: `cat <<'EOF' > .claude/hooks/x.mjs` e a forma mais habitual de um
+ *    agente escrever um ficheiro, e o `> <fronteira>` era apagado com o corpo (#223).
+ *  Os heredocs saem primeiro: o texto deles pode ter apostrofos soltos. O delimitador pode ser
+ *  `\EOF` (literal, como `'EOF'`) ou ter `.`/`-` (`'END-X'`), e um que nao casava deixava o corpo
+ *  inteiro a ser lido como comando — e um apostrofo la dentro desemparelhava tudo o que vinha
+ *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
+export const semCitacoes = (t) =>
+  desaspa(
+    // Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
+    // nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
+    t.replace(/(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
+      ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`)
+  ).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
+
+/** O indice do `)` que fecha o `$(` em `s[k]`, a ler as aspas de DENTRO como o shell: dentro de um
+ *  `$(...)` abre-se um contexto novo, e `"$(echo ")"; rm <f>)"` nao fecha no `)` citado. */
+function fimSubst(s, k) {
+  let fundo = 0;
+  for (let j = k + 2; j < s.length; j++) {
+    const c = s[j];
+    if (c === "\\") j++;
+    // `$'...'` tem escapes: `$'\''` nao abre aspas (leitura do a6abe1d).
+    else if (c === "$" && s[j + 1] === "'") for (j += 2; j < s.length && s[j] !== "'"; j += s[j] === "\\" ? 2 : 1);
+    else if (c === "'") j = s.indexOf("'", j + 1) < 0 ? s.length : s.indexOf("'", j + 1);
+    else if (c === '"') j = fimAspasDuplas(s, j);
+    else if (c === "$" && s[j + 1] === "(") j = fimSubst(s, j);
+    else if (c === "(") fundo++;
+    else if (c === ")" && fundo-- === 0) return j;
+  }
+  return s.length;
+}
+
+/** O indice da `"` que fecha a que esta em `s[k]` — saltando os `$(...)` e as crases de dentro, que
+ *  tem aspas proprias: `"$(echo "x"; rm <f>)"` fechava no `"` de `"x"` e o `rm` ficava escondido. */
+function fimAspasDuplas(s, k) {
+  for (let j = k + 1; j < s.length; j++) {
+    if (s[j] === "\\") j++;
+    else if (s[j] === '"') return j;
+    else if (s[j] === "$" && s[j + 1] === "(") j = fimSubst(s, j);
+    else if (s[j] === "`") j = s.indexOf("`", j + 1) < 0 ? s.length : s.indexOf("`", j + 1);
+  }
+  return s.length;
+}
+
+/** O que o shell EXECUTA dentro de um texto: os `$(...)` e as crases, sem os escapados (#229). Uma
+ *  crase que e so um CAMINHO (o markdown de uma mensagem de commit) nao e comando, e fica de fora.
+ *
+ *  Devolve a LISTA dos interiores. Os de texto citado (aspas duplas, heredoc sem aspas) saem em
+ *  linhas proprias e julgam-se como comando seu — o `rm` de `gh ... --body "$(rm <f>)"` nega, mas o
+ *  `gh` que so recebe o texto de `"$(cat <f>)"` deixa de ser julgado por isso (leitura do 193a9a9).
+ *  Os de uma crase fora de aspas ficam no sitio, como um `$(...)`. */
+function executados(s) {
+  const fora = [];
+  for (let k = 0; k < s.length; k++) {
+    if (s[k] === "\\") { k++; continue; }
+    if (s[k] === "$" && s[k + 1] === "(" && s[k + 2] !== "(") {
+      const fim = fimSubst(s, k);
+      fora.push(s.slice(k + 2, fim));
+      k = fim;
+    } else if (s[k] === "`") {
+      let j = k + 1;
+      while (j < s.length && s[j] !== "`") j += s[j] === "\\" ? 2 : 1;
+      const dentro = s.slice(k + 1, j).trim();
+      if (!/^[^\s;&|<>`$()]+$/.test(dentro)) fora.push(dentro);
+      k = j;
+    }
+  }
+  return fora;
+}
+
+/** As aspas percorridas como o shell, numa so passagem: uma string SIMPLES (sem espacos nem
+ *  metacaracteres nem expansoes, salvo um `$HOME`/`$PWD` inicial) perde as aspas se for o alvo de
+ *  uma redireccao ou tiver um caminho da fronteira; o resto citado e apagado, e os comentarios saltam.
+ *
+ *  Nao por regex: a versao com regex emparelhava a aspa que FECHA uma string com a que abre a
+ *  seguinte (`echo "a cd ";>.claude/settings.json;"z"` escondia o `>`), e com o apagamento feito
+ *  noutro passo as duas leituras discordavam — o `'` de `# it's` emparelhava com o de outro
+ *  comentario e escondia um `rm`, e `'a\'` era lido com um escape que o shell nao tem. Linear: o
+ *  alvo de redireccao vem dos dois ultimos caracteres visiveis. Com `|` dentro, uma string e um
+ *  padrao (`grep -E ".claude/hooks|.githooks"`), e sem aspas o `|` partia o comando. */
+function desaspa(t) {
+  let out = "";
+  let ultimo = "";
+  let penultimo = "";
+  const visto = (s) => {
+    for (const ch of s) if (!/\s/.test(ch)) [penultimo, ultimo] = [ultimo, ch];
+  };
+  // O que correu dentro de aspas duplas sai no FIM do comando de fora — antes do proximo separador
+  // ou do `)` da subshell —, e nao no meio dele: numa linha a meio, o resto do comando de fora ficava
+  // sozinho a parecer um comando (`echo "$(git log)" <f>`), e depois do separador seguinte o `cd`
+  // que viesse a seguir mudava o directorio em que o de dentro era julgado.
+  let pendentes = [];
+  const despeja = () => {
+    // Como SUBSHELL, que e o que e: um `cd` la dentro nao muda o directorio de quem chamou, e
+    // despejado como linha nua mudava-o para o resto do comando (leitura do a6abe1d).
+    if (pendentes.length) out += `${pendentes.map((x) => `\n(${x})`).join("")}\n`;
+    pendentes = [];
+  };
+  for (let k = 0; k < t.length; ) {
+    const c = t[k];
+    const antes = t[k - 1] ?? "";
+    if (c === ";" || c === "\n" || c === ")" || (c === "|" && antes !== ">") || (c === "&" && !"<>".includes(antes) && t[k + 1] !== ">")) despeja();
+    if (c === "\\") { out += t.slice(k, k + 2); visto(t.slice(k, k + 2)); k += 2; continue; }
+    if (c === "#" && (k === 0 || /[\s;&|(]/.test(t[k - 1]))) { while (k < t.length && t[k] !== "\n") k++; continue; }
+    // `$'...'` (ANSI-C) tem escapes, ao contrario das aspas simples: `$'x\' y'` nao fecha no `\'`.
+    if (c === "$" && t[k + 1] === "'") {
+      let j = k + 2;
+      while (j < t.length && t[j] !== "'") j += t[j] === "\\" ? 2 : 1;
+      out += ' "" ';
+      visto('""');
+      k = j + 1;
+      continue;
+    }
+    if (c !== '"' && c !== "'") { out += c; visto(c); k++; continue; }
+    const j = c === '"' ? fimAspasDuplas(t, k) : t.indexOf("'", k + 1) < 0 ? t.length : t.indexOf("'", k + 1);
+    const dentro = t.slice(k + 1, j);
+    const simples = /^(?:\$\{?(?:HOME|PWD)\}?)?[^\s"'$`\\;&|<>()]*$/.test(dentro);
+    // `"$(pwd)/.claude/..."` e `"$(git rev-parse --show-toplevel)/..."` sao caminhos: a raiz ou o
+    // directorio, escritos por um comando (pre-existente, apanhado pela leitura do 193a9a9).
+    const raiz = dentro.match(/^\$\((pwd|git rev-parse --show-toplevel)\)(\/[^\s"'$`\\;&|<>()]*)$/);
+    const alvo = "<>".includes(ultimo) || ("&|!".includes(ultimo) && "<>".includes(penultimo));
+    const fronteira = (x) => alvo || /\.claude|\.githooks/.test(x);
+    // Entre aspas DUPLAS, o que o shell executa sai a parte (#229); as simples nao expandem.
+    const fica =
+      simples && fronteira(dentro) ? dentro
+        : raiz && fronteira(raiz[2]) ? `${raiz[1] === "pwd" ? "$PWD" : "$__RAIZ__"}${raiz[2]}`
+          : ' "" ';
+    // O de dentro le-se pelas MESMAS regras de aspas: tal como foi escrito, `"$(grep -E "a|b" <f>)"`
+    // partia no `|` do padrao, e um `"` la dentro desemparelhava o resto.
+    if (fica === ' "" ' && c === '"') pendentes.push(...executados(dentro).map(desaspa));
+    out += fica;
+    visto(fica);
+    k = j + 1;
+  }
+  despeja();
+  return out;
 }
