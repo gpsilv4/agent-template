@@ -10,6 +10,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF, patchSettings, GUARD_MODULES } from "./harness/test-harness.mjs";
+import { bootstrapado } from "./harness/projeto-derivado.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -298,48 +299,65 @@ test("G11b: um modulo em `lib/` nao e tratado como hook por registar", (dir) => 
   writeF(dir, ".claude/hooks/lib/ajuda.mjs", "export const x = 1;\n");
 }, { code: 0, excludes: ["ajuda.mjs"] });
 
-// Um derivado pode ter removido a camada so-Claude, e isso e legitimo. O ramo existe para o
-// DIZER — "nao encontrei" nao pode ser silencio (`TP2`) — e sem este caso ninguem o exercitava:
-// a fixture traz sempre a pasta. Um ramo que nunca corre e indistinguivel de um ramo partido.
-// A fixture SINTETICA nao tem `.claude/hooks/` — e por isso que serve aqui. Na copia do repo,
-// apagar a pasta faz o Guard 20 disparar (as rules citam `stop-verify.mjs`), e o teste passava a
-// medir esse aviso em vez deste ramo.
 // O que FALTA no `allow` (#193): o guard so via o que estava a mais. Um script que o CI corre sem
-// entrada pedia aprovacao a cada uso — sete, mais o `--diff`, durante meses.
+// entrada pedia aprovacao a cada uso — sete, mais o `--diff`, durante meses. Reprova no TEMPLATE;
+// num derivado e nota (o `ci.yml` e outro, e um script pode estar fora do `allow` de proposito).
 // A fixture nao traz o `.github/`: cada caso escreve o seu `ci.yml`.
 const ci = (...linhas) => `jobs:\n  t:\n    steps:\n${linhas.map((l) => `      - run: ${l}\n`).join("")}`;
-test("G11c: um script do `ci.yml` que sai do `allow` avisa", (dir) => {
+test("G11c: um script do `ci.yml` que sai do `allow` reprova no template", (dir) => {
   writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/simulate-upgrade.mjs"));
   patchSettings(dir, (c) => {
     c.permissions.allow = c.permissions.allow.filter((a) => a !== "Bash(node .agent/scripts/simulate-upgrade.mjs)");
   });
 }, { code: 1, includes: ["simulate-upgrade.mjs", "pede aprovacao a cada uso"] });
 
-test("G11c: um script novo no `ci.yml` sem entrada no `allow` avisa", (dir) => {
+test("G11c: um script novo no `ci.yml` sem entrada no `allow` reprova no template", (dir) => {
   writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/novo.mjs --modo"));
 }, { code: 1, includes: ["node .agent/scripts/novo.mjs --modo", "nao esta no `allow`"] });
 
+test("G11c: num DERIVADO, o que falta no `allow` e nota, e nao reprova", (dir) => {
+  bootstrapado(dir); // o derivado completo: so com o marcador, o bootstrap a meio avisava por tudo
+  writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/novo.mjs --modo"));
+}, { code: 0, anyOut: ["NOTE", "node .agent/scripts/novo.mjs --modo"] });
+
 // Um prefixo `Bash(<comando>:*)` cobre o comando com argumentos — e a forma do `check-test-surface` —,
-// e uma entrada exacta cobre o comando exacto.
-test("G11c: um prefixo `:*` e uma entrada exacta cobrem o que o CI corre", (dir) => {
-  writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/check-test-surface.mjs --outra", "node .agent/scripts/simulate-upgrade.mjs"));
-}, { code: 0, excludes: ["check-test-surface.mjs --outra", "simulate-upgrade.mjs"] });
+// uma entrada exacta cobre o comando exacto, e uma linha comentada nao corre.
+test("G11c: prefixo `:*`, entrada exacta e linha comentada nao avisam", (dir) => {
+  writeF(dir, ".github/workflows/ci.yml",
+    `${ci("node .agent/scripts/check-test-surface.mjs --outra", "node .agent/scripts/simulate-upgrade.mjs")}      # - run: node .agent/scripts/comentado.mjs\n`);
+}, { code: 0, excludes: ["check-test-surface.mjs --outra", "simulate-upgrade.mjs", "comentado.mjs"] });
 
-// O `tools:` dos agentes (S-05 do #195): o Claude Code nao o respeita, mas e o que documenta a
-// intencao — e essa tem de estar escrita, e em nomes que existem.
-test("G11c: um agente sem `tools:` avisa", (dir) => {
+// O `tools:` dos agentes (S-05 do #195) — NOTA, nunca vermelho: o Claude Code nao respeita o campo,
+// e omiti-lo e legitimo (herda todas as ferramentas). Documenta a intencao.
+test("G11c: um agente sem `tools:` da nota", (dir) => {
   writeF(dir, ".claude/agents/sem-tools.md", "---\nname: sem-tools\ndescription: x\n---\n\nCorpo.\n");
-}, { code: 1, includes: ["sem-tools.md", "nao declara `tools:`"] });
+}, { code: 0, anyOut: ["sem-tools.md", "nao declara `tools:`"] });
 
-test("G11c: uma ferramenta desconhecida em `tools:` avisa", (dir) => {
+test("G11c: uma ferramenta desconhecida em `tools:` da nota", (dir) => {
   writeF(dir, ".claude/agents/errado.md", "---\nname: errado\ntools: Read, Lerr\n---\n\nCorpo.\n");
-}, { code: 1, includes: ["errado.md", "`Lerr`", "nao e uma ferramenta conhecida"] });
+}, { code: 0, anyOut: ["errado.md", "`Lerr`", "nao e uma ferramenta que este guard conheca"] });
 
-// Uma ferramenta com regra (`Bash(git diff:*)`) e um servidor MCP sao nomes legitimos.
-test("G11c: `Bash(...)` com regra e `mcp__` sao ferramentas conhecidas", (dir) => {
+// Nomes legitimos: uma regra (`Bash(git log:*)`), um servidor MCP, e as formas YAML do campo —
+// entre `[]`, entre aspas, em lista de blocos, e num ficheiro com CRLF.
+test("G11c: as formas legitimas de `tools:` nao dao nota", (dir) => {
   writeF(dir, ".claude/agents/certo.md", "---\nname: certo\ntools: Read, Bash(git log:*), mcp__x__y\n---\n\nCorpo.\n");
-}, { code: 0, excludes: ["certo.md"] });
+  writeF(dir, ".claude/agents/lista.md", "---\nname: lista\ntools: [Read, Grep]\n---\n");
+  writeF(dir, ".claude/agents/aspas.md", "---\nname: aspas\ntools: \"Read, MultiEdit\"\n---\n");
+  writeF(dir, ".claude/agents/blocos.md", "---\nname: blocos\ntools:\n  - Read\n  - Skill\n---\n");
+  writeF(dir, ".claude/agents/crlf.md", "---\r\nname: crlf\r\ntools: Read\r\n---\r\n");
+}, { code: 0, excludes: ["certo.md", "lista.md", "aspas.md", "blocos.md", "crlf.md"] });
 
+// E uma lista de blocos com um nome desconhecido e lida, e nao passa em silencio.
+test("G11c: uma lista de blocos com um nome desconhecido da nota", (dir) => {
+  writeF(dir, ".claude/agents/blocos.md", "---\nname: blocos\ntools:\n  - Read\n  - Lerr\n---\n");
+}, { code: 0, anyOut: ["blocos.md", "`Lerr`"] });
+
+// Um derivado pode ter removido a camada so-Claude, e isso e legitimo. O ramo existe para o
+// DIZER — "nao encontrei" nao pode ser silencio (`TP2`) — e sem este caso ninguem o exercitava:
+// a fixture traz sempre a pasta. Um ramo que nunca corre e indistinguivel de um ramo partido.
+// A fixture SINTETICA nao tem `.claude/hooks/` — e por isso que serve aqui. Na copia do repo,
+// apagar a pasta faz o Guard 20 disparar (as rules citam `stop-verify.mjs`), e o teste passava a
+// medir esse aviso em vez deste ramo.
 test("G11b: sem `.claude/hooks/` o guard SALTA em vez de se calar", () => {}, {
   code: 0,
   synthetic: true,
