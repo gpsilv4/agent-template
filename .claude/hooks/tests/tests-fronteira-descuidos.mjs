@@ -89,6 +89,27 @@ const EXECUTADO_EM_TEXTO = [
     "echo `.claude/hooks/a.mjs$(rm -rf .claude/hooks)`",
     "echo `.claude/hooks/x.mjs&&rm -rf .claude/hooks`",
   ].map((c, i) => [`crase com um caminho e mais um comando (${i + 1})`, c]),
+  // Da leitura do 193a9a9. Dentro de um `$(...)` abre-se um contexto de aspas NOVO: o `)` ou o `"`
+  // citados la dentro nao fecham nada, e o `rm` corre (medido em bash e zsh).
+  ["aspas dentro de `$(...)` em aspas duplas", `echo "$(echo "x"; rm -rf .claude/hooks)"`],
+  ["`)` citado dentro de `$(...)`", `echo "$(echo ")"; rm -rf .claude/hooks)"`],
+  ["`)` em aspas simples dentro de `$(...)`", `echo "$(echo ')'; rm -rf .claude/hooks)"`],
+  ["aspas aninhadas depois de um `cd`", `cd .claude/hooks && echo "$(echo "x"; rm -rf *)"`],
+  // Um `(` CITADO dentro do `$(...)` nao abre nada: contado, a substituicao nunca fechava e engolia o
+  // `rm` que vem DEPOIS dela — e que corre.
+  ["`(` citado dentro de `$(...)` nao engole o resto", `echo "$(echo "(")"; rm -rf .claude/hooks`],
+  // O de dentro julga-se no directorio do comando de fora, e nao no do `cd` seguinte.
+  ["`cd` a seguir nao muda o directorio do de dentro", `cd .claude/hooks && echo "$(rm -rf *)" ; cd /tmp`],
+  ["dentro de uma subshell", `(cd .claude && echo "$(rm *)") && ls`],
+  // Pre-existentes: o delimitador `\\EOF` ou com `-` nao casava, e o corpo era lido como comando — um
+  // apostrofo la dentro desemparelhava o resto; e o `$'...'` (ANSI-C) tem escapes.
+  ["delimitador `\\EOF`", "cat <<\\EOF > /tmp/x\nit's\nEOF\nrm -rf .claude/hooks # '"],
+  ["delimitador com `-`", "cat <<'END-X' > /tmp/x\nit's\nEND-X\nrm -rf .claude/hooks # '"],
+  ["`$'...'` com `\\'`", "echo $'x\\' y'; rm -rf .claude/hooks; echo 'z'"],
+  // `"$(pwd)/..."` e `"$(git rev-parse --show-toplevel)/..."` sao caminhos, escritos por um comando.
+  ["`$(git rev-parse --show-toplevel)` no caminho", `rm "$(git rev-parse --show-toplevel)/.claude/settings.json"`],
+  ["`$(pwd)` no caminho", `rm -rf "$(pwd)/.claude/hooks"`],
+  ["`$(pwd)` no alvo de uma redireccao", `echo x > "$(pwd)/.claude/settings.json"`],
 ];
 
 /** Trabalho normal: tem de passar. A pasta-mae so conta como token inteiro, e o texto citado que
@@ -127,6 +148,19 @@ const PERMITIDAS = [
   ["`\\$(` escapado em aspas duplas", `echo "\\$(rm .claude/settings.json)"`],
   ["crase que e so um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\""],
   ["`$(date)` em aspas duplas, a ler da fronteira", `cat .claude/hooks/x | grep "$(date)"`],
+  // O que corre dentro de aspas e julgado A PARTE: o verbo de fora, que so recebe o texto, nao e
+  // julgado por uma leitura la dentro (leitura do 193a9a9 — era o passo de publicar a suite).
+  ["publicar um ficheiro da fronteira", `gh issue create --title x --body "$(cat .claude/hooks/README.md)"`],
+  ["publicar o resultado da suite", `gh pr comment 1 --body "$(node .claude/hooks/tests/test-hooks.mjs 2>&1 | tail -5)"`],
+  ["a lista da fronteira como argumento", `npx eslint "$(git ls-files .claude/hooks)"`],
+  ["copiar para um temporario", `cat .claude/hooks/x.mjs > "$(mktemp)"`],
+  ["o corpo de um PR por heredoc", "gh pr create --body \"$(cat <<'EOF'\nTexto com `.claude/hooks` e $(x)\nEOF\n)\""],
+  ["aspas aninhadas que leem", `echo "$(git log -1 --format="%h")" .claude/hooks/x`],
+  ["uma crase numa mensagem que toca a fronteira", "git commit -m \"docs: corre `npm test` antes\" -- .claude/hooks/x.mjs"],
+  ["o corpo de `<<\\EOF` e literal", "cat <<\\EOF\n$(rm .claude/settings.json)\nEOF"],
+  // O de dentro le-se pelas mesmas regras de aspas: o `|` de um padrao citado nao parte nada.
+  ["um padrao com `|` dentro de `$(...)`", `gh pr comment 1 --body "$(grep -E "a|b" .claude/hooks/x)"`],
+  ["um padrao com `|` dentro de uma crase", 'echo `grep "a|b" .claude/hooks/x`'],
 ];
 
 /** Negados de proposito — o preco aceite, e nao um defeito por corrigir. Afirma-se a NEGACAO: se
@@ -143,9 +177,6 @@ const FALSOS_POSITIVOS_ACEITES = [
   ["`mkdir` da pasta-mae", "mkdir -p .claude"],
   // Uma string simples com um caminho da fronteira e um caminho — mesmo num titulo sem espacos.
   ["titulo do `gh` que e so um caminho", `gh pr create --title ".claude/hooks" --body "x"`],
-  // Uma crase dentro de aspas duplas numa mensagem CORRE de facto (`npm test` corre antes do commit):
-  // num comando que toca a fronteira, e julgada — e o `npm` nao e uma leitura (#229).
-  ["crase numa mensagem de commit que toca a fronteira", "git commit -m \"docs: corre `npm test` antes\" -- .claude/hooks/x.mjs"],
 ];
 
 export function registar({ test, eq }) {
