@@ -304,6 +304,42 @@ test("G11b: um modulo em `lib/` nao e tratado como hook por registar", (dir) => 
 // A fixture SINTETICA nao tem `.claude/hooks/` — e por isso que serve aqui. Na copia do repo,
 // apagar a pasta faz o Guard 20 disparar (as rules citam `stop-verify.mjs`), e o teste passava a
 // medir esse aviso em vez deste ramo.
+// O que FALTA no `allow` (#193): o guard so via o que estava a mais. Um script que o CI corre sem
+// entrada pedia aprovacao a cada uso — sete, mais o `--diff`, durante meses.
+// A fixture nao traz o `.github/`: cada caso escreve o seu `ci.yml`.
+const ci = (...linhas) => `jobs:\n  t:\n    steps:\n${linhas.map((l) => `      - run: ${l}\n`).join("")}`;
+test("G11c: um script do `ci.yml` que sai do `allow` avisa", (dir) => {
+  writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/simulate-upgrade.mjs"));
+  patchSettings(dir, (c) => {
+    c.permissions.allow = c.permissions.allow.filter((a) => a !== "Bash(node .agent/scripts/simulate-upgrade.mjs)");
+  });
+}, { code: 1, includes: ["simulate-upgrade.mjs", "pede aprovacao a cada uso"] });
+
+test("G11c: um script novo no `ci.yml` sem entrada no `allow` avisa", (dir) => {
+  writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/novo.mjs --modo"));
+}, { code: 1, includes: ["node .agent/scripts/novo.mjs --modo", "nao esta no `allow`"] });
+
+// Um prefixo `Bash(<comando>:*)` cobre o comando com argumentos — e a forma do `check-test-surface` —,
+// e uma entrada exacta cobre o comando exacto.
+test("G11c: um prefixo `:*` e uma entrada exacta cobrem o que o CI corre", (dir) => {
+  writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/check-test-surface.mjs --outra", "node .agent/scripts/simulate-upgrade.mjs"));
+}, { code: 0, excludes: ["check-test-surface.mjs --outra", "simulate-upgrade.mjs"] });
+
+// O `tools:` dos agentes (S-05 do #195): o Claude Code nao o respeita, mas e o que documenta a
+// intencao — e essa tem de estar escrita, e em nomes que existem.
+test("G11c: um agente sem `tools:` avisa", (dir) => {
+  writeF(dir, ".claude/agents/sem-tools.md", "---\nname: sem-tools\ndescription: x\n---\n\nCorpo.\n");
+}, { code: 1, includes: ["sem-tools.md", "nao declara `tools:`"] });
+
+test("G11c: uma ferramenta desconhecida em `tools:` avisa", (dir) => {
+  writeF(dir, ".claude/agents/errado.md", "---\nname: errado\ntools: Read, Lerr\n---\n\nCorpo.\n");
+}, { code: 1, includes: ["errado.md", "`Lerr`", "nao e uma ferramenta conhecida"] });
+
+// Uma ferramenta com regra (`Bash(git diff:*)`) e um servidor MCP sao nomes legitimos.
+test("G11c: `Bash(...)` com regra e `mcp__` sao ferramentas conhecidas", (dir) => {
+  writeF(dir, ".claude/agents/certo.md", "---\nname: certo\ntools: Read, Bash(git log:*), mcp__x__y\n---\n\nCorpo.\n");
+}, { code: 0, excludes: ["certo.md"] });
+
 test("G11b: sem `.claude/hooks/` o guard SALTA em vez de se calar", () => {}, {
   code: 0,
   synthetic: true,

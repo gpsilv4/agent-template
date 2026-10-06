@@ -76,8 +76,8 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     um congelado, **baixar o teto no mesmo commit**: a folga que fica por reclamar e espaco
     para voltar a crescer em silencio, e o guard reprova ate ela ser reclamada.
     **Script novo que a documentacao manda correr?** Pre-aprova-lo em `.claude/settings.json`
-    (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 verifica excesso de
-    permissoes, nunca falta, logo um script por pre-aprovar nao avisa: so incomoda quem o corre
+    (`allow`, com alvo FIXO e sem wildcard de argumentos) — o Guard 11 avisa o que o `ci.yml`
+    corre e falta no `allow` (#193); um script que so a documentacao manda correr nao avisa: so incomoda quem o corre
 16. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
     > No **template de origem** este ficheiro fica vazio de propósito (ver `/review` §2);
     > num projeto derivado a regra vale por inteiro.

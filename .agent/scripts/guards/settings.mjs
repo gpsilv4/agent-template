@@ -359,6 +359,45 @@ if (settingsRaw === null) {
       hooksVistos = hooksNoDisco.length;
     }
 
+    // O que FALTA no `allow` (#193). O guard so via o que estava a MAIS: sete scripts que o CI corre,
+    // e que as regras mandam correr, pediam aprovacao a cada uso — o `simulate-upgrade` entre eles,
+    // passo obrigatorio antes de cada push. Um script novo no `ci.yml` sem entrada no `allow` avisa.
+    // Casa a entrada exacta, ou um prefixo `Bash(<comando>:*)`.
+    const ci = read(".github/workflows/ci.yml");
+    if (ci !== null) {
+      const exactos = new Set(allow.filter((a) => typeof a === "string"));
+      const prefixos = [...exactos].map((a) => /^Bash\((.*):\*\)$/.exec(a)?.[1]).filter(Boolean);
+      const corridos = new Set([...ci.matchAll(/node \.agent\/scripts\/[^\s"'`]+(?: --?[a-z][\w=-]*)*/g)].map((m) => m[0]));
+      for (const c of corridos) {
+        if (!exactos.has(`Bash(${c})`) && !prefixos.some((p) => c.startsWith(p))) {
+          flag(`o \`ci.yml\` corre \`${c}\`, que nao esta no \`allow\` — pede aprovacao a cada uso (#193)`);
+        }
+      }
+    }
+
+    // E o `tools:` dos agentes (S-05 do #195). O Claude Code nao o respeita (ver o cabecalho do
+    // `code-reviewer.md`), mas e o que documenta a intencao — e um agente sem ele, ou com um nome que
+    // nao e ferramenta, documenta uma intencao que ninguem consegue verificar.
+    const AGENTS_DIR = ".claude/agents";
+    const FERRAMENTAS = new Set([
+      "Read", "Grep", "Glob", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch",
+      "Agent", "Task", "TodoWrite",
+    ]);
+    for (const nome of listDir(AGENTS_DIR, ".md") ?? []) {
+      const cabeca = /^---\n([\s\S]*?)\n---/.exec(read(`${AGENTS_DIR}/${nome}.md`) ?? "")?.[1] ?? "";
+      const tools = /^tools:[ \t]*(.*)$/m.exec(cabeca)?.[1];
+      if (tools === undefined) {
+        flag(`${AGENTS_DIR}/${nome}.md nao declara \`tools:\` no cabecalho — a intencao do agente fica por escrever (#195)`);
+        continue;
+      }
+      for (const t of tools.match(/[^,(]+(?:\([^)]*\))?/g) ?? []) {
+        const ferramenta = t.trim().replace(/\(.*\)$/, "");
+        if (ferramenta && !FERRAMENTAS.has(ferramenta) && !ferramenta.startsWith("mcp__")) {
+          flag(`${AGENTS_DIR}/${nome}.md declara \`${t.trim()}\` em \`tools:\`, que nao e uma ferramenta conhecida (#195)`);
+        }
+      }
+    }
+
     // O VEREDICTO do guard, depois de TUDO o que ele mede. A frase nomeia as duas coisas
     // verificadas; quando a camada so-Claude nao existe, nao promete nada sobre hooks.
     if (issues === 0) {
