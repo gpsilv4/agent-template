@@ -10,7 +10,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF, patchSettings, GUARD_MODULES } from "./harness/test-harness.mjs";
-import { bootstrapado } from "./harness/projeto-derivado.mjs";
+import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
 
 // NAO e um entry point. Corrido diretamente, este ficheiro imprimia o cabecalho de uma
 // suite e saia 0 sem executar uma unica assercao — um ficheiro chamado `tests-*.mjs` que
@@ -304,7 +304,10 @@ test("G11b: um modulo em `lib/` nao e tratado como hook por registar", (dir) => 
 // num derivado e nota (o `ci.yml` e outro, e um script pode estar fora do `allow` de proposito).
 // A fixture nao traz o `.github/`: cada caso escreve o seu `ci.yml`.
 const ci = (...linhas) => `jobs:\n  t:\n    steps:\n${linhas.map((l) => `      - run: ${l}\n`).join("")}`;
+// `comoTemplate`: a fixture e uma copia do repo, e num projeto DERIVADO ja e derivada — ai o guard da
+// nota, como deve, e o teste mediria o modo errado (`TP3`; apanhado pelo `simulate-derived`).
 test("G11c: um script do `ci.yml` que sai do `allow` reprova no template", (dir) => {
+  comoTemplate(dir);
   writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/simulate-upgrade.mjs"));
   patchSettings(dir, (c) => {
     c.permissions.allow = c.permissions.allow.filter((a) => a !== "Bash(node .agent/scripts/simulate-upgrade.mjs)");
@@ -312,6 +315,7 @@ test("G11c: um script do `ci.yml` que sai do `allow` reprova no template", (dir)
 }, { code: 1, includes: ["simulate-upgrade.mjs", "pede aprovacao a cada uso"] });
 
 test("G11c: um script novo no `ci.yml` sem entrada no `allow` reprova no template", (dir) => {
+  comoTemplate(dir);
   writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/novo.mjs --modo"));
 }, { code: 1, includes: ["node .agent/scripts/novo.mjs --modo", "nao esta no `allow`"] });
 
