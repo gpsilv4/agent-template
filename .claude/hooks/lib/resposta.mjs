@@ -14,7 +14,7 @@ import { Worker, isMainThread, parentPort } from "worker_threads";
 
 /** O prazo da analise. A variavel de ambiente so o pode ENCURTAR (para os testes): o ambiente do
  *  hook vem do Claude Code, mas um prazo maior nunca e o que se quer. */
-export const PRAZO_MS = Math.min(30_000, Number(process.env.GUARD_PRAZO_MS) || 30_000);
+export const PRAZO_MS = Number(process.env.GUARD_PRAZO_MS) > 0 ? Math.min(30_000, Number(process.env.GUARD_PRAZO_MS)) : 30_000;
 
 /** O payload do hook, ou `null` se nao vier JSON valido. */
 export function ler() {

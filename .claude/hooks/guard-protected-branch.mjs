@@ -399,9 +399,9 @@ function seguro(inv) {
  *  `pushd`. Sem nenhuma pista, o `cwd` do proprio hook — nunca lista vazia, que PERMITIA. */
 function diretorios(cmd, cwd) {
   const dirs = [];
-  // O caminho para nos separadores (#227): o `\S+` levava o `;` de `cd <repo>; git commit` (fuga).
+  // #227: `\S+` levava o `;` de `cd <repo>; git commit` (fuga). Para nos separadores, aceita escapes.
   for (const m of cmd.matchAll(/(?:-C|--git-dir=?|--work-tree=?)\s*("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
-  for (const m of cmd.matchAll(/(?:^|[;&|(\n]\s*)(?:cd|pushd)\s+("[^"]+"|'[^']+'|[^\s;&|()]+)/g)) dirs.push(limpo(m[1]));
+  for (const m of cmd.matchAll(/(?:(?:^|[;&|({\n])\s*|\b(?:then|do|else)\s+)(?:cd|pushd)\s+(?:(?:-[PLe@]+|--)\s+)*("[^"]+"|'[^']+'|(?:\\.|[^\s;&|()<>\\])+)/g)) dirs.push(limpo(m[1]));
   if (cwd) dirs.push(cwd);
   // O filtro corre ANTES do fallback: com ele depois, um comando cuja unica pista de
   // diretorio comece por `-` (`git commit -C -m x`) e sem `cwd` no payload dava lista vazia
@@ -413,11 +413,11 @@ function diretorios(cmd, cwd) {
 
 function branchDe(dir) {
   try {
-    return execFileSync("git", ["-C", dir, "symbolic-ref", "--short", "HEAD"], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    }).replace(/\n+$/, "");
-  } catch {
+    const opcoes = { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000, killSignal: "SIGKILL" };
+    return execFileSync("git", ["-C", dir, "symbolic-ref", "--short", "HEAD"], opcoes).replace(/\n+$/, "");
+  } catch (err) {
+    // Um `git` que nao responde e DESCONHECIDO, e nega (#227): sem tecto, um HEAD num FIFO prendia o worker.
+    if (err?.signal) negar(`O \`git\` nao respondeu em 5 s em ${dir}: impossivel verificar o branch.`);
     return null; // nao e repo, ou detached — nao decidimos com base nisso
   }
 }

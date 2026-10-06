@@ -10,8 +10,10 @@
  * antes de qualquer analise. Os tempos sao generosos de proposito — o que se afirma e a ORDEM de
  * grandeza (antes: ~15 s com 99k caracteres; depois: dezenas de ms), nao um numero de maquina.
  */
-import { spawnSync } from "child_process";
-import { rmSync } from "fs";
+import { execFileSync, spawnSync } from "child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -145,6 +147,68 @@ export function registar({ test, corre, repo, eq, contem }) {
       }
     });
   }
+
+  // Da leitura do PR #228: o caminho com escapes (a primeira correccao cortava-o na barra — regressao),
+  // e as formas que o regex nunca viu (ja no `main`): `{`, `then`, flags antes do caminho, `>` colado.
+  const formasDoCd = [
+    ["chavetas", (m) => `{ cd ${m}; git commit -m x; }`],
+    ["`then`", (m) => `if true; then cd ${m}; git commit -m x; fi`],
+    ["`cd -P`", (m) => `cd -P ${m}; git commit -m x`],
+    ["`cd --`", (m) => `cd -- ${m}; git commit -m x`],
+    ["`>` colado ao caminho", (m) => `pushd ${m}>/dev/null; git commit -m x`],
+  ];
+  for (const [nome, forma] of formasDoCd) {
+    test(`diretorios: ${nome} nao esconde um repo em main (#227)`, () => {
+      const f = repo("feature/x");
+      const m = repo("main");
+      try {
+        const cmd = forma(m);
+        eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);
+      } finally {
+        rmSync(f, { recursive: true, force: true });
+        rmSync(m, { recursive: true, force: true });
+      }
+    });
+  }
+
+  test("diretorios: um caminho com `\\(` escapado e o repo, nao um corte na barra (#227)", () => {
+    const f = repo("feature/x");
+    const m = repo("main", "m(1)");
+    try {
+      const cmd = `cd ${m}/m\\(1\\) && git commit -m x`;
+      eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);
+    } finally {
+      rmSync(f, { recursive: true, force: true });
+      rmSync(m, { recursive: true, force: true });
+    }
+  });
+
+  // Um `git` que nao responde (HEAD num FIFO, montagem de rede pendurada) prendia o worker para la do
+  // prazo: o processo nao saia. Agora o `git` tem tecto, e o branch DESCONHECIDO nega.
+  test("diretorios: um `git` que nao responde e negado, e nao pendura o guard (#227)", () => {
+    const f = repo("feature/x");
+    const p = mkdtempSync(join(tmpdir(), "hook-fifo-"));
+    try {
+      mkdirSync(join(p, ".git"));
+      execFileSync("mkfifo", [join(p, ".git", "HEAD")]);
+      // O hook corre com o seu PROPRIO tecto: sem o do `git`, ficava pendurado no FIFO, e a suite
+      // inteira pendurava sem um FAIL — um controlo negativo que nao reprova (medido).
+      const r = spawnSync(process.execPath, [HOOK], {
+        input: JSON.stringify({ tool_input: { command: `cd ${p}; git commit -m x` }, cwd: f }),
+        encoding: "utf8",
+        timeout: 15_000,
+        killSignal: "SIGKILL",
+      });
+      eq(r.error?.code === "ETIMEDOUT" || r.signal === "SIGKILL", false, "o guard pendurou no `git` — o tecto de 5 s nao esta la");
+      contem(r.stdout, "nao respondeu", "um branch que nao se consegue ler tem de ser negado, com a razao");
+    } finally {
+      rmSync(f, { recursive: true, force: true });
+      rmSync(p, { recursive: true, force: true });
+    }
+  });
+
+  test("prazo: um GUARD_PRAZO_MS negativo e ignorado, e nao nega tudo (#227)", () =>
+    comRepo((d) => eq(correComPrazo(`echo ${"a".repeat(5000)}`, -5, d).decisao, "allow", "um prazo negativo cai nos 30 s")));
 
   test("diretorios: 50 directorios ainda se verificam um a um (#227)", () =>
     comRepo((d) => {
