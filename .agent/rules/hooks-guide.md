@@ -29,6 +29,16 @@
     sao enumeraveis, as de ler sao poucas. Julga **por segmento** (`;`, `&&`, `|`, `do`) e nao
     pelo primeiro verbo da linha — a primeira versao negava um `for` que corresse a suite dos
     hooks, medido na sessao em que nasceu. O caminho aberto e o `Edit`, que pede aprovacao.
+  - **O criterio de corte** (#223). Uma fronteira feita com regex tem **sempre mais uma forma**
+    de passar — oito leituras independentes ao #185 acharam cada uma a sua. O inventario
+    (`tests-fronteira-inventario.mjs`) classifica cada forma em aberto:
+    **`DESCUIDO`** (sai de uma ferramenta ou de habito: aspas num caminho, `$HOME`, chavetas)
+    **fecha-se**; **`CONTORNO`** (exige escrever algo de proposito para fugir: partir o nome numa
+    variavel, `script -c`, `ssh`) **regista-se e nao se persegue** — salvo se fecha-lo for barato
+    e sem falsos positivos, como o `alias` (a classe das funcoes, fechada no #222). Uma
+    **classe** que volta sempre com mais uma forma ganha **issue proprio**, e nao mais um caso
+    (o texto citado que corre, #229). E a linha do `CLAUDE.md` — barreira contra o **descuido** —
+    escrita em casos.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio), logo e opt-in no CI: correr localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
 
 - **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/tests/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do hook.

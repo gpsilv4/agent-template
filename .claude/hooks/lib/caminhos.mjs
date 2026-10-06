@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { ehCaminhoFronteira, resto } from "./fronteira.mjs";
+import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, resto } from "./fronteira.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
@@ -38,6 +38,8 @@ export function contextoFronteira(cwd = process.cwd()) {
 function relativo(tok, dir, ctx) {
   let t = tok;
   if (ctx.home && (t === "~" || t.startsWith("~/"))) t = ctx.home + t.slice(1);
+  // O `$HOME` e o `~` escrito de outra maneira (#223): `cd $HOME/proj/.claude/hooks` passava.
+  if (ctx.home && /^\$\{?HOME\}?(?=\/|$)/.test(t)) t = ctx.home + t.replace(/^\$\{?HOME\}?/, "");
   if (/^\$\{?PWD\}?(?=\/|$)/.test(t)) {
     if (dir === null) return null;
     t = `${dir || "."}${t.replace(/^\$\{?PWD\}?/, "")}`;
@@ -59,8 +61,27 @@ function relativo(tok, dir, ctx) {
 }
 
 /** A forma que o `FRONTEIRA` reconhece, ou `null`. Uma pasta sai COM a barra. */
-const formaCanonica = (p) =>
-  p === null ? null : ehCaminhoFronteira(p) ? p : ehCaminhoFronteira(`${p}/`) ? `${p}/` : null;
+const formaCanonica = (p) => {
+  if (p === null) return null;
+  if (ehCaminhoFronteira(p)) return p;
+  if (ehCaminhoFronteira(`${p}/`)) return `${p}/`;
+  // Uma pasta-MAE (#223), e um glob no primeiro nome dentro dela (`.claude/*`, `.claude/h*`): sem
+  // isto, so o texto `.claude` contava, e `~/proj/.claude`, `.claude/.` ou `cd .claude && rm -rf *`
+  // passavam (leitura do 2f7235a). `.claude/commands/x.md` nao e a mae, e continua livre.
+  // O glob so conta se puder casar um nome da fronteira: `.claude/*.md` nao apanha `hooks/` nem o
+  // `settings.json`, e copiar os `.md` da pasta e trabalho normal (leitura do 355ae97).
+  const q = p.replace(/\/$/, "");
+  const mae = MAES.find((m) => q === m || (q.startsWith(`${m}/`) && globCasaFilho(m, q.slice(m.length + 1))));
+  return mae ? `${mae}/` : null;
+};
+
+/** O primeiro nome de `resto` e um glob que casa um filho da fronteira dentro da mae `m`? */
+function globCasaFilho(m, resto) {
+  const nome = resto.split("/")[0];
+  if (!/[*?[]/.test(nome)) return false;
+  const re = new RegExp(`^${nome.replace(/[.+^${}()|\\]/g, "\\$&").replace(/\*/g, "[^/]*").replace(/\?/g, "[^/]")}$`);
+  return CAMINHOS_FRONTEIRA.filter((f) => f.startsWith(`${m}/`)).some((f) => re.test(f.slice(m.length + 1).split("/")[0]));
+}
 
 /** Forma de caminho: barra, `.` inicial, extensao com letras, `~` ou `$PWD`. Com o directorio
  *  DENTRO da fronteira so estes se resolvem: `timeout 60` ou o `rm` de `git rm` nao sao caminhos. */
