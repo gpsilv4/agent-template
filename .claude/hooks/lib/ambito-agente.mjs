@@ -19,7 +19,11 @@
  * FALHA FECHADA, so para os agentes restritos: um comando composto (`;`, `&&`, `|`, `$(`,
  * redireccao, varias linhas) nega, mesmo que o primeiro segmento caiba. Analisar a composicao
  * era reabrir o parser do guard inteiro; quem tem um ambito estreito corre um comando de cada vez.
- * Tambem nega `--output`/`--ext-diff`: um `git diff --output=f` cabe no prefixo e escreve.
+ * Tambem nega `--output`/`--ext-diff`: um `git diff --output=f` cabe no prefixo e escreve. E as
+ * opcoes do UGREP, que e o `grep` do Claude Code (medido: `grep --version` da `ugrep 7.8.4`):
+ * `--filter=` corre um comando por ficheiro, `--save-config` escreve um. Palavra a palavra, como a
+ * shell as entrega (`palavras`): `"--output=f"`, `--out"put"=f` e `\-\-output=f` chegam ao git
+ * iguais (#237). Um `-e "--output"` (o padrao de um grep) nega: falha fechada, aceite.
  *
  * O QUE ISTO NAO E: a mesma barreira contra o descuido que o resto dos hooks. Um subagente que o
  * queira contornar escreve um script com outra ferramenta, se a tiver — o `code-reviewer` nao tem.
@@ -27,8 +31,38 @@
 
 /** Caracteres que fazem de um comando mais do que um comando. Mesmo dentro de aspas: falha fechada. */
 const COMPOSTO = /[;&|<>`\n\r]|\$\(/;
-/** Opcoes de leitores que escrevem ou executam (`git diff --output=f`, `--ext-diff`). */
-const ESCREVE = /(?:^|\s)--(?:output|ext-diff)(?:[=\s]|$)/;
+/** Uma PALAVRA que e uma opcao de leitor que escreve ou executa: o `git` (`--output=f`, `--ext-diff`)
+ *  e o ugrep (`--filter=cmd`, `--filter-magic-label`, `--save-config`). */
+const ESCREVE = /^--(?:output|ext-diff|filter|filter-magic-label|save-config)(?:=|$)/;
+
+/** O comando partido em palavras COMO A SHELL o entrega: aspas simples literais, aspas duplas com
+ *  `\` a escapar, `\` fora de aspas a escapar o caractere seguinte, e aspas coladas que se juntam a
+ *  palavra. Duas versoes com regex falharam na leitura independente do #237: tirar todas as aspas
+ *  negava `grep -rn "git diff --output" dir` (um padrao), e esvaziar as strings citadas deixava uma
+ *  aspa escapada (`can\'t`) desemparelhar as outras e esconder um `--output` SEM aspas. Uma aspa
+ *  por fechar fica na palavra — e o comando nao corre na shell. */
+export function palavras(c) {
+  const out = [];
+  let cur = null;
+  let q = null;
+  for (let i = 0; i < c.length; i++) {
+    const ch = c[i];
+    if (q === "'") { if (ch === "'") q = null; else cur += ch; continue; }
+    if (q === '"') {
+      if (ch === '"') q = null;
+      else if (ch === "\\" && /["\\$`]/.test(c[i + 1] ?? "")) cur += c[++i];
+      else cur += ch;
+      continue;
+    }
+    if (/\s/.test(ch)) { if (cur !== null) out.push(cur); cur = null; continue; }
+    cur ??= "";
+    if (ch === "'" || ch === '"') q = ch;
+    else if (ch === "\\") cur += c[++i] ?? "";
+    else cur += ch;
+  }
+  if (cur !== null) out.push(cur);
+  return out;
+}
 
 /** O frontmatter de um ficheiro de agente, ou `undefined`. Um BOM a frente nao o esconde. */
 function frontmatter(md) {
@@ -79,7 +113,7 @@ export function ambitoBash(md) {
  *  ou que seja exactamente um dos comandos exactos. */
 export function cabeNoAmbito(cmd, regras) {
   const c = cmd.trim();
-  if (COMPOSTO.test(c) || ESCREVE.test(c)) return false;
+  if (COMPOSTO.test(c) || palavras(c).some((p) => ESCREVE.test(p))) return false;
   return regras.some(({ texto, prefixo }) => texto && (c === texto || (prefixo && /^[\t ]/.test(c.slice(texto.length)) && c.startsWith(texto))));
 }
 

@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { ambitoBash, cabeNoAmbito, agenteChamado, razaoAmbito } from "../lib/ambito-agente.mjs";
+import { ambitoBash, cabeNoAmbito, agenteChamado, razaoAmbito, palavras } from "../lib/ambito-agente.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -121,6 +121,41 @@ export function registar({ test, eq, contem }) {
     eq(cabeNoAmbito("git diff --output=/tmp/x", DIFF), false, "escreve num ficheiro");
     eq(cabeNoAmbito("git diff --output /tmp/x", DIFF), false, "na forma separada");
     eq(cabeNoAmbito("git diff --ext-diff", DIFF), false, "corre um programa");
+  });
+
+  test("ambito: `--output` entre aspas ou com escape tambem nao cabe (#237)", () => {
+    eq(cabeNoAmbito('git diff "--output=/tmp/x"', DIFF), false, "a shell tira as aspas");
+    eq(cabeNoAmbito("git diff '--output=/tmp/x'", DIFF), false, "aspas simples");
+    eq(cabeNoAmbito("git diff --output\\=/tmp/x", DIFF), false, "com escape");
+  });
+
+  test("ambito: as opcoes do ugrep que executam ou escrevem nao cabem (#237)", () => {
+    const G = P("grep");
+    eq(cabeNoAmbito("grep --filter='*:touch x' -r a .", G), false, "`--filter` corre um comando");
+    eq(cabeNoAmbito("grep --filter-magic-label=x -r a .", G), false, "`--filter-magic-label`");
+    eq(cabeNoAmbito("grep --save-config", G), false, "`--save-config` escreve um ficheiro");
+    eq(cabeNoAmbito("grep -rn TODO .agent", G), true, "um grep normal continua a caber");
+  });
+
+  test("ambito: as formas que a shell entrega como `--output` nao cabem (segunda leitura do #237)", () => {
+    for (const c of ["git diff --output''=/tmp/x", 'git diff --"output=/tmp/x"', 'git diff --out"put"=/tmp/x', "git diff \\-\\-output=/tmp/x"]) {
+      eq(cabeNoAmbito(c, DIFF), false, `"${c}" chega ao git como --output`);
+    }
+  });
+
+  test("ambito: uma aspa escapada nao esconde um `--output` sem aspas (regressao do #237)", () => {
+    eq(cabeNoAmbito("git log --grep=can\\'t --output=/tmp/x --format='%h'", P("git log")), false, "aspa simples escapada");
+    eq(cabeNoAmbito('git log --grep="a\\"b" --output=/tmp/x --format="%h"', P("git log")), false, "aspa dupla escapada");
+    eq(cabeNoAmbito("grep -rn can\\'t . --filter='*:touch /tmp/p'", P("grep")), false, "o `--filter` do ugrep");
+  });
+
+  test("ambito: `palavras` parte como a shell", () => {
+    eq(JSON.stringify(palavras(`a "b c" 'd e' f\\ g --o"ut"='x y'`)), JSON.stringify(["a", "b c", "d e", "f g", "--out=x y"]), "aspas, escapes e colagem");
+  });
+
+  test("ambito: um padrao de pesquisa citado com ` --output` dentro continua a caber (#237)", () => {
+    eq(cabeNoAmbito('grep -rn "git diff --output" .agent', P("grep")), true, "e um padrao, nao uma opcao");
+    eq(cabeNoAmbito("git log --grep 'x --filter y'", P("git log")), true, "idem, dentro de outra opcao");
   });
 
   test("ambito: o agente encontra-se pelo `name:`, nao pelo nome do ficheiro", () => {
