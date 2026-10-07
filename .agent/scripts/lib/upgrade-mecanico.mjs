@@ -102,6 +102,12 @@ export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
+  // Os branches protegidos do projeto (#240): o motor SUBSTITUI os hooks, e sem isto um derivado
+  // que acrescentou `staging` perdia a proteccao em silencio no primeiro upgrade.
+  // `opcional`: um TEMPLATE sem o `guard-protected-branch.mjs` (uma fixture, ou um template que o
+  // tirou) salta; sem a constante num ficheiro que existe, reprova como as outras. O lado do projeto
+  // nunca foi problema: sem o ficheiro, nao ha nada a guardar.
+  [".claude/hooks/guard-protected-branch.mjs", "PROTEGIDOS_LISTA", { opcional: true }],
 ];
 
 /**
@@ -251,7 +257,8 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
 
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];
-  for (const [rel, nome] of constantes) {
+  for (const [rel, nome, { opcional = false } = {}] of constantes) {
+    if (opcional && leOuNull(join(root, rel)) === null) continue;
     const antigo = blocoDaConstante(leOuNull(join(dir, rel)), nome);
     const novo = blocoDaConstante(leOuNull(join(root, rel)), nome);
     // A ORDEM importa: a constante tem de existir no template novo ANTES de se perguntar se o
@@ -305,8 +312,8 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // proprio, a copia de `.agent/scripts/**` passava-lhe por cima e a decisao do projeto
       // voltava ao default do template — era esse o defeito, um directorio abaixo.
       //
-      // Mas a regra NAO e "nunca tocar": e **nunca SUBSTITUIR, copiar se AUSENTE**, que e a
-      // mesma que os hooks ja usam. A diferenca nao e academica — a primeira versao desta linha
+      // Mas a regra NAO e "nunca tocar": e **nunca SUBSTITUIR, copiar se AUSENTE**. (Os hooks NAO
+      // seguem esta regra: sao substituidos, e so o `PROTEGIDOS_LISTA` se preserva, #240.) A diferenca nao e academica — a primeira versao desta linha
       // excluia a pasta por inteiro, e o simulador reprovou: um consumidor anterior a existencia
       // da `config/` recebia o `check-bundle-sizes.mjs` novo, que faz
       // `import ... from "./config/bundles.mjs"`, e **sem o ficheiro que ele importa**. O

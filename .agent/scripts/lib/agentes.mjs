@@ -10,9 +10,11 @@
  * VIVE AQUI, e nao em `.claude/hooks/lib/`, porque o Guard 11 corre em qualquer projeto, com ou sem
  * hooks. O hook importa daqui — a mesma direccao que o `stop-verify` ja usa com o `mapa-suites`.
  *
- * NAO e um entry point e nao avisa: devolve dados. Quem decide o que fazer com eles sao os dois
- * consumidores.
+ * NAO e um entry point e nao avisa: devolve dados. Quem decide o que fazer com eles sao os
+ * consumidores (o Guard 11, o hook, e a medicao do `/upgrade`).
  */
+import { existsSync, readdirSync, readFileSync } from "fs";
+import { join } from "path";
 
 /** O frontmatter de um ficheiro `.md`, ou `undefined`. Um BOM a frente e o CRLF nao o escondem. */
 export function frontmatter(md) {
@@ -70,4 +72,32 @@ export function ferramentasDe(md) {
     }
   }
   return itens.map(limpa).filter(Boolean);
+}
+
+/** Os agentes do projeto cujo `tools:` ficou diferente do do template DEPOIS do upgrade (#240). O
+ *  motor actualiza os agentes intactos contra a tag (a regra dos documentos); os que o projeto
+ *  customizou ficam, e o hook `guard-subagent-bash` impoe o `tools:` deles. Corre-se sobre a copia
+ *  ja actualizada.
+ *
+ *  Emparelhados pelo `name:`, como o hook os resolve — nao pelo nome do ficheiro (um `reviewer.md`
+ *  com `name: code-reviewer` e o mesmo agente). E comparados como o hook os ve: o conjunto dos
+ *  itens, sem ordem; e sem `tools:` ou com ele vazio e o mesmo (livre).
+ *  @returns {string[]} os ficheiros do PROJETO, ordenados */
+export function agentesDesatualizados(dirProjeto, dirTemplate) {
+  const pasta = (d) => join(d, ".claude/agents");
+  if (!existsSync(pasta(dirProjeto)) || !existsSync(pasta(dirTemplate))) return [];
+  const porNome = (d) => {
+    const m = new Map();
+    for (const f of readdirSync(pasta(d)).filter((x) => x.endsWith(".md"))) {
+      const md = readFileSync(join(pasta(d), f), "utf8");
+      const itens = ferramentasDe(md) ?? [];
+      m.set(nomeDe(md) ?? f.replace(/\.md$/, ""), { f, chave: itens.length ? JSON.stringify([...itens].sort()) : "livre" });
+    }
+    return m;
+  };
+  const tpl = porNome(dirTemplate);
+  return [...porNome(dirProjeto)]
+    .filter(([nome, { chave }]) => tpl.has(nome) && tpl.get(nome).chave !== chave)
+    .map(([, { f }]) => f)
+    .sort();
 }

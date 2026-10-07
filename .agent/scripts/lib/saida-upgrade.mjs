@@ -26,3 +26,13 @@ export const linhasMigracoes = (migracoes) =>
         ...migracoes.map(({ nome, de, para }) => `        ${nome}: ${de}  ->  ${para}`),
         "        O valor antigo esta no historico do git; o novo ficheiro chega com os defaults.",
       ];
+
+/** Os agentes customizados cujo `tools:` difere do do template (#240): o motor so traz os intactos. */
+export const linhasAgentes = (agentes) =>
+  agentes.length === 0
+    ? []
+    : [
+        `${agentes.length} agente(s) com \`tools:\` diferente do template — trazer o \`tools:\` novo A MAO:`,
+        ...agentes.map((a) => `        .claude/agents/${a}`),
+        "        O motor nao os actualizou (estao customizados), e o hook guard-subagent-bash impoe o tools: deles.",
+      ];
