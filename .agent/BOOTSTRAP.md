@@ -340,6 +340,13 @@ projeto se perdeu em silencio, com o verificador a correr e a medir bem.
 
 **Nota:** Este script so funciona com Next.js App Router. Para outros frameworks, indicar ao utilizador que deve ser adaptado ou removido.
 
+**`.agent/scripts/config/guards-do-projeto.mjs`** — a outra config do projeto, e pela mesma razao
+(o `/upgrade` nunca a substitui). Adaptar **`PASTAS_DE_SCRIPTS`**: onde vivem os scripts DESTE
+projeto, alem de `.agent/scripts` e `.claude/hooks` — o Guard 20 procura la os `.mjs` que as
+instrucoes citam, e uma pasta que nao exista e ignorada. `GUARDS`, `PARES_DO_PROJETO` e
+`SKIPS_DO_PROJETO` ficam vazios ate o projeto ter guards proprios; o cabecalho do ficheiro diz o
+formato de cada um (#176).
+
 ### 2.4 Configurar os Doc Guards
 
 O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 29 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), e o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le).
@@ -378,8 +385,13 @@ Correr antes de commit e apos merge de PRs do Dependabot. **Corre no CI** no job
 #### Adaptar o `check-test-surface.mjs` a stack
 
 Este verificador responde a "a superficie de teste foi enfraquecida desde a baseline?" (ver
-`TP4`). Tres listas no topo do ficheiro tem de reconhecer o **vocabulario do teu projeto**,
-senao ele mede zero e passa:
+`TP4`). Tres listas tem de reconhecer o **vocabulario do teu projeto**, senao ele mede zero e
+passa — e **nenhuma vive no `check-test-surface.mjs`**, que e logica e o `/upgrade` substitui:
+
+- as duas primeiras em **`.agent/scripts/config/superficie-de-teste.mjs`** (`TEST_GLOBS_DO_PROJETO`
+  e `CONFIG_GLOBS_DO_PROJETO`) — a config do projeto, que o `/upgrade` nunca substitui;
+- a terceira em **`.agent/scripts/lib/surface-patterns.mjs`** (`CONTAGENS`) — o `/upgrade`
+  substitui o ficheiro mas **preserva esta lista pelo nome** (`MIGRACOES`, `upgrade-why.md`).
 
 - **`TEST_GLOBS`** — onde vivem os testes. Cobre `tests/`, `*.test.ts`, `test_*.py` e
   `test-*.mjs`/`tests-*.mjs`. Se a tua stack nomeia de outra forma, acrescenta.
@@ -546,6 +558,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `anti-patterns.md`: exemplo comentado removido, entradas do template **mantidas** (apagar uma exige apagar as citacoes dela — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` em `.agent/scripts/config/bundles.mjs` atualizados (nao no verificador)?
+- [ ] `PASTAS_DE_SCRIPTS` em `.agent/scripts/config/guards-do-projeto.mjs` com as pastas de scripts do projeto?
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
@@ -558,7 +571,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
 - [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
-- [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS` nao casam com a tua stack e o gate esta a medir zero
+- [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS_DO_PROJETO` (`config/superficie-de-teste.mjs`) nao casam com a tua stack e o gate esta a medir zero
 - [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o
   `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
