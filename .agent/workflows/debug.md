@@ -91,6 +91,18 @@ verificacao que nao depende de alguem se lembrar de repetir os passos daqui a se
 > excluido e que evidencia falta. Um palpite apresentado como conclusao custa mais do que um
 > "nao consegui isolar, falta X".
 
+## Racionalizacoes
+
+> As desculpas que um agente usa para saltar um passo deste workflow, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "Passa aqui, logo esta corrigido." | `TP3`: um teste que depende do estado do repo passa no template e falha num derivado. E o que os simuladores apanham (`process-rules.md`). |
+| "Vi o teste verde." | `TP1`: um teste que nunca se viu VERMELHO pode nao afirmar nada. O controlo negativo e o criterio de saida (secao 5). |
+| "Encontrei a causa." | Sem a causa provada, e um palpite. Dizer o que foi testado e o que falta custa menos do que um palpite apresentado como conclusao (secao 5). |
+| "Ja que estou aqui, corrijo isto tambem." | A correcao e minima (secao 5): o que vai alem da causa raiz justifica-se ou sai — e ticket proprio. |
+
 ## 6. Sincronizacao de Conhecimento (Docs Sync)
 
 - [ ] **src/docs/CHANGELOG.md** atualizado com a correcao?

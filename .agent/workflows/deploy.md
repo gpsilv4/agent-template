@@ -170,6 +170,18 @@ git tag vX.Y.Z -m "Descricao da release"
 git push origin --tags
 ```
 
+## Racionalizacoes
+
+> As desculpas que um agente usa para saltar um passo deste workflow, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "O CI esta verde." | Com zero checks, o `gh pr checks --watch` sai 0: o gate conta os checks antes de esperar (secao 2). |
+| "Subo a versao depois da tag." | No template, o `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
+| "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
+| "O Security Audit esta verde." | Por omissao e informativo (`continue-on-error`): verde nao e limpo. Ler o relatorio (secao 2). |
+
 ## 8. Verificacao Pos-Deploy
 
 - Testar fluxo de autenticacao (login/logout)

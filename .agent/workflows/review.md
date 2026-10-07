@@ -10,6 +10,8 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 > espera-se** — fechar o ciclo e decisao do utilizador, nunca do agente. A lista de angulos
 > esta em `.agent/rules/ticket-method.md` (nao carregado).
 
+> As desculpas para saltar um passo deste workflow, e porque nao colam: `review-why.md` § "Racionalizacoes do `/review`" (#245).
+
 ## 0. Escala por tamanho do ticket (ler ANTES de comecar)
 
 > Um `S` nao paga as caixas de um `L` (porque: `review-why.md` § "Porque a checklist tem escala por tamanho").

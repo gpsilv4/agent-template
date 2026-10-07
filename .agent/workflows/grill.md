@@ -111,6 +111,18 @@ As linhas de **Consequencias** sao o que distingue isto de um questionario: se n
 decisao mudou o que vai ser construido, o interrogatorio nao serviu para nada — e dizer isso
 e mais honesto do que apresentar uma tabela cheia.
 
+## Racionalizacoes
+
+> As desculpas que um agente usa para saltar um passo deste workflow, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "A resposta e obvia, assumo-a." | Uma assuncao nao dita e o ramo que se descobre errado no code review. Assumir e permitido — **escrito** em "Em aberto (assuncoes)". |
+| "Ele disse que sim ao plano." | Um "sim" a um plano diz que a explicacao era plausivel, nao que havia acordo (o porque deste workflow, no topo). |
+| "Pergunto tudo de uma vez, e mais rapido." | Uma pergunta de cada vez: a resposta a uma muda a seguinte. |
+| "Isto e um `S`, interrogo na mesma." | Um `S` nunca e interrogado ("Quando corre"): um processo que pergunta sem ramos ensina a salta-lo. |
+
 ## Limite honesto
 
 Isto reduz retrabalho por ambiguidade; nao o elimina. Nao apanha o que **nem o utilizador
