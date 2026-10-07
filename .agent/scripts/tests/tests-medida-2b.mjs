@@ -56,6 +56,13 @@ export function registar() {
       inclui: ["nao existe no template"],
     }));
 
+  // "Use this template" (M6 do #195): o `commit:` e do PROJETO e o template nao o tem, mas o
+  // `versao:` e uma tag dele. Mede-se pela versao — antes, reprovava a mandar fazer `--unshallow`.
+  test("marca com commit alheio e `versao:` do template -> mede pela versao", () =>
+    exige(contraProjeto({ marca: "template: x\ncommit: 0000000000000000000000000000000000000000\nversao: v1.0.0\n" }), {
+      codigo: 0,
+    }));
+
   // A marca que o BOOTSTRAP.md manda escrever quando nao apurou o SHA. Sem este ramo,
   // `desconhecido` era tratado como uma referencia e o motor lia TODOS os ficheiros como novos —
   // uma lista enorme e errada, sem um erro no ecra (`TP2`).

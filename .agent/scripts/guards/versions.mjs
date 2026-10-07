@@ -196,8 +196,8 @@ if (CHECKS.length === 0) {
  *  bootstrap dava `desconhecida`, o commit gravado era o do PROJETO, e o `/upgrade` caia no Modo B
  *  (manual). O `.agent/TEMPLATE_VERSION` viaja com os ficheiros, e o bootstrap le-o.
  *
- *  So no TEMPLATE: num derivado o ficheiro e o da versao de onde ele saiu, e quem o mantem e o
- *  `/upgrade`. Que nao fique ATRAS da ultima tag, mede-o o `simulate-upgrade` — e quem tem as tags.
+ *  So no TEMPLATE: num derivado o ficheiro e o da versao de onde ele saiu, e ninguem o mantem —
+ *  so o bootstrap o le (o `/upgrade` grava a origem na marca). Que nao fique ATRAS da ultima tag, mede-o o `simulate-upgrade` — e quem tem as tags.
  *
  *  @returns {number} guards executados */
 export function guardTemplateVersion({ read, warn, ok, skip, ehDerivado }) {
