@@ -18,7 +18,8 @@ import { join } from "path";
 import { test, syntheticSandbox, runGuard, resumo, registarResultado, contagem } from "./harness/test-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 // Esta suite tambem e o entry point de modulos que NAO importa directamente — descobre-os em
-// disco. O `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
+// disco. O `tests-agentes.mjs` exercita o `lib/agentes.mjs` (o parser do `tools:`, #238), e o
+// `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
 // nesse modulo corre ESTE comando. Fica escrito porque o mapa de suites exige que a suite
 // **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 import { fileURLToPath } from "url";

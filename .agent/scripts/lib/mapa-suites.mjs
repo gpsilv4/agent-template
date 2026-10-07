@@ -77,6 +77,8 @@ export const SUITES = [
   // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir
   // que uma lacuna de alcance passe em silencio.
   { re: /^\.agent\/scripts\/lib\/alcance\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // O parser do `tools:` dos agentes (#238): o Guard 11 e o hook `guard-subagent-bash` leem-no.
+  { re: /^\.agent\/scripts\/lib\/agentes\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
   // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.

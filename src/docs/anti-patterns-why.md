@@ -530,3 +530,24 @@ mostra-a; a decisao de a manter esta no #180.
 **Ficou fora do catalogo durante uma ronda** porque o catalogo estava a 31 bytes do tecto do
 Guard 1e. Entrou quando as entradas maiores (`TP4`, `TP7`, `TP8`) foram condensadas ao formato de
 quatro linhas, com o resto movido para as secoes delas aqui.
+
+## TP13 — Afirmar o que um comando faz pelo nome
+
+**Origem**: a auditoria de 2026-10-07, lente 1 (#238). O S-01 (#236) tinha acabado de impor o
+`tools:` dos subagentes por hook, e o `code-reviewer` e o `plan-auditor` ganharam `Bash(grep:*)`
+com a descricao "o Bash e so de leitura". Era plausivel: `grep` le. Mas o `grep` que o Claude Code
+entrega a shell e o **ugrep** (`grep --version` da `ugrep 7.8.4` — uma funcao do snapshot da
+shell, nao o `/usr/bin/grep`), e o ugrep tem `--filter=COMANDOS`, que corre um comando por
+ficheiro, e `--save-config`, que escreve um. Um `grep --filter='*:touch x' -r a .` cabia no
+prefixo e passava pelo hook.
+
+**Porque e um anti-padrao e nao um bug pontual.** A frase "so leitura" nao estava errada sobre o
+`grep` em geral; estava errada sobre **o `grep` daquele ambiente**. O mesmo engano tem formas
+vizinhas que ja apareceram neste repo: o `git` na `LEITURA` da fronteira escreve com `--output=`,
+`archive -o` e meia duzia de sub-verbos (#237); o `sort` e o `uniq` escrevem com `-o` e com o
+segundo operando (`caminhos.mjs`, `SEM_MARCADOR`). Em todos, o nome do comando sugeria uma
+garantia que so as opcoes da versao instalada podiam dar ou tirar.
+
+**O que se escreve em vez disso.** O que esta IMPOSTO e por quem: "prefixos declarados, impostos
+por hook". O hook nega as opcoes que escrevem ou executam (`ESCREVE` em `ambito-agente.mjs`), e a
+prosa descreve isso — nao uma propriedade do comando que ninguem mediu.

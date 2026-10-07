@@ -17,8 +17,8 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-// Fonte unica da descoberta de suites (TP4). O caminho atravessa arvores de proposito:
-// duplicar a logica aqui era exactamente o que o `sync-docs` proibe.
+// Fonte unica da descoberta de suites (TP4); o caminho atravessa arvores de proposito. O
+// `tests-ambito-agente.mjs` exercita tambem o `.agent/scripts/lib/agentes.mjs` (#238).
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
 import { FAIL_FAST } from "../../../.agent/scripts/tests/harness/relatorio.mjs"; // o modo, de uma so fonte (#157)
 

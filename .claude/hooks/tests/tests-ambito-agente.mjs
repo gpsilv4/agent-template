@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
-import { ambitoBash, cabeNoAmbito, agenteChamado, razaoAmbito, palavras } from "../lib/ambito-agente.mjs";
+import { ambitoBash, cabeNoAmbito, agenteChamado, razaoAmbito, palavras, composto } from "../lib/ambito-agente.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -147,6 +147,57 @@ export function registar({ test, eq, contem }) {
     eq(cabeNoAmbito("git log --grep=can\\'t --output=/tmp/x --format='%h'", P("git log")), false, "aspa simples escapada");
     eq(cabeNoAmbito('git log --grep="a\\"b" --output=/tmp/x --format="%h"', P("git log")), false, "aspa dupla escapada");
     eq(cabeNoAmbito("grep -rn can\\'t . --filter='*:touch /tmp/p'", P("grep")), false, "o `--filter` do ugrep");
+  });
+
+  // #238: o `|` entre aspas e um padrao, nao um pipe. Os greps de detecao do catalogo de
+  // anti-padroes usam-no, e o `/review` manda o leitor independente corre-los.
+  test("ambito: um `|`, `<`, `>` ou `&` ENTRE ASPAS nao compoe (#238)", () => {
+    const GG = [...P("git grep"), ...P("grep")];
+    for (const c of [
+      'git grep -nE "inalcancavel|codigo morto" -- .agent .claude',
+      "git grep -nE '\\|\\s*grep\\s+-[a-zA-Z]*q' -- '*.yml' '*.sh' '*.mjs'",
+      "git grep -nE '(-m|--message|--body) \"[^\"]*`'",
+      "grep -rn 'a<b>c&d' .agent",
+      "grep a\\|b f",
+    ]) eq(cabeNoAmbito(c, GG), true, `"${c}" e um padrao`);
+  });
+
+  test("ambito: fora de aspas, e a crase ou o `$(` entre aspas duplas, continuam a compor (#238)", () => {
+    for (const c of ["grep a f; rm y", "grep a f | sh", "grep a f > o", 'grep "$(rm y)" f', 'grep "a`rm y`" f', "grep `rm y` f", 'grep "a f', "grep 'a f"]) {
+      eq(composto(c), true, `"${c}" compoe ou nao fecha`);
+    }
+    eq(composto("grep '$(rm y)' f"), false, "entre aspas simples o `$(` e texto");
+  });
+
+  // Da leitura independente do #238, todos medidos a passar pelo hook antes desta correccao.
+  test("ambito: `git grep -O<cmd>` executa e nao cabe, agrupado ou abreviado (#238)", () => {
+    const GG = P("git grep");
+    for (const c of ['git grep -O"echo x" -e y -- f', 'git grep -nO"echo x" -e y', "git grep --open-files-in-pager=echo -e y", "git grep --open=echo -e y", "git grep --op=echo y"]) {
+      eq(cabeNoAmbito(c, GG), false, `"${c}" corre um comando`);
+    }
+    eq(cabeNoAmbito('git grep -nE "Opcao|-O" -- .agent', GG), true, "um `-O` dentro do padrao citado nao e a opcao");
+  });
+
+  test("ambito: `$'...'` e o `(` do zsh compoem fora de aspas (#238)", () => {
+    eq(composto("grep -c $'\\'' /dev/null ; echo x #'"), true, "`\\'` dentro de `$'...'` desalinhava as aspas");
+    eq(composto('grep $"x" f'), true, "`$\"...\"`, por simetria");
+    eq(composto("grep -H x =(echo x)"), true, "o `=(cmd)` do zsh");
+    eq(composto("grep x *(e:'rm y':)"), true, "qualificador de glob do zsh");
+    eq(composto("git grep -nE 'cpSync\\(|x' -- f"), false, "o `(` entre aspas e um padrao");
+  });
+
+  // Da segunda leitura do #238: as quatro escreveram um ficheiro pelo hook antes desta correccao.
+  test("ambito: expansoes do zsh que escondem uma opcao ou correm um comando nao cabem (#238)", () => {
+    const D = P("git diff");
+    for (const c of [
+      'grep "${(e):-\\$(touch /tmp/p)}" /dev/null',
+      "git diff $X--output=/tmp/p --stat",
+      "git diff ${X}--output=/tmp/p",
+      "git diff --stat {--output=/tmp/p,HEAD}",
+      "git diff --out\\\nput=/tmp/p --stat",
+      'grep "$HOME" f',
+    ]) eq(cabeNoAmbito(c, [...D, ...P("grep")]), false, `"${c}" e expandido pela shell`);
+    eq(cabeNoAmbito("grep -n '$x' f", P("grep")), true, "um `$` entre aspas simples e texto");
   });
 
   test("ambito: `palavras` parte como a shell", () => {
