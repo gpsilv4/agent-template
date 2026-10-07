@@ -142,6 +142,24 @@ instrumentos que apanham classes diferentes, e so o terceiro apanha uma **decisa
 
 Saltar as tres e trocar tres tipos de deteccao por um.
 
+## Porque o prompt do leitor independente nao leva a avaliacao do autor
+
+A Fase 4 dizia "sem o raciocinio de quem escreveu" e nao dizia **o que entra no prompt** — e por
+isso foi violada sem nada o assinalar. Medido a 2026-10-07: os prompts aos `code-reviewer` de um
+ticket de fronteira (S-01 do #195) e das cinco lentes de um `/audit` levavam frases do autor como
+"o nucleo esta solido" e "contexto medido: ...". Um leitor que recebe a conclusao antes do diff
+procura confirma-la; o valor da Fase 4 e ver o que o autor nao consegue ver **por ter escrito**,
+e esse valor desaparece quando o autor lhe diz o que pensar.
+
+A forma vem do `doubt-driven-development` do
+[addyosmani/agent-skills](https://github.com/addyosmani/agent-skills): EXTRACT antes de DOUBT —
+ao revisor passa so o artefacto e o contrato, nunca o CLAIM (#248). Aqui o contrato sao os
+criterios de "pronto" da Fase 0, e o angulo diz-lhe por onde atacar. Vale para qualquer agente: no Claude Code e o prompt do subagente; no
+Gemini, no Cursor, no Copilot ou no Codex e o que se cola na sessao nova (ou no outro modelo) que
+faz de leitor. O que o autor ja verificou
+nao entra: se estiver certo, o leitor chega la sozinho; se estiver errado, era isso que se queria
+apanhar.
+
 ## Porque o metodo escala com o tamanho do ticket
 
 A escala nao e um detalhe — e o que torna o metodo viavel. Aplicado por inteiro a tudo,

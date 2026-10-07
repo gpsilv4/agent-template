@@ -184,7 +184,10 @@ uma ronda.
 
 ## Fase 4 — O leitor independente
 
-O subagente `code-reviewer`, em modo leitura, **sem o raciocinio de quem escreveu**.
+Um leitor **sem o raciocinio de quem escreveu**: no Claude Code o subagente `code-reviewer`;
+noutro agente (Gemini, Cursor, Copilot, Codex), uma sessao nova ou outro modelo. Recebe o diff,
+os criterios de "pronto" da Fase 0 e o angulo; **nao** a avaliacao do autor ("esta solido",
+"ja verifiquei X") — porque: `ticket-method-why.md`.
 
 | Ticket | Corre? |
 |--------|--------|
@@ -201,9 +204,8 @@ achado com `ficheiro:linha` e reproducao, e **CONFIRMADO** vs **PLAUSIVEL** expl
 **Verificar cada achado** contra o ficheiro real antes de agir — subagentes alucinam, e um
 achado que nao se confirma custa mais do que nao o ter tido.
 
-> Antes de confiar no `tools:` do frontmatter, confirmar numa sessao nova **que ferramentas o
-> subagente tem de facto**: pedir-lhe que as enumere e que tente um comando fora do que
-> declara. Ja se mediu um subagente anunciado como read-only com `Bash` irrestrito.
+> So no Claude Code: o Bash do `code-reviewer` e o que o `tools:` declara, imposto pelo hook
+> `guard-subagent-bash` (S-01 do #195) e nao pelo frontmatter.
 
 Se encontrar algo, volta-se a Fase 2. Custo: e a etapa mais cara — e por isso a unica
 escalada por tamanho de ticket.
