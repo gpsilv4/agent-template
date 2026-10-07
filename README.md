@@ -133,7 +133,7 @@ gh pr create --fill     # then merge once CI is green
 │   ├── core-rules.md           <- Code standards, DRY, CI/CD, security
 │   ├── process-rules.md        <- Git, branches, sprints, backlog, archiving
 │   ├── anti-patterns.md        <- YOUR anti-patterns (prefix AP, starts free) + greps (loaded)
-│   ├── anti-patterns-template.md <- TP1-TP12: the template's own machinery (NOT loaded)
+│   ├── anti-patterns-template.md <- TP1-TP13: the template's own machinery (NOT loaded)
 │   ├── sync-docs.md            <- Pre-commit docs checklist (NOT loaded; on-demand)
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
@@ -266,7 +266,8 @@ gh pr create --fill     # then merge once CI is green
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
 │                                      repo being measured, not the hook's own
-└── agents/                    <- Subagents: code-reviewer, debugger, plan-auditor (all read-only)
+└── agents/                    <- Subagents: code-reviewer, plan-auditor (no Write/Edit; Bash limited to
+                                  the prefixes in `tools:`, hook-enforced), debugger (full Bash)
 
 .githooks/                      <- Versioned git hooks (tool-independent)
 └── commit-msg                 <- Rejects AI attribution in commit messages.

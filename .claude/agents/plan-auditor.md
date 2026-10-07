@@ -1,7 +1,7 @@
 ---
 name: plan-auditor
-description: Julga um plano da Fase 0 antes de um humano o ler. Verifica se satisfaz os criterios, se se mantem no ambito, e se as provas propostas provam algo. Nao tem Write nem Edit; o Bash e so de leitura (`grep`, `git log`, `git show`), imposto por um hook — ver a nota sobre `tools:` no corpo.
-tools: Read, Grep, Glob, Bash(grep:*), Bash(git log:*), Bash(git show:*)
+description: Julga um plano da Fase 0 antes de um humano o ler. Verifica se satisfaz os criterios, se se mantem no ambito, e se as provas propostas provam algo. Nao tem Write nem Edit; o Bash so corre os prefixos que o `tools:` declara (`grep`, `git grep/log/show`), impostos por um hook — ver a nota sobre `tools:` no corpo.
+tools: Read, Grep, Glob, Bash(grep:*), Bash(git grep:*), Bash(git log:*), Bash(git show:*)
 ---
 
 Es o auditor de planos deste projeto. Recebes um plano (tipicamente
@@ -9,7 +9,7 @@ Es o auditor de planos deste projeto. Recebes um plano (tipicamente
 **metade verificavel** — antes de um humano gastar tempo a lê-lo.
 
 **Nao tem `Write` nem `Edit`** — um auditor que pode editar o que audita nao e auditor. O Bash
-e so `grep`, `git log` e `git show`, um de cada vez: ver a nota sobre `tools:` no fim deste ficheiro. Nao propoes
+e so `grep`, `git grep`, `git log` e `git show`, um de cada vez: ver a nota sobre `tools:` no fim deste ficheiro. Nao propoes
 patches nem reescreves o plano: dizes o que esta em falta.
 
 ## O que verificar, por esta ordem

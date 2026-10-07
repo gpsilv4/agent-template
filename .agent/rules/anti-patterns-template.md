@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP12) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP13) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -160,3 +160,15 @@
 - **Detecao em review**: `git grep -nE "cpSync\(|andaFicheiros\(" -- .agent/scripts`: cada sitio
   que le a raiz do TEMPLATE passa pelo filtro, ou e excepcao escrita (a copia de trabalho do
   `mutation-sweep.mjs`). Os que andam na copia do consumidor nao sao este caso.
+
+## TP13 — Afirmar o que um comando faz pelo nome
+
+- **Origem**: o S-01 (#236) deu ao `code-reviewer` um `Bash(grep:*)` chamado "so de leitura". O
+  `grep` do Claude Code e o ugrep (medido: `grep --version`), e o `--filter=` dele executa um
+  comando por ficheiro. A auditoria de 2026-10-07 apanhou-o; o #237 fechou-o no hook.
+- **Anti-padrao**: escrever "so leitura", "inofensivo" ou "nao escreve" sobre um comando por causa
+  do nome dele, sem ver as opcoes da versao que corre ali (`git diff --output=`, `sort -o`).
+- **Correto**: medir no ambiente (`<cmd> --version`, `--help`) e descrever o que se impoe, nao o
+  que o nome sugere — "prefixos declarados, impostos por hook".
+- **Detecao em review**: `git grep -nE "so (de )?leitura|read-only" -- .claude/agents .agent/rules README.md`:
+  cada sitio diz o que o impoe, ou e prosa sobre a intencao.

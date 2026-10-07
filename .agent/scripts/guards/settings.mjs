@@ -13,6 +13,7 @@
  * Os avisos vivem aqui, logo este ficheiro tem de estar em `PARES` no `mutation-sweep.mjs`:
  * sem isso a varredura passaria a cobrir 645 linhas em vez de 911 e reportaria 100% a mentir.
  */
+import { ferramentasDe } from "../lib/agentes.mjs";
 
 /** @returns {number} guards executados (0 se o ficheiro nao existe) */
 export function guardSettings({ read, warn, ok, note, skip, listDir, ehDerivado = () => false }) {
@@ -381,9 +382,10 @@ if (settingsRaw === null) {
       }
     }
 
-    // E o `tools:` dos agentes (S-05 do #195) — como NOTA, nunca vermelho: o Claude Code nao respeita
-    // o campo (ver o cabecalho do `code-reviewer.md`), e omiti-lo e legitimo (o agente herda todas as
-    // ferramentas). E documentacao da intencao; uma lista fixa de nomes de um produto externo envelhece.
+    // E o `tools:` dos agentes (S-05 do #195) — como NOTA, nunca vermelho: omiti-lo e legitimo (o
+    // agente herda todas as ferramentas), e uma lista fixa de nomes de um produto externo envelhece. O
+    // Claude Code so o respeita em parte; o Bash declarado e imposto pelo hook `guard-subagent-bash`.
+    // A leitura e a MESMA que a desse hook (`lib/agentes.mjs`, #238): eram dois parsers a divergir.
     const AGENTS_DIR = ".claude/agents";
     const FERRAMENTAS = new Set([
       "Read", "Grep", "Glob", "LS", "Bash", "BashOutput", "KillShell", "Edit", "MultiEdit", "Write",
@@ -391,18 +393,16 @@ if (settingsRaw === null) {
       "Skill", "SlashCommand", "ExitPlanMode",
     ]);
     for (const nome of listDir(AGENTS_DIR, ".md") ?? []) {
-      const texto = (read(`${AGENTS_DIR}/${nome}.md`) ?? "").replace(/^﻿/, "").replace(/\r\n/g, "\n");
-      const cabeca = /^---\n([\s\S]*?)\n---/.exec(texto)?.[1] ?? "";
-      const linha = /^tools:[ \t]*(.*)$/m.exec(cabeca)?.[1];
-      if (linha === undefined) {
+      const itens = ferramentasDe(read(`${AGENTS_DIR}/${nome}.md`));
+      if (itens === null) {
         note(`${AGENTS_DIR}/${nome}.md nao declara \`tools:\` no cabecalho — herda todas as ferramentas (#195)`);
         continue;
       }
-      // Em linha (`Read, Grep`, `[Read, Grep]`, `"Read, Grep"`) ou em lista YAML (`- Read`).
-      const lista = linha.trim()
-        ? linha.replace(/^\s*\[|\]\s*$/g, "").replace(/["']/g, "")
-        : (/^tools:[ \t]*\n((?:[ \t]*-[ \t]*.+\n?)+)/m.exec(cabeca)?.[1] ?? "").replace(/^[ \t]*-[ \t]*/gm, "").replace(/\n/g, ",");
-      for (const t of lista.match(/[^,(]+(?:\([^)]*\))?/g) ?? []) {
+      if (itens.length === 0) {
+        note(`${AGENTS_DIR}/${nome}.md tem \`tools:\` vazio — e o mesmo que nao o ter: herda todas as ferramentas (#238)`);
+        continue;
+      }
+      for (const t of itens) {
         const ferramenta = t.trim().replace(/\(.*\)$/, "");
         if (ferramenta && !FERRAMENTAS.has(ferramenta) && !ferramenta.startsWith("mcp__")) {
           note(`${AGENTS_DIR}/${nome}.md declara \`${t.trim()}\` em \`tools:\`, que nao e uma ferramenta que este guard conheca (#195)`);

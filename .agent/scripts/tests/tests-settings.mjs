@@ -351,6 +351,19 @@ test("G11c: as formas legitimas de `tools:` nao dao nota", (dir) => {
   writeF(dir, ".claude/agents/crlf.md", "---\r\nname: crlf\r\ntools: Read\r\n---\r\n");
 }, { code: 0, excludes: ["certo.md", "lista.md", "aspas.md", "blocos.md", "crlf.md"] });
 
+// A virgula DENTRO de uma regra e um comentario na lista (#238): o parser antigo do hook partia o
+// primeiro, e o do guard lia o comentario como ferramenta. Agora os dois leem `lib/agentes.mjs`.
+test("G11c: virgula dentro de `Bash(...)` e comentario nao dao nota", (dir) => {
+  writeF(dir, ".claude/agents/virgula.md", "---\nname: virgula\ntools: Read, Bash(git log --format=%h,%s:*)\n---\n");
+  writeF(dir, ".claude/agents/comenta.md", "---\nname: comenta\ntools:\n  - Read  # para ler\n\n  - Grep\n---\n");
+}, { code: 0, excludes: ["virgula.md", "comenta.md"] });
+
+// Um `tools:` presente mas vazio e o mesmo que nao o ter: o hook deixa o agente livre, e isso nao
+// pode passar calado (leitura independente do #238).
+test("G11c: um `tools:` vazio da nota", (dir) => {
+  writeF(dir, ".claude/agents/vazio.md", "---\nname: vazio\ntools: []\ndescription: x\n---\n");
+}, { code: 0, anyOut: ["vazio.md", "`tools:` vazio"] });
+
 // E uma lista de blocos com um nome desconhecido e lida, e nao passa em silencio.
 test("G11c: uma lista de blocos com um nome desconhecido da nota", (dir) => {
   writeF(dir, ".claude/agents/blocos.md", "---\nname: blocos\ntools:\n  - Read\n  - Lerr\n---\n");
