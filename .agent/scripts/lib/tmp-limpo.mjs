@@ -111,6 +111,8 @@ export const PREFIXOS_DE_TESTE = [
   "naorepo-",
   // O repo com o `.git/HEAD` num FIFO (#227): o `git` que o le pendura, e e o que o teste mede.
   "hook-fifo-",
+  // O projeto com `.claude/agents/` do `guard-subagent-bash` (S-01 do #195).
+  "hook-ambito-",
   // Da suite do MODO FAIL-FAST, que monta uma suite falsa em tmpdir para medir a saida
   // antecipada. Entrou aqui pela mesma razao que o `derivado-maduro-teste-` acima, e pela mesma
   // ordem de acontecimentos: eu criei a fixture, nao corri esta suite, e foi a **simulacao de
