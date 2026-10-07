@@ -96,6 +96,18 @@ Antes de comecar a implementacao, perguntar ao utilizador:
 - **Se sim**: criar automaticamente com o formato `feature/kebab-case-description` (em ingles, sem acentos)
 - **Se nao**: continuar no branch atual.
 
+## Racionalizacoes
+
+> As desculpas que um agente usa para saltar um passo deste workflow, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "Sei o que o codigo faz, nao preciso de o ler." | O plano do #240 dizia "o motor nao toca nos agentes"; toca nos intactos. Uma premissa nao lida e o defeito mais caro: tudo o que vem a seguir assenta nela. |
+| "O nome do comando diz que so le." | `TP13`: o `grep` do Claude Code e o ugrep, e o `--filter` executa. Medir a versao que corre ali (`--version`, `--help`). |
+| "Isto e pequeno, salto a Fase 0." | A escala por tamanho (`ticket-method.md`) ja diz o que um `S` dispensa. Fora disso, saltar e decisao do utilizador, nao do agente. |
+| "Ponho o plano no `implementation_plan.md`." | No TEMPLATE, nao: o Guard 21 reprova, e o plano vai para um issue (`process-rules.md`, a excecao do template). |
+
 ## 9. Output
 
 - Criar `.agent/context/implementation_plan.md` detalhado com ficheiros novos/modificados

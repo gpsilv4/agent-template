@@ -91,3 +91,16 @@ agir e o que a mantem util.
 que julgue nao ter `Bash` responde por leitura onde podia ter medido, e um que o tenha sem o
 saber nao o usa. Pedir-lhe que enumere as ferramentas que tem de facto custa uma linha e
 decide se o que ele devolve e medicao ou leitura.
+
+## Racionalizacoes do `/review`
+
+> As desculpas que um agente usa para saltar um passo do `/review`, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "A bateria local esta verde, posso fazer push." | O #232 passou assim e o CI reprovou: os simuladores apanham o que so aparece num derivado (`process-rules.md`). |
+| "Uma passagem sem achados esta limpa." | Diz-se o angulo usado e os que faltam; quem fecha o ciclo e o utilizador (Fase 3 do `ticket-method.md`). |
+| "Ja corri isso antes." | Um resultado anterior a ultima alteracao nao conta: o hook `Stop` lista o que ficou em divida, e cada aviso responde-se com o resultado. |
+| "O leitor independente concordou comigo." | Se o prompt levava as conclusoes do autor, nao era independente (contrato do #248). |
+| "Sao so docs, nao ha nada a rever." | A prosa e o que o agente segue a letra: o #239 mandava editar listas que ja nao viviam no ficheiro citado. |

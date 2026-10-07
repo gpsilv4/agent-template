@@ -71,6 +71,18 @@ Seguir o checklist estrito:
 - Correr testes de seguranca: `npm run test:security`
 - Se dependencias mudaram: `npm run test:audit`
 
+## Racionalizacoes
+
+> As desculpas que um agente usa para saltar um passo deste workflow, e porque nao colam. Cada
+> linha cita a sua origem: um incidente medido, um issue ou um anti-padrao (#245).
+
+| Desculpa | Porque nao |
+|---|---|
+| "E so mover, o comportamento nao muda." | Um movimento so se audita com o output byte-a-byte igual — foi assim que se extraiu o Guard 11 (`guards/settings.mjs`, cabecalho). |
+| "O formatador so reformata." | Um formatador que o projeto nao usa levou um diff de 1 linha a `+225/-99` (`core-rules.md`, "Diff minimo"). |
+| "Abstraio ja, para nao repetir." | Rule of three (`core-rules.md`): a abstracao errada custa mais do que uma duplicacao. Logica de negocio nunca se duplica. |
+| "Os testes passam, logo o refactor esta bem." | Se o refactor mexeu num teste, a superficie mudou: `check-test-surface.mjs` contra a base (`TP4`). |
+
 ## 7. Sincronizacao de Conhecimento (Docs Sync)
 
 - [ ] **src/docs/CHANGELOG.md** atualizado?
