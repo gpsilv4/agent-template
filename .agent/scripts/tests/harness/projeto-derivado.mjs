@@ -110,6 +110,10 @@ export function comoTemplate(dir) {
     mkdirSync(join(dir, ".agent"), { recursive: true });
     writeFileSync(join(dir, ".agent/BOOTSTRAP.md"), `# Bootstrap\n\nMontado pela fixture para negar o segundo sinal do \`ehDerivado()\`. O template traz ${n} workflows.\n`);
   }
+  // Um template declara a sua versao (M6 do #195). Num derivado actualizado pelo /upgrade o ficheiro
+  // pode nao existir, e a fixture que diz montar um template ganhava o aviso de "em falta" —
+  // medido no `simulate-upgrade`.
+  if (!existsSync(join(dir, ".agent/TEMPLATE_VERSION"))) writeFileSync(join(dir, ".agent/TEMPLATE_VERSION"), "v1.0.0\n");
   // O `.agent/context/` de um template so tem o andaime. Um derivado tem la ficheiros SEUS (um
   // `backlog-detail.md`), e deixa-los punha o Guard 21 a acusar "sem entrada em PRISTINOS" numa
   // fixture que diz montar um template (R7-F, #177). Sai o que nao e andaime.
