@@ -402,6 +402,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "return true",
   },
   {
+    // Os branches protegidos numa so fonte (#257). O sinal e o default de quando o JSON falta ou e invalido:
+    // mutado para `[]`, um hook sem config deixava de proteger qualquer branch — falha aberta.
+    alvo: ".claude/hooks/lib/protegidos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /lista: PROTEGIDOS_POR_OMISSAO(?=, estado)/,
+    neutro: "lista: []",
+  },
+  {
     // O hook que liga o ambito ao payload. Um so sitio de `negar(`: mutado, nada nega.
     alvo: ".claude/hooks/guard-subagent-bash.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",

@@ -113,6 +113,8 @@ export const PREFIXOS_DE_TESTE = [
   "hook-fifo-",
   // O projeto com `.claude/agents/` do `guard-subagent-bash` (S-01 do #195).
   "hook-ambito-",
+  // As configs da leitura dos branches protegidos (#257).
+  "hook-protegidos-",
   // Da suite do MODO FAIL-FAST, que monta uma suite falsa em tmpdir para medir a saida
   // antecipada. Entrou aqui pela mesma razao que o `derivado-maduro-teste-` acima, e pela mesma
   // ordem de acontecimentos: eu criei a fixture, nao corri esta suite, e foi a **simulacao de

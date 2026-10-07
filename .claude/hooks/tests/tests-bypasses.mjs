@@ -15,6 +15,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, alteraFronteira } from "../lib/fronteira.mjs";
+import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
 // NAO e um entry point: corrido diretamente nao afirmaria nada e sairia 0 — a forma canonica
 // do `TP2`.
@@ -31,7 +32,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
  *  cada modulo. Ver `lib/registo.mjs`. */
 export const entryPoint = "test-hooks.mjs";
 
-export function registar({ test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP }) {
+export function registar({ test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP, SALTA }) {
+  // Os alvos protegidos sao os DO PROJETO (#257): `main`/`master`/`develop` nas tabelas viram o 1.o,
+  // 2.o e 3.o da lista (o 1.o se faltarem). Sem nenhum, o teste salta em vez de medir outra coisa.
+  const [p1, p2 = p1, p3 = p1] = PROTEGIDOS_LISTA;
+  const alvo = (c) => { if (p1 === undefined && /\b(main|master|develop)\b/.test(c)) throw SALTA; return c.replace(/\b(main|master|develop)\b(?![-/])/g, (b) => ({ main: p1, master: p2, develop: p3 })[b]); };
 // --- BYPASSES: as formas conhecidas de contornar o guard ---------------------
 // Sem numero de propósito: escrever o tamanho da tabela em prosa foi errado duas vezes no
 // mesmo dia (dizia 28 com 47 casos). O que nao envelhece sao os EVENTOS: a primeira leitura
@@ -244,9 +249,9 @@ const BYPASSES = [
 
 for (const [nome, comando] of BYPASSES) {
   test(`bypass: ${nome}`, () => {
-    const d = repo("main");
+    const d = repo();
     try {
-      const r = corre({ tool_input: { command: comando }, cwd: d });
+      const r = corre({ tool_input: { command: alvo(comando) }, cwd: d });
       eq(r.decisao, "deny", `"${comando}" tinha de ser negado em main`);
     } finally {
       rmSync(d, { recursive: true, force: true });
@@ -369,7 +374,7 @@ const LEGITIMOS = [
 
 for (const [nome, comando] of LEGITIMOS) {
   test(`legitimo em main: ${nome}`, () => {
-    const d = repo("main");
+    const d = repo();
     try {
       const r = corre({ tool_input: { command: comando }, cwd: d });
       eq(r.decisao, "allow", `"${comando}" NAO devia ser negado`);
@@ -398,7 +403,7 @@ for (const [nome, comando] of FORCES) {
   test(`force-push (branch nao protegido): ${nome}`, () => {
     const d = repo("feature/x");
     try {
-      const r = corre({ tool_input: { command: comando }, cwd: d });
+      const r = corre({ tool_input: { command: alvo(comando) }, cwd: d });
       eq(r.decisao, "deny", `"${comando}" tinha de ser negado mesmo fora de main`);
       contem(r.razao, "Force-push");
     } finally {

@@ -17,18 +17,17 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
-// Fonte unica da descoberta de suites (TP4); o caminho atravessa arvores de proposito. O
-// `tests-ambito-agente.mjs` exercita tambem o `.agent/scripts/lib/agentes.mjs` (#238).
+// Descoberta de suites numa so fonte (TP4); o `tests-ambito-agente.mjs` exercita o `lib/agentes.mjs` (#238).
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
 import { FAIL_FAST } from "../../../.agent/scripts/tests/harness/relatorio.mjs"; // o modo, de uma so fonte (#157)
+import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".claude/hooks/guard-protected-branch.mjs");
 const SESSION = join(ROOT, ".claude/hooks/session-context.mjs");
 const STOP = join(ROOT, ".claude/hooks/stop-verify.mjs");
 
-/** Corre um hook NO cwd dado: o `session-context` e o `stop-verify` leem o git do processo,
- *  nao do payload, logo simular com um payload nao afirmaria nada. */
+/** Corre um hook NO cwd dado: o `session-context` e o `stop-verify` leem o git do processo. */
 function correNoCwd(script, cwd) {
   const out = execFileSync("node", [script], { cwd, input: "{}", encoding: "utf8" });
   if (!out.trim()) return { vazio: true, ctx: "" };
@@ -36,9 +35,11 @@ function correNoCwd(script, cwd) {
   return { vazio: false, ctx: d.additionalContext ?? "" };
 }
 
-/** Repo git real no branch pedido. O hook le o branch com `git symbolic-ref`, logo simular
- *  com um ficheiro nao serve — tem de ser um repo. */
-function repo(branch, sub) {
+// Os branches protegidos sao do PROJETO (#257): sem nenhum, os testes que precisam de um saltam.
+const PROTEGIDO = PROTEGIDOS_LISTA[0] ?? null, SALTA = Symbol("sem branch protegido");
+/** Repo git REAL no branch pedido — por omissao, o primeiro protegido do projeto (#257). */
+function repo(branch = PROTEGIDO, sub) {
+  if (branch === null) throw SALTA;
   const dir = mkdtempSync(join(tmpdir(), "hook-test-"));
   const alvo = sub ? join(dir, sub) : dir;
   if (sub) mkdirSync(alvo, { recursive: true });
@@ -47,9 +48,8 @@ function repo(branch, sub) {
   return dir;
 }
 
-/** Escreve, **commita** e volta a modificar — para o `git status --porcelain` devolver ` M`
- *  (nao-staged) e nao `??`. Todos os testes anteriores criavam ficheiros NOVOS, cuja linha
- *  comeca por `??`; era por isso que 33 testes verdes conviviam com o bug do `.trim()`. */
+/** Escreve, **commita** e volta a modificar — para o porcelain devolver ` M` e nao `??`: com
+ *  ficheiros so NOVOS, 33 testes verdes conviviam com o bug do `.trim()`. */
 function commitarEModificar(dir, rel, conteudo = "# depois\n") {
   mkdirSync(dirname(join(dir, rel)), { recursive: true });
   writeFileSync(join(dir, rel), "# antes\n");
@@ -65,7 +65,7 @@ function corre(payload) {
   return { decisao: d.permissionDecision ?? "allow", razao: d.permissionDecisionReason ?? "" };
 }
 
-let passed = 0;
+let passed = 0, saltados = 0; // um SKIP conta para o registo: o modulo correu, e disse porque nao mediu
 const falhas = [];
 function test(nome, fn) {
   try {
@@ -73,9 +73,9 @@ function test(nome, fn) {
     passed++;
     console.log(`  PASS  ${nome}`);
   } catch (err) {
+    if (err === SALTA) return void (saltados++, console.log(`  SKIP  ${nome} — o projeto nao protege nenhum branch (#257)`));
     falhas.push({ nome, err: err instanceof Error ? err.message : String(err) });
-    console.log(`  FAIL  ${nome}`);
-    console.log(`          ${err instanceof Error ? err.message : String(err)}`);
+    console.log(`  FAIL  ${nome}\n          ${err instanceof Error ? err.message : String(err)}`);
     if (FAIL_FAST) process.exit(console.log("  MODO FAIL-FAST: saiu ao primeiro FAIL.") ?? 1); // #157: o `finally` do `fn` ja limpou
   }
 }
@@ -89,8 +89,8 @@ const contem = (s, sub) => {
 console.log("\n=== Testes dos Hooks ===\n");
 
 // --- Nega o que tem de negar -------------------------------------------------
-for (const br of ["main", "master", "develop"]) {
-  test(`nega commit em ${br}`, () => {
+for (const br of PROTEGIDOS_LISTA.length ? PROTEGIDOS_LISTA : [null]) {
+  test(`nega commit em ${br ?? "(nenhum protegido)"}`, () => {
     const d = repo(br);
     try {
       const r = corre({ tool_input: { command: "git commit -m x" }, cwd: d });
@@ -103,7 +103,7 @@ for (const br of ["main", "master", "develop"]) {
 }
 
 test("nega push em main", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: "git push origin main" }, cwd: d }).decisao, "deny", "push");
   } finally {
@@ -112,7 +112,7 @@ test("nega push em main", () => {
 });
 
 test("nega reset --hard em main", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: "git reset --hard HEAD~1" }, cwd: d }).decisao, "deny", "reset");
   } finally {
@@ -122,7 +122,7 @@ test("nega reset --hard em main", () => {
 
 // O caso que motiva o hook: o `cd` numa chamada e o `git` na seguinte, ou no mesmo comando.
 test("nega quando o branch protegido vem de um `cd` no comando (nao do cwd)", () => {
-  const d = repo("main", "sub");
+  const d = repo(undefined, "sub");
   try {
     const r = corre({ tool_input: { command: "cd sub && git commit -m x" }, cwd: join(d, "sub") });
     eq(r.decisao, "deny", "cd + commit");
@@ -132,7 +132,7 @@ test("nega quando o branch protegido vem de um `cd` no comando (nao do cwd)", ()
 });
 
 test("nega quando o branch protegido vem de um `-C`", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: `git -C ${d} commit -m x` }, cwd: "/tmp" }).decisao, "deny", "-C");
   } finally {
@@ -180,7 +180,7 @@ test("permite --force-with-lease (nao e force cego)", () => {
 });
 
 test("permite git de leitura em main (status/log/diff)", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     for (const c of ["git status", "git log --oneline -5", "git diff --stat"]) {
       eq(corre({ tool_input: { command: c }, cwd: d }).decisao, "allow", c);
@@ -191,7 +191,7 @@ test("permite git de leitura em main (status/log/diff)", () => {
 });
 
 test("permite um heredoc que MENCIONA o comando sem o executar", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     const cmd = 'cat <<EOF\nNao correr git push --force nem git commit aqui\nEOF';
     eq(corre({ tool_input: { command: cmd }, cwd: d }).decisao, "allow", "heredoc");
@@ -212,7 +212,7 @@ for (const [nome, cmd] of [
   ["awk com o comando no padrao", "awk '/git commit/' f.txt"],
 ]) {
   test(`permite ${nome} (menciona, nao executa)`, () => {
-    const d = repo("main");
+    const d = repo();
     try {
       const r = corre({ tool_input: { command: cmd }, cwd: d });
       eq(r.decisao, "allow", nome);
@@ -225,7 +225,7 @@ for (const [nome, cmd] of [
 // E o inverso: as aspas nao podem esconder um comando VERDADEIRO. Em `-m "texto"` sobra
 // `git commit -m `, que continua a casar.
 test("nega commit com mensagem entre aspas (as aspas nao escondem o comando)", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: 'git commit -m "uma mensagem com espacos"' }, cwd: d }).decisao, "deny", "mensagem");
   } finally {
@@ -234,7 +234,7 @@ test("nega commit com mensagem entre aspas (as aspas nao escondem o comando)", (
 });
 
 test("nega quando o comando vem depois de um separador de shell", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: "cd . && git commit -m x" }, cwd: d }).decisao, "deny", "separador");
   } finally {
@@ -263,10 +263,10 @@ test("cwd que nao e repo git nao bloqueia", () => {
 
 // --- SessionStart: afirmar o estado, em vez de o deixar inferir --------------
 test("session: diz o branch e avisa quando e protegido", () => {
-  const d = repo("main");
+  const d = repo();
   try {
     const { ctx } = correNoCwd(SESSION, d);
-    contem(ctx, "Branch: **main**");
+    contem(ctx, `Branch: **${PROTEGIDO}**`);
     contem(ctx, "branch PROTEGIDO");
   } finally {
     rmSync(d, { recursive: true, force: true });
@@ -643,8 +643,8 @@ test("reinject: seccao Fronteiras VAZIA nao reinjecta um bloco vazio", () => {
 const descoberta = await registaDescobertos({
   dir: dirname(fileURLToPath(import.meta.url)),
   entryPoint: "test-hooks.mjs",
-  ctx: { test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP },
-  contagem: () => passed + falhas.length,
+  ctx: { test, corre, repo, eq, contem, correNoCwd, commitarEModificar, STOP, SALTA },
+  contagem: () => passed + falhas.length + saltados,
   conhecidos: ENTRY_POINTS,
 });
 console.log(resumoDescoberta(descoberta.registados, descoberta.deOutros));
@@ -654,7 +654,7 @@ test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
   // Este repo esta num branch nao protegido durante o desenvolvimento; o que se afirma e que
   // a decisao vem de um branch REAL e nao de uma lista vazia. Em `main` seria deny.
   if (!["allow", "deny"].includes(r.decisao)) throw new Error("decisao invalida");
-  const d = repo("main");
+  const d = repo();
   try {
     eq(corre({ tool_input: { command: "git -C " + d + " commit -m x" } }).decisao, "deny", "-C aponta para main");
   } finally {
@@ -662,7 +662,7 @@ test("sem cwd no payload cai no cwd do hook, em vez de permitir", () => {
   }
 });
 
-console.log(`\n  ${passed} passaram, ${falhas.length} falharam.\n`);
+console.log(`\n  ${passed} passaram, ${falhas.length} falharam${saltados ? `, ${saltados} saltados (o projeto nao protege nenhum branch)` : ""}.\n`);
 if (falhas.length) {
   console.log("  Ha testes dos hooks a falhar.\n");
   process.exit(1);

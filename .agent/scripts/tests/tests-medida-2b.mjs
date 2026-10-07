@@ -97,23 +97,55 @@ export function registar() {
       { codigo: 0, inclui: ["ja reprovam antes do upgrade"], exclui: ["PASSA A REPROVAR  .agent/scripts/stub.mjs"] }
     ));
 
-  // #240: o motor SUBSTITUI os hooks, e os branches protegidos do projeto perdiam-se em silencio.
+  // #257: os branches protegidos sairam do hook (que o motor substitui) para o `protegidos.json`
+  // (que nao substitui). Um projeto que os customizou no hook recebe-os MIGRADOS — nas duas formas
+  // que a lista ja teve. Conta como constante preservada.
   const GUARD = ".claude/hooks/guard-protected-branch.mjs";
-  test("o `PROTEGIDOS_LISTA` customizado sobrevive ao upgrade dos hooks (#240)", () =>
+  test("os branches protegidos customizados no hook migram para o `protegidos.json` (#257)", () =>
     exige(
       contraProjeto({
-        hoje: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n// hoje\n' },
+        ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n' },
         projeto: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "staging"];\n' },
       }),
       { codigo: 0, inclui: ["1 constante(s) preservada(s)"] }
     ));
 
-  test("um template sem o `guard-protected-branch.mjs` salta o `PROTEGIDOS_LISTA` em vez de reprovar (#240)", () =>
-    exige(contraProjeto({}), { codigo: 0, exclui: ["PROTEGIDOS_LISTA nao existe"] }));
+  test("a forma antiga (`PROTEGIDOS = new Set`, ate a v0.3.0) tambem migra (#257)", () =>
+    exige(
+      contraProjeto({
+        ontem: { [GUARD]: 'const PROTEGIDOS = new Set(["main", "master", "develop"]);\n' },
+        projeto: { [GUARD]: 'const PROTEGIDOS = new Set(["main", "staging"]);\n' },
+      }),
+      { codigo: 0, inclui: ["1 constante(s) preservada(s)"] }
+    ));
 
-  // O `opcional` so salta a FALTA do ficheiro: sem a constante num ficheiro que existe, reprova.
-  test("o `guard-protected-branch.mjs` sem `PROTEGIDOS_LISTA` reprova (#240)", () =>
-    exige(contraProjeto({ hoje: { [GUARD]: "const OUTRA = [];\n" } }), { codigo: 1, inclui: ["PROTEGIDOS_LISTA nao existe"] }));
+  test("os branches protegidos INTACTOS no hook nao migram (#257)", () =>
+    exige(
+      contraProjeto({ ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n' } }),
+      { codigo: 0, inclui: ["0 constante(s) preservada(s)"] }
+    ));
+
+  // Uma lista que o motor nao consegue ler como nomes de branch REPROVA em vez de escrever lixo.
+  test("uma lista ilegivel no hook reprova a migracao em vez de a adivinhar (#257)", () =>
+    exige(
+      contraProjeto({ ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main"];\n' }, projeto: { [GUARD]: "const PROTEGIDOS_LISTA = CONFIG.branches;\n" } }),
+      { codigo: 1, inclui: ["nao consegui ler os branches protegidos"] }
+    ));
+
+  test("um item que nao e um nome de branch reprova, em vez de ser descartado (#257)", () =>
+    exige(
+      contraProjeto({ ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main"];\n' }, projeto: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", OUTRO];\n' } }),
+      { codigo: 1, inclui: ["nao consegui ler os branches protegidos"] }
+    ));
+
+  test("um `protegidos.json` que o projeto ja tem nao e tocado (#257)", () =>
+    exige(
+      contraProjeto({
+        ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n' },
+        projeto: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "staging"];\n', ".claude/hooks/protegidos.json": '["main"]\n' },
+      }),
+      { codigo: 0, inclui: ["0 constante(s) preservada(s)"] }
+    ));
 
   // #240: o motor nao toca nos agentes, e o hook impoe o `tools:` deles.
   const AGENTE = ".claude/agents/leitor.md";

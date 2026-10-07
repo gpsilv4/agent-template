@@ -51,16 +51,9 @@ import { comPrazo, negar } from "./lib/resposta.mjs";
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA } from "./lib/verbos-git.mjs";
 import { porqueAltera, contextoFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
 
-/** Branches onde nao se comita nem se faz push diretamente. Adaptar no bootstrap. */
-const PROTEGIDOS_LISTA = ["main", "master", "develop"];
-/** Comparacao NORMALIZADA, nao igualdade exacta de `Set`. Num filesystem case-insensitive
- *  (APFS/macOS e NTFS, ambos por defeito) `refs/heads/MAIN` e o mesmo ficheiro que
- *  `refs/heads/main` — logo um `symbolic-ref` para `MAIN` punha o git a reportar um branch
- *  que a lista nao reconhecia, e tudo passava a ser permitido. Medido: `main` avancou.
- *  Tambem se corta `refs/heads/` a frente, que e como o branch aparece em algumas formas. */
-const PROTEGIDOS = new Set(PROTEGIDOS_LISTA.map((b) => b.toLowerCase()));
-const ehProtegido = (br) =>
-  typeof br === "string" && PROTEGIDOS.has(br.replace(/^refs\/heads\//, "").toLowerCase());
+// Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
+// default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
+import { ehProtegido } from "./lib/protegidos.mjs";
 
 /** Sub-verbos destrutivos. Comparados **so contra o primeiro argumento**, porque os
  *  sub-verbos do git sao posicionais: comparar contra qualquer argumento negava

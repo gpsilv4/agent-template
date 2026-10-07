@@ -23,6 +23,7 @@ import { execFileSync } from "child_process";
 // O parser do `git status --porcelain -z` vive numa so copia (A3 do #195), partilhada com o
 // `stop-verify.mjs`. Aqui so interessa o caminho.
 import { caminhosPorcelain } from "./lib/porcelain.mjs";
+import { ehProtegido, PROTEGIDOS_ESTADO } from "./lib/protegidos.mjs";
 
 const MAX_FICHEIROS = 12; // acima disto, so a contagem — a lista deixa de informar
 
@@ -50,12 +51,15 @@ const linhas = [];
 const branch = tenta(() => git(["symbolic-ref", "--short", "HEAD"])) ?? tenta(() => `(detached em ${git(["rev-parse", "--short", "HEAD"])})`);
 if (!branch) process.exit(0); // nao e um repo git: nada a dizer
 
-const PROTEGIDOS = new Set(["main", "master", "develop"]);
+// A mesma lista que o guard usa (#257): aqui estava uma segunda copia, que o upgrade substituia.
 linhas.push(
-  PROTEGIDOS.has(branch)
+  ehProtegido(branch)
     ? `Branch: **${branch}** — e um branch PROTEGIDO. Antes de implementar, perguntar se se cria branch (ver "Regra de Branch"). O hook nega commit/push aqui.`
     : `Branch: **${branch}**`
 );
+// Um `protegidos.json` que o projeto escreveu e nao se le (partido, um glob) cai no default — e o
+// branch que ele queria proteger ficava de fora sem ninguem saber (#257).
+if (PROTEGIDOS_ESTADO === "invalido") linhas.push("- `.claude/hooks/protegidos.json` **invalido** (partido, ou com um glob/nome vazio): a usar o default `main`/`master`/`develop`.");
 
 // `--untracked-files=all`: sem ele o git colapsa diretorios nao rastreados e a contagem de
 // "por commitar" fica errada — um ficheiro novo em pasta nova conta como 1 (a pasta).
