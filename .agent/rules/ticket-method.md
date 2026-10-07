@@ -64,8 +64,9 @@ aprovacao**.
 **O plano nao e garantia.** Um plano escrito pode estar errado, e estara. Serve para o erro
 ficar visivel cedo, nao para o impedir.
 
-**Auditar o plano antes de o ler** (`L`, ou toca no nucleo do dominio): o subagente
-`plan-auditor` julga a **metade verificavel** — satisfaz os criterios de aceitacao?, mantem-se
+**Auditar o plano antes de o ler** (`L`, ou toca no nucleo do dominio): o `plan-auditor`
+(subagente no Claude Code; noutro agente, sessao nova com `.claude/agents/plan-auditor.md` como
+prompt) julga a **metade verificavel** — satisfaz os criterios de aceitacao?, mantem-se
 no ambito?, as provas propostas provam algo?, replica algum precedente do repo? Read-only de
 proposito: **um auditor que pode editar o que audita nao e auditor.** Nao substitui a tua
 leitura; poupa-te a lê-lo quando esta obviamente incompleto.
@@ -184,7 +185,11 @@ uma ronda.
 
 ## Fase 4 — O leitor independente
 
-O subagente `code-reviewer`, em modo leitura, **sem o raciocinio de quem escreveu**.
+Um leitor **sem o raciocinio de quem escreveu**: no Claude Code o subagente `code-reviewer`;
+noutro agente (Gemini, Cursor, Copilot, Codex), uma sessao nova ou outro modelo, com
+`.claude/agents/code-reviewer.md` como prompt. Recebe o diff, os criterios de "pronto" da Fase
+0 e o angulo; **nao** a avaliacao do autor ("esta solido", "ja verifiquei X") — porque:
+`ticket-method-why.md`.
 
 | Ticket | Corre? |
 |--------|--------|
@@ -198,12 +203,8 @@ hooks. Nao corre a app, nao mede, nao ve o output. Cobre outra coisa.
 **Instrui-lo a atacar**, nao a elogiar: "assume que esta errado ate prova em contrario", cada
 achado com `ficheiro:linha` e reproducao, e **CONFIRMADO** vs **PLAUSIVEL** explicito.
 
-**Verificar cada achado** contra o ficheiro real antes de agir — subagentes alucinam, e um
+**Verificar cada achado** contra o ficheiro real antes de agir — leitores alucinam, e um
 achado que nao se confirma custa mais do que nao o ter tido.
-
-> Antes de confiar no `tools:` do frontmatter, confirmar numa sessao nova **que ferramentas o
-> subagente tem de facto**: pedir-lhe que as enumere e que tente um comando fora do que
-> declara. Ja se mediu um subagente anunciado como read-only com `Bash` irrestrito.
 
 Se encontrar algo, volta-se a Fase 2. Custo: e a etapa mais cara — e por isso a unica
 escalada por tamanho de ticket.
