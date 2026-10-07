@@ -178,6 +178,7 @@ gh pr create --fill     # then merge once CI is green
     │
     ├── config/                 <- THIS project's configuration. /upgrade never replaces it
     │   ├── bundles.mjs         <- Routes, budgets, and the ALVOS_REPROVAM switch
+    │   ├── superficie-de-teste.mjs <- Where THIS project's tests and runner config live
     │   └── guards-do-projeto.mjs <- THIS project's own guards, their sweep pairs, its script dirs
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
