@@ -85,6 +85,44 @@ const FRONTEIRA = new RegExp(
     ")"
 );
 
+/** Para onde ESCREVE uma invocacao do `git`, alem do `>` (#237). O `git` esta na LEITURA, e estes
+ *  sub-verbos e opcoes truncam ou criam ficheiros: `--output[=]`, o `-o`/`--output-directory` do
+ *  `archive` e do `format-patch`, e o caminho de `bundle create`, `worktree add`, `merge-file`,
+ *  `clone`, `init`, `submodule add` e `worktree move`; o `--separate-git-dir` e o `-f`/`--file` do
+ *  `config`. Pelo POSICIONAL, nao por palavra solta: `git grep worktree` e `git log -S archive`
+ *  sao leituras. Uma saida RELATIVA resolve-se contra os `-C <dir>`, como o git faz.
+ *  @param {string[]} toks  o segmento ja sem cabecas, com o `git` (ou `/usr/bin/git`) a frente */
+function saidasDoGit(toks) {
+  if ((toks[0] ?? "").replace(/^.*\//, "") !== "git") return [];
+  const t = toks.slice(1).map((x) => x.replace(/["']/g, "").replace(/\\=/g, "="));
+  const dirs = []; // os `-C`: o git muda para la ANTES de abrir a saida
+  let i = 0; // as opcoes globais, e as que levam valor (leitura independente do #237)
+  while (i < t.length && t[i].startsWith("-")) {
+    if (t[i] === "-C") dirs.push(t[i + 1] ?? "");
+    i += /^-[Cc]$|^--(?:git-dir|work-tree|namespace|config-env|attr-source|exec-path)$/.test(t[i]) ? 2 : 1;
+  }
+  const verbo = t[i] ?? "";
+  const args = t.slice(i + 1);
+  const saidas = [];
+  // `--out=` abreviado: o `archive` aceita prefixos de opcao longa (o `diff` e o `format-patch` nao).
+  const longa = verbo === "archive" ? /^--(?:o|ou|out|outp|outpu|output)(?:=(.*))?$/ : /^--(?:output|output-directory)(?:=(.*))?$/;
+  args.forEach((a, k) => {
+    const m =
+      longa.exec(a) ??
+      /^--(?:separate-git-dir|output-directory|export-marks)(?:=(.*))?$/.exec(a) ??
+      (/^(?:archive|format-patch|index-pack)$/.test(verbo) ? /^-[A-Za-z]*o(.*)$/.exec(a) : null) ?? // `-vo <f>` agrupado
+      (verbo === "config" ? /^(?:-f|--file)(?:=(.*))?$/.exec(a) : null);
+    if (m) saidas.push(m[1] || args[k + 1] || "");
+  });
+  // Todos os posicionais, e nao "o segundo": `-b <ramo>`, `-L <rotulo>` levam valor. Um URL ou um
+  // nome de ramo nunca e um caminho da fronteira, logo conta-los nao nega nada a mais.
+  const pos = args.filter((a) => !a.startsWith("-"));
+  if ((verbo === "bundle" && pos[0] === "create") || (/^(?:worktree|submodule)$/.test(verbo) && /^(?:add|move)$/.test(pos[0]))) saidas.push(...pos.slice(1));
+  if (/^(?:merge-file|init|clone)$/.test(verbo)) saidas.push(...(pos.length ? pos : ["."]));
+  const base = dirs.filter(Boolean).join("/");
+  return saidas.filter(Boolean).map((s) => (base && !s.startsWith("/") ? `${base}/${s}` : s));
+}
+
 /** Este segmento so muda de directorio? Pelo verbo REAL, depois das cabecas (`if cd X`, `builtin
  *  cd X`) — e SEM redireccao nem substituicao: `cd /tmp > <fronteira>` trunca o ficheiro, e o
  *  `$(...)`/crase de `cd $(rm <fronteira>)` corre (a terceira leitura do #185 apanhou os dois). */
@@ -359,7 +397,14 @@ function julga(texto, ctx) {
   // cabeca. E com `/m`, porque o `restoTexto` junta TODOS os segmentos que tocam — o que fecha,
   // de caminho, `cat .claude/settings.json && git rm <alvo>`, onde uma leitura a frente
   // desarmava o verbo.
-  const gitQueEscreve = /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/m.test(restoTexto.trim());
+  // E os que escrevem NUM CAMINHO sem `>` (#237): julgados pelo caminho de SAIDA, nao pela
+  // mencao — `git diff --output=/tmp/p -- <fronteira>` le a fronteira e e trabalho normal.
+  // Depois de um `cd` para dentro da fronteira, uma saida RELATIVA cai la: `cd .githooks && git diff
+  // --output=commit-msg` (sem extensao, o `normalizaCaminhos` nao a reescreve). Falha fechado.
+  const cdNaFronteira = segmentos.some((s) => soMudaDeDirectorio(s) && FRONTEIRA.test(s));
+  const gitQueEscreve =
+    /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/m.test(restoTexto.trim()) ||
+    semCabeca.some((toks) => saidasDoGit(toks).some((s) => FRONTEIRA.test(` ${s}`) || (cdNaFronteira && !s.startsWith("/"))));
   // O `find` esta na LEITURA e destroi — e, ao contrario do `git`, nao tinha verificacao de
   // sub-verbo nenhuma. O espelho correcto NAO e "`-exec` nega": isso negava
   // `find <f> -name '*.mjs' -exec grep -l X {} +`, que e leitura pura e trabalho normal, e um
@@ -385,8 +430,13 @@ function julga(texto, ctx) {
         // com sub-verbo proprio. `find <alvo> -exec git rm {} +` passava por `git` ser leitura.
         if (!LEITURA.has(sub)) return true;
         const resto = m.input.slice(m.index + m[0].length);
+        // O `{}` e cada ficheiro da fronteira que o `find` encontrou: qualquer saida do git conta
+        // (`find .claude/hooks -exec git diff --output={} HEAD \;` truncava cada hook, #237).
+        // So o que cai na fronteira: o `{}` e cada ficheiro dela, e `-exec git diff --output=/tmp/p {}
+        // \;` e leitura (leitura independente do #237).
         return sub === "git"
-          ? /^\s*(?:rm|mv|restore|checkout|clean|stash|config|apply|reset)\b/.test(resto)
+          ? /^\s*(?:rm|mv|restore|checkout|clean|stash|config|apply|reset)\b/.test(resto) ||
+              saidasDoGit(["git", ...resto.split(/\s+/).filter(Boolean)]).some((s) => s.includes("{}") || FRONTEIRA.test(` ${s}`))
           : sub === "node" && /^\s*(?:-e|-p|--eval|--print|-r|--require)\b/.test(resto);
       }));
   // Com DESCRITOR (#206): `2> <fronteira>`, `1>`, `2>>` e `>|` escrevem. O `[^>\d]` antigo existia para

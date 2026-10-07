@@ -158,6 +158,10 @@ const ABERTO = [
   // Da leitura do a995596: uma barra a partir o caminho (#223 — a classe do contorno). As aspas vazias
   // (`>""<caminho>`) fecharam com as aspas no alvo, e estao em `FECHADO_PELO_CAMINHO`.
   ["CONTORNO", "barra a escapar o caminho", "cat /tmp/x >\\.claude/settings.json"],
+  // Da leitura do #237: a opcao curta COLADA ao caminho. O `FRONTEIRA` so reconhece um caminho
+  // depois de um separador, e alarga-lo mexia na regex que serve todas as outras regras. A forma
+  // separada (`-o <caminho>`) e o `--output=` fecharam e estao no `tests-fronteira-descuidos.mjs`.
+  ["CONTORNO", "`git archive -o` colado ao caminho", "git archive -o.claude/settings.json HEAD"],
   // Da segunda leitura do PR #231 (#229), ja no `main`: um `<<` DENTRO de aspas lido como heredoc
   // (a regex corre antes das aspas), e o `)` de um padrao de `case` a fechar o `$(...)`. Os dois
   // exigem montar a estrutura de proposito.

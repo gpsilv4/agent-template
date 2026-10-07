@@ -25,6 +25,7 @@ export const entryPoint = "test-hooks.mjs";
 const CTX = { raiz: "/Users/g/proj", cwd: "/Users/g/proj", prefixo: "", home: "/Users/g" };
 const RM = "verbo-nao-e-leitura:rm";
 const CP = "verbo-nao-e-leitura:cp";
+const GIT = "git-que-escreve";
 
 /** Escrevem na fronteira: tem de ser negados, com o rotulo esperado. */
 const NEGADAS = [
@@ -38,6 +39,39 @@ const NEGADAS = [
   // A regressao da primeira versao, por regex: juntava a aspa que FECHA uma string com a que abre a
   // seguinte, e o `>` que trunca o settings desaparecia com as duas.
   ["duas strings vizinhas nao se juntam", `echo "a cd ";>.claude/settings.json;"z"`, "verbo-nao-e-leitura:settings.json"],
+  // O `git` esta na LEITURA, e estes escrevem num caminho sem `>` (#237, medidos a passar).
+  ["`git diff --output=`", "git diff --output=.claude/settings.json", GIT],
+  ["`git diff --output` separado", "git diff --output .claude/settings.json", GIT],
+  ["`--output` entre aspas", `git diff "--output=.claude/settings.json"`, GIT],
+  ["`git show --output=`", "git show --output=.claude/hooks/x.mjs HEAD", GIT],
+  ["`git archive -o`", "git archive -o .claude/settings.json HEAD", GIT],
+  ["`git format-patch -o`", "git format-patch -o .claude/hooks HEAD~1", GIT],
+  ["`git bundle create`", "git bundle create .githooks/b HEAD", GIT],
+  ["`git worktree add`", "git worktree add .claude/hooks/wt", GIT],
+  // Da leitura independente do #237: o caminho depois de uma opcao com valor, e mais quatro
+  // sub-verbos que escrevem num caminho.
+  ["`--output` com escape", "git diff --output\\=.claude/settings.json", GIT],
+  ["`format-patch --output-directory=`", "git format-patch --output-directory=.claude/hooks HEAD~1", GIT],
+  ["`worktree add -b <ramo>`", "git worktree add -b feat .claude/hooks/wt", GIT],
+  ["`git merge-file`", "git merge-file .claude/hooks/x.mjs base.mjs theirs.mjs", GIT],
+  ["`git clone` para a fronteira", "git clone . .claude/hooks/sub", GIT],
+  ["`git init`", "git init .githooks/x", GIT],
+  ["`git submodule add`", "git submodule add https://x/y .claude/hooks/s", GIT],
+  ["`find -exec git diff --output={}`", "find .claude/hooks -name '*.mjs' -exec git diff --output={} HEAD \\;", "find-que-escreve"],
+  // Da segunda leitura do #237: o directorio para onde o git escreve, opcoes agrupadas ou
+  // abreviadas, e mais tres que escrevem num caminho.
+  ["`-C <fronteira>` com saida relativa", "git -C .githooks diff --output=pre-commit HEAD", GIT],
+  ["`-C <fronteira>` com `merge-file`", "git -C .githooks merge-file commit-msg a b", GIT],
+  ["`-C <fronteira>` com `init` sem caminho", "git -C .githooks init", GIT],
+  ["`cd <fronteira>` e saida sem extensao", "cd .githooks && git diff --output=commit-msg HEAD", GIT],
+  ["`-o` agrupado (`-vo`)", "git archive -vo .claude/settings.json HEAD", GIT],
+  ["`--out=` abreviado no `archive`", "git archive --out=.claude/settings.json HEAD", GIT],
+  ["opcao global com valor (`--config-env`)", "git --config-env a.b=HOME archive -o .claude/settings.json HEAD", GIT],
+  ["`config -f`", "git config -f .githooks/pre-push a.b c", GIT],
+  ["`--separate-git-dir=`", "git init --separate-git-dir=.githooks/g /tmp/r", GIT],
+  ["`worktree move`", "git worktree move /tmp/wt .claude/hooks/wt", GIT],
+  ["`fast-export --export-marks=`", "git fast-export --export-marks=.githooks/m HEAD", GIT],
+  ["`index-pack -o`", "git index-pack -o .githooks/p.idx /tmp/p.pack", GIT],
   ["duas strings vizinhas nao se juntam (simples)", "echo 'a cd ';>.claude/settings.json;'z'", "verbo-nao-e-leitura:settings.json"],
   // O `$HOME` e o `~` escrito de outra maneira.
   ["`cd` por `$HOME`", "cd $HOME/proj/.claude/hooks && cp /tmp/x y.mjs", CP],
@@ -138,6 +172,25 @@ const PERMITIDAS = [
   ["`alias` como argumento", "grep -r alias .claude/hooks"],
   ["`cd` entre aspas para fora", `cd "/tmp/a b" && rm x`],
   ["`cd` citado numa mensagem de commit", `git commit -m "cd '.claude/hooks'"`],
+  // As leituras do git sobre a fronteira continuam livres (#237): so o caminho de SAIDA nega.
+  ["`git diff --stat` da fronteira", "git diff --stat -- .claude/hooks"],
+  ["`git show` de um ficheiro da fronteira", "git show HEAD:.claude/settings.json"],
+  ["`git log -p` da fronteira", "git log -p -- .claude/settings.json"],
+  // Com a fronteira no comando — sem ela, o `julga` saia antes de chegar a regra, e o teste era
+  // vacuo (leitura independente do #237). Le a fronteira, escreve fora: tem de passar.
+  ["`git archive` da fronteira para fora", "git archive -o /tmp/h.tar HEAD .claude/hooks"],
+  ["`git diff --output=` para fora, pathspec da fronteira", "git diff --output=/tmp/h.patch -- .claude/hooks"],
+  ["`git format-patch -o` para fora, pathspec da fronteira", "git format-patch -o /tmp/p HEAD~3 -- .claude/hooks"],
+  ["`git show --output=` para fora", "git show HEAD:.claude/settings.json --output=/tmp/s.json"],
+  // Uma palavra de sub-verbo como TERMO de pesquisa nao e o sub-verbo.
+  ["`git grep worktree` na fronteira", "git grep -n worktree .claude/hooks"],
+  ["`git log -S archive` na fronteira", "git log -S archive -- .claude/hooks"],
+  ["`--output-indicator-new` nao e `--output`", "git diff --output-indicator-new=+ -- .claude/hooks"],
+  // O `find -exec git` so nega o que cai na fronteira, e so ate ao fim do `-exec` (segunda leitura).
+  ["`find -exec git diff --output=/tmp/p {}`", "find .claude/hooks -exec git diff --output=/tmp/p {} \\;"],
+  ["um `git --output` depois do `-exec` acabar", "find .claude/hooks -exec git log {} \\; ; git diff --output=/tmp/x"],
+  ["`-C` para fora, pathspec da fronteira", "git -C /tmp/r diff --output=out.patch -- .claude/hooks"],
+  ["`config --get`", "git config --get user.name && cat .claude/settings.json"],
   ["comando citado numa mensagem de commit", `git commit -m 'fix: cd ".claude/hooks" && rm x'`],
   ["aspas escapadas dentro de aspas", `echo "cd \\".claude/hooks\\""`],
   ["um padrao entre aspas", `grep -rn "x" .claude/hooks && git log --grep=".claude/hooks"`],
