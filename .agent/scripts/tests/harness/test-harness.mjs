@@ -65,6 +65,10 @@ const FIXTURE_PATHS = [
   // permite-o) via a sandbox como TEMPLATE, e os guards que dependem disso (o 21, o 12d/e)
   // mediam outro estado. No template nao existe, e a copia salta-a.
   ".agent/.template-version",
+  // A versao do template (M6 do #195). Sem ela, o guard que a le avisava na sandbox: no template o
+  // aviso ficava na linha de base, e num derivado os testes que forcam o template (`comoTemplate`)
+  // ganhavam-no como novo e reprovavam — o `simulate-derived` apanhou-o (`TP3`).
+  ".agent/TEMPLATE_VERSION",
   ".agent/context",
   ".agent/scripts",
   ".claude/commands",
