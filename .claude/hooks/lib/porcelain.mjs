@@ -35,8 +35,10 @@ export function caminhosPorcelain(saida) {
     // relativos a raiz do repo e o hook pode correr de uma subpasta, logo um teste ao disco
     // responderia sobre o sitio errado. O git ja sabe o que apagou.
     caminhos.push({ caminho: entradas[i].slice(3), apagado: estado.includes("D") });
-    // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado.
-    if (estado[0] === "R" || estado[0] === "C") i++;
+    // `R`/`C` trazem o caminho de origem como entrada seguinte, sem coluna de estado — em QUALQUER
+    // das duas colunas: ` R` e uma renomeacao na arvore de trabalho (com `git add -N`), e so a
+    // primeira coluna deixava a origem passar por um ficheiro a mais (as duas copias antigas tinham-no).
+    if (/[RC]/.test(estado)) i++;
   }
   return caminhos;
 }

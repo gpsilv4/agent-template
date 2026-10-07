@@ -36,6 +36,12 @@ export function registar({ test, eq }) {
       "o caminho de origem nao pode aparecer como um ficheiro a mais, com 3 caracteres comidos");
   });
 
+  test("porcelain: uma renomeacao na arvore de trabalho (` R`) tambem consome as duas", () => {
+    eq(JSON.stringify(caminhosPorcelain(z(" R novo.mjs", "antigo.mjs"))),
+      JSON.stringify([{ caminho: "novo.mjs", apagado: false }]),
+      "o `R` na segunda coluna tambem traz a origem como entrada seguinte");
+  });
+
   test("porcelain: uma copia tambem consome as duas entradas", () => {
     eq(caminhosPorcelain(z("C  copia.mjs", "origem.mjs")).length, 1, "a origem de uma copia nao e um ficheiro tocado a mais");
   });
