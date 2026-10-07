@@ -393,6 +393,22 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O ambito do Bash de um subagente (S-01 do #195). O sinal e o `return false` que recusa um
+    // comando composto ou com `--output`: mutado para `true`, esse comando passa. A recusa fora dos
+    // prefixos vem do `.some(...)` e mede-se pelos testes de ponta a ponta, nao por este par.
+    alvo: ".claude/hooks/lib/ambito-agente.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /return false(?=;)/,
+    neutro: "return true",
+  },
+  {
+    // O hook que liga o ambito ao payload. Um so sitio de `negar(`: mutado, nada nega.
+    alvo: ".claude/hooks/guard-subagent-bash.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])(?<!function\s)negar\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e

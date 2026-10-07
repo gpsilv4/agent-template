@@ -1,7 +1,7 @@
 ---
 name: code-reviewer
-description: Reviewer de leitura. Usar para rever diffs quanto a correcao, seguranca, performance e alinhamento com as regras do projeto. Nao tem Write nem Edit. NAO assumir que nao corre comandos — ver a nota sobre `tools:` no corpo.
-tools: Read, Grep, Glob, Bash(git diff:*)
+description: Reviewer de leitura. Usar para rever diffs quanto a correcao, seguranca, performance e alinhamento com as regras do projeto. Nao tem Write nem Edit; o Bash e so de leitura (`git diff/status/log/show`, `grep`), imposto por um hook — ver a nota sobre `tools:` no corpo.
+tools: Read, Grep, Glob, Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(git show:*), Bash(grep:*)
 ---
 
 Es um revisor de codigo para este projeto. Analisa o diff/ficheiros indicados e reporta problemas — nao edites nada.
@@ -49,7 +49,7 @@ honrado.
 O campo tem *algum* efeito — `Write` e `Edit` nao sao concedidos, e e por isso que a descricao
 promete apenas isso. Mas nao restringe o `Bash`.
 
-Duas consequencias praticas:
+Tres consequencias praticas:
 
 1. **Nao escrever aqui garantias de "read-only".** A versao anterior desta descricao dizia "nao
    corre comandos que alterem estado". Era falso, e era o que levava alguem a confiar.
@@ -58,6 +58,10 @@ Duas consequencias praticas:
    comprovadamente funciona. Um subprocesso (`node`, `python`) que abra um ficheiro por conta
    propria continua fora do alcance das regras `Read(...)`; para bloqueio a nivel de OS e preciso
    sandbox ou um hook `PreToolUse`.
+3. **Os `Bash(<prefixo>:*)` sao impostos por um hook**, nao pela plataforma: o `guard-subagent-bash`
+   le este `tools:` e nega qualquer outro Bash deste subagente, e qualquer comando composto (S-01 do
+   #195). Sao todos de leitura: `git diff`/`status`/`log`/`show` e o `grep` dos anti-padroes (o
+   `Grep` nao e concedido, ver acima) — um de cada vez, sem `|`. Correr as suites e de quem chama.
 
 **Por verificar:** as definicoes dos subagentes sao carregadas no arranque da sessao — editar este
 ficheiro a meio de uma sessao nao muda nada (testado). Se alterares o `tools:`, confirma o efeito
