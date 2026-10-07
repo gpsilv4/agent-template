@@ -119,7 +119,12 @@ const porGerar = (dir) =>
 
 /** O que distingue os dois estados, e e a medida do `ehDerivado()` vista pelos guards. */
 const SO_TEMPLATE = [{ chave: "Guard 13 (placeholders) — bootstrap ainda nao correu", vezes: 1 }];
-const SO_DERIVADO = [{ chave: "Guard 21 (.agent/context/ por estrear) — projeto derivado", vezes: 1 }];
+const SO_DERIVADO = [
+  { chave: "Guard 21 (.agent/context/ por estrear) — projeto derivado", vezes: 1 },
+  // Num derivado o `.agent/TEMPLATE_VERSION` e o da versao de onde ele saiu, e mante-lo e do
+  // `/upgrade` (M6 do #195): o guard so verifica o template.
+  { chave: "versao do template — projeto derivado", vezes: 1 },
+];
 
 export function registar() {
   /** Monta um estado, corre a bateria, e afirma sobre o conjunto de `SKIP` que ele produz. */

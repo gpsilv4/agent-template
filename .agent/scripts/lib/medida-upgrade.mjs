@@ -161,16 +161,21 @@ export function novasLinhas(antes, depois) {
  * apurar o SHA, e e exactamente o caso do **Modo B** do `/upgrade` — julgamento, nao mecanica.
  * Devolver isso como se fosse uma baseline media contra um ponto que nao existe.
  *
- * @returns {string|null} a referencia, ou `null` quando nao ha marca utilizavel
+ * Devolve OS DOIS, por ordem, e nao so o primeiro: com "Use this template" o `commit:` e um SHA
+ * do PROJETO, que o template nao tem — e o `versao:` e que o resolve (M6 do #195). Quem chama
+ * escolhe o primeiro que existe no template, como o bash da seccao 1 do `/upgrade`.
+ *
+ * @returns {string[]} as referencias candidatas — vazio quando nao ha marca utilizavel
  */
 export function versaoDeOrigem(raiz) {
   const marca = leOuNull(join(raiz, ".agent/.template-version"));
-  if (marca === null) return null;
+  if (marca === null) return [];
+  const refs = [];
   for (const campo of ["commit", "versao"]) {
     const v = new RegExp(`^${campo}:\\s*(\\S+)\\s*$`, "m").exec(marca)?.[1];
-    if (v && v !== "desconhecido") return v;
+    if (v && v !== "desconhecido" && v !== "desconhecida") refs.push(v);
   }
-  return null;
+  return refs;
 }
 
 /**
@@ -237,8 +242,8 @@ export async function adapta2bGuard17({ dir, fatal }) {
  * @returns {number} o codigo de saida
  */
 export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fatal }) {
-  const ref = versaoDeOrigem(raiz);
-  if (ref === null) {
+  const refs = versaoDeOrigem(raiz);
+  if (refs.length === 0) {
     fatal(
       "sem `.agent/.template-version` utilizavel — isto e o Modo B do /upgrade (decidir por " +
         "categoria, com julgamento), e o Modo B nao se mede: mede-se o que e mecanico"
@@ -248,11 +253,18 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // falhar em todos os ficheiros, interpretava cada falha como "nao existia na tag" e concluia
   // que o template inteiro e novo — uma lista enorme e completamente errada, sem um unico erro
   // no ecra (`TP2`).
-  try {
-    git(["rev-parse", "--verify", `${ref}^{commit}`], template);
-  } catch {
+  const existe = (r) => {
+    try {
+      git(["rev-parse", "--verify", `${r}^{commit}`], template);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const ref = refs.find(existe);
+  if (ref === undefined) {
     fatal(
-      `a marca deste projeto aponta para ${ref}, que nao existe no template em ${template} — ` +
+      `a marca deste projeto aponta para ${refs.join(" / ")}, que nao existe no template em ${template} — ` +
         "num clone raso falta `git fetch --unshallow`"
     );
   }

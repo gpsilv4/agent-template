@@ -65,6 +65,10 @@ const FIXTURE_PATHS = [
   // permite-o) via a sandbox como TEMPLATE, e os guards que dependem disso (o 21, o 12d/e)
   // mediam outro estado. No template nao existe, e a copia salta-a.
   ".agent/.template-version",
+  // A versao do template (M6 do #195). Sem ela, o guard que a le avisava na sandbox: no template o
+  // aviso ficava na linha de base, e num derivado os testes que forcam o template (`comoTemplate`)
+  // ganhavam-no como novo e reprovavam — o `simulate-derived` apanhou-o (`TP3`).
+  ".agent/TEMPLATE_VERSION",
   ".agent/context",
   ".agent/scripts",
   ".claude/commands",
@@ -367,6 +371,8 @@ function syntheticSandbox() {
   // E a tabela 2.2, como a real: e dela que o `bootstrapado()` tira as rules a gerar (#190).
   w(".agent/BOOTSTRAP.md", `# Bootstrap\n\nO checker corre ${nGuards} guards numerados.\nO template traz 1 workflows.\n\n### 2.2 Ficheiros a GERAR\n\n| \`.agent/rules/business-logic.md\` |\n| \`.agent/rules/pages-architecture.md\` |\n\n### 2.3 Fim\n`);
   w(".agent/workflows/plan.md", "# /plan\n");
+  // O template declara a sua versao (M6 do #195): sem ela, o guard da versao avisa.
+  w(".agent/TEMPLATE_VERSION", "v1.0.0\n");
   w(".claude/commands/plan.md", "---\ndescription: x\n---\n\nLer `.agent/workflows/plan.md`.\n");
   w(".gemini/commands/plan.toml", 'description = "x"\nprompt = "Le .agent/workflows/plan.md"\n');
   w(".agent/context/session.md", "# Session\n");

@@ -189,3 +189,29 @@ if (CHECKS.length === 0) {
 
   return guardsRun;
 }
+
+/** O template declara a sua versao num ficheiro (M6 do #195).
+ *
+ *  Com "Use this template", o projeto novo nao traz tags nem historico: o `git describe` do
+ *  bootstrap dava `desconhecida`, o commit gravado era o do PROJETO, e o `/upgrade` caia no Modo B
+ *  (manual). O `.agent/TEMPLATE_VERSION` viaja com os ficheiros, e o bootstrap le-o.
+ *
+ *  So no TEMPLATE: num derivado o ficheiro e o da versao de onde ele saiu, e ninguem o mantem —
+ *  so o bootstrap o le (o `/upgrade` grava a origem na marca). Que nao fique ATRAS da ultima tag, mede-o o `simulate-upgrade` — e quem tem as tags.
+ *
+ *  @returns {number} guards executados */
+export function guardTemplateVersion({ read, warn, ok, skip, ehDerivado }) {
+  if (ehDerivado()) {
+    skip("versao do template — projeto derivado (o `.agent/TEMPLATE_VERSION` e o de onde saiu)");
+    return 0;
+  }
+  const v = read(".agent/TEMPLATE_VERSION");
+  if (v === null) {
+    warn("`.agent/TEMPLATE_VERSION` nao existe — com \"Use this template\", o bootstrap nao sabe de que versao o projeto saiu");
+  } else if (!/^v\d+\.\d+\.\d+\s*$/.test(v)) {
+    warn(`\`.agent/TEMPLATE_VERSION\` tem \`${v.trim()}\` — devia ser \`vX.Y.Z\`, e so isso`);
+  } else {
+    ok(`versao do template declarada: ${v.trim()}`);
+  }
+  return 1;
+}

@@ -211,6 +211,23 @@ if (!temDelta) {
 const sha = git(["rev-parse", "--short", tag]);
 ok(`baseline: ${tag} (${sha}) -> HEAD`);
 
+// O `.agent/TEMPLATE_VERSION` (M6 do #195) nao pode ficar ATRAS da ultima tag: e o que o bootstrap
+// grava num projeto criado com "Use this template", e um ficheiro esquecido numa release dava a esse
+// projeto uma versao que nao e a sua. O formato verifica-o o `guardTemplateVersion`; aqui, a ordem — e e
+// aqui porque e este script que tem as tags. Pode ir A FRENTE: entre o passo do /deploy que o sobe
+// e a tag, a versao nova ja esta escrita.
+const declarada = leOuNull(join(ROOT, ".agent/TEMPLATE_VERSION"))?.trim() ?? "";
+const partes = (v) => (/^v?(\d+)\.(\d+)\.(\d+)$/.exec(v) ?? []).slice(1).map(Number);
+const [dv, tv] = [partes(declarada), partes(tag)];
+if (dv.length === 3 && tv.length === 3) {
+  const i = dv.findIndex((x, k) => x !== tv[k]);
+  if (i >= 0 && dv[i] < tv[i]) {
+    warn(`.agent/TEMPLATE_VERSION diz ${declarada}, ATRAS da ultima tag ${tag} — subi-lo antes de marcar a release (/deploy)`);
+  } else {
+    ok(`.agent/TEMPLATE_VERSION (${declarada}) nao esta atras da ultima tag (${tag})`);
+  }
+}
+
 // --- 2. montar o projeto de ONTEM ------------------------------------------------
 const dir = criaTmp("upgrade-");
 copiaAtiva = dir;
