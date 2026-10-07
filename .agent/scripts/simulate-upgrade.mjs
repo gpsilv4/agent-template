@@ -58,7 +58,8 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
-import { linhasSubstituidos, linhasMigracoes } from "./lib/saida-upgrade.mjs";
+import { linhasSubstituidos, linhasMigracoes, linhasAgentes } from "./lib/saida-upgrade.mjs";
+import { agentesDesatualizados } from "./lib/agentes.mjs";
 import { linhasNaoCopiados } from "./lib/fora-do-template.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
@@ -252,6 +253,8 @@ if (semCopia) {
   ok(semCopia);
   for (const l of semCopiaLinhas) console.log(l);
 }
+// Os agentes que o motor NAO actualizou (os customizados): o hook impoe o `tools:` deles (#240).
+for (const [i, l] of linhasAgentes(agentesDesatualizados(dir, ROOT)).entries()) i === 0 ? ok(l) : console.log(l);
 
 // O que SAIU do template e o consumidor ainda tem. O upgrade copia com `cpSync`, que acrescenta
 // e substitui mas NUNCA apaga — logo uma renomeacao no template deixava o ficheiro velho no

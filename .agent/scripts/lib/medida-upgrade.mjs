@@ -26,7 +26,8 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import { leOuNull } from "./ficheiros.mjs";
 import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
-import { linhasSubstituidos, linhasMigracoes } from "./saida-upgrade.mjs";
+import { linhasSubstituidos, linhasMigracoes, linhasAgentes } from "./saida-upgrade.mjs";
+import { agentesDesatualizados } from "./agentes.mjs";
 import { linhasNaoCopiados } from "./fora-do-template.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
@@ -342,6 +343,9 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     ok(semCopia);
     for (const l of semCopiaLinhas) console.log(l);
   }
+  // Os agentes que o motor NAO actualizou (os customizados), sobre a copia ja actualizada, como o
+  // simulador: um intacto contra a tag ja chega novo, e lista-lo era mandar fazer a mao o feito (#240).
+  for (const [i, l] of linhasAgentes(agentesDesatualizados(dir, template)).entries()) i === 0 ? ok(l) : console.log(l);
 
   // O que SAIU do template e o projeto ainda tem. Nao e desarrumacao: a descoberta em disco
   // exige par ao orfao, o Guard 17 conta-o e o `check-test-surface` ve a superficie duplicada.

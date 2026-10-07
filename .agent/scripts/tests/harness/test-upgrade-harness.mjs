@@ -114,8 +114,9 @@ export function corre(dir, args = []) {
  * @param {object} o.hoje    ficheiros do template DEPOIS da tag (o upgrade a medir)
  * @param {object} o.projeto ficheiros a sobrepor no projeto (o estado proprio dele)
  * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
+ * @param {object} o.ontem   ficheiros do template JA na tag (o projeto herda-os intactos)
  */
-export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined, base = tmpdir() } = {}) {
+export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir() } = {}) {
   const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
   const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
@@ -129,7 +130,7 @@ export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined, base
     }
   };
 
-  escreve(tpl, templateSintetico());
+  escreve(tpl, { ...templateSintetico(), ...ontem });
   git(tpl, ["init", "-q", "-b", "main"]);
   git(tpl, ["config", "user.email", "t@t"]);
   git(tpl, ["config", "user.name", "t"]);
@@ -140,7 +141,7 @@ export function contraProjeto({ hoje = {}, projeto = {}, marca = undefined, base
 
   // O projeto sai da TAG — e nao do template de hoje. Um projeto montado do HEAD ja teria tudo,
   // e a medicao do que o upgrade acrescenta daria sempre vazio: verde por construcao.
-  escreve(proj, templateSintetico());
+  escreve(proj, { ...templateSintetico(), ...ontem });
   escreve(proj, projeto);
   rmSync(join(proj, ".agent/BOOTSTRAP.md"), { force: true });
   if (marca !== null) {

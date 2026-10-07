@@ -97,6 +97,58 @@ export function registar() {
       { codigo: 0, inclui: ["ja reprovam antes do upgrade"], exclui: ["PASSA A REPROVAR  .agent/scripts/stub.mjs"] }
     ));
 
+  // #240: o motor SUBSTITUI os hooks, e os branches protegidos do projeto perdiam-se em silencio.
+  const GUARD = ".claude/hooks/guard-protected-branch.mjs";
+  test("o `PROTEGIDOS_LISTA` customizado sobrevive ao upgrade dos hooks (#240)", () =>
+    exige(
+      contraProjeto({
+        hoje: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n// hoje\n' },
+        projeto: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "staging"];\n' },
+      }),
+      { codigo: 0, inclui: ["1 constante(s) preservada(s)"] }
+    ));
+
+  test("um template sem o `guard-protected-branch.mjs` salta o `PROTEGIDOS_LISTA` em vez de reprovar (#240)", () =>
+    exige(contraProjeto({}), { codigo: 0, exclui: ["PROTEGIDOS_LISTA nao existe"] }));
+
+  // O `opcional` so salta a FALTA do ficheiro: sem a constante num ficheiro que existe, reprova.
+  test("o `guard-protected-branch.mjs` sem `PROTEGIDOS_LISTA` reprova (#240)", () =>
+    exige(contraProjeto({ hoje: { [GUARD]: "const OUTRA = [];\n" } }), { codigo: 1, inclui: ["PROTEGIDOS_LISTA nao existe"] }));
+
+  // #240: o motor nao toca nos agentes, e o hook impoe o `tools:` deles.
+  const AGENTE = ".claude/agents/leitor.md";
+  const agente = (tools) => `---\nname: leitor\ntools: ${tools}\n---\n\ncorpo\n`;
+  test("um agente com `tools:` atras do template aparece na lista da 2b (#240)", () =>
+    exige(
+      contraProjeto({ hoje: { [AGENTE]: agente("Read, Bash(git diff:*), Bash(git grep:*)") }, projeto: { [AGENTE]: agente("Read, Bash(git diff:*)") } }),
+      { codigo: 0, inclui: ["1 agente(s) com `tools:` diferente do template", ".claude/agents/leitor.md"] }
+    ));
+
+  // O motor ACTUALIZA um agente intacto contra a tag: lista-lo era mandar fazer a mao o ja feito.
+  test("um agente intacto na tag, com `tools:` novo no template, NAO aparece (#240)", () =>
+    exige(
+      contraProjeto({ ontem: { [AGENTE]: agente("Read, Bash(git diff:*)") }, hoje: { [AGENTE]: agente("Read, Bash(git diff:*), Bash(git grep:*)") } }),
+      { codigo: 0, exclui: ["agente(s) com `tools:` diferente"] }
+    ));
+
+  test("o agente emparelha-se pelo `name:`, nao pelo nome do ficheiro (#240)", () =>
+    exige(
+      contraProjeto({ hoje: { [AGENTE]: agente("Read, Bash(git grep:*)") }, projeto: { ".claude/agents/outro-nome.md": agente("Read") } }),
+      { codigo: 0, inclui: [".claude/agents/outro-nome.md"] }
+    ));
+
+  test("a ordem do `tools:` nao conta como diferenca (#240)", () =>
+    exige(
+      contraProjeto({ hoje: { [AGENTE]: agente("Bash(git diff:*), Read") }, projeto: { [AGENTE]: agente("Read, Bash(git diff:*)") } }),
+      { codigo: 0, exclui: ["agente(s) com `tools:` diferente"] }
+    ));
+
+  test("um agente com o mesmo `tools:` nao aparece (#240)", () =>
+    exige(
+      contraProjeto({ hoje: { [AGENTE]: agente("Read, Bash(git diff:*)") }, projeto: { [AGENTE]: agente("Read, Bash(git diff:*)") } }),
+      { codigo: 0, exclui: ["agente(s) com `tools:` diferente"] }
+    ));
+
   test("upgrade puramente aditivo diz-o em vez de nao dizer nada", () =>
     exige(contraProjeto({ hoje: { "NOVO.md": "# so um doc\n" } }), {
       codigo: 0,
