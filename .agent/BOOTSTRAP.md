@@ -233,12 +233,13 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 ```bash
 # Correr AINDA dentro do clone do template, para que `git rev-parse HEAD` seja o commit DO
 # TEMPLATE. Se ja fizeste "Use this template" no GitHub (que nao copia historico nem tags),
-# o HEAD aqui e o do TEU projeto e o valor fica errado — nesse caso clona o template a parte
-# e le o SHA de la, ou deixa `commit: desconhecido` e o /upgrade usa o Modo B.
+# o HEAD aqui e o do TEU projeto — e por isso que a VERSAO tambem se grava: sem tags, vem do
+# `.agent/TEMPLATE_VERSION`, que viaja com os ficheiros, e o /upgrade resolve-a no clone do
+# template quando o commit gravado nao for de la (Modo A, passo 1).
 printf 'template: %s\ncommit: %s\nversao: %s\ndata: %s\n' \
   "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
   "$(git rev-parse HEAD 2>/dev/null || echo desconhecido)" \
-  "$(git describe --tags --abbrev=0 2>/dev/null || echo desconhecida)" \
+  "$(git describe --tags --abbrev=0 2>/dev/null || cat .agent/TEMPLATE_VERSION 2>/dev/null || echo desconhecida)" \
   "$(date +%F)" > .agent/.template-version
 ```
 

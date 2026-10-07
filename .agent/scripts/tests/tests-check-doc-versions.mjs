@@ -239,6 +239,31 @@ export function registar() {
     writeF(dir, ".gemini/commands/debug.toml", "");
   }, { code: 1, includes: [".gemini/commands/debug.toml nao aponta"] });
 
+  // M6 do #195: o template declara a sua versao num ficheiro, em `vX.Y.Z` e so isso.
+  test("versao do template: sem o ficheiro, avisa", (dir) => {
+    rmSync(file(dir, ".agent/TEMPLATE_VERSION"), { force: true });
+  }, { code: 1, synthetic: true, includes: ["`.agent/TEMPLATE_VERSION` nao existe"] });
+
+  test("versao do template: fora do formato, avisa", (dir) => {
+    writeF(dir, ".agent/TEMPLATE_VERSION", "versao 1\n");
+  }, { code: 1, synthetic: true, includes: ["devia ser `vX.Y.Z`"] });
+
+  test("versao do template: num derivado, salta", (dir) => {
+    writeF(dir, ".agent/.template-version", "sha: abc1234\nversao: v0.3.0\n");
+    rmSync(file(dir, ".agent/TEMPLATE_VERSION"), { force: true });
+  }, { code: 1, synthetic: true, anyOut: ["SKIP  versao do template"], excludes: ["`.agent/TEMPLATE_VERSION` nao existe"] });
+
+  // G-08 do #195: um wrapper que aponta para o workflow certo mas copia a logica la para dentro.
+  test("G10: wrapper que aponta mas e grosso avisa", (dir) => {
+    writeF(dir, ".claude/commands/review.md",
+      `---\ndescription: x\n---\n\nLer \`.agent/workflows/review.md\`.\n\n${"1. Passo copiado do workflow.\n".repeat(40)}`);
+  }, { code: 1, includes: [".claude/commands/review.md tem", "a logica vive em"] });
+
+  test("G10: wrapper fino perto do tecto nao avisa", (dir) => {
+    writeF(dir, ".claude/commands/review.md",
+      `---\ndescription: ${"x".repeat(900)}\n---\n\nLer \`.agent/workflows/review.md\`.\n`);
+  }, { code: 0, excludes: [".claude/commands/review.md tem"] });
+
 
   // --- Clone em Windows: CRLF nao pode desligar nada ---------------------------
   // Um clone com `core.autocrlf=true` entrega `\r\n`. Dois patches de teste usavam o literal

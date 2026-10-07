@@ -125,6 +125,8 @@ gh pr create --fill     # then merge once CI is green
 ```
 .agent/                         <- AI knowledge management
 ├── BOOTSTRAP.md                <- Setup guide: Phase 0 (analysis) + Phase 1 (config) — run once
+├── TEMPLATE_VERSION            <- the template's version (`vX.Y.Z`); travels with the files, so
+│                                 "Use this template" (no tags) still knows where it came from
 ├── rules/                     <- loaded (core, process, anti-patterns) + reference,
 │                                 not loaded: scripts-guide, hooks-guide, sync-docs,
 │                                 propagation, ticket-method, mcp-policy
@@ -475,8 +477,10 @@ Full guide in [CONTRIBUTING.md](CONTRIBUTING.md) and `.agent/rules/process-rules
 **Template -> your projects.** Run **`/upgrade`** in the derived project
 (`.agent/workflows/upgrade.md`). It decides by **file category**, never by a list of names, and
 never touches `.agent/context/`. If the project has `.agent/.template-version` (written at
-bootstrap) it diffs only what changed since; if not, it detects which capabilities are missing
-instead of diffing — and writes the marker, so the next upgrade is cheap.
+bootstrap) it diffs only what changed since — also for a project made with "Use this template",
+which has no tags: the marker records the version from `.agent/TEMPLATE_VERSION`. If not, it
+detects which capabilities are missing instead of diffing — and writes the marker, so the next
+upgrade is cheap.
 
 **Your projects -> template.** A rule that proved itself in a real project is worth more than
 one invented here. Update the file in the template repo, then add the row to the propagation

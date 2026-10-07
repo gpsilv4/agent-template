@@ -33,7 +33,7 @@ import { readFileSync, readdirSync, existsSync } from "fs";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, resolve, join } from "path";
 import { guardSettings } from "./guards/settings.mjs";
-import { guardChangelogVersion, guardDependencyVersions } from "./guards/versions.mjs";
+import { guardChangelogVersion, guardDependencyVersions, guardTemplateVersion } from "./guards/versions.mjs";
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardContextVirgem } from "./guards/context-virgem.mjs";
@@ -208,6 +208,7 @@ if (claude !== null && gemini !== null) {
 // --- Guard 3: package.json version === ultima versao do CHANGELOG ---
 // Extraido para `guards/versions.mjs`.
 guardsRun += guardChangelogVersion({ read, warn, ok, note, skip });
+guardsRun += guardTemplateVersion({ read, warn, ok, skip, ehDerivado });
 // --- Guard 4: termos obsoletos/banidos nos docs vivos ---
 // Adicionar entradas conforme forem renomeados ficheiros/termos ou mudarem contagens.
 // Exclui historico (*-archive.md, CHANGELOG.md).
@@ -383,12 +384,19 @@ if (workflows && agentGuide) {
 // O Guard 6 valida existencia; este valida conteudo. Um wrapper vazio, ou a apontar
 // para o workflow errado, passava — e core-rules.md exige ponteiros finos, verificavel.
 if (workflows && (claudeCmds || geminiCmds)) {
+  const WRAPPER_MAX_BYTES = 1000;
   let bad = 0;
   const checkPointer = (file, w, label) => {
     const content = read(file);
     if (content === null) return; // ausencia ja e apanhada pelo Guard 6
     if (!content.includes(`.agent/workflows/${w}.md`)) {
       warn(`Wrapper ${label} nao aponta para \`.agent/workflows/${w}.md\` — ponteiro fino em falta`);
+      bad++;
+    }
+    // FINO tambem no tamanho (G-08 do #195): apontar nao chegava, e um wrapper com a logica copiada
+    // la dentro passava. O maior tinha 434 bytes; acima do tecto, quase de certeza duplica o workflow.
+    if (Buffer.byteLength(content) > WRAPPER_MAX_BYTES) {
+      warn(`Wrapper ${label} tem ${Buffer.byteLength(content)} bytes (> ${WRAPPER_MAX_BYTES}) — a logica vive em \`.agent/workflows/${w}.md\`, nao no wrapper`);
       bad++;
     }
   };

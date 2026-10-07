@@ -87,6 +87,26 @@ test("com delta, PASSA deste guarda (nao reprova por baseline)", () => {
   }
 });
 
+// M6 do #195: o `.agent/TEMPLATE_VERSION` nao pode ficar ATRAS da ultima tag — e o que o bootstrap
+// grava num projeto criado com "Use this template". A frente, ou igual, passa: entre o passo do
+// /deploy que o sobe e a tag, a versao nova ja esta escrita.
+for (const [declarada, atras] of [["v9.8.0", true], ["v9.9.9", false], ["v10.0.0", false]]) {
+  test(`TEMPLATE_VERSION ${declarada} com a ultima tag v9.9.9 ${atras ? "REPROVA" : "passa"}`, () => {
+    const dir = repo({ comTag: "v9.9.9" });
+    try {
+      writeFileSync(join(dir, ".agent/TEMPLATE_VERSION"), `${declarada}\n`);
+      git(dir, ["add", "-A"]);
+      git(dir, ["commit", "-qm", "depois da tag"]);
+      const r = corre(dir);
+      return atras
+        ? exige(r, { codigo: 1, inclui: ["ATRAS da ultima tag v9.9.9"] })
+        : exige(r, { codigo: 1, inclui: ["nao esta atras da ultima tag"], exclui: ["ATRAS da ultima tag"] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
 // Este script e COPIADO para todos os projetos derivados. La, "a ultima tag antes do HEAD"
 // sao as releases DESSE projeto — mediria projeto-v1 -> projeto-v2. Pior que inutil: media
 // uma coisa a fingir que media outra. Sai 0 com a razao VISIVEL.

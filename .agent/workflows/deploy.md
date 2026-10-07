@@ -161,6 +161,9 @@ gh pr merge --squash         # (ou merge pela UI do GitHub)
 
 # 3. Criar tag da versao — no commit de merge em main, NAO no branch de feature
 #    (apos squash merge o main local esta desatualizado: sincronizar primeiro)
+#    SO NO TEMPLATE DE ORIGEM: o `.agent/TEMPLATE_VERSION` tem de dizer `vX.Y.Z` ANTES da tag —
+#    sobe-se no PR da release. E o que um projeto criado com "Use this template" grava como a sua
+#    origem, e o `simulate-upgrade` reprova se ficar atras da ultima tag (M6 do #195).
 git checkout main
 git pull origin main
 git tag vX.Y.Z -m "Descricao da release"
