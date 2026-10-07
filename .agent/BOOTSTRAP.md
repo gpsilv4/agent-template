@@ -496,8 +496,9 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   a unica que nao depende de o agente se lembrar. Cinco: nega `commit`/`push` em branch
   protegido, afirma o estado real no arranque, diz que suite ficou em divida ao parar, lembra a
   Fase 0 quando o prompt parece uma ordem de implementacao, e reinjecta as Fronteiras quando a
-  janela compacta. **Nao ha nada a customizar no bootstrap** — funcionam tal como vem; a lista
-  de branches protegidos le-se do `main`/`master` do repo. Detalhe em
+  janela compacta. **So uma coisa a customizar**: os branches protegidos, em
+  **`.claude/hooks/protegidos.json`** (por omissao `["main", "master", "develop"]`; uma lista
+  vazia respeita-se). O `/upgrade` nao o substitui (#257). Detalhe em
   **`.agent/rules/hooks-guide.md`**; a suite negativa e `node .claude/hooks/tests/test-hooks.mjs`.
   > Fora do Claude Code (Gemini, Cursor, Copilot, Codex) **perde-se o automatismo, nao a
   > verificacao**: os mesmos criterios estao nos guards de `.agent/scripts/`, que so precisam de
@@ -622,7 +623,7 @@ git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 > Depois: abrir o PR (`gh pr create --fill`), esperar o CI, e so entao mergear. Se este
 > projeto nao vai usar PRs, dizer ao utilizador **antes** de mergear a mao — a alternativa
 > nao e commitar em `main` por baixo do hook, e decidir por escrito que este repo nao tem
-> branch protegido e tirar `main` de `PROTEGIDOS` em `.claude/hooks/guard-protected-branch.mjs`.
+> branch protegido e tirar `main` de `.claude/hooks/protegidos.json` (#257).
 
 > **No template por estrear, o Gemini imprime dois `[ERROR]` ao arrancar — e esperado.**
 > O `GEMINI.md` importa `business-logic.md` e `pages-architecture.md`, que so nascem neste

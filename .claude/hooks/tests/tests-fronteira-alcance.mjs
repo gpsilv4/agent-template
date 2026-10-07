@@ -59,7 +59,7 @@ const INLINE_PERMITE = [
 
 export function registar({ test, corre, repo, eq, contem }) {
   const decide = (comando, esperado, extra) => {
-    const d = repo("main");
+    const d = repo();
     try {
       const r = corre({ tool_input: { command: comando }, cwd: d });
       eq(r.decisao, esperado, `"${comando}"`);

@@ -38,3 +38,24 @@ export function blocoDaConstante(texto, nome) {
   if (fim === -1) return null;
   return linhas.slice(i, fim + 1).join("\n");
 }
+
+/** Os nomes de branch do PRIMEIRO literal de array de um bloco JS — `["main", "staging"]`, ou o de
+ *  `new Set([...])` (#257). Sem comentarios (um apostrofo num `// the team's` desalinhava as aspas
+ *  e engolia um branch) e so ate ao `]` que fecha o literal (um `]; // QA` no fim da linha fazia o
+ *  `blocoDaConstante` ir ate ao proximo fecho). `null` se algum item nao for um nome de branch
+ *  citado: quem chama recusa em vez de escrever lixo como se fosse uma lista de branches.
+ *  @returns {string[]|null} */
+export function listaDeBranches(bloco) {
+  const i = (bloco ?? "").indexOf("[");
+  if (i === -1) return null;
+  let prof = 0;
+  let j = i;
+  for (; j < bloco.length; j++) {
+    if (bloco[j] === "[") prof++;
+    else if (bloco[j] === "]" && --prof === 0) break;
+  }
+  if (prof !== 0) return null;
+  const corpo = bloco.slice(i + 1, j).replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  const nomes = corpo.split(",").map((t) => t.trim()).filter(Boolean).map((t) => /^(["'])([\w.\/-]+)\1$/.exec(t)?.[2]);
+  return nomes.every(Boolean) ? nomes : null;
+}

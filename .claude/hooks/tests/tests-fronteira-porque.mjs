@@ -75,7 +75,7 @@ export function registar({ test, corre, repo, eq, contem }) {
   // --- Ponta a ponta: o rotulo CHEGA a mensagem -----------------------------
   for (const [nome, comando, rotulo] of CONDICOES) {
     test(`porque: ${nome} -> ${rotulo}`, () => {
-      const d = repo("main");
+      const d = repo();
       try {
         const r = corre({ tool_input: { command: comando }, cwd: d });
         eq(r.decisao, "deny", `"${comando}" tinha de ser negado`);
@@ -90,7 +90,7 @@ export function registar({ test, corre, repo, eq, contem }) {
   // sempre e dissesse sempre a mesma coisa: um comando permitido nao leva rotulo nenhum,
   // porque nao leva negacao nenhuma.
   test("porque: leitura legitima da fronteira nao e negada nem rotulada", () => {
-    const d = repo("main");
+    const d = repo();
     try {
       const r = corre({ tool_input: { command: "grep -n LEITURA .claude/hooks/lib/fronteira.mjs" }, cwd: d });
       eq(r.decisao, "allow", "um grep da fronteira e leitura e tem de passar");

@@ -251,6 +251,7 @@ gh pr create --fill     # then merge once CI is green
 ├── commands/                  <- Real slash commands (/plan, /review, ...) wrapping .agent/workflows/
 ├── hooks/                     <- Runtime enforcement, before/after the tool (Claude-only)
 │   ├── guard-protected-branch.mjs  <- DENY commit/push on protected branches; no force-push
+│   ├── protegidos.json             <- THIS project's protected branches (data; /upgrade keeps it)
 │   ├── guard-subagent-bash.mjs     <- DENY a subagent's Bash outside what its `tools:` declares
 │   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched

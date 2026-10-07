@@ -136,8 +136,8 @@ export function registar({ test, corre, repo, eq, contem }) {
   // colado — `cd <repo-em-main>; git commit` verificava o branch de `<repo>;`, que nao e repo nenhum.
   for (const [nome, sep] of [["`;` colado ao caminho", "; "], ["`;` e outro `cd` antes", "; cd /tmp; cd "]]) {
     test(`diretorios: ${nome} nao esconde um repo em main (#227)`, () => {
+      const m = repo(); // primeiro: sem protegidos, salta antes de criar o outro
       const f = repo("feature/x");
-      const m = repo("main");
       try {
         const cmd = sep.startsWith(";") && sep.includes("cd") ? `cd /tmp${sep}${m}; git commit -m x` : `cd ${m}${sep}git commit -m x`;
         eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);
@@ -159,8 +159,8 @@ export function registar({ test, corre, repo, eq, contem }) {
   ];
   for (const [nome, forma] of formasDoCd) {
     test(`diretorios: ${nome} nao esconde um repo em main (#227)`, () => {
+      const m = repo(); // primeiro: sem protegidos, salta antes de criar o outro
       const f = repo("feature/x");
-      const m = repo("main");
       try {
         const cmd = forma(m);
         eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);
@@ -172,8 +172,8 @@ export function registar({ test, corre, repo, eq, contem }) {
   }
 
   test("diretorios: um caminho com `\\(` escapado e o repo, nao um corte na barra (#227)", () => {
+    const m = repo(undefined, "m(1)"); // primeiro: sem protegidos, salta antes de criar o outro
     const f = repo("feature/x");
-    const m = repo("main", "m(1)");
     try {
       const cmd = `cd ${m}/m\\(1\\) && git commit -m x`;
       eq(corre({ tool_input: { command: cmd }, cwd: f }).decisao, "deny", `"${cmd}" comita em main e tem de ser negado`);

@@ -47,6 +47,31 @@ function andaTudo(dir, out = []) {
 export function registar() {
   // --- O motor mecanico: e aqui que um erro custa DADOS -----------------------------
 
+  // #257: os branches protegidos do projeto vivem no `protegidos.json`, que o motor NAO substitui —
+  // e, customizados no hook (que substitui), migram para la. A 2b corre numa copia descartavel, logo
+  // so aqui se ve o ficheiro que fica.
+  const JSON_P = ".claude/hooks/protegidos.json";
+  const GUARD = ".claude/hooks/guard-protected-branch.mjs";
+  for (const [nome, consumidor, esperado] of [
+    ["o `protegidos.json` do projeto sobrevive ao upgrade dos hooks (#257)", { [JSON_P]: '["main"]\n' }, '["main"]\n'],
+    ["a lista customizada no hook migra para o `protegidos.json` (#257)", { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "staging"];\n' }, '["main","staging"]\n'],
+    // Da segunda leitura: um apostrofo num comentario engolia o `staging`; e uma lista vazia
+    // customizada e uma decisao, que tambem migra.
+    ["um comentario com apostrofo nao engole um branch (#257)", { [GUARD]: "const PROTEGIDOS_LISTA = [\n  \"main\", // the team's default\n  \"staging\",\n];\n" }, '["main","staging"]\n'],
+    ["uma lista VAZIA customizada tambem migra (#257)", { [GUARD]: "const PROTEGIDOS_LISTA = [];\n" }, "[]\n"],
+  ]) {
+    test(nome, () => {
+      let c;
+      try {
+        c = cenario({ ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n' }, hoje: { [JSON_P]: '["main", "master", "develop"]\n' }, consumidor });
+        const v = c.ler(JSON_P);
+        return v === esperado ? [] : [`ficou ${JSON.stringify(v)}, esperado ${JSON.stringify(esperado)}`];
+      } finally {
+        limpa(c);
+      }
+    });
+  }
+
   // A regra geral do `/upgrade`, na sua forma mais simples: intacto -> traz-se o novo.
   test("documento NAO customizado fica com a versao nova", () => {
     let c;

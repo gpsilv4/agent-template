@@ -21,7 +21,7 @@ import { join, dirname, sep, relative } from "path";
 // Re-exportado para nao partir quem ja o importava daqui. A definicao vive em
 // `lib/ficheiros.mjs` — estava escrita duas vezes, identica (`TP8`).
 export { leOuNull } from "./ficheiros.mjs";
-import { leOuNull, blocoDaConstante } from "./ficheiros.mjs";
+import { leOuNull, blocoDaConstante, listaDeBranches } from "./ficheiros.mjs";
 import { foraDoTemplate } from "./fora-do-template.mjs";
 import { intactoAMenosDePlaceholders, capturaPlaceholders, valoresDoProjeto } from "./intacto.mjs";
 
@@ -102,12 +102,6 @@ export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
-  // Os branches protegidos do projeto (#240): o motor SUBSTITUI os hooks, e sem isto um derivado
-  // que acrescentou `staging` perdia a proteccao em silencio no primeiro upgrade.
-  // `opcional`: um TEMPLATE sem o `guard-protected-branch.mjs` (uma fixture, ou um template que o
-  // tirou) salta; sem a constante num ficheiro que existe, reprova como as outras. O lado do projeto
-  // nunca foi problema: sem o ficheiro, nao ha nada a guardar.
-  [".claude/hooks/guard-protected-branch.mjs", "PROTEGIDOS_LISTA", { opcional: true }],
 ];
 
 /**
@@ -243,7 +237,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       return bloco === null ? acc : acc.replace(bloco, `<${nome} preservada>`);
     }, t);
   const substituidos = [...agora]
-    .filter((p) => !p.includes("/config/"))
+    .filter((p) => !p.includes("/config/") && !p.endsWith("/protegidos.json"))
     .filter((p) => {
       const doConsumidor = leOuNull(join(dir, p));
       const referencia = naTag.has(p) ? tagFicheiro(p) : leOuNull(join(root, p));
@@ -257,8 +251,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
 
   // Guardar os blocos do projeto ANTES de copiar por cima.
   const guardados = [];
-  for (const [rel, nome, { opcional = false } = {}] of constantes) {
-    if (opcional && leOuNull(join(root, rel)) === null) continue;
+  for (const [rel, nome] of constantes) {
     const antigo = blocoDaConstante(leOuNull(join(dir, rel)), nome);
     const novo = blocoDaConstante(leOuNull(join(root, rel)), nome);
     // A ORDEM importa: a constante tem de existir no template novo ANTES de se perguntar se o
@@ -313,7 +306,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // voltava ao default do template — era esse o defeito, um directorio abaixo.
       //
       // Mas a regra NAO e "nunca tocar": e **nunca SUBSTITUIR, copiar se AUSENTE**. (Os hooks NAO
-      // seguem esta regra: sao substituidos, e so o `PROTEGIDOS_LISTA` se preserva, #240.) A diferenca nao e academica — a primeira versao desta linha
+      // seguem esta regra: sao substituidos, menos o `protegidos.json`, #257.) A diferenca nao e academica — a primeira versao desta linha
       // excluia a pasta por inteiro, e o simulador reprovou: um consumidor anterior a existencia
       // da `config/` recebia o `check-bundle-sizes.mjs` novo, que faz
       // `import ... from "./config/bundles.mjs"`, e **sem o ficheiro que ele importa**. O
@@ -324,7 +317,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       filter: (src) => {
         if (!podeCopiar(relative(root, src).split(sep).join("/"))) return false;
         const p = src.split(sep).join("/");
-        if (!p.includes("/.agent/scripts/config/")) return true;
+        if (!p.includes("/.agent/scripts/config/") && !p.endsWith("/.claude/hooks/protegidos.json")) return true;
         // Descer sempre nas pastas: recusar a pasta `config/` porque ela ja existe saltava
         // tambem os ficheiros NOVOS que o template tivesse acrescentado la dentro.
         if (statSync(src).isDirectory()) return true;
@@ -335,6 +328,20 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     });
   }
   
+  // Os protegidos customizados no hook (ou `new Set`, ate v0.3.0) MIGRAM para o JSON antes da copia (#257).
+  const HOOK = ".claude/hooks/guard-protected-branch.mjs";
+  let protegidosMigrados = 0;
+  if (!existsSync(join(dir, ".claude/hooks/protegidos.json"))) {
+    for (const nome of ["PROTEGIDOS_LISTA", "PROTEGIDOS"]) {
+      const seu = blocoDaConstante(leOuNull(join(dir, HOOK)), nome);
+      const naTag = blocoDaConstante(tagFicheiro(HOOK), nome);
+      if (seu === null || (naTag !== null && intactoAMenosDePlaceholders(seu, naTag))) continue;
+      const lista = listaDeBranches(seu); // `[]` customizado tambem migra: e uma decisao do projeto
+      if (lista === null) fatal(`nao consegui ler os branches protegidos de ${HOOK} (${nome}) — migrar a mao para .claude/hooks/protegidos.json`);
+      writeFileSync(join(dir, ".claude/hooks/protegidos.json"), `${JSON.stringify(lista)}\n`); protegidosMigrados = 1; break;
+    }
+  }
+
   // (i) `.agent/scripts/**` — copia limpa. (ii) O catalogo de anti-padroes do TEMPLATE, por
   // inteiro: e dele, e os IDs dele sao os mesmos em todos os projetos. (iii) Os hooks.
   trazerDoHead(".agent/scripts");
@@ -346,7 +353,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   }
   
   // Repor as constantes do projeto por cima da copia. E o passo que a tabela chama "preservando".
-  let repostas = 0;
+  let repostas = protegidosMigrados;
   for (const [rel, nome, bloco] of guardados) {
     const p = join(dir, rel);
     const c = leOuNull(p);
