@@ -44,7 +44,14 @@ const PASTAS = [".agent/scripts", ".claude/hooks"];
  * Contagem congelada dos ficheiros que ja estavam acima do limite quando o guard nasceu
  * (2026-09-14). Podem encolher; crescer reprova. Baixar um destes valores e trabalho legitimo
  * e bem-vindo — subi-lo e desligar a catraca, e o `sync-docs.md` di-lo por escrito.
+ *
+ * Uma entrada e o numero, ou `{ teto, dono, ate: "AAAA-MM-DD" }` (#250): uma excecao sem prazo e
+ * permanente por omissao. Passado o `ate`, o guard da NOTE — nao bloqueia: o que se quer e que a
+ * excecao volte a ser olhada. O numero continua valido (e o que a 2b do `/upgrade` escreve).
  */
+/** O teto de uma entrada de `TETOS`, nas duas formas. */
+export const tetoDe = (entrada) => (entrada !== null && typeof entrada === "object" ? entrada.teto : entrada);
+
 export const TETOS = {
   // 696 -> 670: os casos do `stop-verify` sairam para `tests/tests-stop.mjs`, quando a catraca
   // exigiu a divisao ao acrescentar os do ficheiro apagado. Foi o ramo da folga a reclamar as 26.
@@ -109,7 +116,12 @@ export function guardFileSizes({ read, warn, ok, skip, note, listTree }) {
     vistos.add(f);
     if (n > maior.n) maior = { f, n };
 
-    const teto = TETOS[f];
+    const entrada = TETOS[f];
+    const teto = tetoDe(entrada);
+    // O prazo de uma excecao (#250). A data compara-se como texto: `AAAA-MM-DD` ordena-se assim.
+    if (entrada?.ate && entrada.ate < new Date().toISOString().slice(0, 10)) {
+      note(`Guard 17: a excecao de ${f} em TETOS passou do prazo ${entrada.ate} (dono: ${entrada.dono ?? "por dizer"}) — revisitar`);
+    }
     if (teto === undefined) {
       if (n > LIMITE) {
         warn(
