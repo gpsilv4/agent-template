@@ -14,7 +14,8 @@
  * a parte que escreve por cima dos ficheiros de um consumidor, e e ai que um erro custa dados.
  *
  * O QUE ESTA SUITE COBRE, contando os modulos que importa: o SIMULADOR e os seus guardas de
- * arranque (aqui), o MOTOR de `lib/upgrade-mecanico.mjs` (em `tests-upgrade-motor.mjs`), a
+ * arranque (aqui), o MOTOR de `lib/upgrade-mecanico.mjs` e as categorias dele em
+ * `lib/upgrade-categorias.mjs` (em `tests-upgrade-motor.mjs`), a
  * fixture `lib/projeto-de-ontem.mjs`, o instrumento da seccao 2b em `lib/medida-upgrade.mjs`
  * (em `tests-medida-2b.mjs`), o filtro do que nao e do template em `lib/fora-do-template.mjs`
  * (em `tests-upgrade-fora-do-template.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`

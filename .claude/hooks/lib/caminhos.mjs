@@ -1,7 +1,7 @@
 /**
  * Os caminhos escritos de outra maneira, na forma que a fronteira reconhece — {{PROJECT_NAME}}
  *
- * PORQUE EXISTE (#185): o `FRONTEIRA` do `fronteira.mjs` olha para o TEXTO de um comando, e so
+ * PORQUE EXISTE (#185): o `FRONTEIRA` (hoje em `fronteira-dados.mjs`) olha para o TEXTO de um comando, e so
  * reconhecia os caminhos relativos a raiz. `../`, `//`, `/./`, absoluto, `$PWD`, `~` e um `cd`
  * noutro segmento passavam — o caminho estava la, escrito de outra maneira. Este modulo resolve
  * cada argumento contra o directorio em que o segmento corre e reescreve-o, **so se der na
@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, resto } from "./fronteira.mjs";
+import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, resto } from "./fronteira-dados.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */

@@ -20,7 +20,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // Esta suite tambem e o entry point de modulos que NAO importa directamente — descobre-os em
 // disco. O `tests-agentes.mjs` exercita o `lib/agentes.mjs` (o parser do `tools:`, #238), e o
 // `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
-// nesse modulo corre ESTE comando. Fica escrito porque o mapa de suites exige que a suite
+// nesse modulo corre ESTE comando. O `tests-pares.mjs` exercita o `lib/pares.mjs` e o
+// `lib/pares-hooks.mjs` que ele junta (#243). Fica escrito porque o mapa de suites exige que a suite
 // **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 import { fileURLToPath } from "url";
 import { dirname } from "path";
