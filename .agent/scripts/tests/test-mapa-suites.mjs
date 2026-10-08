@@ -14,6 +14,7 @@
 import { SUITES, regraDe, comandoDe, verificadoresDe } from "../lib/mapa-suites.mjs";
 import { PARES } from "../lib/pares.mjs";
 import { readFileSync, readdirSync, existsSync } from "fs";
+import { posix } from "path";
 
 let passed = 0;
 const falhas = [];
@@ -187,18 +188,34 @@ test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
 //
 // E o `TP8` na forma mais cara: nao e uma copia que envelheceu, sao duas leituras do mesmo facto
 // a validarem-se uma a outra. Por isso a pergunta passa a usar o caminho LISTADO.
-// Um modulo importado por uma suite de OUTRO lado tem de obrigar a ela tambem (#241). Cada par
-// traz quem o importa: se deixar de importar, o caso reprova, e o par sai daqui em vez de
-// envelhecer a afirmar uma razao que ja nao existe.
-for (const [modulo, suite, importador] of [
-  [".agent/scripts/tests/harness/relatorio.mjs", ".claude/hooks/tests/test-hooks.mjs", ".claude/hooks/tests/test-hooks.mjs"],
-  [".agent/scripts/lib/pares.mjs", ".agent/scripts/tests/test-guards.mjs", ".agent/scripts/tests/tests-pares.mjs"],
-]) {
-  test(`${modulo.split("/").pop()} obriga a ${suite.split("/").pop()} (importado por ${importador.split("/").pop()})`, () => [
-    ...(readFileSync(importador, "utf8").includes(`/${modulo.split("/").pop()}"`) ? [] : [`${importador} ja nao importa ${modulo}`]),
-    ...((regraDe(modulo)?.verifica ?? []).includes(suite) ? [] : [`mexer em ${modulo} nao obriga a correr ${suite}`]),
-  ]);
-}
+// Quem IMPORTA um modulo de `lib/` ou de `tests/harness/` tem de ser obrigado a correr quando ele
+// muda (#241, #271). Eram dois pares escritos a mao; derivado dos imports, apanhou mais quatro
+// (`registo`, `pares`, `patch`, `varredura-paralela`). So o import DIRECTO de uma suite ou de um
+// modulo `tests-*` (pelo `entryPoint` que declara): a indireccao por um harness ja tem a regra dele.
+// So os imports que existem no disco — um `import` dentro de uma string de fixture nao e um.
+const importadores = () =>
+  [".agent/scripts/tests", ".claude/hooks/tests"].flatMap((d) =>
+    readdirSync(d).flatMap((f) => {
+      if (/^test-[\w-]+\.mjs$/.test(f)) return [[`${d}/${f}`, `${d}/${f}`]];
+      const ep = /^tests-[\w-]+\.mjs$/.test(f) && /export const entryPoint = "([^"]+)"/.exec(readFileSync(`${d}/${f}`, "utf8"));
+      return ep ? [[`${d}/${f}`, `${d}/${ep[1]}`]] : [];
+    })
+  );
+const importsDe = (f) =>
+  [...readFileSync(f, "utf8").matchAll(/^\s*(?:import|export)\b[^;'"]*?from\s*["'](\.{1,2}\/[^"']+)["']/gm)]
+    .map((m) => posix.normalize(posix.join(posix.dirname(f), m[1])))
+    .filter((m) => existsSync(m));
+test("quem importa um modulo de lib/ ou tests/harness/ e obrigado a correr quando ele muda", () => {
+  const pares = importadores();
+  if (pares.length < 10) return [`so ${pares.length} suites e modulos encontrados — o teste mediria quase o vazio`];
+  const p = new Set();
+  for (const [f, suite] of pares) {
+    for (const m of importsDe(f).filter((m) => /^\.agent\/scripts\/(?:lib|tests\/harness)\//.test(m))) {
+      if (!(regraDe(m)?.verifica ?? []).includes(suite)) p.add(`mexer em ${m} nao obriga a correr ${suite} (importado por ${f})`);
+    }
+  }
+  return [...p];
+});
 
 test("todo o harness casa uma regra no mapa", () => {
   const dir = ".agent/scripts/tests/harness";
