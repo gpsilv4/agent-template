@@ -23,7 +23,7 @@
  *
  *   node .agent/scripts/tests/test-simulate-upgrade.mjs
  */
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join } from "path";
 import { CONSTANTES_DO_PROJETO } from "../lib/upgrade-mecanico.mjs";
@@ -90,22 +90,35 @@ test("com delta, PASSA deste guarda (nao reprova por baseline)", () => {
 // M6 do #195: o `.agent/TEMPLATE_VERSION` nao pode ficar ATRAS da ultima tag — e o que o bootstrap
 // grava num projeto criado com "Use this template". A frente, ou igual, passa: entre o passo do
 // /deploy que o sobe e a tag, a versao nova ja esta escrita.
-for (const [declarada, atras] of [["v9.8.0", true], ["v9.9.9", false], ["v10.0.0", false]]) {
-  test(`TEMPLATE_VERSION ${declarada} com a ultima tag v9.9.9 ${atras ? "REPROVA" : "passa"}`, () => {
+//
+// A fixture minima sai 1 por outras razoes, logo o exit code nao distingue nada: um `warn` trocado
+// por `note` deixava o caso "atras" verde (#241). O que distingue e a CONTAGEM de avisos — atras
+// conta um a mais do que igual; a frente, e fora do formato `vX.Y.Z`, contam o mesmo.
+test("TEMPLATE_VERSION com a ultima tag v9.9.9: so ATRAS conta um problema a mais", () => {
+  const medeCom = (declarada) => {
     const dir = repo({ comTag: "v9.9.9" });
     try {
       writeFileSync(join(dir, ".agent/TEMPLATE_VERSION"), `${declarada}\n`);
       git(dir, ["add", "-A"]);
       git(dir, ["commit", "-qm", "depois da tag"]);
       const r = corre(dir);
-      return atras
-        ? exige(r, { codigo: 1, inclui: ["ATRAS da ultima tag v9.9.9"] })
-        : exige(r, { codigo: 1, inclui: ["nao esta atras da ultima tag"], exclui: ["ATRAS da ultima tag"] });
+      // As linhas `WARN`, e nao o `WARNING: N` do fim: a fixture sai por um `fatal` antes dele.
+      return { ...r, problemas: r.out.split("\n").filter((l) => l.startsWith("  WARN  ")).length };
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
-}
+  };
+  const [atras, igual, frente, foraDoFormato] = ["v9.8.0", "v9.9.9", "v10.0.0", "9.9"].map(medeCom);
+  return [
+    ...exige(atras, { codigo: 1, inclui: ["WARN  .agent/TEMPLATE_VERSION diz v9.8.0, ATRAS da ultima tag v9.9.9"] }),
+    ...exige(igual, { codigo: 1, inclui: ["nao esta atras da ultima tag"], exclui: ["ATRAS da ultima tag"] }),
+    ...exige(frente, { codigo: 1, inclui: ["nao esta atras da ultima tag"], exclui: ["ATRAS da ultima tag"] }),
+    ...exige(foraDoFormato, { codigo: 1, inclui: ["NOTE  .agent/TEMPLATE_VERSION (9.9) ou a tag v9.9.9 fora do formato"] }),
+    ...(atras.problemas === igual.problemas + 1 ? [] : [`atras conta ${atras.problemas} problema(s), igual ${igual.problemas}: o aviso nao conta`]),
+    ...(frente.problemas === igual.problemas ? [] : [`a frente conta ${frente.problemas}, igual ${igual.problemas}`]),
+    ...(foraDoFormato.problemas === igual.problemas ? [] : [`fora do formato conta ${foraDoFormato.problemas}, igual ${igual.problemas}`]),
+  ];
+});
 
 // Este script e COPIADO para todos os projetos derivados. La, "a ultima tag antes do HEAD"
 // sao as releases DESSE projeto — mediria projeto-v1 -> projeto-v2. Pior que inutil: media
@@ -184,6 +197,37 @@ test("template sintetico completo: o simulador corre ate ao fim", () => {
     rmSync(r.dir, { recursive: true, force: true });
   }
 });
+
+// Cada `warn(` do simulador e uma reprovacao, e a varredura passou a desliga-los (#241): cada um
+// tem aqui o cenario que o dispara. O do `.agent/context/` so se alcanca com um motor AVARIADO —
+// o verdadeiro nao toca la, e e precisamente isso que o aviso existe para afirmar.
+const motorQueEscreveNoContexto = (escreve) =>
+  'export * from "./upgrade-mecanico-real.mjs";\n' +
+  'import { aplicaUpgradeMecanico as real } from "./upgrade-mecanico-real.mjs";\n' +
+  'import { writeFileSync } from "fs";\nimport { join } from "path";\n' +
+  `export const aplicaUpgradeMecanico = (o) => { const r = real(o); writeFileSync(join(o.dir, ${JSON.stringify(escreve)}), "atropelado\\n"); return r; };\n`;
+const comMotor = (escreve) => ({
+  "upgrade-mecanico-real.mjs": readFileSync(new URL("../lib/upgrade-mecanico.mjs", import.meta.url), "utf8"),
+  "upgrade-mecanico.mjs": motorQueEscreveNoContexto(escreve),
+});
+const FALHA_SE_NOVO =
+  'import { existsSync } from "fs";\nif (existsSync("NOVO.md")) { console.log("  FAIL  o NOVO chegou"); process.exit(1); }\n' +
+  'console.log("  1 passaram, 0 falharam.");\n';
+for (const [nome, extra, hoje, sobrepoe, aviso] of [
+  ["o template deixa de ter a decisao dos bundles", {}, { ".agent/scripts/config/bundles.mjs": null }, {}, "WARN  a suspensao do gate dos bundles NAO sobreviveu"],
+  ["uma verificacao reprova depois das adaptacoes", { ".agent/scripts/stub.mjs": FALHA_SE_NOVO }, {}, {}, "WARN  .agent/scripts/stub.mjs: FAIL  o NOVO chegou"],
+  ["o motor acrescenta um ficheiro ao `.agent/context/`", {}, {}, comMotor(".agent/context/intruso.md"), "WARN  .agent/context/ foi alterado pelo upgrade"],
+  ["o motor reescreve um ficheiro do `.agent/context/` (mesmo nome)", {}, {}, comMotor(".agent/context/session.md"), "WARN  .agent/context/ foi alterado pelo upgrade"],
+]) {
+  test(`${nome}: AVISA e reprova`, () => {
+    const r = pontaAPonta(extra, hoje, sobrepoe);
+    try {
+      return exige(r, { codigo: 1, inclui: [aviso, "WARNING: 1 problema(s)"] });
+    } finally {
+      rmSync(r.dir, { recursive: true, force: true });
+    }
+  });
+}
 
 // Cada um destes desliga uma peca que o simulador PRECISA, e exige que ele pare a dizer o que
 // falta — em vez de seguir e dar um veredicto sobre uma simulacao incompleta.

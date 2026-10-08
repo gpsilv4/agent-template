@@ -113,7 +113,7 @@ export const CONSTANTES_DO_PROJETO = [
  * seguranca tem de parar tudo. Escrever por cima dos ficheiros de um consumidor as cegas e
  * pior do que nao fazer upgrade nenhum.
  *
- * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: object[], migracoes: object[], naoCopiados: object[]}}
+ * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: object[], migracoes: object[], naoCopiados: object[], substituidos: string[]}}
  *          o que mediu. `naoCopiados` sao `{caminho, razao}`: o que estava no disco do template
  *          e NAO e dele (ignorado pelo git, ou nome de segredo/lixo) — ver `lib/fora-do-template.mjs`. `removidos` sao `{caminho, migrado}`: os ficheiros que sairam do template e o
  *          consumidor ainda tem. `migrado: true` quando o mesmo NOME existe noutro caminho — ou

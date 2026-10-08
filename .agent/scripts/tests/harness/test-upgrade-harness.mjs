@@ -79,8 +79,10 @@ export function repo({ comTag = null, comMarca = false, semBootstrap = false } =
 }
 
 /** Corre o simulador DENTRO de `dir`. O simulador resolve a raiz a partir do seu proprio
- *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo. */
-export function corre(dir, args = []) {
+ *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo.
+ *  `sobrepoe` troca modulos de `lib/` DEPOIS da copia (`{ "upgrade-mecanico.mjs": src }`): e
+ *  como se injecta um motor avariado, para medir o que o simulador apanha quando o motor erra. */
+export function corre(dir, args = [], sobrepoe = {}) {
   mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, ".agent", "scripts", "guards"), { recursive: true });
   // A `lib/` INTEIRA, e nao os modulos nomeados um a um. A lista a mao era uma segunda copia
@@ -96,6 +98,7 @@ export function corre(dir, args = []) {
   ]) {
     writeFileSync(join(dir, para), readFileSync(de, "utf8"));
   }
+  for (const [f, src] of Object.entries(sobrepoe)) writeFileSync(join(dir, ".agent/scripts/lib", f), src);
   try {
     return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], { cwd: dir, encoding: "utf8" }) };
   } catch (err) {
@@ -309,8 +312,9 @@ export function templateSintetico(extra = {}) {
   };
 }
 
-/** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. */
-export function pontaAPonta(extra = {}) {
+/** Monta um repo com esse template, tagado, e corre o SIMULADOR la dentro. `hoje` muda o
+ *  template DEPOIS da tag (`null` apaga): e o que o upgrade traz. */
+export function pontaAPonta(extra = {}, hoje = {}, sobrepoe = {}) {
   const dir = registaTmp(mkdtempSync(join(tmpdir(), "sim-up-e2e-")));
   for (const [rel, c] of Object.entries(templateSintetico(extra))) {
     if (c === null) continue;
@@ -324,9 +328,13 @@ export function pontaAPonta(extra = {}) {
   git(dir, ["commit", "-qm", "ontem"]);
   git(dir, ["tag", "v1.0.0"]);
   writeFileSync(join(dir, "NOVO.md"), "# ha delta\n");
+  for (const [rel, c] of Object.entries(hoje)) {
+    if (c === null) rmSync(join(dir, rel), { force: true });
+    else writeFileSync(join(dir, rel), c);
+  }
   git(dir, ["add", "-A"]);
   git(dir, ["commit", "-qm", "hoje"]);
-  return { dir, ...corre(dir) };
+  return { dir, ...corre(dir, [], sobrepoe) };
 }
 
 /** O runner desta suite e os seus contadores.

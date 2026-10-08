@@ -49,6 +49,30 @@ export function registar() {
     if (comProprio.length !== base.length + 1) p.push(`PARES tem ${comProprio.length}, esperado ${base.length + 1} (os do template mais o proprio)`);
     if (base.length === 0) p.push("sem nenhum par do template — a copia do pares.mjs nao foi lida");
     registarResultado("pares: um par declarado em config/guards-do-projeto.mjs entra na varredura", p);
+
+    // Sem a config, recusa a dizer QUAL ficheiro falta e o que fazer (#243): o `ERR_MODULE_NOT_FOUND`
+    // cru nao dizia que a varredura precisa dele. Uma config PARTIDA continua a rebentar com o erro dela.
+    const importa = () => {
+      try {
+        execFileSync(process.execPath, ["--input-type=module", "-e", `await import(${JSON.stringify(pathToFileURL(join(dir, "lib/pares.mjs")).href)} + "?" + Date.now());`],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+        return "";
+      } catch (err) {
+        return String(err.stderr);
+      }
+    };
+    writeFileSync(join(dir, "config/guards-do-projeto.mjs"), "export const PARES_DO_PROJETO = [;\n");
+    const partida = importa();
+    // Uma config que importa um modulo apagado: o erro e DELE, e a config existe — nao e "falta".
+    writeFileSync(join(dir, "config/guards-do-projeto.mjs"), 'import "./inexistente.mjs";\nexport const PARES_DO_PROJETO = [];\n');
+    const dependencia = importa();
+    rmSync(join(dir, "config/guards-do-projeto.mjs"));
+    const falta = importa();
+    registarResultado("pares: sem config/guards-do-projeto.mjs recusa a dizer o que falta; partida ou com um import em falta, o erro e o dela", [
+      ...(falta.includes("falta .agent/scripts/config/guards-do-projeto.mjs") ? [] : [`sem a config: ${falta.split("\n").find((l) => /Error/.test(l)) ?? "(importou)"}`]),
+      ...(/SyntaxError/.test(partida) && !partida.includes("falta .agent/scripts") ? [] : [`config partida: ${partida.split("\n").find((l) => /Error/.test(l)) ?? "(importou)"}`]),
+      ...(/inexistente\.mjs/.test(dependencia) && !dependencia.includes("falta .agent/scripts") ? [] : [`dependencia da config em falta: ${dependencia.split("\n").find((l) => /Error/.test(l)) ?? "(importou)"}`]),
+    ]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

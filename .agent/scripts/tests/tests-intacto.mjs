@@ -4,6 +4,8 @@
  * O dono do modulo pela convencao do registo. NAO e um entry point: o `test-guards.mjs` descobre-o.
  */
 import { pathToFileURL } from "url";
+import { execFileSync } from "child_process";
+import { join } from "path";
 import { registarResultado } from "./harness/test-harness.mjs";
 import { intactoAMenosDePlaceholders as intacto, capturaPlaceholders, valoresDoProjeto } from "../lib/intacto.mjs";
 
@@ -36,16 +38,26 @@ export function registar() {
     intacto("# A (Um)\nfeito por Outro\n", `# A (${PH})\nfeito por ${PH}\n`) ? ["dois valores para o mesmo placeholder passaram por intactos"] : []);
   // Varios placeholders numa linha: a falha numa linha de baixo voltava atras por todas as
   // combinacoes desta — medido, 5 por linha davam 6,9 s. Agora e linear.
+  //
+  // Num processo filho e com tecto, como o irmao do `tests-upgrade-placeholders.mjs`: medido aqui
+  // dentro, um retrocesso catastrofico PENDURAVA o `test-guards` em vez de reprovar (#241).
   {
-    const linha = Array.from({ length: 5 }, (_, k) => PH.replace("PROJECT_NAME", `X${"ABCDE"[k]}`)).join(" ");
-    const tag = [linha, linha, linha, "fim"].join("\n");
-    const palavras = Array.from({ length: 200 }, (_, k) => `p${k}`).join(" ");
-    const t0 = Date.now();
-    const r = capturaPlaceholders([palavras, palavras, palavras, "fim diferente"].join("\n"), tag);
-    registarResultado("intacto: cinco placeholders numa linha nao penduram a comparacao", [
-      ...(r === null ? [] : ["um ficheiro alterado deu intacto"]),
-      ...(Date.now() - t0 < 500 ? [] : [`${Date.now() - t0} ms`]),
-    ]);
+    const lib = pathToFileURL(join(import.meta.dirname, "../lib/intacto.mjs")).href;
+    const codigo = `const { capturaPlaceholders } = await import(${JSON.stringify(lib)});
+      const PH = "{" + "{" + "PROJECT_NAME" + "}" + "}";
+      const linha = Array.from({ length: 5 }, (_, k) => PH.replace("PROJECT_NAME", "X" + "ABCDE"[k])).join(" ");
+      const palavras = Array.from({ length: 200 }, (_, k) => "p" + k).join(" ");
+      const t0 = Date.now();
+      const r = capturaPlaceholders([palavras, palavras, palavras, "fim diferente"].join("\\n"), [linha, linha, linha, "fim"].join("\\n"));
+      console.log(JSON.stringify({ ms: Date.now() - t0, nulo: r === null }));`;
+    let p;
+    try {
+      const { ms, nulo } = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", codigo], { encoding: "utf8", timeout: 10000 }));
+      p = [...(nulo ? [] : ["um ficheiro alterado deu intacto"]), ...(ms < 500 ? [] : [`${ms} ms`])];
+    } catch (err) {
+      p = [`a comparacao pendurou ou rebentou: ${err.message.split("\n")[0]}`];
+    }
+    registarResultado("intacto: cinco placeholders numa linha nao penduram a comparacao", p);
   }
   // Dois lado a lado nao dizem onde acaba um e comeca o outro: a linha compara, e nao da valores.
   registarResultado("intacto: placeholders adjacentes comparam mas nao dao valores",

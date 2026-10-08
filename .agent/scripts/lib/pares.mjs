@@ -13,7 +13,15 @@
  * novo de entrar sem rede nenhuma.
  */
 
-import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
+import { existsSync } from "fs";
+
+// A config e OBRIGATORIA aqui (#243): sem ela a varredura media menos e reportava 100% (o
+// `check-doc-versions` tolera-a, e la um guard por ligar da WARN). Decide-se pela EXISTENCIA: um
+// import em falta DENTRO da config tambem a nomeia, e "trazer o do template" apagava a do projeto.
+const CFG = new URL("../config/guards-do-projeto.mjs", import.meta.url);
+if (!existsSync(CFG)) throw new Error("falta .agent/scripts/config/guards-do-projeto.mjs — a varredura precisa dele para saber os pares " +
+  "do projeto. Trazer o do template (exporta GUARDS e PARES_DO_PROJETO, vazios por omissao).");
+const { PARES_DO_PROJETO } = await import(CFG.href);
 
 // Cada verificador tem de ter a sua suite E declarar como sinaliza um problema — nem todos
 // sinalizam da mesma forma, e um regex global daria "0 sitios, nada a varrer" a um
@@ -31,6 +39,8 @@ import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
 // `skip(` fica de fora de proposito: um SKIP nao e um achado, e o que o dispara e a
 // ausencia de um ficheiro, nao a linha em si.
 const PARES_DO_TEMPLATE = [
+  // ESTE ficheiro: o `throw` da config em falta e um sitio de recusa, e o `tests-pares.mjs` mede-o.
+  { alvo: ".agent/scripts/lib/pares.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])throw new Error\(/, neutro: "(() => {})(" },
   {
     // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
     // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel
@@ -112,10 +122,11 @@ const PARES_DO_TEMPLATE = [
   {
     // O simulador do OUTRO caminho: o `/upgrade`. Mesma razao que o de cima, e a mesma forma
     // de recusa (`fatal()`), porque o veredicto dele tambem e o exit code das suites que
-    // orquestra. Um simulador que falhe ABERTO da por verificada metade do produto.
+    // orquestra. Um simulador que falhe ABERTO da por verificada metade do produto. O `warn(`
+    // tambem reprova (conta `problemas`): sem ele no sinal, o da versao ficava fora da varredura (#241).
     alvo: ".agent/scripts/simulate-upgrade.mjs",
     suite: ".agent/scripts/tests/test-simulate-upgrade.mjs",
-    sinal: /(?<![\w.$])fatal\(/,
+    sinal: /(?<![\w.$])(?:fatal|warn)\(/,
     neutro: "(() => {})(",
   },
   {

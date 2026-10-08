@@ -187,6 +187,19 @@ test("cada modulo `tests-*.mjs` vai para o entry point que declara", () => {
 //
 // E o `TP8` na forma mais cara: nao e uma copia que envelheceu, sao duas leituras do mesmo facto
 // a validarem-se uma a outra. Por isso a pergunta passa a usar o caminho LISTADO.
+// Um modulo importado por uma suite de OUTRO lado tem de obrigar a ela tambem (#241). Cada par
+// traz quem o importa: se deixar de importar, o caso reprova, e o par sai daqui em vez de
+// envelhecer a afirmar uma razao que ja nao existe.
+for (const [modulo, suite, importador] of [
+  [".agent/scripts/tests/harness/relatorio.mjs", ".claude/hooks/tests/test-hooks.mjs", ".claude/hooks/tests/test-hooks.mjs"],
+  [".agent/scripts/lib/pares.mjs", ".agent/scripts/tests/test-guards.mjs", ".agent/scripts/tests/tests-pares.mjs"],
+]) {
+  test(`${modulo.split("/").pop()} obriga a ${suite.split("/").pop()} (importado por ${importador.split("/").pop()})`, () => [
+    ...(readFileSync(importador, "utf8").includes(`/${modulo.split("/").pop()}"`) ? [] : [`${importador} ja nao importa ${modulo}`]),
+    ...((regraDe(modulo)?.verifica ?? []).includes(suite) ? [] : [`mexer em ${modulo} nao obriga a correr ${suite}`]),
+  ]);
+}
+
 test("todo o harness casa uma regra no mapa", () => {
   const dir = ".agent/scripts/tests/harness";
   const harnesses = readdirSync(dir).filter((n) => n.endsWith(".mjs"));

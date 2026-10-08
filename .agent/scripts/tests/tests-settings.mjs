@@ -325,14 +325,20 @@ test("G11c: num DERIVADO, o que falta no `allow` e nota, e nao reprova", (dir) =
 }, { code: 0, anyOut: ["NOTE", "node .agent/scripts/novo.mjs --modo"] });
 
 // Um prefixo `Bash(<comando>:*)` cobre o comando com argumentos — e a forma do `check-test-surface` —,
-// uma entrada exacta cobre o comando exacto, e uma linha comentada nao corre.
+// uma entrada exacta cobre o comando exacto, e uma linha comentada nao corre. No TEMPLATE (onde o
+// que falta reprova) e com o `allow` montado aqui: dependia das linhas do `settings.json` do
+// repo, e mudava de resposta quando alguem o editava (`TP3`, #241).
 test("G11c: prefixo `:*`, entrada exacta e linha comentada nao avisam", (dir) => {
+  comoTemplate(dir);
+  patchSettings(dir, (c) => {
+    c.permissions.allow.push("Bash(node .agent/scripts/prefixo.mjs:*)", "Bash(node .agent/scripts/exacta.mjs)");
+  });
   writeF(dir, ".github/workflows/ci.yml",
-    `${ci("node .agent/scripts/check-test-surface.mjs --outra", "node .agent/scripts/simulate-upgrade.mjs")}      # - run: node .agent/scripts/comentado.mjs\n`);
-}, { code: 0, excludes: ["check-test-surface.mjs --outra", "simulate-upgrade.mjs", "comentado.mjs"] });
+    `${ci("node .agent/scripts/prefixo.mjs --outra", "node .agent/scripts/exacta.mjs")}      # - run: node .agent/scripts/comentado.mjs\n`);
+}, { code: 0, excludes: ["prefixo.mjs --outra", "exacta.mjs", "comentado.mjs"] });
 
-// O `tools:` dos agentes (S-05 do #195) — NOTA, nunca vermelho: o Claude Code nao respeita o campo,
-// e omiti-lo e legitimo (herda todas as ferramentas). Documenta a intencao.
+// O `tools:` dos agentes (S-05 do #195) — NOTA, nunca vermelho: omiti-lo e legitimo (herda todas
+// as ferramentas), e o `Bash(...)` declarado e imposto pelo hook `guard-subagent-bash` (#238).
 test("G11c: um agente sem `tools:` da nota", (dir) => {
   writeF(dir, ".claude/agents/sem-tools.md", "---\nname: sem-tools\ndescription: x\n---\n\nCorpo.\n");
 }, { code: 0, anyOut: ["sem-tools.md", "nao declara `tools:`"] });
