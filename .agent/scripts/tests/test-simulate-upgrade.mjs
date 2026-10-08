@@ -324,6 +324,18 @@ test("ficheiro NOVO do template chega ao consumidor", () => {
   }
 });
 
+// `.github/scripts/` e maquinaria como `.agent/scripts/` (#277): a suite do `release-da-tag.sh`
+// vive em `.agent/scripts/tests/`, e copiada sem o script reprovava em todo o projeto atualizado.
+test("`.github/scripts/` do template chega ao consumidor", () => {
+  let c;
+  try {
+    c = cenario({ ontem: {}, hoje: { ".github/scripts/novo.sh": "#!/bin/bash\necho novo\n" } });
+    return c.ler(".github/scripts/novo.sh") === "#!/bin/bash\necho novo\n" ? [] : ["o `.github/scripts/` nao chegou ao consumidor"];
+  } finally {
+    limpa(c);
+  }
+});
+
 // Os placeholders TEM de ser substituidos neste caminho. O bootstrap do consumidor correu ha
 // muito, logo ninguem os la vai substituir depois — e o Guard 13 reprova-os no projeto dele.
 // O literal constroi-se, nunca se escreve: a Fase 2.1 do bootstrap varre os `.mjs` e

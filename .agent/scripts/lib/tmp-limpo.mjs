@@ -108,6 +108,8 @@ export const PREFIXOS_DE_TESTE = [
   //
   // `naorepo-` e composto e nao ambiguo: as fixtures que montam uma pasta que NAO e um repo git.
   "hook-test-",
+  // A suite do criador de Releases (`test-release-da-tag.mjs`, #277).
+  "release-test-",
   "naorepo-",
   // O repo com o `.git/HEAD` num FIFO (#227): o `git` que o le pendura, e e o que o teste mede.
   "hook-fifo-",

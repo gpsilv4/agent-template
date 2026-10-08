@@ -36,8 +36,12 @@ export function andaFicheiros(base, fn, rel = "") {
  *
  *  `.agent/rules/` fica de FORA de proposito: o upgrade so traz de la o catalogo de
  *  anti-padroes do template, e as restantes rules sao diff-e-decidir. Propor apagar uma rule
- *  que o projeto customizou seria propor apagar trabalho. */
-export const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/"];
+ *  que o projeto customizou seria propor apagar trabalho.
+ *
+ *  `.github/scripts/` entrou com o `release-da-tag.sh` (#277): e maquinaria do template como as
+ *  outras duas, e a suite dele vive em `.agent/scripts/tests/` — copiada sem ele, reprovava em
+ *  todo o projeto atualizado (medido pelo `simulate-upgrade`). */
+export const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/", ".github/scripts/"];
 
 /** Constantes que MUDARAM DE CASA entre versoes, e para onde foram.
  *

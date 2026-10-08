@@ -270,8 +270,15 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
 
   // (i) `.agent/scripts/**` — copia limpa. (ii) O catalogo de anti-padroes do TEMPLATE, por
   // inteiro: e dele, e os IDs dele sao os mesmos em todos os projetos. (iii) Os hooks.
-  trazerDoHead(".agent/scripts");
-  trazerDoHead(".claude/hooks");
+  // Da MESMA lista que diz o que "saiu do template": duas chamadas escritas a mao ao lado dela eram
+  // o `TP1`, e o `.github/scripts/` entrou na lista sem ser copiado (#277, medido).
+  for (const pre of PREFIXOS_COPIADOS) {
+    const rel = pre.replace(/\/$/, "");
+    // `.github/scripts/` so existe desde o #277: um template que nao o tenha (as fixtures
+    // sinteticas) nao tem nada a trazer. As outras duas continuam obrigatorias.
+    if (rel === ".github/scripts" && !existsSync(join(root, rel))) continue;
+    trazerDoHead(rel);
+  }
   for (const rel of [".agent/rules/anti-patterns-template.md"]) {
     const c = leOuNull(join(root, rel));
     if (c === null) fatal(`${rel} nao existe no HEAD`);
