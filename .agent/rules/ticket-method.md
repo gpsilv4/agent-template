@@ -196,9 +196,9 @@ noutro agente (Gemini, Cursor, Copilot, Codex), uma sessao nova ou outro modelo,
 | `S` | nao |
 | `M` | se pedires |
 | `L`, ou toca no nucleo do dominio | **sim** |
+| `L` ou fronteira | **duas**, angulos diferentes; a 2.a sem os achados da 1.a (`-why`) |
 
-**Nao substitui a Fase 3**: le **codigo** — logica, invariantes, ramos mortos, ordem de
-hooks. Nao corre a app, nao mede, nao ve o output. Cobre outra coisa.
+**Nao substitui a Fase 3**: le **codigo** (logica, invariantes, ramos mortos); nao corre nem mede.
 
 **Instrui-lo a atacar**, nao a elogiar: "assume que esta errado ate prova em contrario", cada
 achado com `ficheiro:linha` e reproducao, e **CONFIRMADO** vs **PLAUSIVEL** explicito.
@@ -206,8 +206,7 @@ achado com `ficheiro:linha` e reproducao, e **CONFIRMADO** vs **PLAUSIVEL** expl
 **Verificar cada achado** contra o ficheiro real antes de agir — leitores alucinam, e um
 achado que nao se confirma custa mais do que nao o ter tido.
 
-Se encontrar algo, volta-se a Fase 2. Custo: e a etapa mais cara — e por isso a unica
-escalada por tamanho de ticket.
+Se encontrar algo, volta-se a Fase 2. E a etapa mais cara: por isso escala por tamanho.
 
 ## Fase 5 — Relatorio, e so depois o commit
 

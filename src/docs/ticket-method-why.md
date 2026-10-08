@@ -160,6 +160,30 @@ faz de leitor. O que o autor ja verificou
 nao entra: se estiver certo, o leitor chega la sozinho; se estiver errado, era isso que se queria
 apanhar.
 
+## Porque um `L` ou a fronteira levam duas leituras independentes
+
+Medido nos quatro tickets de fronteira de 2026-10-07/08: a **segunda** leitura encontrou sempre o
+que a primeira nao viu.
+
+| Ticket | O que so a 2.a leitura apanhou |
+|---|---|
+| #237 (PR #252) | escrever na fronteira por `-C <dir>` e `cd`, `-vo` agrupado, e uma regressao do autor |
+| #238 (PR #254) | **Critico**: `"${(e):-\$(cmd)}"` corria um comando; `\`+newline — ambos regressoes do autor |
+| #240 (PR #256) | o erro de premissa "o motor nao toca nos agentes" (toca nos intactos) |
+| #257 (PR #258) | a 1.a apanhou um Alto (a lista fora da fronteira); a 2.a, a extracao da migracao que perdia um branch |
+
+Duas regras fazem a segunda valer alguma coisa. **Angulo diferente**, declarado: a mesma pergunta
+feita duas vezes da a mesma resposta. **Sem os achados da primeira**: e a revisao cega do
+[karpathy/llm-council](https://github.com/karpathy/llm-council), onde cada modelo avalia as
+respostas dos outros sem saber de quem sao. O contrato acima tira ao leitor as conclusoes do
+AUTOR; isto tira-lhe as do outro LEITOR — um leitor que sabe o que ja foi encontrado procura a
+volta disso (#259).
+
+Uma delas pode correr **noutro modelo**, se o agente o permitir (o `model:` de um subagente no
+Claude Code; outra CLI noutro agente). E opcional e nao medido: aqui, o que mudou o resultado foi
+o angulo, com o mesmo modelo. Num `S` ou `M`, uma leitura chega — o custo de duas passa o que elas
+apanham num diff pequeno.
+
 ## Porque o metodo escala com o tamanho do ticket
 
 A escala nao e um detalhe — e o que torna o metodo viavel. Aplicado por inteiro a tudo,
