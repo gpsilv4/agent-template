@@ -1,5 +1,7 @@
 # /e2e-tests — Correr e manter a suite E2E ({{TEST_FRAMEWORK}})
 
+> **Quando usar:** fluxos de utilizador: correr ou manter a suite E2E · **Quando NAO usar:** logica pura (teste unitario) ou so visual (#246).
+
 Levar a suite E2E a um **veredicto**: verde, ou uma lista de falhas com causa atribuida. E
 manter a cobertura dos fluxos criticos honesta — um fluxo sem spec e divida, nao ausencia de
 risco.

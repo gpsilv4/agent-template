@@ -1,5 +1,7 @@
 # /deploy — Deploy para Producao
 
+> **Quando usar:** sprint completo, com todos os items fechados · **Quando NAO usar:** ticket individual (commit no branch, sem deploy) (#246).
+
 Checklist obrigatoria antes de fazer deploy do {{PROJECT_NAME}}.
 
 ## Fluxo de Ambientes

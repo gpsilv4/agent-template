@@ -1,5 +1,7 @@
 # /market-scan — Analise de Mercado & Ideacao de Features
 
+> **Quando usar:** estrategia de produto e ideacao de features · **Quando NAO usar:** decisoes tecnicas de implementacao (#246).
+
 Research **externo** de produto para o {{PROJECT_NAME}}: o que fazem apps semelhantes, que features faltam, e que ideias adotar. Distinto do `/audit` (saude interna). Cadencia **estrategica** (nao rotina), conduzido pelo utilizador.
 
 > **Fundamentar na web e ser cetico**: cada afirmacao (features, pricing) leva **fonte (URL) + data + confianca** (alta/media/baixa) e e marcada **verificado** vs **assuncao**. Pricing e features alucinam e ficam stale — nunca inventar. **Nao implementar nada** — o output sao propostas de backlog.

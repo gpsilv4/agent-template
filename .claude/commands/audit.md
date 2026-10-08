@@ -1,5 +1,5 @@
 ---
-description: Auditoria completa do projeto/app (multi-lente, milestone) via fan-out de subagentes
+description: Auditoria completa do projeto/app (multi-lente, milestone) via fan-out de subagentes — usar num milestone (fim de sprint, pre-release)
 ---
 
 Ler `.agent/workflows/audit.md` e correr a auditoria holistica: primeiro os guards deterministicos,

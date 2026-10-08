@@ -1,2 +1,2 @@
-description = "Refactoring seguro sem regressoes"
+description = "Refactoring seguro sem regressoes — usar para reorganizar sem mudar comportamento"
 prompt = "Le e segue .agent/workflows/refactor.md (baseline, extrair, verificar tsc/build/testes). Alvo: {{args}}"

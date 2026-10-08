@@ -1,5 +1,7 @@
 # /setup — Onboarding de Developer
 
+> **Quando usar:** um developer novo, ou um ambiente por montar · **Quando NAO usar:** configurar o projeto pela primeira vez (e o `BOOTSTRAP.md`) (#246).
+
 Guia para configurar o ambiente de desenvolvimento do {{PROJECT_NAME}}.
 
 > **Isto e documentacao para uma PESSOA, nao uma tarefa de agente** — e a excecao entre os

@@ -14,7 +14,7 @@ Stack: {{STACK}}.
 - **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias **ou um servidor MCP** (`.agent/rules/mcp-policy.md`).
 - **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
 
-> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida, lembram a Fase 0 quando o pedido e uma ordem de implementacao, e reinjectam as Fronteiras antes de a janela compactar) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.
+> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida, lembram a Fase 0 quando o pedido e uma ordem de implementacao, restringem o Bash dos subagentes ao que o `tools:` declara, e reinjectam as Fronteiras depois de a janela compactar) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.
 
 ---
 
@@ -50,21 +50,21 @@ Stack: {{STACK}}.
 > Referencias (NAO importadas — carregar on-demand para manter o contexto enxuto).
 > Quando o utilizador invoca um comando, **ler** o ficheiro correspondente e seguir os passos.
 
-| Workflow                  | Ficheiro (ler on-demand)               |
-| ------------------------- | -------------------------------------- |
-| Setup / Onboarding        | `.agent/workflows/setup.md`            |
-| Interrogar antes de haver codigo | `.agent/workflows/grill.md`     |
-| Planear funcionalidade    | `.agent/workflows/plan.md`             |
-| Review antes de commit    | `.agent/workflows/review.md`           |
-| Review de qualidade UI/UX | `.agent/workflows/design-review.md`    |
-| Refactoring seguro        | `.agent/workflows/refactor.md`         |
-| Testes E2E (Funcionais)   | `.agent/workflows/e2e-tests.md`        |
-| Testes de Seguranca       | `.agent/workflows/security-tests.md`   |
-| Debugging estruturado     | `.agent/workflows/debug.md`            |
-| Deploy para producao      | `.agent/workflows/deploy.md`           |
-| Auditoria completa        | `.agent/workflows/audit.md`            |
-| Analise de mercado        | `.agent/workflows/market-scan.md`      |
-| Atualizar do template     | `.agent/workflows/upgrade.md`          |
+| Workflow                  | Ficheiro (ler on-demand)               | Quando |
+| ------------------------- | -------------------------------------- | ------ |
+| Setup / Onboarding        | `.agent/workflows/setup.md`            | num developer novo ou num ambiente por montar |
+| Interrogar antes de haver codigo | `.agent/workflows/grill.md`     | num ticket L ou M ambiguo, antes do plano |
+| Planear funcionalidade    | `.agent/workflows/plan.md`             | num ticket feature, antes de implementar |
+| Review antes de commit    | `.agent/workflows/review.md`           | antes de qualquer commit |
+| Review de qualidade UI/UX | `.agent/workflows/design-review.md`    | num ticket com UI, depois do /review |
+| Refactoring seguro        | `.agent/workflows/refactor.md`         | para reorganizar sem mudar comportamento |
+| Testes E2E (Funcionais)   | `.agent/workflows/e2e-tests.md`        | para os fluxos de utilizador (suite E2E) |
+| Testes de Seguranca       | `.agent/workflows/security-tests.md`   | antes de uma release com auth, formularios ou APIs novos |
+| Debugging estruturado     | `.agent/workflows/debug.md`            | num bug com causa nao obvia |
+| Deploy para producao      | `.agent/workflows/deploy.md`           | com o sprint completo |
+| Auditoria completa        | `.agent/workflows/audit.md`            | num milestone (fim de sprint, pre-release) |
+| Analise de mercado        | `.agent/workflows/market-scan.md`      | na estrategia de produto |
+| Atualizar do template     | `.agent/workflows/upgrade.md`          | num derivado, para trazer o template novo |
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-description: Review de qualidade de UI/UX (design, a11y, estados, premium) por tier
+description: Review de qualidade de UI/UX (design, a11y, estados, premium) por tier — usar num ticket com UI, depois do /review
 ---
 
 Ler `.agent/workflows/design-review.md` e correr a rubrica de qualidade de UI/UX na alteracao atual,

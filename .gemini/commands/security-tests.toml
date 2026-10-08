@@ -1,2 +1,2 @@
-description = "Correr e manter os testes de seguranca"
+description = "Correr e manter os testes de seguranca — usar antes de uma release com auth, formularios ou APIs novos"
 prompt = "Le e segue .agent/workflows/security-tests.md para os testes de seguranca."

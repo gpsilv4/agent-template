@@ -1,5 +1,5 @@
 ---
-description: Code review antes de commit (checklist completa + guards)
+description: Code review antes de commit (checklist completa + guards) — usar antes de qualquer commit
 ---
 
 Ler `.agent/workflows/review.md` e correr a checklist de review no diff atual.

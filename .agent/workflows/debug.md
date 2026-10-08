@@ -1,5 +1,7 @@
 # /debug — Debug Estruturado
 
+> **Quando usar:** um bug cuja causa nao e obvia · **Quando NAO usar:** uma mudanca de comportamento pedida (e `/plan`) (#246).
+
 Workflow metodico para isolar e corrigir bugs no {{PROJECT_NAME}}. Nunca adivinhar — seguir o processo.
 
 > Um bug e um ticket: corre a **Fase 0** (explicar a causa e a correcao, e esperar) antes de
