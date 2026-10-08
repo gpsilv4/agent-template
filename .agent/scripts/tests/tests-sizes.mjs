@@ -11,7 +11,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { test, file, readF, writeF, registarResultado } from "./harness/test-harness.mjs";
-import { TETOS, guardFileSizes } from "../guards/sizes.mjs";
+import { TETOS, guardFileSizes, tetoDe } from "../guards/sizes.mjs";
 import { correDireto } from "./harness/guard-direto.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -46,7 +46,7 @@ export const entryPoint = "test-guards.mjs";
 // a da catraca.
 export function escolheCobaia(tetos) {
   const rel = Object.keys(tetos).find((f) => !/check-doc-versions\.mjs$|\/guards\/|\/lib\//.test(f));
-  return rel ? { rel, teto: tetos[rel], sintetica: false } : { rel: ".agent/scripts/cobaia-do-teto.mjs", teto: 600, sintetica: true };
+  return rel ? { rel, teto: tetoDe(tetos[rel]), sintetica: false } : { rel: ".agent/scripts/cobaia-do-teto.mjs", teto: 600, sintetica: true };
 }
 const COBAIA = escolheCobaia(TETOS);
 const SINTETICA = escolheCobaia({});
@@ -77,7 +77,24 @@ export function registar() {
     ...(escolheCobaia({}).sintetica ? [] : ["TETOS vazio nao deu a sintetica"]),
     ...(escolheCobaia({ ".agent/scripts/guards/x.mjs": 510 }).sintetica ? [] : ["so um guard em TETOS nao deu a sintetica"]),
     ...(escolheCobaia({ ".agent/scripts/x.mjs": 510 }).rel === ".agent/scripts/x.mjs" ? [] : ["com uma entrada utilizavel nao a usou"]),
+    ...(escolheCobaia({ ".agent/scripts/x.mjs": { teto: 510, ate: "2999-01-01" } }).teto === 510 ? [] : ["uma entrada em objeto (#250) nao deu o teto"]),
   ]);
+
+  // --- O prazo de uma excecao (#250) -----------------------------------------
+  // Uma entrada pode ser `{ teto, dono, ate }`. Passado o prazo, NOTE e nao reprova; o teto dela
+  // continua a valer como o de um numero.
+  const comEntrada = (n, literal) => (dir) => {
+    writeF(dir, ".agent/scripts/lib/velho.mjs", "// linha\n".repeat(n));
+    const g = ".agent/scripts/guards/sizes.mjs";
+    writeF(dir, g, readF(dir, g).replace("export const TETOS = {", `export const TETOS = {\n  ".agent/scripts/lib/velho.mjs": ${literal},`));
+  };
+  test("G17: uma excecao com o prazo passado da NOTE e nao reprova",
+    comEntrada(600, '{ teto: 600, dono: "ana", ate: "2000-01-01" }'),
+    { code: 0, includes: ["NOTE  Guard 17: a excecao de .agent/scripts/lib/velho.mjs em TETOS passou do prazo 2000-01-01 (dono: ana)"] });
+  test("G17: uma excecao dentro do prazo, ou um numero, nao da NOTE",
+    comEntrada(600, '{ teto: 600, dono: "ana", ate: "2999-12-31" }'), { code: 0, excludes: ["passou do prazo"] });
+  test("G17: o teto de uma entrada com prazo continua a reprovar o crescimento",
+    comEntrada(601, '{ teto: 600, dono: "ana", ate: "2999-12-31" }'), { code: 1, includes: ["velho.mjs tem 601 linhas e o teto congelado e 600"] });
 
   // --- O estado limpo do repo ------------------------------------------------
   test("G17: o repo como esta passa — nenhum congelado cresceu", null, {
