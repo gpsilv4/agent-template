@@ -1,12 +1,12 @@
 # /upgrade — Trazer melhorias do template para este projeto
 
+> **Quando usar:** num derivado · **Quando NAO usar:** no proprio template (#246).
+
 Workflow para atualizar um projeto **derivado** com melhorias feitas no template de origem,
 sem apagar o que e deste projeto.
 
-> **E o inverso da Matriz de Propagacao** (`.agent/rules/sync-docs.md`). A matriz responde a
-> _"acrescentei X, onde tem de ir"_; este workflow responde a _"o template ganhou X, o que
-> trago"_. Por isso decide por **categoria de ficheiro**, e nao por uma lista de nomes: uma
-> lista envelhece a cada alteracao do template, uma categoria nao.
+> **E o inverso da Matriz de Propagacao** (`.agent/rules/sync-docs.md`): _"o template ganhou X,
+> o que trago"_. Decide por **categoria de ficheiro**, nao por uma lista de nomes, que envelhece.
 
 ## 0. Fase 0 — mostrar e esperar
 

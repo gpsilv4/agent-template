@@ -1,2 +1,2 @@
-description = "Debug estruturado e metodico de um bug"
+description = "Debug estruturado e metodico de um bug — usar num bug com causa nao obvia"
 prompt = "Le e segue .agent/workflows/debug.md (reproduzir, classificar, corrigir, verificar). Se o bug revelar um padrao evitavel, registar em .agent/rules/anti-patterns.md. Bug: {{args}}"

@@ -1,5 +1,7 @@
 # /review — Code Review
 
+> **Quando usar:** antes de qualquer commit, em qualquer ticket · **Quando NAO usar:** nunca se salta; com UI, junta-se o `/design-review` (#246).
+
 Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
 > Para alteracoes com **UI**, correr tambem `/design-review` (qualidade visual, UX, a11y, estados) — este `/review` cobre codigo/seguranca.

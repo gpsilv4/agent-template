@@ -1,2 +1,2 @@
-description = "Planear uma nova feature de forma estruturada"
+description = "Planear uma nova feature de forma estruturada — usar num ticket feature, antes de implementar"
 prompt = "Le e segue o workflow em .agent/workflows/plan.md para planear a feature. Contexto: {{args}}"

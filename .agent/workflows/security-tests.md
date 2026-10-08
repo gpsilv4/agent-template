@@ -1,5 +1,7 @@
 # /security-tests — Testes de Seguranca
 
+> **Quando usar:** antes de releases com alteracoes em auth, formularios ou APIs · **Quando NAO usar:** alteracao so visual, sem rotas nem inputs novos (#246).
+
 Levar a suite de seguranca a um **veredicto**, e manter honesta a lista do que ela cobre.
 Valida headers HTTP, flags de cookies, XSS/injection, bypass de autenticacao e isolamento de
 dados.
@@ -117,8 +119,6 @@ zap-cli quick-scan http://localhost:<PORT>
 > **Nota:** `zap-cli` **nao** vem com o ZAP — e um wrapper Python separado (`pip install zapcli`).
 > Em alternativa, usar o modo headless do proprio ZAP (`zap.sh -cmd ...`) — confirmar os flags
 > na documentacao da versao instalada.
-
-**Quando usar:** Antes de releases com alteracoes significativas em auth, formularios ou APIs.
 
 ### Alternativa: agente autonomo de pentesting
 

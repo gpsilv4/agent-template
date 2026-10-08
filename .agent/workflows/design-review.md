@@ -1,5 +1,7 @@
 # /design-review — Review de Qualidade de UI/UX
 
+> **Quando usar:** ticket com UI, depois do `/review` · **Quando NAO usar:** alteracao sem UI, ou projeto sem UI (#246).
+
 Rubrica de qualidade visual e de experiencia do {{PROJECT_NAME}}. Correr **antes de dar uma feature de UI por concluida** — complementa o `/review` (que cobre codigo/seguranca), nao o substitui.
 
 **Tier do projeto (bootstrap): {{QUALITY_TIER}}** — MVP < Polido < Elite. Quanto mais alto o tier, mais criterios sao obrigatorios (marcados `[Polido]` / `[Elite]`).

@@ -1,5 +1,5 @@
 ---
-description: Debug estruturado e metodico de um bug
+description: Debug estruturado e metodico de um bug — usar num bug com causa nao obvia
 argument-hint: "[descricao do bug]"
 ---
 

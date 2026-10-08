@@ -1,5 +1,7 @@
 # /audit — Auditoria Completa do Projeto & App
 
+> **Quando usar:** milestone: fim de sprint ou pre-release · **Quando NAO usar:** a cada commit (e o `/review`) (#246).
+
 Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para ver o "estado da app". Complementa (nao substitui) o `/review` (por-alteracao) e o `/design-review` (por-feature-UI).
 
 > **Workflow mais caro** (muitos agentes/tokens) — usar em **milestones** (fim de sprint, pre-release) ou on-demand, **nao** a cada commit.

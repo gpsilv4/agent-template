@@ -1,5 +1,7 @@
 # /refactor — Refactoring Seguro
 
+> **Quando usar:** reorganizar codigo sem mudar comportamento · **Quando NAO usar:** mudar comportamento (e `/plan` ou `/debug`) (#246).
+
 Workflow para refactoring que garante seguranca e nao introduz regressoes no {{PROJECT_NAME}}.
 
 > Um refactor e um ticket: **Fase 0** primeiro (o que muda, o que **nao** muda, e esperar).

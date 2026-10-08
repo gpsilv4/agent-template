@@ -1,5 +1,5 @@
 ---
-description: Refactoring seguro sem regressoes
+description: Refactoring seguro sem regressoes — usar para reorganizar sem mudar comportamento
 argument-hint: "[alvo do refactor]"
 ---
 

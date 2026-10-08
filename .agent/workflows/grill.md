@@ -1,5 +1,7 @@
 # /grill — Interrogar quem pediu, antes de haver codigo
 
+> **Quando usar:** ticket `L`, `M` ambiguo, ou desenho fora de um ticket · **Quando NAO usar:** ticket `S`, ou `M` sem ambiguidade (#246).
+
 Extrair as decisoes que **ainda nao foram tomadas** de um pedido, uma pergunta de cada vez,
 ate nao sobrar ramo por resolver. Corre **antes** da explicacao da Fase 0 do
 `.agent/rules/ticket-method.md`: o que sai daqui e o input do plano.

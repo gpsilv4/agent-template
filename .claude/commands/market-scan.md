@@ -1,5 +1,5 @@
 ---
-description: Analise de mercado/concorrencia e ideacao de features (web-grounded)
+description: Analise de mercado/concorrencia e ideacao de features (web-grounded) — usar na estrategia de produto
 ---
 
 Ler `.agent/workflows/market-scan.md` e correr o research de produto: scan de concorrentes (WebSearch,

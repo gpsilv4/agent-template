@@ -1,5 +1,5 @@
 ---
-description: Planear uma nova feature de forma estruturada
+description: Planear uma nova feature de forma estruturada — usar num ticket feature, antes de implementar
 argument-hint: "[descricao da feature]"
 ---
 

@@ -1,5 +1,7 @@
 # /plan — Planear Nova Feature
 
+> **Quando usar:** ticket feature: e a Fase 0 · **Quando NAO usar:** bug (`/debug`) ou refactor (`/refactor`) (#246).
+
 Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
 > Este workflow **e a Fase 0** do Metodo de Trabalho por Ticket (`process-rules.md`):
