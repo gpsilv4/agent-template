@@ -7,7 +7,7 @@
  * como um MOVIMENTO — o output do guard fica byte-a-byte igual — e nao como uma reescrita
  * onde um erro se esconde. Ver `guards/settings.mjs` para o mesmo raciocinio.
  *
- * Os avisos vivem aqui, logo este ficheiro esta em `PARES` no `mutation-sweep.mjs`.
+ * Os avisos vivem aqui, logo este ficheiro esta em `PARES` (`lib/pares.mjs`).
  */
 
 import { AP_FILES, CABECALHO_AP, semHtml } from "./anti-patterns.mjs";

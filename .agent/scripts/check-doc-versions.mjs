@@ -136,7 +136,7 @@ console.log(`  raiz: ${ROOT}\n`);
 // --- Guards 1/1b/1c/1d: os orcamentos de bytes ---
 // O que o agente carrega a cada sessao e o que ele paga a cada sessao. Extraidos para
 // `guards/budgets.mjs` (o bloco mais coeso deste ficheiro, que passou o flag das 500 linhas);
-// a entrada em `PARES` do `mutation-sweep.mjs` e obrigatoria, senao a varredura mede este
+// a entrada em `PARES` de `lib/pares.mjs` e obrigatoria, senao a varredura mede este
 // ficheiro e reporta 100% a mentir.
 /**
  * O projeto ja passou pelo bootstrap? E o discriminador PARTILHADO entre os guards que se
@@ -447,7 +447,7 @@ guardsRun += guardMcp({ read, warn, ok, skip });
 // --- Guard 15: as referencias a anti-padroes RESOLVEM ---
 // Uma citacao de anti-padrao errada manda o leitor a uma entrada REAL com outro significado,
 // e nada no ecra a denuncia. Extraido para `guards/anti-patterns.mjs` (o maior bloco deste
-// ficheiro, que passou o flag das 500 linhas); a entrada em `PARES` do `mutation-sweep.mjs` e
+// ficheiro, que passou o flag das 500 linhas); a entrada em `PARES` de `lib/pares.mjs` e
 // obrigatoria, senao a varredura mede este ficheiro e reporta 100% a mentir.
 guardsRun += guardAntiPatternRefs({ read, warn, ok, skip, note, listDir });
 guardsRun += guardAntiPatternEvidence({ read, warn, ok, skip });

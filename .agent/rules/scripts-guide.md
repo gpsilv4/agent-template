@@ -77,7 +77,7 @@ um `FAIL` — a prova de que um TESTE apanhou a mutacao. Sair `!= 0` sem isso e 
 ## A regra que os liga
 
 Cada verificador **e cada hook** tem de ter **a sua suite de testes negativos** e **a sua
-entrada em `PARES`** no `mutation-sweep.mjs`. A varredura reprova com `SEM PAR` um
+entrada em `PARES`** (`lib/pares.mjs`). A varredura reprova com `SEM PAR` um
 `check-*.mjs`, um `guards/*.mjs` ou um `.claude/hooks/*.mjs` que exista no disco e nao esteja
 registado — nao a silenciar, registar. E reprova com `SEM SUITE` uma entrada sem testes: um
 verificador nao verificado nao da confianca, da a aparencia dela.

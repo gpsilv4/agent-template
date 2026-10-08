@@ -10,7 +10,7 @@
  * refactor e auditavel como um MOVIMENTO — o output tem de ficar byte-a-byte igual — e nao
  * como uma reescrita onde um erro se pode esconder.
  *
- * Os avisos vivem aqui, logo este ficheiro tem de estar em `PARES` no `mutation-sweep.mjs`:
+ * Os avisos vivem aqui, logo este ficheiro tem de estar em `PARES` (`lib/pares.mjs`):
  * sem isso a varredura passaria a cobrir 645 linhas em vez de 911 e reportaria 100% a mentir.
  */
 import { ferramentasDe } from "../lib/agentes.mjs";

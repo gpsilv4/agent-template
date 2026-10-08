@@ -7,7 +7,7 @@
  * como um MOVIMENTO — o output do guard fica byte-a-byte igual — e nao como uma reescrita
  * onde um erro se esconde. Ver `guards/settings.mjs` para o mesmo raciocinio.
  *
- * Os avisos vivem aqui, logo este ficheiro esta em `PARES` no `mutation-sweep.mjs`.
+ * Os avisos vivem aqui, logo este ficheiro esta em `PARES` (`lib/pares.mjs`).
  */
 
 // No ficheiro original o `package.json` era lido UMA vez, no Guard 3, e o resultado ficava
