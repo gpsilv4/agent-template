@@ -3,8 +3,9 @@
  *
  * Extraido do `mutation-sweep.mjs` quando este passou as 500 linhas (Guard 17). A fronteira nao e
  * so de tamanho, e a mesma do `lib/upgrade-mecanico.mjs`: **este modulo MEDE, quem o chama JULGA
- * e REPORTA**. Ele nao sabe o que e um veredicto, nao imprime nada e nao decide exit codes —
- * devolve numeros. Assim pode ser exercitado sem montar uma varredura inteira.
+ * e REPORTA**. Ele nao sabe o que e um veredicto e nao decide exit codes — devolve numeros. So
+ * imprime o que nao cabe nos numeros: a ordem dependente, o veredicto que a ordem mudou, o
+ * timeout e o rebentamento. Assim pode ser exercitado sem montar uma varredura inteira.
  *
  * PORQUE E PARALELO, e o que isso nao muda: os sitios sao embaracosamente independentes — cada um
  * e "desliga esta linha, corre esta suite, ve se fica vermelha". Corriam em serie por nenhuma

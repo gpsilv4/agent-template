@@ -58,9 +58,8 @@ import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { aplicaUpgradeMecanico, leOuNull } from "./lib/upgrade-mecanico.mjs";
-import { linhasSubstituidos, linhasMigracoes, linhasAgentes } from "./lib/saida-upgrade.mjs";
+import { imprimeAntesDeAprovar } from "./lib/saida-upgrade.mjs";
 import { agentesDesatualizados } from "./lib/agentes.mjs";
-import { linhasNaoCopiados } from "./lib/fora-do-template.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { comandosDoCI, correBateria, correNaBateria, adapta2bGuard17, medeImpactoAqui } from "./lib/medida-upgrade.mjs";
@@ -216,7 +215,8 @@ ok(`baseline: ${tag} (${sha}) -> HEAD`);
 // grava num projeto criado com "Use this template", e um ficheiro esquecido numa release dava a esse
 // projeto uma versao que nao e a sua. O formato verifica-o o `guardTemplateVersion`; aqui, a ordem — e e
 // aqui porque e este script que tem as tags. Pode ir A FRENTE: entre o passo do /deploy que o sobe
-// e a tag, a versao nova ja esta escrita.
+// e a tag, a versao nova ja esta escrita. Fora do formato `vX.Y.Z` nao ha ordem a medir — e
+// calar isso era medir zero em silencio (`TP2`, #243): diz-se que nao se mediu.
 const declarada = leOuNull(join(ROOT, ".agent/TEMPLATE_VERSION"))?.trim() ?? "";
 const partes = (v) => (/^v?(\d+)\.(\d+)\.(\d+)$/.exec(v) ?? []).slice(1).map(Number);
 const [dv, tv] = [partes(declarada), partes(tag)];
@@ -227,12 +227,36 @@ if (dv.length === 3 && tv.length === 3) {
   } else {
     ok(`.agent/TEMPLATE_VERSION (${declarada}) nao esta atras da ultima tag (${tag})`);
   }
+} else {
+  note(`.agent/TEMPLATE_VERSION (${declarada || "vazio"}) ou a tag ${tag} fora do formato vX.Y.Z — a ordem nao foi medida`);
 }
 
 // --- 2. montar o projeto de ONTEM ------------------------------------------------
 const dir = criaTmp("upgrade-");
 copiaAtiva = dir;
 montaProjetoDeOntem({ dir, root: ROOT, tag, sha, substituto: SUBSTITUTO, marcaProjeto: MARCA_PROJETO, ok, fatal });
+
+// O que o `/upgrade` manda NUNCA tocar, medido ANTES e depois. Um `cp -R` mal apontado aqui
+// apaga trabalho que nao existe em mais sitio nenhum — e a primeira frase da Fase 0 de la.
+//
+// ANTES quer dizer antes do MOTOR. A fotografia era tirada depois dele e das remocoes, e so dos
+// nomes: o `cp -R` mal apontado que este comentario promete apanhar acontecia antes da primeira
+// fotografia, e um conteudo reescrito nem mudava a segunda (#241).
+/** Os nomes E o conteudo de `.agent/context/`, ou `null` se a pasta nao existir. Um
+ *  `readdirSync` cru aqui rebentava com um stack do Node em vez de dizer o que falta — e quem le
+ *  um stack nao sabe se o simulador esta partido ou se o template e que esta incompleto. */
+const contextoDe = () => {
+  try {
+    const base = join(dir, ".agent/context");
+    return readdirSync(base).sort().map((f) => `${f}\0${leOuNull(join(base, f)) ?? ""}`).join("\0\0");
+  } catch {
+    return null;
+  }
+};
+const contextoAntes = contextoDe();
+if (contextoAntes === null) {
+  fatal("`.agent/context/` nao existe na copia — sem ela nao consigo afirmar que o upgrade nao lhe tocou");
+}
 
 // --- 3. FASE 1: o upgrade MECANICO -----------------------------------------------
 // As categorias que a tabela do `/upgrade` resolve sem julgamento. O motor vive em
@@ -243,18 +267,16 @@ ok(
   `upgrade mecanico aplicado: ${medido.repostas} constante(s) customizada(s) preservada(s), ` +
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`
 );
-const [substituiu, ...substituiuLinhas] = linhasSubstituidos(medido.substituidos);
-if (substituiu) {
-  ok(substituiu);
-  for (const l of substituiuLinhas) console.log(l);
-}
-const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
-if (semCopia) {
-  ok(semCopia);
-  for (const l of semCopiaLinhas) console.log(l);
-}
-// Os agentes que o motor NAO actualizou (os customizados): o hook impoe o `tools:` deles (#240).
-for (const [i, l] of linhasAgentes(agentesDesatualizados(dir, ROOT)).entries()) i === 0 ? ok(l) : console.log(l);
+// O que se le antes de aprovar, com a 2b: a mesma funcao, a mesma ordem (#243). Os agentes sao os
+// que o motor NAO actualizou (os customizados): o hook impoe o `tools:` deles (#240).
+//
+// AS CONSTANTES QUE MUDARAM DE CASA (um dos blocos). O consumidor que as tinha customizadas perde
+// a customizacao em silencio: o ficheiro da logica e substituido, a entrada sai da lista de
+// preservadas, e o `config/` novo chega com os defaults. E o modo de falha que o `upgrade-why.md`
+// descreve — uma verificacao por diferenca de output apanha o que some, **nao apanha um default
+// que regressa**. Avisa e nao migra: o formato pode ter mudado com a mudanca de casa, e um motor
+// que adivinhasse o merge entregava configuracao que ninguem escreveu.
+imprimeAntesDeAprovar({ medido, agentes: agentesDesatualizados(dir, ROOT), desde: tag }, ok);
 
 // O que SAIU do template e o consumidor ainda tem. O upgrade copia com `cpSync`, que acrescenta
 // e substitui mas NUNCA apaga — logo uma renomeacao no template deixava o ficheiro velho no
@@ -277,31 +299,7 @@ for (const [i, l] of linhasAgentes(agentesDesatualizados(dir, ROOT)).entries()) 
 //
 // Por isso a simulacao **aplica** as remocoes e **diz que as aplicou**. A linha existe para
 // ninguem ler isto como "o /upgrade apaga sozinho": num projeto real sao propostas, uma a uma.
-// CONSTANTES QUE MUDARAM DE CASA. O consumidor que as tinha customizadas perde a customizacao
-// em silencio: o ficheiro da logica e substituido, a entrada sai da lista de preservadas, e o
-// `config/` novo chega com os defaults. E o modo de falha que o `upgrade-why.md` descreve — uma
-// verificacao por diferenca de output apanha o que some, **nao apanha um default que regressa**.
-//
-// Avisa e nao migra: o formato pode ter mudado com a mudanca de casa, e um motor que adivinhasse
-// o merge entregava configuracao que ninguem escreveu.
-{
-  const [titulo, ...resto] = linhasMigracoes(medido.migracoes ?? []);
-  if (titulo) {
-    ok(titulo);
-    for (const l of resto) console.log(l);
-  }
-}
-
 if (medido.removidos.length) {
-  const migrados = medido.removidos.filter((r) => r.migrado);
-  ok(`${medido.removidos.length} ficheiro(s) sairam do template desde ${tag} e continuam no projeto:`);
-  for (const { caminho, migrado } of medido.removidos) {
-    console.log(`        ${caminho}${migrado ? "   (MIGRADO: o mesmo nome existe noutra pasta)" : ""}`);
-  }
-  if (migrados.length) {
-    console.log(`        ${migrados.length} sao MIGRACAO, nao limpeza — adiar a remocao deixa o projeto`);
-    console.log("        com as duas estruturas, e e isso que poe o gate vermelho.");
-  }
   for (const { caminho } of medido.removidos) rmSync(join(dir, caminho), { force: true });
   ok(`aplicadas ${medido.removidos.length} remocao(oes) propostas — num projeto real aprovam-se uma a uma`);
 } else {
@@ -319,23 +317,6 @@ if (medido.removidos.length) {
         "reposta no default, e e isso que faz um consumidor levar um gate vermelho sem ter decidido nada"
     );
   }
-}
-
-// O que o `/upgrade` manda NUNCA tocar, medido ANTES e depois. Um `cp -R` mal apontado aqui
-// apaga trabalho que nao existe em mais sitio nenhum — e a primeira frase da Fase 0 de la.
-/** O conteudo de `.agent/context/`, ou `null` se a pasta nao existir. Um `readdirSync` cru
- *  aqui rebentava com um stack do Node em vez de dizer o que falta — e quem le um stack nao
- *  sabe se o simulador esta partido ou se o template e que esta incompleto. */
-const contextoDe = () => {
-  try {
-    return readdirSync(join(dir, ".agent/context")).sort().join(",");
-  } catch {
-    return null;
-  }
-};
-const contextoAntes = contextoDe();
-if (contextoAntes === null) {
-  fatal("`.agent/context/` nao existe na copia — sem ela nao consigo afirmar que o upgrade nao lhe tocou");
 }
 
 const COMANDOS = comandosDoCI(ROOT);

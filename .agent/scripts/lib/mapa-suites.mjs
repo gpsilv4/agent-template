@@ -46,8 +46,11 @@ export const SUITES = [
   // `test-guards`) e o motor do upgrade usa-o — mexer nele manda correr os dois.
   { re: /^\.agent\/scripts\/lib\/intacto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
+  // O que os dois modos do `/upgrade` imprimem: a ordem e a promessa tem casos puros no
+  // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
+  { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem|saida-upgrade)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },
@@ -70,8 +73,10 @@ export const SUITES = [
   // O `relatorio.mjs` entrou quando o `test-harness.mjs` chegou as 510 linhas contra um limite
   // de 500 — e nao e um mero anexo dele: e quem **decide o exit code** de toda a suite, e agora
   // tambem quem implementa o MODO FAIL-FAST. Mexer nele sem correr o `test-guards.mjs` era
-  // exactamente o buraco que este mapa existe para fechar.
-  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|relatorio|recongelar-contexto|projeto-derivado|guard-direto)\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // exactamente o buraco que este mapa existe para fechar. E o `test-hooks.mjs` importa o
+  // `FAIL_FAST` dele, de outra arvore: regra propria, para nao ficar de fora (#241).
+  { re: /^\.agent\/scripts\/tests\/harness\/relatorio\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
+  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado|guard-direto)\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O `lib/alcance.mjs` deriva do git que pastas e ficheiros cada guard tem de varrer, e o
   // `tests-alcance.mjs` (que corre no `test-guards.mjs`) e quem o exercita. Sem esta regra,
   // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir
@@ -108,7 +113,11 @@ export const SUITES = [
   //
   // E mais grave do que parecer: uma entrada perdida no `PARES` nao produz vermelho nenhum —
   // a varredura passa a medir um conjunto mais pequeno e **reporta 100% sobre ele**.
-  { re: /^\.agent\/scripts\/(lib\/pares|lib\/varredura-paralela|lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  //
+  // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
+  // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241).
+  { re: /^\.agent\/scripts\/lib\/pares\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/varredura-paralela|lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point

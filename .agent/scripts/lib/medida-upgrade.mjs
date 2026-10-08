@@ -26,9 +26,8 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import { leOuNull } from "./ficheiros.mjs";
 import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
-import { linhasSubstituidos, linhasMigracoes, linhasAgentes } from "./saida-upgrade.mjs";
+import { imprimeAntesDeAprovar } from "./saida-upgrade.mjs";
 import { agentesDesatualizados } from "./agentes.mjs";
-import { linhasNaoCopiados } from "./fora-do-template.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
@@ -330,34 +329,14 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     `upgrade mecanico aplicado a copia: ${medido.repostas} constante(s) preservada(s), ` +
       `${medido.trazidos} doc(s) actualizado(s)`
   );
-  // As migracoes so eram mostradas pelo simulador: aqui, no modo que um consumidor real corre,
-  // perdiam-se (#176).
-  for (const [i, l] of linhasMigracoes(medido.migracoes ?? []).entries()) i === 0 ? ok(l) : console.log(l);
-  const [substituiu, ...substituiuLinhas] = linhasSubstituidos(medido.substituidos);
-  if (substituiu) {
-    ok(substituiu);
-    for (const l of substituiuLinhas) console.log(l);
-  }
-  const [semCopia, ...semCopiaLinhas] = linhasNaoCopiados(medido.naoCopiados);
-  if (semCopia) {
-    ok(semCopia);
-    for (const l of semCopiaLinhas) console.log(l);
-  }
-  // Os agentes que o motor NAO actualizou (os customizados), sobre a copia ja actualizada, como o
-  // simulador: um intacto contra a tag ja chega novo, e lista-lo era mandar fazer a mao o feito (#240).
-  for (const [i, l] of linhasAgentes(agentesDesatualizados(dir, template)).entries()) i === 0 ? ok(l) : console.log(l);
-
-  // O que SAIU do template e o projeto ainda tem. Nao e desarrumacao: a descoberta em disco
-  // exige par ao orfao, o Guard 17 conta-o e o `check-test-surface` ve a superficie duplicada.
-  // Numa MIGRACAO (o mesmo nome noutra pasta) adiar a remocao deixa o projeto com as duas
-  // estruturas, e e isso que poe o gate vermelho — logo isto pertence a lista da 2b, que e
-  // lida ANTES de aplicar.
-  const migrados = medido.removidos.filter((r) => r.migrado);
+  // O que se le antes de aprovar: a mesma funcao e a mesma ordem que o simulador (#243). Escritas
+  // aqui a parte, as migracoes ja se tinham perdido neste modo, o que um consumidor real corre
+  // (#176). Os agentes sao os que o motor NAO actualizou, sobre a copia ja actualizada: um intacto
+  // contra a tag ja chega novo, e lista-lo era mandar fazer a mao o feito (#240). Os removidos
+  // pertencem a esta lista porque uma MIGRACAO adiada deixa as duas estruturas e poe o gate
+  // vermelho — e a lista e lida ANTES de aplicar.
+  imprimeAntesDeAprovar({ medido, agentes: agentesDesatualizados(dir, template), desde: ref.slice(0, 12) }, ok);
   if (medido.removidos.length) {
-    ok(`${medido.removidos.length} ficheiro(s) sairam do template e continuam neste projeto:`);
-    for (const { caminho, migrado } of medido.removidos) {
-      console.log(`        ${caminho}${migrado ? "   (MIGRADO: o mesmo nome existe noutra pasta)" : ""}`);
-    }
     // A copia e que fica sem eles — o projeto nao e tocado. Sem isto mediamos o MEIO da
     // migracao, um estado que ninguem deve ficar a ter, e a lista vinha cheia de ruido que
     // desaparece assim que as remocoes forem aprovadas.
@@ -393,10 +372,6 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     console.log("\n  As adaptacoes mecanicas da 2b resolvem tudo o que passou a reprovar.\n");
   }
 
-  if (migrados.length) {
-    console.log(`  ${migrados.length} das remocoes sao MIGRACAO, nao limpeza — adiar deixa o projeto`);
-    console.log("  com as duas estruturas, e e isso que poe o gate vermelho.\n");
-  }
   console.log("  Nada foi aplicado a este projeto: a medicao correu sobre uma copia.\n");
   return 0;
 }
