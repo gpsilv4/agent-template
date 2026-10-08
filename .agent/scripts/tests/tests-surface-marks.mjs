@@ -125,13 +125,15 @@ export function registar() {
   //
   // Fabrica os dois commits e devolve a baseline. So o texto do `if:` varia, logo o que o teste
   // mede e a excecao e nada mais.
+  const DEPOIS_DO_IF = "        with:\n          a: b\n";
   const gatedPor = (dir, cond) => {
     mkdirSync(join(dir, ".github/workflows"), { recursive: true });
     writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
     commit(dir, "ci");
     const ref = git(dir, ["rev-parse", "HEAD"]);
+    // Uma chave irma LOGO DEPOIS do `if:`: o lookahead da continuacao tem de a deixar passar. Sem elas, um lookahead alargado passava a suite inteira (auditoria do #277).
     writeFileSync(join(dir, ".github/workflows/ci.yml"),
-      `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n`);
+      `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n${DEPOIS_DO_IF}`);
     commit(dir, `gate ${cond}`);
     return ref;
   };
@@ -191,7 +193,7 @@ export function registar() {
     writeFileSync(join(dir, `.github/workflows/${wf}`), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
     commit(dir, wf);
     const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, `.github/workflows/${wf}`), `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n`);
+    writeFileSync(join(dir, `.github/workflows/${wf}`), `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n${DEPOIS_DO_IF}`);
     commit(dir, `gate ${cond}`);
     return ref;
   };
@@ -220,6 +222,25 @@ export function registar() {
   test("`if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento", (dir) => {
     return gatedPor(dir, "github.event_name == 'pull_request'\n          && false");
   }, { code: 1, includes: ["condicao `if:`"] });
+  test("`if: … == 'pull_request'` + comentario MAIS indentado NAO e enfraquecimento", (dir) => {
+    return gatedPor(dir, "github.event_name == 'pull_request'\n          # um comentario nao continua o escalar");
+  }, { code: 0, excludes: ["condicao `if:`"] });
+  test("`if: … == 'pull_request'` + linha em branco + continuacao `&& false` E enfraquecimento", (dir) => {
+    return gatedPor(dir, "github.event_name == 'pull_request'\n\n          && false");
+  }, { code: 1, includes: ["condicao `if:`"] });
+  // Os ficheiros so do template saem de cada derivado pelo BOOTSTRAP: remove-los nao e APAGADO.
+  test("remover o `codeql.yml` (so do template) NAO e APAGADO", (dir) => {
+    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'");
+    rmSync(join(dir, ".github/workflows/codeql.yml"));
+    commit(dir, "bootstrap remove o codeql");
+    return ref;
+  }, { code: 0, includes: ["so do template"], excludes: ["APAGADO"] });
+  test("remover o `ci.yml` (herdado) continua APAGADO", (dir) => {
+    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'", "ci.yml");
+    rmSync(join(dir, ".github/workflows/ci.yml"));
+    commit(dir, "apagar o ci");
+    return ref;
+  }, { code: 1, includes: ["APAGADO"] });
   // DE ONDE vem o nome deste repo: o `origin` (`https` ou `git@`, com ou sem `.git`), senao o
   // `GITHUB_REPOSITORY` do CI; sem nenhum, a excecao nao se aplica (falha fechada).
   test("sem `origin`, o nome vem do `GITHUB_REPOSITORY` (o CI)", (dir) => {

@@ -363,6 +363,13 @@ if (tocados.length === 0) {
         ok(`${f}: MIGRADO para ${migradoPara} (mesmo nome noutra pasta da superficie)`);
         continue;
       }
+      // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
+      // APAGADO reprovava o PR do bootstrap e confirmava em falso o passo "apaga uma suite e
+      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra.
+      if (SO_DO_TEMPLATE.has(f)) {
+        ok(`${f}: removido (so do template; o BOOTSTRAP remove-o num derivado)`);
+        continue;
+      }
       // APAGADO de facto. E a forma mais brutal de enfraquecer, e merece nome proprio.
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;

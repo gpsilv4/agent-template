@@ -19,12 +19,10 @@ projeto que nao estao em mais sitio nenhum. Apresentar sempre: o que se traz, o 
 cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 ```
 
-> **E preciso um clone local do template.** Os comandos abaixo usam `git -C "$TPL"` ou
-> `cd "$TPL"`, que exigem um **diretorio** — uma URL falha com `cannot change to '...'`. Se so
-> tiveres a URL: `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
+> **E preciso um clone local do template**: `$TPL` e um **diretorio**, nao uma URL. So com a
+> URL: `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
 
-Isto decide o modo. Os dois sao validos; o segundo e o normal em projetos criados antes de a
-marca existir.
+Isto decide o modo (o B e o normal num projeto anterior a marca).
 
 ### Modo A — com marca (`.agent/.template-version` existe)
 
@@ -87,14 +85,14 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
-| **So do template**: o job `simulators`, `codeql.yml`, `.github/codeql/` | **Nunca copiar** (modo A ou B) | So servem o repo do template |
+| **So do template**: o job `simulators`, `codeql.yml`, `.github/codeql/` | **Nunca copiar** (modo A ou B); apagar o que os cita nos trazidos (BOOTSTRAP §2.7) | So servem o repo do template |
 | `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`), contra o ficheiro do **TEMPLATE** (um passo **comentado** conta como AUSENTE). Um passo que o template **moveu** de job sai do job antigo, senao corre duas vezes. Um workflow em falta (`release.yml`) traz o `.github/scripts/`. Nao substituir o CI do projeto; nos passos que ja tem, trazer as flags novas (`--skips`) | O CI tem passos do projeto |
 | `.claude/settings.json` | Trazer regras de `deny`/`ask` novas; **acrescentar** ao `allow` os scripts novos | O `allow` do projeto reflete o que ele corre |
 | `.claude/agents/*` | Copia se ausentes; se existem, **trazer o `tools:` novo** (a 2b lista os customizados; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
 | `.claude/hooks/*` + a chave `hooks` do `settings.json` | **Substituidos pelo motor** (menos o `protegidos.json`); comparar a mao o `SEGUROS` (`lib/verbos-git.mjs`) e ligar cada hook novo | So-Claude Code (`upgrade-why.md`) |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` | Metade e do projeto |
-| **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
+| **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego. Um `SECURITY.md` novo: rever com o utilizador as definicoes do GitHub (BOOTSTRAP §2.7) | As categorias acima tambem envelhecem; esta linha e a rede |
 
 ## 2b. Mudancas que REPROVAM um projeto que estava verde
 

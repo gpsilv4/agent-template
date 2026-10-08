@@ -8,7 +8,7 @@ If you discover a security vulnerability in this project, please report it respo
 
 - **Preferred — GitHub private vulnerability reporting:** on the repository's **Security** tab,
   click **Report a vulnerability**. The report stays private between you and the maintainers.
-  (Only exists on **public** repositories — see the table below.)
+  (Only exists on **public** repositories, once the maintainers turn it on — see the table below.)
 - **Or email** **{{SECURITY_EMAIL}}** — the only channel on a private repository.
 
 Include:
@@ -54,7 +54,7 @@ so confirm there):
 | **Dependabot security updates** (and grouped) | free | needs the two above; plan not stated in the docs — check whether it appears |
 | **Code scanning (CodeQL)** | free | not available: the **GitHub Code Security** license is sold only to organizations (Team/Enterprise) — and without it, CodeQL must **not** run at all (below) |
 | **Secret scanning + push protection** | free | not available for user-owned private repos (GitHub Enterprise only) |
-| **Branch protection / rulesets** | free | can be configured, but is **not enforced** without **GitHub Pro** (or Team) |
+| **Branch protection / rulesets** | free | can be configured, but is **not enforced** without **GitHub Pro** (or an organization on Team) |
 
 The private column is for a **personal** account on the free plan. A private repository owned by
 an **organization** has other options (e.g. buying GitHub Secret Protection or Code Security on
@@ -78,7 +78,8 @@ Team) — see [GitHub's plans](https://docs.github.com/en/get-started/learning-a
 
 ### On a private repository without a paid plan
 
-Nothing breaks — the settings above that are unavailable simply do not appear, and no workflow
+Nothing breaks — the settings above that are unavailable simply do not appear (except branch
+protection/rulesets, which can be saved but are not enforced), and no workflow
 of the template needs them (CodeQL is not in a derived project's CI). What keeps protecting the
 project, on any plan:
 

@@ -104,10 +104,10 @@ const LEGITIMOS = [
   ["pull --ff-only (procedimento de release)", "git pull --ff-only origin main"],
   ["push so de tags (procedimento de release)", "git push origin --tags"],
   // O procedimento de release (#277): a tag anotada com a mensagem num FICHEIRO (`-F`, nunca
-  // `-m "..."`, TP10) e o push dessa tag. O `-F` e o ficheiro da mensagem e o `-f` e o force: so a
-  // caixa os separa, e este caso e o que o fixa (um `i` na regex do `tag` negava o procedimento).
+  // `-m "..."`, TP10). O `-F` e o ficheiro da mensagem e o `-f` e o force: so a caixa os separa.
+  // Este caso fixa um lado (um `i` na regex do `tag` negava o procedimento); o `tag -f` do
+  // `tests-bypasses.mjs` fixa o outro. O push da tag ja esta acima (`push de uma tag de versao`).
   ["tag anotada com a mensagem num ficheiro (procedimento de release)", "git tag -a v1.2.0 -F notas.txt"],
-  ["push de UMA tag (procedimento de release)", "git push origin v1.2.0"],
   // `git push --follow-tags` SAIU daqui: medido com `--dry-run --porcelain` contra um remoto
   // real, publica o refspec normal **mais** as tags — ou seja, publica o branch atual. Estava
   // listado como procedimento de release por analogia com `--tags`, que publica so tags.
