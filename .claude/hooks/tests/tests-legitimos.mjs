@@ -133,6 +133,20 @@ const LEGITIMOS = [
   ["apagar feature com -dv agrupado", "git push -dv origin fix/algo"],
   ["mencionar depois de um wrapper nao e executar", "sudo -u me echo git commit"],
   ["notes add acrescenta", "git notes add -m x"],
+  // #253: so as opcoes que EXECUTAM negam em `main`; paginar e configurar o que nao executa passa.
+  ["GIT_PAGER=cat", "GIT_PAGER=cat git log"],
+  ["-c core.pager=less", "git -c core.pager=less log"],
+  ["-c que nao executa", "git -c color.ui=false log"],
+  ["grep -c conta, nao configura", "git grep -c foo"],
+  // Das leituras do #253: um ssh com chave, um proxy, paginadores reais, um booleano, e um `-e`
+  // cujo padrao tem um `O` — nenhum executa o git.
+  ["GIT_SSH_COMMAND com chave (pull da release)", "GIT_SSH_COMMAND='ssh -i ~/.ssh/k' git pull --ff-only origin main"],
+  ["-c http.proxy (um URL)", "git -c http.proxy=http://p:8080 fetch"],
+  ["GIT_PAGER=delta", "GIT_PAGER=delta git log"],
+  ["-c pager.log=false", "git -c pager.log=false log"],
+  ["grep -eTODO (o O e do padrao)", "git grep -eTODO"],
+  ["grep -O sem valor (paginador por omissao)", "git grep -O foo"],
+  ["EDITOR=vim na tag da release", "EDITOR=vim git tag -a v1.2.0"],
 ];
 
 for (const [nome, comando] of LEGITIMOS) {

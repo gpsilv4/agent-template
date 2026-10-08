@@ -37,6 +37,7 @@ export { contextoFronteira } from "./caminhos.mjs";
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
 // importe deste ficheiro); `MAES` e `resto` importam-se da folha.
 import { FRONTEIRA, resto } from "./fronteira-dados.mjs";
+import { valoresQueExecutam } from "./verbos-git.mjs";
 export { CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
 
 /** Para onde ESCREVE uma invocacao do `git`, alem do `>` (#237). O `git` esta na LEITURA, e estes
@@ -170,7 +171,27 @@ export function porqueAltera(texto, ctx = {}) {
  *  segundos, e um hook lento e um hook que se desliga. */
 const MAX_SUBSTITUICOES = 64;
 
-function julga(texto, ctx) {
+/** Comandos que o git executaria, a mais disto num so comando: nega sem os julgar (o custo). */
+const MAX_EXECUTADOS = 16;
+
+function julga(texto, ctx, dentroDoGit = false) {
+  // O que o git EXECUTA de uma opcao ou de uma variavel (#253) e um comando, e julga-se como um:
+  // citado, o caminho era texto, e `git -c core.pager='rm <f>' log` apagava a fronteira.
+  // UM nivel so: a recursao sem tecto crescia ~2,3x por `bisect run` (n=11: 98 ms; medido), e um
+  // hook que excede o prazo PERMITE. Um comando executado que traga, ele proprio, opcoes que
+  // executam nega sem se abrir — nenhum trabalho normal tem essa forma (2.a leitura do #253).
+  // O tecto e a negacao aninhada so valem se o comando NOMEIA a fronteira: sem ela, um
+  // `rebase -x 'git -c ... commit'` era negado com uma razao que fala da fronteira (3.a leitura).
+  // Nomear e o NOME das pastas, e nao o regex estrito, que exige um separador antes:
+  // `$PWD/.claude/hooks` nao o casava e a negacao aninhada desligava-se (4.a leitura).
+  if (!dentroDoGit) {
+    const executados = valoresQueExecutam(texto);
+    const nomeia = /\.claude|\.githooks/.test(texto);
+    if (nomeia && executados.length > MAX_EXECUTADOS) return nega("git-que-executa");
+    for (const { comando } of executados) {
+      if ((nomeia && valoresQueExecutam(comando).length) || julga(comando, ctx, true)) return nega("git-que-executa");
+    }
+  }
   const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
   const opaco = OPACO.test(texto);
   const inline = CODIGO_INLINE.test(texto);

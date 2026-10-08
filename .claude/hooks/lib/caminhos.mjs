@@ -275,7 +275,7 @@ export const semCitacoes = (t) =>
 
 /** O indice do `)` que fecha o `$(` em `s[k]`, a ler as aspas de DENTRO como o shell: dentro de um
  *  `$(...)` abre-se um contexto novo, e `"$(echo ")"; rm <f>)"` nao fecha no `)` citado. */
-function fimSubst(s, k) {
+export function fimSubst(s, k) {
   let fundo = 0;
   for (let j = k + 2; j < s.length; j++) {
     const c = s[j];
