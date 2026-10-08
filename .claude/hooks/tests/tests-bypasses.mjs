@@ -245,6 +245,12 @@ const BYPASSES = [
   // a regra "citado = texto" tem de se inverter. E o par do heredoc, do lado do ataque.
   ["eval a apagar um hook", 'eval "rm .claude/hooks/stop-verify.mjs"'],
   ["sh -c a escrever o settings", 'sh -c "printf \'{}\' > .claude/settings.json"'],
+  // Em branch protegido, uma opcao que faz o git EXECUTAR o git nega por si (#253): o verbo
+  // escrito (`log`, `fetch`) e seguro, e o que corre nao e. Antes negavam por ACIDENTE (o valor com
+  // espaco partia o token) — a forma com o `git` colado num so token passava.
+  ["GIT_PAGER que corre o git", "GIT_PAGER='git commit -am x' git log"],
+  ["-c core.pager que corre o git", "git -c core.pager='git push' log"],
+  ["GIT_SSH_COMMAND que compoe", "GIT_SSH_COMMAND='ssh x; git push' git fetch"],
 ];
 
 for (const [nome, comando] of BYPASSES) {
@@ -258,6 +264,8 @@ for (const [nome, comando] of BYPASSES) {
     }
   });
 }
+
+// --- O que o git EXECUTA de uma opcao ou variavel (#253): em `tests-git-executa.mjs`. ----------
 
 // --- FALSOS POSITIVOS: a tabela `LEGITIMOS` vive em `tests-legitimos.mjs` (#243). ---------
 

@@ -309,6 +309,7 @@ not to* line, so every agent sees it.
 │       ├── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
 │       │                              the branch guard (TP6)
 │       ├── tests-legitimos.mjs     <- The legitimate commands it must NOT block
+│       ├── tests-git-executa.mjs   <- What git EXECUTES from an option (`-c`, `--exec`, `GIT_PAGER`...)
 │       ├── tests-sem-ciclos.mjs    <- No import cycle among the hooks and their lib/
 │       ├── tests-fronteira-*.mjs   <- The frontier: what a careless command must not write
 │       │                              (descuidos, redirections, inventory, generated corpus)

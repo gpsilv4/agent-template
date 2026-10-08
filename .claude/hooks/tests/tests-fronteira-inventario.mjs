@@ -173,6 +173,21 @@ const ABERTO = [
   ["CONTORNO", "`$$'` lido como ANSI-C", "echo $$'\\'; rm -rf .claude/hooks; echo 'x'"],
   ["CONTORNO", "`script -c` re-interpreta uma string", `script -c "rm ${H}" /tmp/log`],
   ["CONTORNO", "`ssh` com o comando em aspas", `ssh host "rm ${H}"`],
+  // Do #253: o que o git EXECUTA de uma opcao fechou (`git-que-executa`); o `--config-env` le o
+  // valor de OUTRA variavel, que tem de ser montada de proposito a parte.
+  ["CONTORNO", "`git --config-env` com o comando noutra variavel", `X='rm ${H}' git --config-env=core.pager=X log`],
+  ["CONTORNO", "`export` noutra instrucao, depois o git", `export GIT_PAGER='rm ${H}'; git -p log`],
+  // O `foreach` e apanhado (`tests-bypasses.mjs`); um caminho prefixado por uma VARIAVEL nao e
+  // reconhecido em lado nenhum, dentro ou fora do git.
+  ["CONTORNO", "`submodule foreach` com o caminho atras de `$toplevel`", `git submodule foreach 'rm -f $toplevel/${H}'`],
+  // Da 4.a leitura do #253: a classe "o que o git executa" voltou com mais quatro formas em cada
+  // leitura. Pelo criterio do `hooks-guide.md`, um contorno regista-se e nao se persegue.
+  ["CONTORNO", "`GIT_CONFIG_PARAMETERS` com o escape `'\\''`", `GIT_CONFIG_PARAMETERS="'alias.x=!rm -rf '\\''${H}'\\'''" git x`],
+  ["CONTORNO", "`exec -a git` a por um isco antes do git", `exec -a git git -c alias.x='!rm -rf ${H}' x`],
+  ["CONTORNO", "`git clone -c` depois do verbo", `git clone -c core.sshCommand='rm -rf ${H}' ssh://h/r z`],
+  ["CONTORNO", "opcao abreviada a duas letras (`--ex`)", `git rebase --ex 'rm -rf ${H}' HEAD~1`],
+  // Da 5.a leitura: o nome partido por aspas, num git aninhado — a classe de `D=.cla; ${D}ude`.
+  ["CONTORNO", "nome da pasta partido por aspas num git aninhado", `git rebase -x "git -c alias.y='!rm -rf .cl\\"\\"aude/hooks' y" HEAD~1`],
 ];
 
 /**

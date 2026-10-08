@@ -22,9 +22,9 @@
  *
  * O QUE CONTINUA A FALHAR ABERTO, e nao vale a pena esconder: para chegar ao verbo e preciso
  * primeiro reconhecer que o segmento e uma invocacao do `git`, e isso depende da lista
- * `WRAPPERS`, que **e** uma blocklist. Passam `flock l git commit`, `su - u -c "git commit"`,
- * `ssh host git commit`, `GIT_PAGER='git commit' git log` e `git -c core.pager='git commit'
- * log`. Fechar isto exigiria negar qualquer `git` em qualquer posicao e recuperar depois os
+ * `WRAPPERS`, que **e** uma blocklist. Passam `flock l git commit`, `su - u -c "git commit"` e
+ * `ssh host git commit` (o `GIT_PAGER=...` e o `-c core.pager=...` que executam fecharam no #253:
+ * negam em branch protegido, salvo um paginador simples). Fechar isto exigiria negar qualquer `git` em qualquer posicao e recuperar depois os
  * `echo`/`grep` legitimos — mais falsos positivos do que valor, para um modelo de ameaca que
  * e a distracao. **So o verbo falha fechado**; a posicao de comando, nao.
  *
@@ -48,7 +48,7 @@ import { isMainThread, workerData } from "worker_threads";
 import { comPrazo, negar } from "./lib/resposta.mjs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
-import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA } from "./lib/verbos-git.mjs";
+import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA, valoresQueExecutam, executaAlgo } from "./lib/verbos-git.mjs";
 import { porqueAltera, contextoFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
@@ -468,7 +468,10 @@ try {
     }
   }
 
-  const perigosas = invs.filter((inv) => !seguro(inv));
+  // Uma opcao que faz o git EXECUTAR um comando (#253) nao e segura em branch protegido, seja qual
+  // for o verbo — so os paginadores passam. Antes negava por acidente (o valor partia o token).
+  const executa = (inv) => valoresQueExecutam(inv.seg).some(({ valor }) => executaAlgo(valor));
+  const perigosas = invs.filter((inv) => !seguro(inv) || executa(inv));
   if (!perigosas.length) process.exit(0);
 
   const dirs = diretorios(texto, payload?.cwd);
@@ -476,7 +479,7 @@ try {
   for (const dir of dirs) {
     const br = branchDe(dir);
     if (ehProtegido(br)) {
-      const v = perigosas.map((p) => p.verbo ?? "(nao identificado)").join(", ");
+      const v = perigosas.map((p) => `${p.verbo ?? "(nao identificado)"}${seguro(p) ? " (com uma opcao que faz o git executar)" : ""}`).join(", ");
       negar(
         // A saida de MUDAR faltava, e custou: quem corria `git checkout main` era mandado CRIAR.
         `\`${br}\` e um branch protegido (${dir}) e \`git ${v}\` nao esta nos verbos seguros. ` +

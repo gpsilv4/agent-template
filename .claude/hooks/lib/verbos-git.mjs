@@ -14,6 +14,8 @@
  * assim que `git switch -C main` (que faz o que o `reset --hard` faz) passou a ser negado.
  */
 
+import { fimSubst } from "./caminhos.mjs";
+
 /** Verbos que exigem uma FORMA para serem seguros (nao basta faltar-lhes a forma insegura).
  *
  *  Existe porque o `deploy.md`, o `CONTRIBUTING.md` e o `process-rules.md` mandam correr
@@ -129,6 +131,170 @@ export const CHAVES_PERIGOSAS = new RegExp(
     ")$",
   "i"
 );
+
+/** Variaveis de ambiente cujo valor o git EXECUTA como comando, postas a frente do `git`. As
+ *  `GIT_CONFIG_*` injectam configuracao: o valor julga-se como comando, por precaucao. */
+const ENV_QUE_EXECUTA = /^(?:GIT_PAGER|PAGER|GIT_EDITOR|EDITOR|VISUAL|GIT_SEQUENCE_EDITOR|GIT_SSH_COMMAND|GIT_SSH|GIT_EXTERNAL_DIFF|GIT_ASKPASS|SSH_ASKPASS|GIT_PROXY_COMMAND|GIT_CONFIG_PARAMETERS|GIT_CONFIG_VALUE_\d+)=/;
+
+/** As chaves cujo VALOR e um comando — nao as de `CHAVES_PERIGOSAS` todas: essas sao as de
+ *  ESCRITA perigosa, e incluem caminhos (`core.hooksPath`, `include.path`), URLs (`http.proxy`,
+ *  `url.*.insteadOf`) e booleanos. Julgar `core.hooksPath=.githooks` como comando negava a forma
+ *  de ligar o hook de commit deste repo (2.a leitura do #253). */
+const CHAVES_QUE_EXECUTAM = new RegExp(
+  "^(?:core\\.(?:pager|editor|askpass|sshCommand|fsmonitor|gitProxy|alternateRefsCommand)|sequence\\.editor|" +
+    "uploadpack\\.packObjectsHook|instaweb\\.httpd|credential(?:\\..+)?\\.helper|(?:diff|merge)\\..+\\.(?:command|driver|textconv)|" +
+    "diff\\.external|filter\\..+\\.(?:clean|smudge|process)|gpg(?:\\..+)?\\.program|(?:pager|man|browser|guitool)\\..+|" +
+    "alias\\..+|.*\\.(?:cmd|command|program|driver|helper))$",
+  "i"
+);
+
+/** Opcoes LONGAS cujo valor e um comando, POR VERBO (o `--index` do `apply` nao e o `--index-filter`
+ *  do `filter-branch`); `*` vale para todos. O git aceita um PREFIXO unico (`--exe`, `--upload`):
+ *  casa-se o nome dado como prefixo destes, com pelo menos tres letras. */
+const LONGAS_QUE_EXECUTAM = {
+  "*": ["exec", "upload-pack", "receive-pack"],
+  difftool: ["extcmd"],
+  instaweb: ["httpd"],
+  grep: ["open-files-in-pager"],
+  "filter-branch": ["tree-filter", "index-filter", "msg-filter", "env-filter", "commit-filter", "parent-filter", "tag-name-filter"],
+};
+/** E as CURTAS, por verbo — separadas (`-x cmd`) ou coladas (`-xcmd`). */
+const CURTA_QUE_EXECUTA = { rebase: "x", clone: "u", difftool: "x" };
+/** Cabecas que correm o `git` sem mudar o que ele faz: as atribuicoes a frente delas contam. */
+const CABECA_DO_GIT = /^(?:env|command|builtin|exec|sudo|nice|nohup|time|timeout|stdbuf|-[\w-]*|\d+[smhd]?)$/;
+
+/** As palavras de cada SEGMENTO, como a shell as entrega: as aspas citam, e `;`, `&`, `|`, `(`,
+ *  `)` e a mudanca de linha fora delas separam. O `palavras()` do `ambito-agente.mjs` nao parte em
+ *  separadores, e `true;git -c ...` escondia o `git` (1.a leitura do #253). */
+export function palavrasPorSegmento(c) {
+  const segs = [[]];
+  const interiores = []; // o `$(...)`/crase dentro de aspas duplas CORRE: os segmentos dele contam
+  let cur = null;
+  let q = null;
+  const fecha = () => { if (cur !== null) segs[segs.length - 1].push(cur); cur = null; };
+  for (let i = 0; i < c.length; i++) {
+    const ch = c[i];
+    // `\`+newline e continuacao de linha: a shell tira o par (3.a leitura do #253).
+    if (ch === "\\" && c[i + 1] === "\n" && q !== "'") { i++; continue; }
+    if (q === "'") { if (ch === "'") q = null; else cur += ch; continue; }
+    if (q === '"') {
+      if (ch === '"') q = null;
+      else if (ch === "\\" && /["\\$`]/.test(c[i + 1] ?? "")) cur += c[++i];
+      else {
+        const abre = ch === "$" && c[i + 1] === "(" ? "$(" : ch === "`" ? "`" : null;
+        if (abre) {
+          // O fecho le as aspas de DENTRO (`fimSubst`, a do `caminhos.mjs`): contar parenteses fechava
+          // num `)` citado. E o interior SALTA-SE depois de lido: varrido de novo com as aspas de fora,
+          // uma aspa impar la dentro dessincronizava o resto (4.a leitura do #253).
+          const fim = abre === "$(" ? fimSubst(c, i) : c.indexOf("`", i + 1) < 0 ? c.length : c.indexOf("`", i + 1);
+          interiores.push(...palavrasPorSegmento(c.slice(i + abre.length, fim)));
+          cur += c.slice(i, fim + 1);
+          i = fim;
+          continue;
+        }
+        cur += ch;
+      }
+      continue;
+    }
+    if (/[;&|()\n]/.test(ch)) { fecha(); if (segs[segs.length - 1].length) segs.push([]); continue; }
+    if (/\s/.test(ch)) { fecha(); continue; }
+    cur ??= "";
+    if (ch === "'" || ch === '"') q = ch;
+    else if (ch === "\\") cur += c[++i] ?? "";
+    else cur += ch;
+  }
+  fecha();
+  return [...segs, ...interiores].filter((s) => s.length);
+}
+
+/**
+ * O que uma invocacao do `git` vai EXECUTAR alem do verbo (#253), como COMANDOS a julgar.
+ *
+ * PORQUE EXISTE: a fronteira le um caminho entre aspas como texto, e o git executa-o.
+ * `git -c core.pager='rm <f>' log`, `GIT_PAGER='rm <f>' git log`, `git archive --exec='rm <f>'` e
+ * `git grep -O'rm <f>'` apagavam a fronteira num branch de feature (medido: vinte formas passavam).
+ *
+ * O `comando` e o VALOR seguido do resto da invocacao: o git acrescenta argumentos ao que executa
+ * (um alias `!rm` recebe os do comando, o `grep -Orm` os ficheiros encontrados), e julgar o valor
+ * sozinho deixava passar `git -c alias.x='!rm' x <f>` (1.a leitura). A mais, num pager, so torna
+ * o julgamento mais largo — e uma leitura continua leitura (`cat <f> log`).
+ *
+ * Fica de fora, de proposito: o que corre da CONFIGURACAO do repo (`--textconv`,
+ * `--show-signature`, `--ext-diff` sem `-c`), que nao e texto do comando — escreve-la nao e
+ * escrever na fronteira; e o que vem de OUTRA variavel (`--config-env`, `export X=...; git`): um
+ * CONTORNO, em `ABERTO` no `tests-fronteira-inventario.mjs`.
+ *
+ * @param {string} c o comando completo
+ * @returns {{valor: string, comando: string}[]} o que o git executaria; `[]` se nada
+ */
+export function valoresQueExecutam(c) {
+  const out = [];
+  for (const ps of palavrasPorSegmento(c)) {
+    const i = ps.findIndex((p) => p.replace(/^.*\//, "") === "git");
+    if (i < 0) continue;
+    // O resto vai RE-CITADO: sem as aspas, a mensagem de `git commit -m "... <f> ..."` virava
+    // argumentos e o caminho dela, um alvo (3.a leitura). Um booleano ou o vazio nao sao comandos
+    // (`pager.log=false`, `GIT_EDITOR=true`, `GIT_PAGER=`).
+    const cita = (w) => (/^[\w./:=@%+,~-]+$/.test(w) ? w : `'${w.replace(/'/g, "'\\''")}'`);
+    const junta = (valor, k) => {
+      if (/^(?:true|false|yes|no|on|off|[01])?$/i.test(valor.trim())) return;
+      out.push({ valor, comando: [valor, ...ps.slice(k).map(cita)].join(" ") });
+    };
+    // As atribuicoes a frente do `git`, mesmo atras de uma cabeca e das flags dela
+    // (`GIT_PAGER=x env -u FOO git log`): o valor de uma flag (`FOO`) nao para a procura.
+    for (let k = i - 1; k >= 0 && (/^\w+=/.test(ps[k]) || CABECA_DO_GIT.test(ps[k]) || /^-/.test(ps[k - 1] ?? "")); k--) {
+      if (!ENV_QUE_EXECUTA.test(ps[k])) continue;
+      const valor = ps[k].slice(ps[k].indexOf("=") + 1);
+      if (!/^GIT_CONFIG_PARAMETERS=/.test(ps[k])) { junta(valor, i + 1); continue; }
+      // `'core.pager=cmd'` (antigo) ou `'core.pager'='cmd'` (desde o git 2.31): o comando e o valor.
+      for (const m of valor.matchAll(/'([^']*)'(?:='([^']*)')?/g)) junta(m[2] ?? m[1].slice(m[1].indexOf("=") + 1), i + 1);
+    }
+    // As opcoes GLOBAIS ate ao verbo. So aqui o `-c` e configuracao: depois do verbo e outra coisa
+    // (`git grep -c`, `git branch -c`). O git nao aceita `-c` colado (`-ckey=v`: medido).
+    let j = i + 1;
+    for (; j < ps.length && ps[j].startsWith("-"); j++) {
+      if (ps[j] !== "-c") {
+        if (/^-C$|^--(?:git-dir|work-tree|namespace|exec-path|super-prefix|config-env|attr-source)$/.test(ps[j])) j++;
+        continue;
+      }
+      const cfg = ps[++j] ?? "";
+      const igual = cfg.indexOf("=");
+      if (igual <= 0 || !CHAVES_QUE_EXECUTAM.test(cfg.slice(0, igual))) continue;
+      const valor = cfg.slice(igual + 1);
+      // Um alias sem `!` e um sub-verbo do git: julga-se como `git <valor>`.
+      junta(/^alias\./i.test(cfg) && !valor.startsWith("!") ? `git ${valor}` : valor.replace(/^!/, ""), j + 1);
+    }
+    const verbo = ps[j];
+    for (let k = j + 1; k < ps.length; k++) {
+      const a = ps[k];
+      // Duas letras chegam no `grep` (`--op`, como no `ambito-agente.mjs`); nos outros, tres.
+      const longa = new RegExp(`^--([\\w-]{${verbo === "grep" ? 2 : 3},})(?:=([\\s\\S]*))?$`).exec(a);
+      const curta = CURTA_QUE_EXECUTA[verbo];
+      if (verbo === "bisect" && a === "run") { junta(ps.slice(k + 1).join(" "), ps.length); break; }
+      if (verbo === "submodule" && a === "foreach") { junta(ps.slice(k + 1).join(" "), ps.length); break; }
+      if (longa && [...LONGAS_QUE_EXECUTAM["*"], ...(LONGAS_QUE_EXECUTAM[verbo] ?? [])].some((n) => n.startsWith(longa[1]))) {
+        // O `grep --open-files-in-pager` sem valor usa o paginador por omissao: nao consome o padrao.
+        if (longa[2] !== undefined) junta(longa[2], k + 1);
+        else if (!(verbo === "grep" && "open-files-in-pager".startsWith(longa[1]))) junta(ps[k + 1] ?? "", (k += 1) + 1);
+      } else if (curta && new RegExp(`^-[a-zA-Z]*?${curta}`).test(a)) {
+        // Agrupada (`-ix`, `-qu`): o valor e o resto do token depois da letra, ou a palavra seguinte.
+        const resto = a.slice(a.indexOf(curta, 1) + 1);
+        junta(resto || ps[k + 1] || "", resto ? k + 1 : (k += 1) + 1);
+      } else if (verbo === "grep" && /^-[a-zA-Z]/.test(a)) {
+        // As curtas agrupadas, como o parse-options do git as le: `-e`, `-f`, `-A`/`-B`/`-C`, `-m`
+        // levam o RESTO do token, e o `O` so conta se vier antes delas (`-eTODO` e um padrao).
+        const m = /^-[^efABCmO]*O(.*)$/.exec(a);
+        if (m && m[1]) junta(m[1], k + 1);
+      }
+    }
+  }
+  return out;
+}
+
+/** O que o git executaria pode mexer no branch? Num branch protegido conta o que invoca o `git`
+ *  (`GIT_PAGER='git commit -am x' git log`) ou compoe na shell — nao um paginador, um editor ou
+ *  um `ssh -i <chave>`, que eram falsos positivos (2.a leitura do #253). */
+export const executaAlgo = (valor) => /[;&|`$<>()]/.test(valor) || /(?:^|[\s/])git(?:\s|$)/.test(valor);
 
 /** Um verbo seguro pode ser destrutivo pela FLAG. Medido numa revisao independente:
  *  `git switch -C main`, `git checkout -B main`, `git branch -f master`, `git branch -D
