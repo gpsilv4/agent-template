@@ -64,7 +64,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 14. [ ] `.agent/workflows/` — workflows refletem processos atuais
 15. [ ] `.agent/scripts/` — scripts e targets atualizados.
     **Verificador novo ou alterado?** Entao (a) tem o seu `test-*.mjs` com controlos negativos,
-    (b) esta registado em `PARES` no `mutation-sweep.mjs` com o seu `sinal` de reprovacao, e
+    (b) esta registado em `PARES` em `lib/pares.mjs` com o seu `sinal` de reprovacao, e
     (c) `node .agent/scripts/mutation-sweep.mjs` sai 0. A varredura reprova de proposito um
     verificador sem suite — nao a silenciar, escrever a suite.
     **Guard extraido para `guards/*.mjs`, ou hook novo em `.claude/hooks/`?** A entrada em `PARES` e obrigatoria: os avisos
@@ -95,7 +95,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     `simulate-derived.mjs`. Um `.githooks/commit-msg` sem extensao escapou as tres e o
     placeholder sobrevivia ao bootstrap — apanhado pela simulacao de projeto derivado.
 27. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
-    em `PARES` no `mutation-sweep.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
+    em `PARES` em `lib/pares.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
     do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no
     `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
 28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/tests/test-guards.mjs` + `node .agent/scripts/tests/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.

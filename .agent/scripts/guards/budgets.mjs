@@ -12,7 +12,7 @@
  * importada entra em TODAS as sessoes, uma de referencia entra por ticket.
  *
  * PORQUE ESTAO NUM MODULO PROPRIO: o `check-doc-versions.mjs` passou o flag das 500 linhas, e
- * este era o bloco mais coeso de la. A entrada em `PARES` do `mutation-sweep.mjs` e
+ * este era o bloco mais coeso de la. A entrada em `PARES` de `lib/pares.mjs` e
  * obrigatoria — os avisos passaram a viver aqui.
  */
 

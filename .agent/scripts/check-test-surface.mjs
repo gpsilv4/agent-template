@@ -54,7 +54,7 @@ const TEST_GLOBS = [
 const CONFIG_GLOBS = CONFIG_GLOBS_DO_PROJETO;
 
 // Configuracao **contavel**: o que seleciona os testes NESTE repo nao e um `vitest.config`,
-// e a lista de steps do `ci.yml` e a tabela `PARES` do `mutation-sweep.mjs`. Apagar um step
+// e a lista de steps do `ci.yml` e a tabela `PARES` de `lib/pares.mjs`. Apagar um step
 // do CI desliga uma suite inteira sem tocar em nenhum ficheiro de teste (invariante 2 do
 // `TP4`). Estes entram na superficie mas **nunca** dao o aviso generico de "confirmar": o que
 // deles interessa mede-se por contagem.
