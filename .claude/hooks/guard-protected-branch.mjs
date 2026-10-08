@@ -129,8 +129,6 @@ const GIT_FLAGS_COM_VALOR = new Set(["-C", "-c", "--git-dir", "--work-tree", "--
  *  desmonta a ofuscacao por aspas (`git comm""it`) sem precisar de a prever. */
 const limpo = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
 
-/** Parte o comando em comandos simples. Todo o separador de shell conta — incluindo
- *  `$(`, backticks, `{`/`}` e `!`, que eram bypasses na versao anterior. */
 /** Token opaco que substitui uma substituicao de comando ou uma redireção. Nao e um
  *  separador: se `$(` virasse newline, `git $(echo commit) -m x` produzia o segmento `git`
  *  sozinho, o verbo ficava nulo e o comando era declarado inofensivo — bypass medido. Como
@@ -158,6 +156,8 @@ function zonasCitadas(txt) {
   return z;
 }
 
+/** Parte o comando em comandos simples. Todo o separador de shell conta — incluindo
+ *  `$(`, backticks, `{`/`}` e `!`, que eram bypasses na versao anterior. */
 function segmentos(texto) {
   // Uma substituicao de comando e DUAS coisas ao mesmo tempo, e a versao anterior tratou-a
   // como uma so:
@@ -267,7 +267,6 @@ function invocacoes(texto) {
   return out;
 }
 
-/** Force-push: `--force`, `-f`, ou um refspec com `+` a frente (`git push origin +main`). */
 /** Force-push e o que o iguala. `--force`, `-f`, refspec com `+` e `--mirror` sao sempre
  *  destrutivos. **Apagar um ref so conta se o alvo for um branch PROTEGIDO**: `git push
  *  origin --delete fix/algo` num branch ja mergeado e rotina — e e o que as regras deste
@@ -317,14 +316,14 @@ function refsApagados(args) {
 }
 
 
-/** Sem verbo identificavel: `git`, `git --version`, `git --help` nao fazem nada e negar isso
- *  e ruido; qualquer outra coisa (`git $VERBO`) **nao** e segura — e a parte que falha fechada. */
 /** Wrappers cujo comando NAO esta visivel no texto: vem do stdin (`xargs`) ou de uma string
  *  que o shell volta a interpretar (`eval`, `sh -c`). Para estes, o que se ve nao e o que
  *  corre, logo falha fechado. Os outros (`env`, `timeout`, `sudo`, `command`, `nice`) passam
  *  o comando como ARGUMENTOS — o texto e fiavel e `env git --version` nao esconde nada. */
 const WRAPPERS_OPACOS = new Set(["xargs", "eval", "sh", "bash", "zsh", "dash", "ksh", "ssh", "su", "doas"]);
 
+/** Sem verbo identificavel: `git`, `git --version`, `git --help` nao fazem nada e negar isso
+ *  e ruido; qualquer outra coisa (`git $VERBO`) **nao** e segura — e a parte que falha fechada. */
 function semVerboEInofensivo(inv) {
   // `echo commit | xargs git` chega aqui sem verbo — o verbo vem do stdin, logo nao ha nada
   // de inofensivo nisso. Mas `env git --version` e `timeout 5 git --version` eram negados

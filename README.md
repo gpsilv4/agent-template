@@ -233,9 +233,11 @@ not to* line, so every agent sees it.
     │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
+    │   ├── pares-hooks.mjs     <- ...its entries for .claude/hooks/, joined in the same place
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
+    │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved
     │   ├── fora-do-template.mjs   <- What sits on the template's disk but is NOT the template's
     │   ├── intacto.mjs         <- "The project did not touch this file", placeholders aside
     │   ├── saida-upgrade.mjs   <- The lists /upgrade shows before approval, one formatter for both modes
@@ -297,15 +299,17 @@ not to* line, so every agent sees it.
 │   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
 │   │                                  block AFTER compaction dropped the imported rules
 │   ├── lib/                        <- What the hooks share: the frontier rule (`fronteira`,
-│   │                                  `caminhos`), git verbs, the guard's deadline (`resposta`),
+│   │                                  `caminhos`, and their import-free leaf `fronteira-dados`),
+│   │                                  git verbs, the guard's deadline (`resposta`),
 │   │                                  porcelain parsing, a subagent's scope (`ambito-agente`),
 │   │                                  the protected-branch list (`protegidos`)
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
 │       ├── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
-│       │                              the branch guard, plus the legitimate commands
-│       │                              it must NOT block (TP6)
+│       │                              the branch guard (TP6)
+│       ├── tests-legitimos.mjs     <- The legitimate commands it must NOT block
+│       ├── tests-sem-ciclos.mjs    <- No import cycle among the hooks and their lib/
 │       ├── tests-fronteira-*.mjs   <- The frontier: what a careless command must not write
 │       │                              (descuidos, redirections, inventory, generated corpus)
 │       ├── tests-ambito-agente.mjs <- A subagent's Bash scope, read like the shell reads it

@@ -50,7 +50,7 @@ export const SUITES = [
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|medida-upgrade|projeto-de-ontem)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|medida-upgrade|projeto-de-ontem)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },
@@ -115,8 +115,8 @@ export const SUITES = [
   // a varredura passa a medir um conjunto mais pequeno e **reporta 100% sobre ele**.
   //
   // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
-  // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241).
-  { re: /^\.agent\/scripts\/lib\/pares\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
+  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/(lib\/varredura-paralela|lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os

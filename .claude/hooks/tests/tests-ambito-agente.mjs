@@ -27,15 +27,23 @@ const HOOK = resolve(dirname(fileURLToPath(import.meta.url)), "..", "guard-subag
 const agente = (nome, tools) => `---\nname: ${nome}\ndescription: x\n${tools === null ? "" : `tools: ${tools}\n`}---\n\ncorpo\n`;
 
 /** Corre o hook com um projeto de agentes na sandbox. */
-function correHook(agentes, payload) {
+//  `pasta`: "nenhuma" nao cria `.claude/agents/`, "ficheiro" cria-a como FICHEIRO (o `readdirSync`
+//  lanca). `viaCwd`: sem `CLAUDE_PROJECT_DIR`, a raiz chega no `payload.cwd` (#241).
+function correHook(agentes, payload, { pasta = "sim", viaCwd = false } = {}) {
   const raiz = mkdtempSync(join(tmpdir(), "hook-ambito-"));
   try {
-    mkdirSync(join(raiz, ".claude/agents"), { recursive: true });
+    if (pasta === "sim") mkdirSync(join(raiz, ".claude/agents"), { recursive: true });
+    if (pasta === "ficheiro") {
+      mkdirSync(join(raiz, ".claude"), { recursive: true });
+      writeFileSync(join(raiz, ".claude/agents"), "");
+    }
     for (const [f, md] of Object.entries(agentes)) writeFileSync(join(raiz, ".claude/agents", f), md);
+    const env = { ...process.env, CLAUDE_PROJECT_DIR: raiz };
+    if (viaCwd) delete env.CLAUDE_PROJECT_DIR;
     const out = execFileSync("node", [HOOK], {
-      input: JSON.stringify(payload),
+      input: JSON.stringify(viaCwd ? { ...payload, cwd: raiz } : payload),
       encoding: "utf8",
-      env: { ...process.env, CLAUDE_PROJECT_DIR: raiz },
+      env,
     });
     if (!out.trim()) return { decisao: "allow", razao: "" };
     const d = JSON.parse(out).hookSpecificOutput ?? {};
@@ -248,8 +256,20 @@ export function registar({ test, eq, contem }) {
     eq(out.trim(), "", "sem decisao, permite");
   });
 
-  test("hook: sem `.claude/agents/` permite", () => {
+  // A pasta VAZIA e a pasta AUSENTE sao dois ramos: um le zero ficheiros, o outro faz o
+  // `readdirSync` lancar e cai no `catch`. Este caso media so o primeiro (#241).
+  test("hook: com `.claude/agents/` vazia permite", () => {
     eq(correHook({}, pede("node x.mjs")).decisao, "allow", "nenhum agente definido");
+  });
+
+  test("hook: sem `.claude/agents/`, ou com ela como ficheiro, permite sem rebentar", () => {
+    eq(correHook({}, pede("node x.mjs"), { pasta: "nenhuma" }).decisao, "allow", "pasta ausente");
+    eq(correHook({}, pede("node x.mjs"), { pasta: "ficheiro" }).decisao, "allow", "o readdirSync lanca e o catch permite");
+  });
+
+  // Sem `CLAUDE_PROJECT_DIR`, a raiz vem do `payload.cwd` — e o ambito continua imposto.
+  test("hook: sem `CLAUDE_PROJECT_DIR`, le os agentes do `payload.cwd`", () => {
+    eq(correHook(LEITOR, pede("node x.mjs"), { viaCwd: true }).decisao, "deny", "o ambito imposto via cwd");
   });
 
   test("hook: um subagente sem Bash declarado nao corre Bash", () => {
