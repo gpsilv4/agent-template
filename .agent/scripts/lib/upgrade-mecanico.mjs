@@ -362,7 +362,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // respeitar** — copia-se se ele nao o tiver, e nunca se sobrepoe nada.
       //
       // Sem isto, NENHUMA rule, workflow ou `-why` novo chegava alguma vez a um projeto
-      // derivado: o `trazerDoHead` cobre so `.agent/scripts` e `.claude/hooks`, e este ciclo
+      // derivado: o `trazerDoHead` cobre so os `PREFIXOS_COPIADOS`, e este ciclo
       // saltava tudo o que nao existia na tag antiga.
       //
       // Apanhado pelo `simulate-upgrade` ao criar o `src/docs/review-why.md` (#109), e **so

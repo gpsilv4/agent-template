@@ -40,7 +40,7 @@ Ficheiros de governance e configuracao na raiz:
 | `CODE_OF_CONDUCT.md` | Codigo de conduta (Contributor Covenant) |
 | `LICENSE` | Licenca do projeto (MIT por defeito) |
 
-**Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Apos cada sprint/release mergeado para main, criar tag: `git tag -a vX.Y.Z -F <ficheiro-fora-do-repo>` (1.a linha = titulo; nunca `-m "..."` com crases, `TP10`) + `git push origin vX.Y.Z`. O `release.yml` cria o GitHub Release da tag (titulo e notas vem dela); visiveis em GitHub > Releases.
+**Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Apos cada sprint/release mergeado para main, criar tag: `git tag -a vX.Y.Z -F <ficheiro-fora-do-repo>` (1.a linha = titulo; nunca `-m "..."`: uma crase la dentro executa, `TP10`) + `git push origin vX.Y.Z`. O `release.yml` cria o GitHub Release da tag (titulo e notas vem dela); visiveis em GitHub > Releases.
 
 **Branch Protection**: Requer GitHub Pro em repos privados. O CI funciona como semaforo informativo (mostra verde/vermelho no PR). Se disponivel, ativar: require status checks + bloquear force push.
 

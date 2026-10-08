@@ -99,8 +99,9 @@ function corre(dir, base, env = {}) {
   try {
     // O `GITHUB_REPOSITORY` sai do ambiente (o CI define-o, a maquina local nao): um teste que
     // dependa dele declara-o em `env`, e da o mesmo resultado nos dois sitios (#277).
+    // E a config git GLOBAL tambem: um `url.*.insteadOf` reescrevia o `origin` que o verificador le.
     const { GITHUB_REPOSITORY: _ci, ...herdado } = process.env;
-    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8", env: { ...herdado, ...env } }) };
+    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8", env: { ...herdado, GIT_CONFIG_GLOBAL: "/dev/null", ...env } }) };
   } catch (err) {
     return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }

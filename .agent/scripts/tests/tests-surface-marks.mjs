@@ -229,18 +229,37 @@ export function registar() {
     return gatedPor(dir, "github.event_name == 'pull_request'\n\n          && false");
   }, { code: 1, includes: ["condicao `if:`"] });
   // Os ficheiros so do template saem de cada derivado pelo BOOTSTRAP: remove-los nao e APAGADO.
-  test("remover o `codeql.yml` (so do template) NAO e APAGADO", (dir) => {
+  test("num derivado, remover o `codeql.yml` (so do template) NAO e APAGADO", (dir) => {
     const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'");
+    writeFileSync(join(dir, ".agent/.template-version"), "v0.0.0\n"); // a marca do bootstrap
     rmSync(join(dir, ".github/workflows/codeql.yml"));
     commit(dir, "bootstrap remove o codeql");
     return ref;
   }, { code: 0, includes: ["so do template"], excludes: ["APAGADO"] });
+  test("no PROPRIO template (sem a marca), remover o `codeql.yml` continua APAGADO", (dir) => {
+    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'");
+    rmSync(join(dir, ".github/workflows/codeql.yml"));
+    commit(dir, "apagar o codeql no template");
+    return ref;
+  }, { code: 1, includes: ["APAGADO"] });
   test("remover o `ci.yml` (herdado) continua APAGADO", (dir) => {
     const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'", "ci.yml");
     rmSync(join(dir, ".github/workflows/ci.yml"));
     commit(dir, "apagar o ci");
     return ref;
   }, { code: 1, includes: ["APAGADO"] });
+  test("`if: github.repository == '<este repo>'` + linha em branco + continuacao `&& false` E enfraquecimento", (dir) => {
+    return gatedNoRepo(dir, "github.repository == 'dono/repo'\n\n          && false");
+  }, { code: 1, includes: ["condicao `if:`"] });
+  test("`if: \"github.repository == '<este repo>'\"  # nota` (aspas, comentario na cauda) NAO e enfraquecimento", (dir) => {
+    return gatedNoRepo(dir, "\"github.repository == 'dono/repo'\"  # nota\n          # comentario mais indentado");
+  }, { code: 0, excludes: ["condicao `if:`"] });
+  test("o `origin` ganha ao `GITHUB_REPOSITORY`", (dir) => {
+    return gatedNoRepo(dir, "github.repository == 'dono/repo'");
+  }, { code: 0, excludes: ["condicao `if:`"] }, { env: { GITHUB_REPOSITORY: "outro/x" } });
+  test("um `origin` fora do GitHub cai no `GITHUB_REPOSITORY`", (dir) => {
+    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", "https://gitlab.com/a/b.git");
+  }, { code: 0, excludes: ["condicao `if:`"] }, { env: { GITHUB_REPOSITORY: "dono/repo" } });
   // DE ONDE vem o nome deste repo: o `origin` (`https` ou `git@`, com ou sem `.git`), senao o
   // `GITHUB_REPOSITORY` do CI; sem nenhum, a excecao nao se aplica (falha fechada).
   test("sem `origin`, o nome vem do `GITHUB_REPOSITORY` (o CI)", (dir) => {

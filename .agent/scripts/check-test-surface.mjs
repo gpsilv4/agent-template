@@ -365,8 +365,10 @@ if (tocados.length === 0) {
       }
       // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
       // APAGADO reprovava o PR do bootstrap e confirmava em falso o passo "apaga uma suite e
-      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra.
-      if (SO_DO_TEMPLATE.has(f)) {
+      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra. SO num derivado (a marca
+      // `.agent/.template-version`, que o bootstrap cria): no proprio template, apaga-lo e perder
+      // a analise dele, e continua APAGADO.
+      if (SO_DO_TEMPLATE.has(f) && existsSync(join(ROOT, ".agent/.template-version"))) {
         ok(`${f}: removido (so do template; o BOOTSTRAP remove-o num derivado)`);
         continue;
       }

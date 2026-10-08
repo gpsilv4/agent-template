@@ -16,7 +16,7 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
   - `node .agent/scripts/check-doc-versions.mjs`
   - `node .agent/scripts/check-backlog.mjs`
   - `node .agent/scripts/check-test-surface.mjs` — a superficie de teste nao encolheu (`TP4`)
-  - **as nove suites** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte)
+  - **as suites** que o job `guard-tests` do `ci.yml` corre (a lista esta la, e e a fonte)
   - `node .agent/scripts/mutation-sweep.mjs` — **so se a auditoria tocar em verificadores ou
     hooks**; custa dezenas de minutos, e e o unico instrumento que mede se um aviso NOVO fica
     vermelho quando desligado

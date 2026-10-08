@@ -62,7 +62,7 @@ Team) — see [GitHub's plans](https://docs.github.com/en/get-started/learning-a
 
 **CodeQL, case by case:**
 
-- **Your project, public repository:** turn on **"Default setup"** (`Settings > Advanced
+- **Your project, public repository:** once it has application code, turn on **"Default setup"** (`Settings > Advanced
   Security > CodeQL analysis`). It analyses your source folders, picks the languages itself, runs
   on GitHub's infrastructure and needs no file in the repository.
 - **Your project, private repository without a Code Security license:** **do not run CodeQL**.
