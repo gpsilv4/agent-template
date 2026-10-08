@@ -469,7 +469,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.8 Ficheiros de regras/contexto adicionais e lingua
 
-- **`.agent/rules/anti-patterns.md`**: apagar **so** o exemplo comentado (esse e ilustrativo). As entradas preenchidas sao reais e herdadas do template, e **os ficheiros do template citam-nas** — as rules, os workflows, os verificadores de `.agent/scripts/` e os hooks de `.claude/`. **Manter enquanto mantiveres esses ficheiros**, e acrescentar os teus no `anti-patterns.md` a comecar no primeiro numero — o prefixo `AP` e teu e nao colide com os `TPn` do template. Apagar uma entrada obriga a apagar tambem as citacoes dela, ou o Guard 15 reprova o commit (e diz-te, ficheiro e linha, quais ficaram penduradas). Medido: seguir a versao anterior desta instrucao — deixar o ficheiro sem entradas — dava 68 avisos e exit 1 no dia 1. A evidencia de cada entrada vive em `src/docs/anti-patterns-why.md`, que podes esvaziar sem consequencia nenhuma: nada o cita por numero.
+- **`.agent/rules/anti-patterns.md`**: e TEU, e chega so com o cabecalho e um exemplo comentado — apagar o exemplo, e acrescentar os teus a comecar no primeiro numero (o prefixo `AP` e teu e nao colide com os `TPn` do template). As licoes do template vivem no `anti-patterns-template.md` (abaixo), e e a esse que os ficheiros herdados citam.
 - **`.agent/rules/ticket-method.md`**: adaptar duas coisas ao projeto — o **nucleo do dominio** (os sitios onde um erro destroi dados ou a confianca, nao apenas da uma resposta errada: reducer, seed, pontuacao, migracoes, precos) e a **lista de angulos** da Fase 3 (os de UI nao servem a uma CLI ou lib). Nao importar — o ponteiro obrigatorio vive em `process-rules.md`.
 - **`.agent/rules/anti-patterns-template.md`**: **manter**. Sao as licoes do template, citadas por dezenas de ficheiros que vais herdar; o Guard 15 reprova se as apagares e diz quais citacoes ficaram penduradas. Os teus anti-padroes vao para `anti-patterns.md`.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em **nenhum** dos tres pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`).
@@ -556,7 +556,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
   - Limpo = **sem output**; o pipeline sai com codigo `1` (o `grep` nao encontrou nada). Inverter se algum dia for usado como gate de CI.
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
-- [ ] `anti-patterns.md`: exemplo comentado removido, entradas do template **mantidas** (apagar uma exige apagar as citacoes dela — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
+- [ ] `anti-patterns.md`: exemplo comentado removido, `anti-patterns-template.md` **mantido** (apagar um `TPn` exige apagar as citacoes dele — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` em `.agent/scripts/config/bundles.mjs` atualizados (nao no verificador)?
 - [ ] `PASTAS_DE_SCRIPTS` em `.agent/scripts/config/guards-do-projeto.mjs` com as pastas de scripts do projeto?
