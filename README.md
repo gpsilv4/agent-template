@@ -119,6 +119,32 @@ gh pr create --fill     # then merge once CI is green
 # -> tell the AI: "run /review"
 ```
 
+### The 13 workflows
+
+Each one is a file in `.agent/workflows/` — the single source of truth every agent reads.
+
+| Workflow | What it does | When to use it |
+|---|---|---|
+| `/setup` | Developer onboarding and environment setup | a new developer, or an environment to set up |
+| `/grill` | Interrogate the request until no decision is left open | an `L` ticket, or an ambiguous `M`, before the plan |
+| `/plan` | Plan a feature (Phase 0: explain, then wait for approval) | a feature ticket, before implementing |
+| `/review` | Code review with the guards, before committing | before every commit |
+| `/design-review` | UI/UX quality rubric (states, a11y, responsiveness) | a ticket with UI, after `/review` |
+| `/refactor` | Restructure code without changing behaviour | to reorganise code without changing what it does |
+| `/e2e-tests` | Run and maintain the end-to-end suite | for user flows |
+| `/security-tests` | Run and maintain the security suite | before a release touching auth, forms or APIs |
+| `/debug` | Isolate the root cause, then fix with a regression test | a bug whose cause is not obvious |
+| `/deploy` | Release checklist with a real CI gate | when the sprint is complete |
+| `/audit` | Multi-lens health check of the whole project | at a milestone (end of sprint, pre-release) |
+| `/market-scan` | Market research and feature ideation | for product strategy |
+| `/upgrade` | Bring template improvements into a derived project | in a derived project, to pull a newer template |
+
+**How to invoke them:** in **Claude Code** and **Gemini CLI** they are real slash commands
+(`.claude/commands/`, `.gemini/commands/`). In **Cursor**, **GitHub Copilot** and
+**ChatGPT/Codex**, ask for `/<name>` or say *"follow `.agent/workflows/<name>.md`"* — their entry
+files tell them to open the workflow. Each workflow also opens with its own *when to use / when
+not to* line, so every agent sees it.
+
 <details>
 <summary><strong>What's included</strong> — the full file inventory (click to expand)</summary>
 
@@ -200,6 +226,12 @@ gh pr create --fill     # then merge once CI is green
     │
     ├── lib/                    <- Shared modules. No entry point, no discovery: imported
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
+    │   ├── ordem-por-alvo.mjs  <- The suite that owns a target runs first (sweep and discovery)
+    │   ├── alvos-no-disco.mjs  <- Which verifier files exist on disk (what the sweep must cover)
+    │   ├── alcance.mjs         <- Which files a guard reaches (instructions vs fixtures)
+    │   ├── agentes.mjs         <- Reads the `tools:` of `.claude/agents/*` (Guard 11 + the subagent hook)
+    │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
+    │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
@@ -225,6 +257,11 @@ gh pr create --fill     # then merge once CI is green
             ├── test-sweep-harness.mjs    <- Fake checker + fake suite of known behaviour
             ├── test-upgrade-harness.mjs  <- Synthetic template + consumer, tagged
             ├── test-derived-harness.mjs  <- The minimal repo the derived-project simulator runs in
+            ├── test-backlog-harness.mjs  <- Synthetic backlog fixtures
+            ├── projeto-derivado.mjs      <- bootstrapado()/comoTemplate(): the two sides of "derived?"
+            ├── guard-direto.mjs          <- Runs one guard module directly, without the full checker
+            ├── fixture-ordem.mjs         <- Fixtures for the owner-first ordering
+            ├── relatorio.mjs             <- PASS/FAIL counters and the fail-fast mode, one source
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -259,12 +296,22 @@ gh pr create --fill     # then merge once CI is green
 │   │                                  prompt looks like an order to implement
 │   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
 │   │                                  block AFTER compaction dropped the imported rules
+│   ├── lib/                        <- What the hooks share: the frontier rule (`fronteira`,
+│   │                                  `caminhos`), git verbs, the guard's deadline (`resposta`),
+│   │                                  porcelain parsing, a subagent's scope (`ambito-agente`),
+│   │                                  the protected-branch list (`protegidos`)
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
 │       ├── tests-bypasses.mjs      <- The BYPASSES table: every known way to evade
 │       │                              the branch guard, plus the legitimate commands
 │       │                              it must NOT block (TP6)
+│       ├── tests-fronteira-*.mjs   <- The frontier: what a careless command must not write
+│       │                              (descuidos, redirections, inventory, generated corpus)
+│       ├── tests-ambito-agente.mjs <- A subagent's Bash scope, read like the shell reads it
+│       ├── tests-protegidos.mjs    <- protegidos.json: fails closed when missing or broken
+│       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
+│       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
 │                                      repo being measured, not the hook's own
@@ -323,7 +370,8 @@ src/docs/
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
-| Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — run locally after touching a `check-*.mjs` (opt-in in ci.yml) |
+| Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks** (full sweep plus `--skips`); run locally after touching a `check-*.mjs` |
+| Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there — **own job, in parallel with Guard Tests** |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
@@ -335,7 +383,7 @@ src/docs/
 
 | Step | What it does |
 |------|--------------|
-| E2E Tests | `npm run test` — Playwright headless |
+| E2E Tests | `npm run test:e2e` — Playwright headless (skipped if the script does not exist) |
 | Security Tests | `npm run test:security` |
 | Report | Upload Playwright report on failure |
 

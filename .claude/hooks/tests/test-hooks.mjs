@@ -559,9 +559,9 @@ test("fase0: NUNCA bloqueia — nao emite decision/deny", () => {
     throw new Error("recusar o prompt do utilizador custa muito mais do que um lembrete a mais");
 });
 
-// --- PreCompact: reinjectar as Fronteiras -------------------------------------
+// --- SessionStart(compact): reinjectar as Fronteiras --------------------------
 // A compactacao descarta as rules importadas pelo CLAUDE.md e nada avisa. Este hook devolve
-// o bloco Fronteiras em `additionalContext` (campo honrado no PreCompact). Falha ABERTA:
+// o bloco Fronteiras em `additionalContext`, DEPOIS de compactar (o PreCompact nao o entregava). Falha ABERTA:
 // qualquer problema sai 0 em silencio, porque bloquear uma compactacao custa mais do que
 // perder a reinjeccao.
 const REINJECT = join(ROOT, ".claude/hooks/reinject-fronteiras.mjs");
