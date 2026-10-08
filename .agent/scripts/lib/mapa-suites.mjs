@@ -116,8 +116,11 @@ export const SUITES = [
   //
   // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
   // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
-  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
-  { re: /^\.agent\/scripts\/(lib\/varredura-paralela|lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // E quem o IMPORTA tambem (#271): o mapa de suites (a ligacao ao `PARES`) e a cobertura da superficie.
+  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
+  // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271).
+  { re: /^\.agent\/scripts\/lib\/varredura-paralela\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
@@ -145,11 +148,16 @@ export const SUITES = [
   // manda tudo para a suite do registo — que nao toca nestes dois.
   // O `lib/ficheiros.mjs` serve os dois simuladores: o `blocoDaConstante` mudou-se para la (#179).
   { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs")] },
-  { re: /^\.agent\/scripts\/(simulate-derived|lib\/patch|lib\/derivado)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  { re: /^\.agent\/scripts\/(simulate-derived|lib\/derivado)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
+  { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
   // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A
   // regra vem ANTES da geral de `lib/` porque o mapa decide pela primeira que casa.
   { re: /^\.agent\/scripts\/lib\/derivado-maduro\.mjs$/, verifica: [S("test-derivado-maduro.mjs"), S("test-simulate-derived.mjs")] },
   // A ordem por alvo (#156) e lida pelo REGISTO e pelo MOTOR da varredura: as duas suites.
+  // A descoberta por disco: as suites que a usam correm se ela mudar (#271) — um defeito aqui muda
+  // quantos modulos cada uma regista.
+  { re: /^\.agent\/scripts\/lib\/registo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/lib\/ordem-por-alvo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
