@@ -276,7 +276,11 @@ not to* line, so every agent sees it.
 ├── workflows/
 │   ├── ci.yml                  <- CI: TypeScript, lint, build, tests, audit, secret-scan
 │   ├── e2e.yml                 <- E2E + security tests (manual trigger)
+│   ├── codeql.yml              <- CodeQL on the template's machinery (hidden folders) — TEMPLATE-ONLY: the bootstrap removes it
+│   ├── release.yml             <- Every `vX.Y.Z` tag creates its GitHub Release (title and notes from the tag)
 │   └── dependabot-auto-merge.yml <- Auto-merge patch/minor Dependabot PRs (OPT-IN, off by default)
+├── codeql/codeql-config.yml    <- Where the template's code is (`.agent/scripts`, `.claude/hooks`, `.github`) — template-only
+├── scripts/release-da-tag.sh   <- What `release.yml` runs (idempotent: an existing Release is left alone)
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.md           <- Structured bug reporting template
 │   └── feature_request.md      <- Structured feature request template
@@ -394,6 +398,11 @@ src/docs/
 
 > E2E is separate from CI because it's slower and requires test credentials. Enable on PRs by uncommenting the trigger in the file.
 
+### `codeql.yml` and `release.yml`
+
+- **CodeQL** (`codeql.yml`) is **template-only**: it analyses this repository's machinery, which lives in hidden folders that GitHub's "Default setup" ignores. The bootstrap removes it from a new project, and `/upgrade` does not bring it. A project uses **"Default setup"** on a public repository (it analyses the project's own source) and **no CodeQL** on a private one without a license — CodeQL's terms forbid it on non-open-source code. See `SECURITY.md` for what each GitHub security setting offers on public vs. private repositories.
+- **Release**: pushing a `vX.Y.Z` tag creates the GitHub Release — title from the annotated tag's first line, notes from its body plus the PRs since the previous **final** version. A tag with `-` (`v1.1.0-rc1`) is published as a pre-release, never as "Latest".
+
 ### Dependabot
 
 - Weekly npm dependency updates (minor + patch grouped)
@@ -419,7 +428,7 @@ src/docs/
 
 ### Tags & Releases
 
-Each version (vX.Y.Z) has an annotated git tag. Tags are created after each sprint/release is merged to main. Visible at **GitHub > Code > Tags**.
+Each version (vX.Y.Z) has an annotated git tag. Tags are created after each sprint/release is merged to main (`/deploy`). Pushing a tag runs `release.yml`, which creates its **GitHub Release** (title and notes from the tag message, plus the PRs since the previous final version). Visible at **GitHub > Releases**.
 
 ### Branch Protection
 

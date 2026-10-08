@@ -142,6 +142,45 @@ function git(args) {
   }).trim();
 }
 
+/** O `dono/repo` DESTE repositorio (#277): do `origin`, ou do `GITHUB_REPOSITORY` no CI. `null`
+ *  se nao se souber — e ai a excecao abaixo nao se aplica (falha fechada). */
+function esteRepo() {
+  try {
+    const m = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/i.exec(git(["remote", "get-url", "origin"]));
+    if (m) return m[1];
+  } catch {
+    // sem `origin`: tenta-se o do CI
+  }
+  return process.env.GITHUB_REPOSITORY || null;
+}
+/** Os ficheiros SO DO TEMPLATE: o bootstrap remove-os e o `/upgrade` nao os traz. So neles a
+ *  excecao abaixo se aplica. Num ficheiro que o derivado HERDA (o `ci.yml`), o mesmo `if:` e
+ *  verdadeiro no template e falso em cada copia: os testes morriam em todos os derivados, e a
+ *  baseline deles ja nascia com o gate — nenhum aviso, nunca (leitura independente do #277). */
+const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
+/** Num ficheiro so do template, um `if:` cuja condicao INTEIRA e `github.repository == '<este
+ *  repo>'` e sempre verdadeiro aqui, e o ficheiro nem existe numa copia: nao desliga nada.
+ *  Neutraliza-se antes das MARCAS. Ancorado nos dois extremos como a excecao do `pull_request`:
+ *  outro nome, `!=`, uma cauda (`&& false`) — ou uma CONTINUACAO na linha seguinte, que o YAML junta
+ *  ao escalar (`\n  && false`) — continuam a contar. So o NOME ignora a caixa (o `==` do GitHub
+ *  Actions ignora-a); a chave `if:` e o contexto ficam exatos — escritos noutra caixa contam,
+ *  mesmo que o GitHub os aceitasse (falha fechada). Calculada so quando ha um ficheiro desses. */
+let gateDesteRepo;
+const semGateDesteRepo = (t) => {
+  if (gateDesteRepo === undefined) {
+    const repo = esteRepo();
+    gateDesteRepo = !repo
+      ? null
+      : new RegExp(
+          String.raw`^([ \t]*)if:[ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.repository[ \t]*==[ \t]*'` +
+            repo.replace(/[a-z]/gi, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`).replace(/[.\\-]/g, "\\$&") +
+            String.raw`'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#])`,
+          "gm"
+        );
+  }
+  return gateDesteRepo ? t.replace(gateDesteRepo, "$1# (if: so este repo)") : t;
+};
+
 let problemas = 0;
 const warn = (m) => {
   console.log(`  WARN  ${m}`);
@@ -362,7 +401,10 @@ if (tocados.length === 0) {
     // continua a fazer a contagem descer e a reprovar.
     const achadas = definePadroes(f)
       ? []
-      : MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
+      : MARCAS.filter((m) => {
+          const gate = SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t;
+          return conta(gate(agora), m.re, m.cru) > conta(gate(antes), m.re, m.cru);
+        });
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);
       const d = conta(agora, c.re, c.cru);

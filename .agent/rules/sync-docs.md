@@ -83,7 +83,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     > num projeto derivado a regra vale por inteiro.
 17. [ ] `src/docs/` restantes — manuais refletem UI/logica atual
 18. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
-19. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers)
+19. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers); `release.yml` (Release por tag) e `codeql.yml` (so do template) coerentes com o `/deploy` e o `SECURITY.md`
 20. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`
 21. [ ] `.github/ISSUE_TEMPLATE/` — templates alinhados com backlog
 22. [ ] `.github/dependabot.yml` — schedule e labels corretos

@@ -89,7 +89,7 @@ ci(actions): add Playwright browser caching
 3. Update documentation if needed (see the sync-docs checklist in `.agent/rules/sync-docs.md`)
 4. Request review from CODEOWNERS
 5. Squash and merge after approval
-6. After sprint/release merge: sync `main` first, then tag it — after a squash merge your local `main` is stale, so tagging without pulling would tag the feature branch (`git checkout main && git pull origin main`, then `git tag vX.Y.Z -m "Description"` + `git push origin --tags`)
+6. After sprint/release merge: sync `main` first, then tag it — after a squash merge your local `main` is stale, so tagging without pulling would tag the feature branch (`git checkout main && git pull --ff-only origin main`, then `git tag -a vX.Y.Z -F <file>` + `git push origin vX.Y.Z` — the message in a file outside the repo, first line = title; never `-m "..."` with backticks, which the shell executes). The GitHub Release is created automatically from the tag (`.github/workflows/release.yml`)
 
 ## Testing
 

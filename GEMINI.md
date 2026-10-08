@@ -76,4 +76,4 @@ Stack: {{STACK}}.
 - **Dependabot**: `.github/dependabot.yml` — updates automaticos semanais
 - **Conventional Commits**: Formato obrigatorio — ver `CONTRIBUTING.md`
 - **Seguranca**: `SECURITY.md` — politica de disclosure
-- **Tags & Releases**: Cada versao (vX.Y.Z) tem tag anotada — criar apos cada sprint/release
+- **Tags & Releases**: Cada versao (vX.Y.Z) tem tag anotada — criar apos cada sprint/release; o `release.yml` cria o GitHub Release da tag

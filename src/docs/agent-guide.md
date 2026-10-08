@@ -21,6 +21,8 @@ A pasta `.github/` complementa o `.agent/` com automacao e governance do reposit
 - **`workflows/`**: Pipelines automaticos de CI/CD
   - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). `permissions: contents: read`; Dependabot no `pull_request` normal.
   - `e2e.yml`: Testes E2E e seguranca (trigger manual; trigger em PRs e opt-in, descomentar no ficheiro)
+  - `codeql.yml` (+ `.github/codeql/`): CodeQL da maquinaria do template (pastas ocultas). **So do template**: o bootstrap remove-o; o projeto usa o "Default setup" num repo publico (ver `SECURITY.md`)
+  - `release.yml`: cada push de uma tag `vX.Y.Z` cria o GitHub Release (titulo e notas da tag anotada)
   - `dependabot-auto-merge.yml`: auto-merge de PRs patch/minor do Dependabot — **opt-in** (desligado; requer a label `automerge` no `dependabot.yml` + "Allow auto-merge" + branch protection). Majors ficam sempre para review. Ver o cabecalho do ficheiro (inclui aviso para repos privados)
 - **`pull_request_template.md`**: Checklist que sincroniza com o workflow `/review`
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
@@ -38,7 +40,7 @@ Ficheiros de governance e configuracao na raiz:
 | `CODE_OF_CONDUCT.md` | Codigo de conduta (Contributor Covenant) |
 | `LICENSE` | Licenca do projeto (MIT por defeito) |
 
-**Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Apos cada sprint/release mergeado para main, criar tag: `git tag vX.Y.Z -m "Descricao"` + `git push origin --tags`. Visiveis em GitHub > Code > Tags.
+**Tags & Releases**: Cada versao (vX.Y.Z) tem uma tag anotada no Git. Apos cada sprint/release mergeado para main, criar tag: `git tag -a vX.Y.Z -F <ficheiro-fora-do-repo>` (1.a linha = titulo; nunca `-m "..."` com crases, `TP10`) + `git push origin vX.Y.Z`. O `release.yml` cria o GitHub Release da tag (titulo e notas vem dela); visiveis em GitHub > Releases.
 
 **Branch Protection**: Requer GitHub Pro em repos privados. O CI funciona como semaforo informativo (mostra verde/vermelho no PR). Se disponivel, ativar: require status checks + bloquear force push.
 

@@ -19,7 +19,8 @@ import { fimSubst } from "./caminhos.mjs";
 /** Verbos que exigem uma FORMA para serem seguros (nao basta faltar-lhes a forma insegura).
  *
  *  Existe porque o `deploy.md`, o `CONTRIBUTING.md` e o `process-rules.md` mandam correr
- *  `git pull` e `git push origin --tags` em `main`: negar isso punha o guard em contradicao
+ *  `git pull --ff-only` e `git push origin vX.Y.Z` (a tag) em `main` — e o `--tags` continua
+ *  aceite (#277): negar isso punha o guard em contradicao
  *  com o procedimento de release documentado — e um falso positivo que bloqueia trabalho
  *  documentado custa tanto como um bypass.
  *

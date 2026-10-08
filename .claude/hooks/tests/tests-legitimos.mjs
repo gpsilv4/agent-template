@@ -103,10 +103,15 @@ const LEGITIMOS = [
   // process-rules.md) corre em `main`. Negar isso punha o guard contra a documentacao.
   ["pull --ff-only (procedimento de release)", "git pull --ff-only origin main"],
   ["push so de tags (procedimento de release)", "git push origin --tags"],
+  // O procedimento de release (#277): a tag anotada com a mensagem num FICHEIRO (`-F`, nunca
+  // `-m "..."`, TP10) e o push dessa tag. O `-F` e o ficheiro da mensagem e o `-f` e o force: so a
+  // caixa os separa, e este caso e o que o fixa (um `i` na regex do `tag` negava o procedimento).
+  ["tag anotada com a mensagem num ficheiro (procedimento de release)", "git tag -a v1.2.0 -F notas.txt"],
+  ["push de UMA tag (procedimento de release)", "git push origin v1.2.0"],
   // `git push --follow-tags` SAIU daqui: medido com `--dry-run --porcelain` contra um remoto
   // real, publica o refspec normal **mais** as tags — ou seja, publica o branch atual. Estava
   // listado como procedimento de release por analogia com `--tags`, que publica so tags.
-  // O procedimento de release usa `--tags`, e esse continua aqui em baixo.
+  // O procedimento usa `git push origin vX.Y.Z` (acima); o `--tags` continua aceite.
   // B3: nao fazem nada; negar e ruido.
   ["git sozinho", "git"],
   ["git --version", "git --version"],
