@@ -57,7 +57,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 ## 4. Sintese (obrigatoria)
 
 - **Verificar** cada achado: re-confirmar `ficheiro:linha` + regra contra o ficheiro real; marcar **CONFIRMADO** ou **PLAUSIVEL**; descartar os que nao se confirmam (subagentes podem alucinar).
-- **Dedup** entre lentes (ex: `npm audit` cai em Seguranca e Dependencias — manter um; doc-drift so na lente 8).
+- **Dedup** entre lentes (ex: `npm audit` cai em Seguranca e Dependencias — manter um; doc-drift so na lente 8). **Na duvida, nao e duplicado**: mostrar um achado repetido custa menos do que esconder um real dentro de outro (a regra do `usestrix/strix`, #267).
 - **Ordenar** por **severidade x esforco**: separar *quick wins* (alto valor, baixo esforco) de *big rocks*.
 
 ## 5. Output

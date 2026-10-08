@@ -135,6 +135,17 @@ no mesmo momento do ZAP, pre-release. Se o usares:
   o codigo real antes de agir. Um agente que explora tambem alucina.
 - Os achados confirmados viram tickets no backlog, com severidade e esforco.
 
+Cuidados medidos no codigo do Strix (v1.7.0, #267) — confirmar na versao que instalares:
+
+- **Telemetria ligada por omissao** (PostHog, Scarf): `STRIX_TELEMETRY=0` desliga-a. O codigo e as
+  respostas da app vao para o fornecedor de LLM configurado: as perguntas da `mcp-policy.md`.
+- **Instalar uma versao fixa**, nao o `curl ... | bash` que traz sempre a ultima.
+- **Em CI**: `--scope-mode diff` e `--fail-on <severidade>`. O codigo de saida `2` sao vulnerabilidades,
+  e o **`1` e um ERRO** (Docker em baixo, config invalida) — o gate trata o `1` como falha do scan, nao
+  como "limpo" nem como "ha vulnerabilidades" (`TP2`).
+- O "diff-scope" e uma **instrucao ao modelo**, nao uma restricao: o agente pode sair dele.
+- O benchmark publicado (96% no XBEN) e da v0.4.0, em desafios CTF: medir no teu projeto antes de confiar.
+
 ## 6. Regras para Novos Testes de Seguranca
 
 - Novos headers de seguranca -> adicionar teste em "Security Headers"
