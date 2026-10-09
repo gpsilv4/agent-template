@@ -19,7 +19,7 @@ A pasta `.agent` funciona como o "cerebro" da assistencia de IA no projeto. Ela 
 A pasta `.github/` complementa o `.agent/` com automacao e governance do repositorio:
 
 - **`workflows/`**: Pipelines automaticos de CI/CD
-  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). `permissions: contents: read`; Dependabot no `pull_request` normal.
+  - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). O bundle size check e opt-in (descomentar no ficheiro); os doc guards e o backlog correm sempre, no job `guard-tests`. `permissions: contents: read`; Dependabot no `pull_request` normal.
   - `e2e.yml`: Testes E2E e seguranca (trigger manual; trigger em PRs e opt-in, descomentar no ficheiro)
   - `codeql.yml` (+ `.github/codeql/`): CodeQL da maquinaria do template (pastas ocultas). **So do template**: o bootstrap remove-o; o projeto usa o "Default setup" num repo publico (ver `SECURITY.md`)
   - `release.yml`: cada push de uma tag `vX.Y.Z` cria o GitHub Release (titulo e notas da tag anotada)

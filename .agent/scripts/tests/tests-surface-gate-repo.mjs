@@ -176,6 +176,68 @@ export function registar() {
   test("DOIS jobs com o gate deste repo: nenhum conta", (dir) => {
     return gatedNoRepo(dir, `github.repository == 'dono/repo'\n${DEPOIS_DO_IF}      - run: node b-test.mjs\n        if: github.repository == 'dono/repo'`);
   }, { code: 0, excludes: ["condicao `if:`"] });
+  // Mover um passo de teste do `ci.yml` para o `codeql.yml` (#279): neste repo nada se perde, mas
+  // o `codeql.yml` sai de cada derivado. Nao e "movido, nao perdido". O caminho inverso passa.
+  const doisPassos = "      - run: node a-test.mjs\n      - run: node b-test.mjs\n";
+  const passo = (dir, ci, codeql) => {
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, ".github/workflows/ci.yml"), `jobs:\n  t:\n    steps:\n${ci}`);
+    writeFileSync(join(dir, ".github/workflows/codeql.yml"), `# **SO DO TEMPLATE.**\njobs:\n  t:\n    steps:\n${codeql}`);
+  };
+  test("passo de teste movido do `ci.yml` para o `codeql.yml` (so do template) E perdido", (dir) => {
+    passo(dir, doisPassos, "      - run: echo x\n");
+    commit(dir, "dois passos no ci");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    passo(dir, "      - run: node a-test.mjs\n", "      - run: echo x\n      - run: node b-test.mjs\n");
+    commit(dir, "mover para o codeql");
+    return ref;
+  }, { code: 1, includes: ["steps de verificacao no CI"], excludes: ["movido, nao perdido"] });
+  test("passo de teste movido do `codeql.yml` para o `ci.yml` continua \"movido, nao perdido\"", (dir) => {
+    passo(dir, "      - run: node a-test.mjs\n", "      - run: echo x\n      - run: node b-test.mjs\n");
+    commit(dir, "um passo no codeql");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    passo(dir, doisPassos, "      - run: echo x\n");
+    commit(dir, "trazer para o ci");
+    return ref;
+  }, { code: 0, includes: ["movido, nao perdido"] });
+  // Com DOIS passos contados no `codeql.yml`, mover UM para o `ci.yml` continua "movido" (#279): do
+  // lado "agora" o ficheiro so do template conta o que ainda tem (o minimo), e nao zero.
+  test("dois passos no `codeql.yml`, um movido para o `ci.yml`: \"movido, nao perdido\"", (dir) => {
+    passo(dir, "      - run: node a-test.mjs\n", "      - run: node b-test.mjs\n      - run: node c-test.mjs\n");
+    commit(dir, "dois passos no codeql");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    passo(dir, "      - run: node a-test.mjs\n      - run: node b-test.mjs\n", "      - run: node c-test.mjs\n");
+    commit(dir, "trazer um para o ci");
+    return ref;
+  }, { code: 0, includes: ["movido, nao perdido"] });
+  test("CRLF: `if: github.repository == '<este repo>'` + continuacao `&& false` E enfraquecimento", (dir) => {
+    return gatedNoRepo(dir, "github.repository == 'dono/repo'\r\n          && false\r");
+  }, { code: 1, includes: ["condicao `if:`"] });
+  // So o lado "agora": excluir o `codeql.yml` dos DOIS lados escondia um passo apagado dele.
+  test("APAGAR um passo de teste do `codeql.yml` E perdido", (dir) => {
+    passo(dir, "      - run: node a-test.mjs\n", "      - run: echo x\n      - run: node b-test.mjs\n");
+    commit(dir, "um passo no codeql");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    passo(dir, "      - run: node a-test.mjs\n", "      - run: echo x\n");
+    commit(dir, "apagar o passo do codeql");
+    return ref;
+  }, { code: 1, includes: ["steps de verificacao no CI"], excludes: ["movido, nao perdido"] });
+
+  // A forma `- if:` (#279) tambem na excecao do repo: a chave na linha do `-`.
+  const repoNaLinhaDoTraco = (dir, cond) => {
+    git(dir, ["remote", "add", "origin", "https://github.com/dono/repo.git"]);
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, ".github/workflows/codeql.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+    commit(dir, "codeql");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, ".github/workflows/codeql.yml"), `jobs:\n  t:\n    steps:\n      - if: ${cond}\n        run: node a-test.mjs\n${DEPOIS_DO_IF}`);
+    commit(dir, "gate");
+    return ref;
+  };
+  test("`- if: github.repository == '<este repo>'` no `codeql.yml` continua a ser a excecao",
+    (dir) => repoNaLinhaDoTraco(dir, "github.repository == 'dono/repo'"), { code: 0, excludes: ["condicao `if:`"] });
+  test("`- if: github.repository == '<este repo>'` + continuacao `&& false` E enfraquecimento",
+    (dir) => repoNaLinhaDoTraco(dir, "github.repository == 'dono/repo'\n          && false"), { code: 1, includes: ["condicao `if:`"] });
   test("`origin` com o host noutra caixa (`GitHub.com`) da o nome", (dir) => {
     return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", "https://GitHub.com/dono/repo.git");
   }, { code: 0, excludes: ["condicao `if:`"] });

@@ -128,7 +128,7 @@ export const SUITES = [
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
-  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/surface-patterns|lib\/marcas-yaml)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da

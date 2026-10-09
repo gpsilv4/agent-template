@@ -31,6 +31,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
+import { SO_DO_TEMPLATE, paraMarcas, repoDoOrigin, gateDesteRepo } from "./lib/marcas-yaml.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -143,44 +144,16 @@ function git(args) {
   }).trim();
 }
 
-/** O `dono/repo` DESTE repositorio (#277): do `origin`, ou do `GITHUB_REPOSITORY` no CI. `null`
- *  se nao se souber — e ai a excecao abaixo nao se aplica (falha fechada). */
-function esteRepo() {
+// O que e so do template, a excecao do gate deste repo e o texto que as MARCAS leem: `lib/marcas-yaml.mjs`.
+const semGateDesteRepo = gateDesteRepo(() => {
   try {
-    const m = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/i.exec(git(["remote", "get-url", "origin"]));
-    if (m) return m[1];
+    const r = repoDoOrigin(git(["remote", "get-url", "origin"]));
+    if (r) return r;
   } catch {
     // sem `origin`: tenta-se o do CI
   }
   return process.env.GITHUB_REPOSITORY || null;
-}
-/** Os ficheiros SO DO TEMPLATE: o bootstrap remove-os e o `/upgrade` nao os traz. So neles a
- *  excecao abaixo se aplica. Num ficheiro que o derivado HERDA (o `ci.yml`), o mesmo `if:` e
- *  verdadeiro no template e falso em cada copia: os testes morriam em todos os derivados, e a
- *  baseline deles ja nascia com o gate — nenhum aviso, nunca (leitura independente do #277). */
-const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
-/** Num ficheiro so do template, um `if:` cuja condicao INTEIRA e `github.repository == '<este
- *  repo>'` e sempre verdadeiro aqui, e o ficheiro nem existe numa copia: nao desliga nada.
- *  Neutraliza-se antes das MARCAS. Ancorado nos dois extremos como a excecao do `pull_request`:
- *  outro nome, `!=`, uma cauda (`&& false`) — ou uma CONTINUACAO na linha seguinte, que o YAML junta
- *  ao escalar (`\n  && false`) — continuam a contar. So o NOME ignora a caixa (o `==` do GitHub
- *  Actions ignora-a); a chave `if:` e o contexto ficam exatos — escritos noutra caixa contam,
- *  mesmo que o GitHub os aceitasse (falha fechada). Calculada so quando ha um ficheiro desses. */
-let gateDesteRepo;
-const semGateDesteRepo = (t) => {
-  if (gateDesteRepo === undefined) {
-    const repo = esteRepo();
-    gateDesteRepo = !repo
-      ? null
-      : new RegExp(
-          String.raw`^([ \t]*)if:[ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.repository[ \t]*==[ \t]*'` +
-            repo.replace(/[a-z]/gi, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`).replace(/[.\\-]/g, "\\$&") +
-            String.raw`'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#])`,
-          "gm"
-        );
-  }
-  return gateDesteRepo ? t.replace(gateDesteRepo, "$1# (if: so este repo)") : t;
-};
+});
 
 let problemas = 0;
 const warn = (m) => {
@@ -225,12 +198,20 @@ const naSuperficie = (f) =>
 
 let alterados;
 let naoRastreados = [];
+const renomeados = new Map();
 try {
   // `${base}` e nao `${base}..HEAD`: compara a baseline com a **arvore de trabalho**. Com
   // `..HEAD` o verificador ignorava tudo o que nao estivesse commitado — ou seja, "correr
   // antes de commit" nao media exatamente o que estava a ser commitado. No CI as duas formas
   // coincidem (arvore limpa), logo nao ha perda.
-  alterados = git(["diff", "--name-only", base]).split("\n").filter(Boolean);
+  // `--no-renames` (#279): com a deteccao de renomeacoes, um `git mv` listava SO o destino, e um
+  // teste movido para fora da superficie nunca aparecia como apagado.
+  alterados = git(["diff", "--name-only", "--no-renames", base]).split("\n").filter(Boolean);
+  // E os pares que o git EMPARELHA (`-M`): uma renomeacao para dentro da superficie e uma migracao.
+  for (const l of git(["diff", "--name-status", "-M", base]).split("\n")) {
+    const [st, de, para] = l.split("\t");
+    if (st?.startsWith("R")) renomeados.set(de, para);
+  }
   // Os NAO RASTREADOS nao aparecem no `git diff`, logo a afirmacao "compara com a arvore de
   // trabalho" so valia para caminhos rastreados: um `vitest.config.ts` novo que estreitasse a
   // selecao passava sem aviso enquanto nao fosse ao `git add`. Uniao com os untracked.
@@ -331,6 +312,10 @@ if (tocados.length === 0) {
     })();
     if (existeNaBaseline) antes = git(["show", `${base}:${f}`]);
     else existiaAntes = false; // ausente da baseline: zero marcas antes, e correto
+    // O DESTINO de uma renomeacao (#279): as MARCAS comparam com a baseline da ORIGEM, senao cada marca
+    // que o ficheiro ja tinha contava como acrescentada. As CONTAGENS nao (a origem ja entra no total).
+    const origem = existiaAntes ? undefined : [...renomeados].find(([, para]) => para === f)?.[0];
+    const antesMarcas = origem ? git(["show", `${base}:${origem}`]) : antes;
     // Sem `try` em volta do `show`, de proposito. Para um ficheiro chegar aqui tem de estar
     // na lista do `git diff base`, e o diff **ja leu os dois blobs** para os comparar: se o
     // blob da baseline nao existisse, o diff falhava primeiro e o `fatal` de "nao conseguiu
@@ -354,14 +339,20 @@ if (tocados.length === 0) {
       // O irmao ja tem este conceito e imprime-o: o `simulate-upgrade.mjs` diz "MIGRADO: o mesmo
       // nome existe noutra pasta". Aqui usa-se a mesma leitura.
       //
-      // O RISCO, escrito e nao tapado: apagar um teste quando existe outro com o mesmo nome
-      // noutra pasta passa a ler-se como migracao. E estreito — exige o mesmo nome de ficheiro,
-      // dentro da superficie — e a linha **continua no ecra** em vez de desaparecer, logo quem
-      // le a corrida ve o que aconteceu.
+      // O RISCO que isto tinha (apagar um teste com um homonimo noutra pasta lia-se como migracao)
+      // fechou-se com a origem no total (#279): se o homonimo nao ganhou o que a origem perdeu, o
+      // total desce e avisa. A linha MIGRADO continua no ecra.
+      // E RENOMEADO (#279): o par que o git emparelha (`-M`), se o destino estiver na superficie. A
+      // ORIGEM entra no total com a baseline e o lado "agora" vazio: mover e esvaziar no mesmo
+      // commit faz o total descer (perdido); mover sem perder nada fica "movido, nao perdido".
       const nome = f.split("/").pop();
-      const migradoPara = daSuperficieNoDisco().find((o) => o !== f && o.split("/").pop() === nome);
+      const existentes = daSuperficieNoDisco();
+      const migradoPara =
+        (existentes.includes(renomeados.get(f)) && renomeados.get(f)) ||
+        existentes.find((o) => o !== f && o.split("/").pop() === nome);
       if (migradoPara) {
-        ok(`${f}: MIGRADO para ${migradoPara} (mesmo nome noutra pasta da superficie)`);
+        ok(`${f}: MIGRADO para ${migradoPara} (${renomeados.get(f) === migradoPara ? "renomeado" : "mesmo nome noutra pasta"} da superficie)`);
+        medidos.push({ f, antes, antesMarcas: antes, agora: "", config: false, conta, migrado: true });
         continue;
       }
       // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
@@ -380,7 +371,7 @@ if (tocados.length === 0) {
     // RECOLHER agora, DECIDIR depois. A decisao por ficheiro nao pode ser tomada aqui porque
     // depende de um numero que so existe depois de ler a superficie toda: o TOTAL. Ver o
     // bloco de veredicto abaixo.
-    medidos.push({ f, antes, agora, config, conta });
+    medidos.push({ f, antes, antesMarcas, agora, config, conta });
   }
 
   // --- Totais da superficie: distinguir o que se PERDEU do que se MOVEU -------------
@@ -394,11 +385,23 @@ if (tocados.length === 0) {
   //
   // Somar so os ficheiros TOCADOS e suficiente e nao e um atalho: um ficheiro que nao mudou
   // contribui com o mesmo numero para os dois lados e cancela-se. Um ficheiro novo nao existe
-  // na baseline (contribui 0 antes), e um apagado ja avisou por nome proprio acima.
-  const total = (lado, c) => medidos.reduce((n, m) => n + m.conta(m[lado], c.re, c.cru), 0);
-  const totalDesceu = new Map(CONTAGENS.map((c) => [c.msg, total("agora", c) < total("antes", c)]));
+  // na baseline (contribui 0 antes); um APAGADO ja avisou por nome proprio acima, e a ORIGEM de um
+  // MIGRADO entra com a baseline e o lado "agora" vazio (#279).
+  // Um ficheiro SO DO TEMPLATE conta, do lado "agora", so o que ja tinha (#279): sai de cada
+  // derivado, logo um passo movido PARA ele nao e "movido, nao perdido"; um que saia dele, sim.
+  const total = (lado, c) =>
+    medidos.reduce((n, m) => {
+      const k = (t) => m.conta(t, c.re, c.cru);
+      return n + (lado === "agora" && SO_DO_TEMPLATE.has(m.f) ? Math.min(k(m.antes), k(m.agora)) : k(m[lado]));
+    }, 0);
+  // Com a semantica de cada contagem: uma `zero` (o veredicto do runner) so desce quando chega a zero —
+  // juntar tres `process.exit(1)` num helper, e renomear o ficheiro no mesmo commit, nao e perda (#279).
+  const totalDesceu = new Map(CONTAGENS.map((c) => {
+    const [a, d] = [total("antes", c), total("agora", c)];
+    return [c.msg, c.zero ? a > 0 && d === 0 : d < a];
+  }));
 
-  for (const { f, antes, agora, config, conta } of medidos) {
+  for (const { f, antes, antesMarcas, agora, config, conta, migrado } of medidos) {
     // As MARCAS nao se aplicam ao ficheiro que as DEFINE. Nele, cada entrada e uma definicao e
     // nao uma diretiva: um `xit` ali nao desativa nada, nao ha testes naquele ficheiro. E nao
     // e uma hipotese — os padroes com alternacao casam-se a si mesmos (ver a nota em
@@ -411,10 +414,10 @@ if (tocados.length === 0) {
     // continua a fazer a contagem descer e a reprovar.
     const achadas = definePadroes(f)
       ? []
-      : MARCAS.filter((m) => {
-          const gate = SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t;
-          return conta(gate(agora), m.re, m.cru) > conta(gate(antes), m.re, m.cru);
-        });
+      : ((gate) => {
+          const [a, d] = [gate(paraMarcas(f, antesMarcas)), gate(paraMarcas(f, agora))];
+          return MARCAS.filter((m) => conta(d, m.re, m.cru) > conta(a, m.re, m.cru));
+        })(SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t);
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);
       const d = conta(agora, c.re, c.cru);
@@ -467,6 +470,8 @@ if (tocados.length === 0) {
           .map((d) => `${d.msg}: ${conta(antes, d.re, d.cru)} -> ${conta(agora, d.re, d.cru)}`)
           .join("; ")} — o total da superficie NAO desceu (movido, nao perdido)`
       );
+    } else if (migrado) {
+      // ja anunciado (MIGRADO) ao recolher, e nada desceu NESTE ficheiro
     } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
     } else {
