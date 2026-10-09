@@ -235,6 +235,7 @@ not to* line, so every agent sees it.
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     │   ├── pares-hooks.mjs     <- ...its entries for .claude/hooks/, joined in the same place
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
+    │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved

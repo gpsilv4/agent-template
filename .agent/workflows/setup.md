@@ -148,7 +148,7 @@ Os dois que interessam no primeiro dia: **`/grill`** antes de um ticket `L` ou a
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. Bundle sizes e doc guards sao opt-in (descomentar no ficheiro). **Todos os checks devem estar verdes antes de mergear** — exceto o Security Audit, que e informativo (`continue-on-error`) e fica verde mesmo com advisories: abrir o log e ler o relatorio. Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
+- **`ci.yml`**: Corre em cada push e PR para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre. O bundle size check e opt-in (descomentar no ficheiro); os doc guards e o backlog correm sempre, no job `guard-tests`. **Todos os checks devem estar verdes antes de mergear** — exceto o Security Audit, que e informativo (`continue-on-error`) e fica verde mesmo com advisories: abrir o log e ler o relatorio. Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:

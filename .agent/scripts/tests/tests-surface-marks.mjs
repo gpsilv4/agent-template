@@ -7,7 +7,7 @@
  *
  * NAO e um entry point: o `test-test-surface.mjs` importa e chama `registar()`.
  */
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, commit, git, DEPOIS_DO_IF } from "./harness/test-surface-harness.mjs";
@@ -180,6 +180,78 @@ export function registar() {
     return gatedPor(dir, "github.event_name == 'pull_request'  # so em PRs");
   }, { code: 0, excludes: ["condicao `if:`"] });
 
+  // A chave na LINHA DO `-` (#279): `- if: false` e YAML valido e escapava a `^([ \t]*)if:`. O
+  // verificador troca o `-` por um espaco antes das MARCAS, logo a chave fica na mesma coluna.
+  const naLinhaDoTraco = (dir, chave, crlf = false, wf = "ci.yml") => {
+    const fim = (t) => (crlf ? t.replace(/\n/g, "\r\n") : t);
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    writeFileSync(join(dir, `.github/workflows/${wf}`), fim("jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n"));
+    commit(dir, "ci");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, `.github/workflows/${wf}`), fim(`jobs:\n  t:\n    steps:\n      - ${chave}\n        run: node a-test.mjs\n${DEPOIS_DO_IF}`));
+    commit(dir, `gate ${chave}`);
+    return ref;
+  };
+  test("`- if: false` (a chave na linha do `-`) E enfraquecimento", (dir) => naLinhaDoTraco(dir, "if: false"),
+    { code: 1, includes: ["condicao `if:`"] });
+  test("`- continue-on-error: true` E enfraquecimento", (dir) => naLinhaDoTraco(dir, "continue-on-error: true"),
+    { code: 1, includes: ["`continue-on-error: true`"] });
+  test("`- if: … == 'pull_request'` continua a ser a excecao", (dir) => naLinhaDoTraco(dir, "if: github.event_name == 'pull_request'"),
+    { code: 0, excludes: ["condicao `if:`"] });
+  test("`- if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento",
+    (dir) => naLinhaDoTraco(dir, "if: github.event_name == 'pull_request'\n          && false"),
+    { code: 1, includes: ["condicao `if:`"] });
+  // E num `.yaml` (o GitHub aceita as duas extensoes), e numa linha propria em CRLF.
+  test("`- if: false` num workflow `.yaml` E enfraquecimento", (dir) => naLinhaDoTraco(dir, "if: false", false, "ci.yaml"),
+    { code: 1, includes: ["condicao `if:`"] });
+  test("CRLF: `if: … == 'pull_request'` numa linha propria NAO e enfraquecimento", (dir) => {
+    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
+    const wf = (t) => writeFileSync(join(dir, ".github/workflows/ci.yml"), t.replace(/\n/g, "\r\n"));
+    wf("jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
+    commit(dir, "ci");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    wf(`jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: github.event_name == 'pull_request'\n${DEPOIS_DO_IF}`);
+    commit(dir, "gate");
+    return ref;
+  }, { code: 0, excludes: ["condicao `if:`"] });
+  // A chave ENTRE ASPAS ou com espacos antes dos `:` (#279) — YAML valido, escapava as marcas.
+  test("`\"if\": false` (chave entre aspas) E enfraquecimento", (dir) => naLinhaDoTraco(dir, '"if": false'),
+    { code: 1, includes: ["condicao `if:`"] });
+  test("`'continue-on-error': true` (chave entre plicas) E enfraquecimento", (dir) => naLinhaDoTraco(dir, "'continue-on-error': true"),
+    { code: 1, includes: ["`continue-on-error: true`"] });
+  test("`continue-on-error : true` (espaco antes dos `:`) E enfraquecimento", (dir) => naLinhaDoTraco(dir, "continue-on-error : true"),
+    { code: 1, includes: ["`continue-on-error: true`"] });
+  // Num SEGUNDO passo (a normalizacao e de todas as linhas, nao so da primeira).
+  test("`- if: false` no SEGUNDO passo, depois de um gate legitimo, E enfraquecimento",
+    (dir) => naLinhaDoTraco(dir, "if: github.event_name == 'pull_request'\n        run: node b-test.mjs\n      - \"if\": false"),
+    { code: 1, includes: ["condicao `if:`"] });
+  test("`if : false` (espaco antes dos `:`) E enfraquecimento", (dir) => naLinhaDoTraco(dir, "if : false"),
+    { code: 1, includes: ["condicao `if:`"] });
+  test("`\"if\": … == 'pull_request'` (chave entre aspas) continua a ser a excecao",
+    (dir) => naLinhaDoTraco(dir, "\"if\": github.event_name == 'pull_request'"), { code: 0, excludes: ["condicao `if:`"] });
+  // A normalizacao aplica-se aos DOIS lados: um `- continue-on-error` que ja estava na baseline nao
+  // e novo. E so a YAML: num `.js`, uma linha `- if: false` dentro de uma string nao e um passo.
+  test("`- continue-on-error: true` que JA estava na baseline nao e novo", (dir) => {
+    naLinhaDoTraco(dir, "continue-on-error: true");
+    const ref = git(dir, ["rev-parse", "HEAD"]); // a baseline JA tem o `- continue-on-error`
+    const ci = join(dir, ".github/workflows/ci.yml");
+    writeFileSync(ci, readFileSync(ci, "utf8") + "      - run: echo outro\n");
+    commit(dir, "outro passo");
+    return ref;
+  }, { code: 0, excludes: ["continue-on-error"] });
+  test("num `.js`, uma linha `- if: false` numa string NAO e uma marca", (dir) => {
+    writeFileSync(join(dir, "tests/exemplo.test.js"),
+      'test("soma", () => { expect(1 + 1).toBe(2); });\nconst yaml = `\n  - if: false\n`;\n');
+    commit(dir, "um yaml numa string");
+  }, { code: 0, excludes: ["condicao `if:`"] });
+  // CRLF (#279): regressao. Com a flag `m`, o `$` do JS ja para antes do `\r`, logo estes passavam
+  // antes da correcao — ficam para que uma mudanca futura das regex nao o parta.
+  test("CRLF: `- if: … == 'pull_request'` legitimo NAO e enfraquecimento", (dir) => naLinhaDoTraco(dir, "if: github.event_name == 'pull_request'", true),
+    { code: 0, excludes: ["condicao `if:`"] });
+  test("CRLF: `- if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento",
+    (dir) => naLinhaDoTraco(dir, "if: github.event_name == 'pull_request'\n          && false", true),
+    { code: 1, includes: ["condicao `if:`"] });
+
   test("`if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento", (dir) => {
     return gatedPor(dir, "github.event_name == 'pull_request'\n          && false");
   }, { code: 1, includes: ["condicao `if:`"] });
@@ -322,6 +394,38 @@ export function registar() {
     commit(dir, "mover o hook de pasta");
     return base;
   }, { code: 0, includes: ["MIGRADO para .claude/hooks/lib/vigia.mjs"] });
+
+  // `git mv` com o conteudo IGUAL (#279): o git emparelha-o como renomeacao, e o `--name-only`
+  // listava so o destino. Para fora da superficie, o teste deixava de correr sem aviso; para
+  // outra pasta da superficie, continua a ser uma migracao.
+  test("`git mv` de um teste para FORA da superficie e APAGADO", (dir, base) => {
+    git(dir, ["mv", "tests/exemplo.test.js", "exemplo.test.js.off"]);
+    commit(dir, "desligar por rename");
+    return base;
+  }, { code: 1, includes: ["tests/exemplo.test.js: ficheiro da superficie de teste APAGADO"] });
+  // RENOMEADO dentro da superficie (#279): com `--no-renames` sozinho dava APAGADO — um PR real
+  // deste repo (`tests-harness-self.mjs` -> `tests-test-harness.mjs`) chumbava.
+  test("`git mv` de um teste para OUTRO NOME na superficie e MIGRADO", (dir, base) => {
+    git(dir, ["mv", "tests/exemplo.test.js", "tests/soma.test.js"]);
+    commit(dir, "renomear");
+    return base;
+  }, { code: 0, includes: ["MIGRADO para tests/soma.test.js (renomeado"] });
+  // Mover E esvaziar no mesmo commit (#279): a origem entra no total com a baseline — perdido.
+  // Sem par do git (o conteudo mudou todo): e o caminho do HOMONIMO noutra pasta, nao o da renomeacao
+  // (esse esta no `tests-surface-migrado.mjs`).
+  test("homonimo noutra pasta, ESVAZIADO no mesmo commit, e perdido", (dir, base) => {
+    mkdirSync(join(dir, "tests/sub"), { recursive: true });
+    git(dir, ["mv", "tests/exemplo.test.js", "tests/sub/exemplo.test.js"]);
+    writeFileSync(join(dir, "tests/sub/exemplo.test.js"), "// vazio\n");
+    commit(dir, "mover e esvaziar");
+    return base;
+  }, { code: 1, includes: ["tests/exemplo.test.js: casos de teste: 1 -> 0"] });
+  test("`git mv` de um teste para OUTRA pasta da superficie continua MIGRADO", (dir, base) => {
+    mkdirSync(join(dir, "tests/sub"), { recursive: true });
+    git(dir, ["mv", "tests/exemplo.test.js", "tests/sub/exemplo.test.js"]);
+    commit(dir, "mudar de pasta");
+    return base;
+  }, { code: 0, includes: ["MIGRADO para tests/sub/exemplo.test.js"] });
 
   // O CONTRA-CASO, e sem ele o de cima abria um buraco: apagar de verdade — sem nenhum ficheiro
   // do mesmo nome noutra pasta — tem de continuar a ser APAGADO com exit 1. E a diferenca entre

@@ -449,7 +449,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.7 Customizar GitHub CI/CD e Governance
 
-- **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check e os guards (`check-doc-versions`, `check-backlog`) se aplicavel. Duas decisoes a tomar **com o utilizador**:
+- **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check se aplicavel (os guards `check-doc-versions` e `check-backlog` ja correm sempre, no job `guard-tests`). Duas decisoes a tomar **com o utilizador**:
   - **Guards por step** (`if [ -f tsconfig.json ]`, `scripts?.lint`, …): existem para o template puro nao ficar vermelho. Assim que a stack estiver fixa, **remover o guard** dos steps que o projeto usa de facto — senao um script apagado por acidente passa a "skip" silencioso em vez de falhar.
   - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`.
   - **Job `simulators`**: **remover o job inteiro**, sem perguntar. E so do template — os dois simuladores dao `SKIP` num derivado —, e deixa-lo era um job verde em cada PR que nao mede nada (num repo privado, +1 min faturado por PR: cada job arredonda ao minuto). A mesma regra que o `/upgrade` aplica (`src/docs/upgrade-why.md`).

@@ -8,6 +8,10 @@
  * A fixture e um **repo git real** em `os.tmpdir()` — o verificador pergunta ao git o que
  * mudou desde a baseline, logo simular com ficheiros nao afirmaria nada.
  *
+ * O `lib/marcas-yaml.mjs` (o texto que as MARCAS leem num workflow, a excecao do gate deste repo e
+ * o que e so do template) testa-se pelos modulos descobertos: `tests-surface-marks.mjs` (a chave
+ * na linha do `-`, entre aspas, o CRLF) e `tests-surface-gate-repo.mjs` (o gate e o SO_DO_TEMPLATE).
+ *
  *   node .agent/scripts/tests/test-test-surface.mjs
  */
 
