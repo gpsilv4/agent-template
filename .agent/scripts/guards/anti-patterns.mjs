@@ -142,6 +142,8 @@ export function alvosDe(listDir) {
     // varredura de mutacao (#136): uma lista de alcance escrita a mao que nao inclui tudo.
     ...(listDir(".claude/hooks/lib", ".mjs") ?? []).map((n) => `.claude/hooks/lib/${n}.mjs`),
     ...(listDir(".claude/hooks/tests", ".mjs") ?? []).map((n) => `.claude/hooks/tests/${n}.mjs`),
+    // A logica do `commit-msg` do git (#278) cita `TP2`, `TP4` e `TP6`.
+    ...(listDir(".githooks/lib", ".mjs") ?? []).map((n) => `.githooks/lib/${n}.mjs`),
     "CLAUDE.md",
     "GEMINI.md",
     "AGENTS.md",

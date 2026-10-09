@@ -274,9 +274,9 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   // o `TP1`, e o `.github/scripts/` entrou na lista sem ser copiado (#277, medido).
   for (const pre of PREFIXOS_COPIADOS) {
     const rel = pre.replace(/\/$/, "");
-    // `.github/scripts/` so existe desde o #277: um template que nao o tenha (as fixtures
-    // sinteticas) nao tem nada a trazer. As outras duas continuam obrigatorias.
-    if (rel === ".github/scripts" && !existsSync(join(root, rel))) continue;
+    // `.github/scripts/` (#277) e `.githooks/` (#278) entraram depois: um template que nao os tenha
+    // (as fixtures sinteticas) nao tem nada a trazer. As outras duas continuam obrigatorias.
+    if ((rel === ".github/scripts" || rel === ".githooks") && !existsSync(join(root, rel))) continue;
     trazerDoHead(rel);
   }
   for (const rel of [".agent/rules/anti-patterns-template.md"]) {

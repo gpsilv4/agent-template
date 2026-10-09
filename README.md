@@ -329,9 +329,10 @@ not to* line, so every agent sees it.
                                   the prefixes in `tools:`, hook-enforced), debugger (full Bash)
 
 .githooks/                      <- Versioned git hooks (tool-independent)
-└── commit-msg                 <- Rejects AI attribution in commit messages.
-                                  Enable per clone: git config core.hooksPath .githooks
-                                  (the CI re-runs it on every PR, so it holds either way)
+├── commit-msg                 <- Rejects AI attribution in commit messages (a pointer to lib/).
+│                                 Enable per clone: git config core.hooksPath .githooks
+│                                 (the CI re-runs it on every PR, so it holds either way)
+└── lib/commit-msg.mjs         <- The logic: a hook has no extension, and CodeQL picks files by it.
 
 .gemini/                        <- Native Gemini CLI layer
 └── commands/                  <- Same slash commands as .claude/, in TOML (wrap .agent/workflows/)

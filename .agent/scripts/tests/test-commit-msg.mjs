@@ -15,7 +15,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, copyFileSync, chmodSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -161,8 +161,53 @@ test("ficheiro da mensagem ausente reprova", null, {
 // Sem isto, quem leva a recusa nao sabe o que fazer e alcanca o `--no-verify`.
 test("a recusa diz a regra, o ficheiro e o que fazer", "fix: x\n\nCo-Authored-By: Claude <a@b>\n", {
   code: 1,
-  includes: ["process-rules.md", ".githooks/commit-msg", "Apagar as linhas acima"],
+  includes: ["process-rules.md", ".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", "Apagar as linhas acima"],
 });
+
+// --- O PONTEIRO, chamado pelo git como no uso real (#278) ----------------------
+// O `.githooks/commit-msg` so importa `lib/commit-msg.mjs`. O git chama-o pelo nome, num repo com
+// `core.hooksPath`: e assim que se prova o import relativo — e que, sem o `lib/`, o commit FALHA
+// em vez de passar sem verificacao (falha fechada).
+function commitComHooks(nome, hooks, msg, esperaRecusa, motivo) {
+  const dir = mkdtempSync(join(tmpdir(), "commit-msg-test-"));
+  try {
+    const g = (...a) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...a], {
+      cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+    });
+    g("init", "-q");
+    g("config", "core.hooksPath", hooks(dir));
+    let recusado = false;
+    let err = "";
+    try {
+      g("commit", "-q", "--allow-empty", "-m", msg);
+    } catch (e) {
+      recusado = true;
+      err = e.stderr ?? "";
+    }
+    if (recusado === esperaRecusa && (!motivo || err.includes(motivo))) {
+      passed++;
+      console.log(`  PASS  ${nome}`);
+    } else {
+      falhas.push({ nome, problemas: [], err });
+      console.log(`  FAIL  ${nome}`);
+      console.log(`          o commit ${recusado ? "foi recusado" : "passou"}${motivo ? ` (motivo esperado: ${motivo})` : ""}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const HOOKS = join(ROOT, ".githooks");
+commitComHooks("o git chama o ponteiro, que recusa uma atribuicao a IA", () => HOOKS,
+  "fix: x\n\nCo-Authored-By: Claude <a@b>\n", true);
+commitComHooks("o git chama o ponteiro, que aceita uma mensagem limpa", () => HOOKS, "fix: x\n", false);
+commitComHooks("sem o `lib/`, o ponteiro FALHA e o commit nao passa (falha fechada)", (dir) => {
+  const h = join(dir, "hooks-sem-lib");
+  mkdirSync(h);
+  copyFileSync(HOOK, join(h, "commit-msg"));
+  chmodSync(join(h, "commit-msg"), 0o755);
+  return h;
+}, "fix: x\n", true, "lib/commit-msg.mjs");
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

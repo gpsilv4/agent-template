@@ -38,7 +38,7 @@ export const LIMITE = 500;
 export const contaLinhas = (src) => src.replace(/\n$/, "").split("\n").length;
 
 /** Onde vive a maquinaria. Cada entrada e uma pasta varrida em profundidade. */
-const PASTAS = [".agent/scripts", ".claude/hooks"];
+const PASTAS = [".agent/scripts", ".claude/hooks", ".githooks"];
 
 /**
  * Contagem congelada dos ficheiros que ja estavam acima do limite quando o guard nasceu

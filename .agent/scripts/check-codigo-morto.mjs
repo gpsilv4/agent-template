@@ -68,7 +68,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** Onde vive a maquinaria. O codigo da APP nao entra: cada projeto traz a sua stack e as suas
  *  excecoes legitimas, e um verificador que varresse `src/` era ruido no dia 1. */
-const PASTAS = [".agent/scripts", ".claude/hooks"];
+const PASTAS = [".agent/scripts", ".claude/hooks", ".githooks"];
 
 /** O texto sem o que NAO e codigo: strings e comentarios.
  *
