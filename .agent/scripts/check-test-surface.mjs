@@ -30,6 +30,7 @@ import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs";
+import { ehDerivado } from "./lib/derivado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -141,6 +142,45 @@ function git(args) {
     stdio: ["ignore", "pipe", "ignore"],
   }).trim();
 }
+
+/** O `dono/repo` DESTE repositorio (#277): do `origin`, ou do `GITHUB_REPOSITORY` no CI. `null`
+ *  se nao se souber — e ai a excecao abaixo nao se aplica (falha fechada). */
+function esteRepo() {
+  try {
+    const m = /github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?$/i.exec(git(["remote", "get-url", "origin"]));
+    if (m) return m[1];
+  } catch {
+    // sem `origin`: tenta-se o do CI
+  }
+  return process.env.GITHUB_REPOSITORY || null;
+}
+/** Os ficheiros SO DO TEMPLATE: o bootstrap remove-os e o `/upgrade` nao os traz. So neles a
+ *  excecao abaixo se aplica. Num ficheiro que o derivado HERDA (o `ci.yml`), o mesmo `if:` e
+ *  verdadeiro no template e falso em cada copia: os testes morriam em todos os derivados, e a
+ *  baseline deles ja nascia com o gate — nenhum aviso, nunca (leitura independente do #277). */
+const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
+/** Num ficheiro so do template, um `if:` cuja condicao INTEIRA e `github.repository == '<este
+ *  repo>'` e sempre verdadeiro aqui, e o ficheiro nem existe numa copia: nao desliga nada.
+ *  Neutraliza-se antes das MARCAS. Ancorado nos dois extremos como a excecao do `pull_request`:
+ *  outro nome, `!=`, uma cauda (`&& false`) — ou uma CONTINUACAO na linha seguinte, que o YAML junta
+ *  ao escalar (`\n  && false`) — continuam a contar. So o NOME ignora a caixa (o `==` do GitHub
+ *  Actions ignora-a); a chave `if:` e o contexto ficam exatos — escritos noutra caixa contam,
+ *  mesmo que o GitHub os aceitasse (falha fechada). Calculada so quando ha um ficheiro desses. */
+let gateDesteRepo;
+const semGateDesteRepo = (t) => {
+  if (gateDesteRepo === undefined) {
+    const repo = esteRepo();
+    gateDesteRepo = !repo
+      ? null
+      : new RegExp(
+          String.raw`^([ \t]*)if:[ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.repository[ \t]*==[ \t]*'` +
+            repo.replace(/[a-z]/gi, (c) => `[${c.toLowerCase()}${c.toUpperCase()}]`).replace(/[.\\-]/g, "\\$&") +
+            String.raw`'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#])`,
+          "gm"
+        );
+  }
+  return gateDesteRepo ? t.replace(gateDesteRepo, "$1# (if: so este repo)") : t;
+};
 
 let problemas = 0;
 const warn = (m) => {
@@ -324,6 +364,15 @@ if (tocados.length === 0) {
         ok(`${f}: MIGRADO para ${migradoPara} (mesmo nome noutra pasta da superficie)`);
         continue;
       }
+      // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
+      // APAGADO reprovava o PR do bootstrap e confirmava em falso o passo "apaga uma suite e
+      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra. SO num derivado
+      // (`lib/derivado.mjs`; no template, apaga-lo e perder a analise dele) e SO se o apagado era
+      // o do template (o cabecalho): o `codeql.yml` e tambem o nome do "Advanced setup" do GitHub.
+      if (SO_DO_TEMPLATE.has(f) && antes.includes("SO DO TEMPLATE") && ehDerivado((r) => (existsSync(join(ROOT, r)) ? "" : null))) {
+        ok(`${f}: removido (so do template; o BOOTSTRAP remove-o num derivado)`);
+        continue;
+      }
       // APAGADO de facto. E a forma mais brutal de enfraquecer, e merece nome proprio.
       warn(`${f}: ficheiro da superficie de teste APAGADO desde ${base}${existiaAntes ? "" : " (e ausente da baseline — verificar a mao)"}`);
       continue;
@@ -362,7 +411,10 @@ if (tocados.length === 0) {
     // continua a fazer a contagem descer e a reprovar.
     const achadas = definePadroes(f)
       ? []
-      : MARCAS.filter((m) => conta(agora, m.re, m.cru) > conta(antes, m.re, m.cru));
+      : MARCAS.filter((m) => {
+          const gate = SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t;
+          return conta(gate(agora), m.re, m.cru) > conta(gate(antes), m.re, m.cru);
+        });
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);
       const d = conta(agora, c.re, c.cru);

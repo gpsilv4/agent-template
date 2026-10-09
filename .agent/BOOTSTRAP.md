@@ -201,8 +201,8 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 15. **CI/CD** (ex: "GitHub Actions com Vercel", "GitLab CI", "GitHub Actions only")
     → Adaptar `.github/workflows/` com triggers e targets do projeto
 
-16. **Branch protection?** (require status checks, require reviews, etc.)
-    → Configurar no GitHub Settings > Branches > Branch protection rules
+16. **Repo publico ou privado (conta pessoal ou organizacao)? Branch protection?** (require status checks, require reviews, etc.)
+    → Configurar no GitHub Settings > Branches > Branch protection rules. Num privado de conta pessoal gratuita grava-se mas **nao e imposta** (ver `SECURITY.md`); a visibilidade decide tambem o que o §2.7 manda fazer ao `SECURITY.md`
 
 17. **Email de seguranca** (para disclosure de vulnerabilidades)
     → Substitui `{{SECURITY_EMAIL}}` em `SECURITY.md`
@@ -453,6 +453,8 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   - **Guards por step** (`if [ -f tsconfig.json ]`, `scripts?.lint`, …): existem para o template puro nao ficar vermelho. Assim que a stack estiver fixa, **remover o guard** dos steps que o projeto usa de facto — senao um script apagado por acidente passa a "skip" silencioso em vez de falhar.
   - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`.
   - **Job `simulators`**: **remover o job inteiro**, sem perguntar. E so do template — os dois simuladores dao `SKIP` num derivado —, e deixa-lo era um job verde em cada PR que nao mede nada (num repo privado, +1 min faturado por PR: cada job arredonda ao minuto). A mesma regra que o `/upgrade` aplica (`src/docs/upgrade-why.md`).
+- **`.github/workflows/codeql.yml` e `.github/codeql/`**: **remover os dois**, sem perguntar. Sao so do template: analisam a maquinaria dele (`.agent/`, `.claude/`), nao o codigo do projeto. O CodeQL do projeto e o "Default setup" do GitHub num repo publico (ou num privado com licenca Code Security), ligado quando houver codigo da aplicacao; num privado sem licenca, nenhum — ver o `SECURITY.md` abaixo. E apagar o que os cita: no `SECURITY.md`, o bullet "This template's own repository"; no `src/docs/agent-guide.md`, a linha do `codeql.yml`; o ponto 19 do `.agent/rules/sync-docs.md` passa a acabar em "`release.yml` (Release por tag) coerente com o `/deploy` e o `SECURITY.md`".
+- **`.github/workflows/release.yml`** + **`.github/scripts/release-da-tag.sh`**: manter os dois (andam juntos); nada a configurar. Cada tag `vX.Y.Z` cria o seu GitHub Release. O Release e criado pelo `GITHUB_TOKEN`, logo nao dispara workflows `on: release`. Se o projeto nasceu de um `git clone` do template (e nao de "Use this template"), o utilizador apaga as tags herdadas (`git tag -l 'v*' | xargs git tag -d` — o hook nega `tag -d` ao agente; e, se ja foram publicadas, tambem no remoto: `git push origin --delete <tags>`): senao a primeira release conta as notas desde uma versao do template, e as do projeto abaixo dela nunca sao a Latest.
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
@@ -462,7 +464,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template
 - **`.editorconfig`**: Verificar que reflete coding standards do projeto (tabs vs spaces, indent size)
 - **`LICENSE`**: Substituir `{{COPYRIGHT_HOLDER}}` e `{{YEAR}}`; verificar tipo de licenca (MIT por defeito)
-- **`SECURITY.md`**: Substituir `{{SECURITY_EMAIL}}`; adaptar politica de disclosure se necessario
+- **`SECURITY.md`**: Substituir `{{SECURITY_EMAIL}}`; adaptar politica de disclosure se necessario. E **ligar no GitHub** as definicoes da seccao "Enable on GitHub" — sao definicoes do repo, nao ficheiros, e um projeto novo **nao as herda**. Perguntar ao utilizador se o repo e **publico ou privado** (a tabela diz o que existe em cada caso). Ligam-se pela UI (`Settings > Advanced Security`), ou pelo agente com `gh api` **com aprovacao**. Num publico, o CodeQL e o **"Default setup"** (analisa o codigo do projeto) — ligar **quando houver codigo da aplicacao**: sem ele, a analise de JavaScript falha (so ha YAML fora das pastas ocultas, medido no template). Num **privado de conta pessoal, o CodeQL nao se liga**: a licenca Code Security so existe para organizacoes, e os termos proibem-no em codigo nao open source. Num privado, o reporte de vulnerabilidades e so por email (o privado nao tem o "Report a vulnerability"): apagar o bullet "Preferred" do `SECURITY.md` e reescrever o do email como "**Email** <email> — the only channel"
 - **`CONTRIBUTING.md`**: Adaptar workflow, commit format e scripts de teste ao projeto
 - **`CODE_OF_CONDUCT.md`**: Manter Contributor Covenant ou adaptar
 - **`.nvmrc`**: definir a versao Node do projeto — e a **fonte unica** (o `ci.yml`/`e2e.yml` leem-na via `node-version-file` e o `setup.md` remete para ela, por isso nao ha versao a duplicar)
@@ -571,6 +573,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
+- [ ] Definicoes de seguranca do GitHub ligadas conforme o `SECURITY.md` (publico vs privado)? O `codeql.yml` e a `.github/codeql/` removidos, e o CodeQL "Default setup" ligado **so** num publico (ou num privado com licenca Code Security), e so com codigo da aplicacao?
 - [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 - [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS_DO_PROJETO` (`config/superficie-de-teste.mjs`) nao casam com a tua stack e o gate esta a medir zero
 - [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o

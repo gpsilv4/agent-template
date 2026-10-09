@@ -91,13 +91,17 @@ function commit(dir, msg) {
   git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", msg]);
 }
 
-function corre(dir, base) {
+function corre(dir, base, env = {}) {
   // `base` vazio => corre SEM argumento, que e o unico modo em que a auto-deteccao da
   // baseline esta sob teste. Antes, um `mutate` que devolvesse `null` caia no `?? base` do
   // harness e o teste passava com a baseline explicita — verde sem afirmar nada.
   const args = [join(dir, ".agent/scripts/check-test-surface.mjs"), ...(base ? [base] : [])];
   try {
-    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8" }) };
+    // O `GITHUB_REPOSITORY` sai do ambiente (o CI define-o, a maquina local nao): um teste que
+    // dependa dele declara-o em `env`, e da o mesmo resultado nos dois sitios (#277).
+    // E a config git GLOBAL tambem: um `url.*.insteadOf` reescrevia o `origin` que o verificador le.
+    const { GITHUB_REPOSITORY: _ci, ...herdado } = process.env;
+    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8", env: { ...herdado, GIT_CONFIG_GLOBAL: "/dev/null", ...env } }) };
   } catch (err) {
     return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -140,11 +144,11 @@ export function registarResultado(nome, problemas, out) {
   }
 }
 
-function test(nome, mutate, expect) {
+function test(nome, mutate, expect, { env } = {}) {
   const { dir, base } = sandbox();
   try {
     const ref = mutate ? mutate(dir, base) ?? base : base;
-    const { code, out } = corre(dir, ref);
+    const { code, out } = corre(dir, ref, env);
     const problemas = avaliar({ code, out, expect });
     if (problemas.length) {
       falhas.push({ nome, problemas, out });
@@ -185,7 +189,11 @@ function seOGlobExistir(glob, nome, regista) {
   else registarResultado(nome, [`o glob por omissao ${glob} saiu da config do TEMPLATE — repor, ou mudar este teste com ele`]);
 }
 
-export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir };
+/** Uma chave irma LOGO DEPOIS de um `if:` nas fixtures: o lookahead da continuacao YAML tem de a
+ *  deixar passar. Sem ela, um lookahead alargado passava a suite inteira (auditoria do #277). */
+const DEPOIS_DO_IF = "        with:\n          a: b\n";
+
+export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir, DEPOIS_DO_IF };
 
 /** Imprime o resumo e sai. Ver a nota no cabecalho sobre porque vive aqui. */
 export function resumo() {

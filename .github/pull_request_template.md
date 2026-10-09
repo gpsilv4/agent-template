@@ -21,7 +21,7 @@
 - [ ] Security tests pass (`npm run test:security`)
 - [ ] Dependency audit reviewed (`npm run test:audit`) — it is informative in CI, so green does not mean clean
 - [ ] Doc guards pass (`node .agent/scripts/check-doc-versions.mjs`) — no WARN
-- [ ] If `.agent/scripts/`, `.claude/hooks/` or `.githooks/` changed: all nine guard suites pass (the ones `ci.yml` runs)
+- [ ] If `.agent/scripts/`, `.claude/hooks/`, `.githooks/` or `.github/scripts/` changed: all guard suites pass (the ones the `guard-tests` job in `ci.yml` runs)
 - [ ] `/review` §8 ran: anti-pattern greps from BOTH `anti-patterns.md` and `anti-patterns-template.md`
 - [ ] `/review` §10 ran: the 28-point checklist in `.agent/rules/sync-docs.md`
 - [ ] If a `check-*.mjs` changed: `node .agent/scripts/mutation-sweep.mjs` exits 0 (every warning site goes red; no checker without a suite)

@@ -97,6 +97,9 @@ export const SUITES = [
   // `lib/pares.mjs` junta-os a varredura. Mexer na lista obriga a correr os dois.
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
+  // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
+  // via no Release seguinte, ja publicado.
+  { re: /^(\.github\/scripts\/release-da-tag\.sh|\.agent\/scripts\/tests\/test-release-da-tag\.mjs)$/, verifica: [S("test-release-da-tag.mjs")] },
   // A limpeza de `tmpdir` decide se uma copia de trabalho e apagada — e uma decisao errada aqui
   // apaga a copia de uma corrida VIVA. Regra propria, antes da generica de `lib/`, porque a
   // suite dela e a unica que exercita o contra-caso (o processo vivo que nao se toca).

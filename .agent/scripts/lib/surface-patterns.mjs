@@ -197,10 +197,16 @@ const MARCAS = [
   // condicao volta a contar — inclusive um composto legitimo como `&& matrix.node == 20`, e
   // esse e o comportamento pretendido: um step que deixa de correr em parte dos PRs reduz o
   // que se verifica num PR, e a excecao existe so para o caso em que nada se perde.
-  // O `(["']?)…\1` faz o par das aspas do escalar YAML casar (nao aceita abrir com `"` e
+  // O `(["']?)…\2` faz o par das aspas do escalar YAML casar (nao aceita abrir com `"` e
   // fechar com `'`), e o `(?:#[^\n]*)?` deixa passar um comentario YAML na cauda, que nao
-  // muda a condicao. Medido: 21 formas (10 a excluir, 11 a contar), todas certas.
-  { re: /^[ \t]*if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*(?:\}\})?[ \t]*\1[ \t]*(?:#[^\n]*)?$)/m, msg: "condicao `if:`", cru: true },
+  // muda a condicao. Medido: 21 formas (10 a excluir, 11 a contar), todas certas — antes da
+  // continuacao, cujos casos tem testes proprios em `tests-surface-marks.mjs`.
+  //
+  // E a CONTINUACAO (#277): o `$` so ancora a primeira linha, e o YAML junta ao escalar uma linha
+  // seguinte mais indentada (`if: github.event_name == 'pull_request'` + `\n    && false`). A
+  // excecao recusa-a: depois do `$`, nenhuma linha seguinte (saltando as em branco) mais indentada
+  // que a chave (`\1`, a indentacao capturada) que nao seja comentario.
+  { re: /^([ \t]*)if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#]))/m, msg: "condicao `if:`", cru: true },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },

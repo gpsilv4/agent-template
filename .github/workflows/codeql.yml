@@ -1,0 +1,64 @@
+# CodeQL — analise estatica da MAQUINARIA deste template (#277). **SO DO TEMPLATE.**
+#
+# PORQUE NAO O "DEFAULT SETUP" AQUI: ele ignora pastas ocultas, e todo o codigo deste repo vive em
+# `.agent/scripts/` e `.claude/hooks/`. Medido: o extrator de JavaScript so leu os YAML de
+# `.github/` e falhou ("could not process any of it"). A config ao lado diz onde esta o codigo.
+#
+# NUM PROJETO DERIVADO NAO CORRE: o job so corre NESTE repositorio (`if:` abaixo). Um repo criado
+# com "Use this template" dispara os workflows `on: push` no commit inicial, ANTES do bootstrap — e
+# num privado o CodeQL nao pode correr. A condicao e a excecao estreita do `check-test-surface`:
+# um `if:` que so compara `github.repository` com o nome DESTE repo e sempre verdadeiro aqui.
+# O nome esta escrito a mao: se este repo mudar de nome ou de dono, o job SALTA em silencio —
+# atualizar o `if:` (o GitHub redireciona o nome antigo, mas o `github.repository` e o novo).
+#
+# Alem disso, este ficheiro e a config SAEM do derivado (o BOOTSTRAP remove-os; o `/upgrade` nao os
+# traz), como o job `simulators`:
+#   - repo PUBLICO: ligar o "Default setup" (Settings > Advanced Security > CodeQL analysis) — esse
+#     analisa o codigo da APLICACAO (`src/`...), escolhe as linguagens e nao precisa de ficheiro;
+#   - repo PRIVADO sem licenca GitHub Code Security: nao ligar nada. Os termos do CodeQL proibem
+#     usa-lo em codigo que nao e open source ("e.g., code in a private repo"), com ou sem upload —
+#     e gastava minutos do plano sem resultado visivel. Ver `SECURITY.md`.
+#
+# Com este workflow, o "Default setup" deste repo fica DESLIGADO: os dois nao coexistem.
+#
+# AUTO-MERGE DO DEPENDABOT (opt-in, `dependabot-auto-merge.yml`): faz squash, e o push no `main`
+# feito pelo Dependabot tem o token so de leitura — o upload deste workflow falhava nesse push. Se
+# o ligares aqui, trocar o `--squash` desse workflow por `--merge` (e permitir "Create a merge
+# commit" em Settings > General): e o conselho da documentacao do GitHub.
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    if: github.repository == 'gpsilv4/agent-template'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v7
+      # Por SHA, como as actions de terceiros do `ci.yml` (so as `actions/*` ficam por tag); o
+      # Dependabot mantem o pin.
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          category: "/language:${{ matrix.language }}"

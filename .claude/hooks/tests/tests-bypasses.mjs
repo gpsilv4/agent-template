@@ -91,6 +91,10 @@ const BYPASSES = [
   ["fetch com refspec escreve refs locais", "git fetch . HEAD:master"],
   ["stash drop destroi", "git stash drop"],
   ["tag -d apaga uma tag", "git tag -d v1.0.0"],
+  // O outro lado do `-F` (#277): o `-f` minusculo reescreve uma tag publicada. Sem este caso,
+  // tirar `-f|--force` das formas inseguras do `tag` nao fazia falhar nada.
+  ["tag -f reescreve uma tag", "git tag -f v1.0.0"],
+  ["tag --force reescreve uma tag", "git tag --force v1.0.0"],
   ["reflog expire destroi a rede de recuperacao", "git reflog expire --expire=now --all"],
   ["remote set-url muda o destino do push", "git remote set-url origin git@x:y.git"],
   ["config --unset apaga configuracao", "git config --unset user.email"],

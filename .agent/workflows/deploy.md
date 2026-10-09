@@ -166,10 +166,21 @@ gh pr merge --squash         # (ou merge pela UI do GitHub)
 #    SO NO TEMPLATE DE ORIGEM: o `.agent/TEMPLATE_VERSION` tem de dizer `vX.Y.Z` ANTES da tag —
 #    sobe-se no PR da release. E o que um projeto criado com "Use this template" grava como a sua
 #    origem, e o `simulate-upgrade` reprova se ficar atras da ultima tag (M6 do #195).
+#    Tag ANOTADA, com a mensagem num FICHEIRO FORA do repo (ex. no tmpdir; escrito com a
+#    ferramenta de edicao, nao pelo shell; dentro do repo ficava por commitar): 1.a linha = titulo do GitHub Release ("vX.Y.Z — titulo"), linha em branco, o resto =
+#    notas. Nunca `-m "..."`: uma crase entre aspas duplas EXECUTA (TP10).
 git checkout main
-git pull origin main
-git tag vX.Y.Z -m "Descricao da release"
-git push origin --tags
+git pull --ff-only origin main   # o hook so deixa `pull --ff-only` em `main`
+git tag -a vX.Y.Z -F <ficheiro-com-a-mensagem>
+git push origin vX.Y.Z
+
+# 4. O GitHub Release cria-se SOZINHO (`.github/workflows/release.yml`, #277): titulo e notas
+#    da tag, e a lista de PRs desde a versao final anterior. Esperar o run e confirmar:
+#    `id=$(gh run list --workflow=release.yml --event=push --limit 1 --json databaseId --jq '.[0].databaseId')`
+#    (vazio logo a seguir ao push: repetir), `gh run watch "$id" --exit-status`, `gh release view vX.Y.Z`.
+#    Nao aparece se o commit da tag for anterior ao `release.yml`, ou se o push levar mais de 3
+#    tags (o GitHub nao gera eventos): uma tag por push. Nesses casos, cria-lo a mao com
+#    `bash .github/scripts/release-da-tag.sh vX.Y.Z` (idempotente), **com aprovacao**: publica.
 ```
 
 ## Racionalizacoes
@@ -180,6 +191,7 @@ git push origin --tags
 | Desculpa | Porque nao |
 |---|---|
 | "O CI esta verde." | Com zero checks, o `gh pr checks --watch` sai 0: o gate conta os checks antes de esperar (secao 2). |
+| "A tag chega, o Release faz-se depois." | O Release cria-se sozinho da tag; sem o `release.yml` ficaram 50 de 55 tags sem ele (#277). Confirmar que apareceu (secao 7). |
 | "Subo a versao depois da tag." | No template, o `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
 | "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
 | "O Security Audit esta verde." | Por omissao e informativo (`continue-on-error`): verde nao e limpo. Ler o relatorio (secao 2). |

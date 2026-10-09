@@ -10,7 +10,7 @@
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, DEPOIS_DO_IF } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -130,8 +130,9 @@ export function registar() {
     writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
     commit(dir, "ci");
     const ref = git(dir, ["rev-parse", "HEAD"]);
+    // Uma chave irma LOGO DEPOIS do `if:`: o lookahead da continuacao tem de a deixar passar. Sem elas, um lookahead alargado passava a suite inteira (auditoria do #277).
     writeFileSync(join(dir, ".github/workflows/ci.yml"),
-      `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n`);
+      `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n${DEPOIS_DO_IF}`);
     commit(dir, `gate ${cond}`);
     return ref;
   };
@@ -178,6 +179,16 @@ export function registar() {
   test("`if: … == 'pull_request'  # comentario` NAO e enfraquecimento", (dir) => {
     return gatedPor(dir, "github.event_name == 'pull_request'  # so em PRs");
   }, { code: 0, excludes: ["condicao `if:`"] });
+
+  test("`if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento", (dir) => {
+    return gatedPor(dir, "github.event_name == 'pull_request'\n          && false");
+  }, { code: 1, includes: ["condicao `if:`"] });
+  test("`if: … == 'pull_request'` + comentario MAIS indentado NAO e enfraquecimento", (dir) => {
+    return gatedPor(dir, "github.event_name == 'pull_request'\n          # um comentario nao continua o escalar");
+  }, { code: 0, excludes: ["condicao `if:`"] });
+  test("`if: … == 'pull_request'` + linha em branco + continuacao `&& false` E enfraquecimento", (dir) => {
+    return gatedPor(dir, "github.event_name == 'pull_request'\n\n          && false");
+  }, { code: 1, includes: ["condicao `if:`"] });
 
   test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {
     // `if (failures.length) {` -> `if (false) {`: o `process.exit(1)` fica **la** e portanto a

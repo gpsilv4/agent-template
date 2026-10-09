@@ -1,0 +1,40 @@
+# Release — cada tag de versao cria o seu GitHub Release (#277).
+#
+# PORQUE EXISTE: o `/deploy` mandava criar a tag, e o Release ficava a mao — 50 de 55 tags ficaram
+# sem ele. Uma tag e o que o `/upgrade` dos derivados usa; o Release e o que quem segue o repo ve.
+#
+# FORMATO (o dos Releases existentes): titulo = a primeira linha da tag anotada (com a tag a
+# frente, se nao a tiver); notas = o corpo da tag e a lista de PRs desde a versao FINAL anterior.
+# Uma tag com `-` (`v1.1.0-rc1`) sai como pre-release, nunca como a "Latest"; uma versao final so
+# e a "Latest" se for a mais alta (um `v0.53.1` tardio nao a rouba ao `v0.54.0`).
+# Se o Release ja existir (criado a mao), nao faz nada.
+#
+# So usa o `GITHUB_TOKEN`: funciona em repo publico e privado, em qualquer plano. Por isso o
+# Release criado aqui NAO dispara outros workflows (`on: release`) — regra do GitHub para eventos
+# do `GITHUB_TOKEN`. Um workflow que deva correr numa release dispara-se com `on: push: tags`.
+#
+# Precisa do `.github/scripts/release-da-tag.sh`: os dois andam juntos (BOOTSTRAP, `/upgrade`).
+# So dispara numa tag cujo commit ja tenha este ficheiro, e so se o push levar ate 3 tags (com
+# mais, o GitHub nao gera eventos) — ver o `/deploy`.
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Criar o Release da tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: bash .github/scripts/release-da-tag.sh "$TAG"

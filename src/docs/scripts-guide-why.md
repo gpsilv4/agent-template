@@ -8,7 +8,7 @@
 ## `guard-protected-branch` — os detalhes que so aparecem quando se mede
 
     - **A forma conta, nao so o verbo** (`FORMAS_INSEGURAS`): `switch -C main` faz o que `reset --hard` faz, e `branch -f`/`branch -D`/`fetch . HEAD:master` reescrevem ou apagam um branch protegido. O verbo esta em `SEGUROS` e a flag e que destroi.
-    - **Alguns verbos exigem uma forma** (`FORMA_EXIGIDA`): `pull --ff-only` e `push --tags` passam porque o procedimento de release deste repo (`deploy.md`, `CONTRIBUTING.md`) corre em `main`; nega-los punha o guard contra a documentacao, e um falso positivo que bloqueia trabalho documentado custa tanto como um bypass.
+    - **Alguns verbos exigem uma forma** (`FORMA_EXIGIDA`): `pull --ff-only` e o push de uma tag (`git push origin vX.Y.Z`, e tambem `--tags`) passam porque o procedimento de release deste repo (`deploy.md`, `CONTRIBUTING.md`) corre em `main`; nega-los punha o guard contra a documentacao, e um falso positivo que bloqueia trabalho documentado custa tanto como um bypass.
     - **So o verbo falha fechado.** Chegar ao verbo depende da lista `WRAPPERS`, que **e** uma blocklist: `flock`, `su -c`, `ssh host git commit` e `GIT_PAGER='git commit' git log` passam. Esta escrito no cabecalho do hook e nao se finge o contrario.
 
 ## `simulate-derived` — porque a lista de comandos e derivada
