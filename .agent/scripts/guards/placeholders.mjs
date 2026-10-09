@@ -109,6 +109,8 @@ export function alvosPlaceholders(listDir) {
     // do `simulate-derived.mjs`, no dia em que ela passou a olhar para alem das extensoes que
     // ela propria substitui.
     ...(listDir(".githooks", "") || []).map((f) => `.githooks/${f}`),
+    // E a logica deles, em `lib/` (#278): o `commit-msg` passou a ponteiro para `lib/commit-msg.mjs`.
+    ...(listDir(".githooks/lib", ".mjs") || []).map((f) => `.githooks/lib/${f}.mjs`),
   ];
 }
 

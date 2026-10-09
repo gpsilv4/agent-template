@@ -41,7 +41,9 @@ export function andaFicheiros(base, fn, rel = "") {
  *  `.github/scripts/` entrou com o `release-da-tag.sh` (#277): e maquinaria do template como as
  *  outras duas, e a suite dele vive em `.agent/scripts/tests/` — copiada sem ele, reprovava em
  *  todo o projeto atualizado (medido pelo `simulate-upgrade`). */
-export const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/", ".github/scripts/"];
+/*  `.githooks/` entrou com o #278: o `commit-msg` passou a ponteiro para `lib/commit-msg.mjs`, e um
+ *  projeto que trouxesse o ponteiro sem o modulo ficava com um hook que rebenta no `import`. */
+export const PREFIXOS_COPIADOS = [".agent/scripts/", ".claude/hooks/", ".github/scripts/", ".githooks/"];
 
 /** Constantes que MUDARAM DE CASA entre versoes, e para onde foram.
  *
@@ -93,4 +95,8 @@ export const CONSTANTES_DO_PROJETO = [
   [".agent/scripts/check-doc-versions.mjs", "BANNED"],
   [".agent/scripts/guards/versions.mjs", "CHECKS"],
   [".agent/scripts/lib/surface-patterns.mjs", "CONTAGENS"],
+  // A lista de nomes de IA do `commit-msg` (#278): a recusa manda o projeto ajusta-la ali, e o
+  // `/upgrade` passou a copiar o `.githooks/`. Na casa antiga (`.githooks/commit-msg`, ate a v0.54.0)
+  // estava em varias linhas e o motor nao a le: essa unica mudanca de casa aparece em `substituidos`.
+  [".githooks/lib/commit-msg.mjs", "IA"],
 ];

@@ -450,6 +450,16 @@ export function registar() {
     commit(dir, "apagar o githook");
     return base;
   }, { code: 1, includes: [".githooks/pre-push", "APAGADO"] });
+  // E a logica deles em `lib/` (#278): o `commit-msg` e um ponteiro, e quem decide e o modulo.
+  test("modulo em .githooks/lib/ apagado e reportado", (dir) => {
+    mkdirSync(join(dir, ".githooks/lib"), { recursive: true });
+    writeFileSync(join(dir, ".githooks/lib/commit-msg.mjs"), "export const correr = () => process.exit(1);\n");
+    commit(dir, "modulo do githook");
+    const base = git(dir, ["rev-parse", "HEAD"]).trim();
+    rmSync(join(dir, ".githooks/lib/commit-msg.mjs"));
+    commit(dir, "apagar o modulo");
+    return base;
+  }, { code: 1, includes: [".githooks/lib/commit-msg.mjs", "APAGADO"] });
 
   // `.claude/hooks/lib/` esteve fora da superficie enquanto `.agent/scripts/lib/` ja estava
   // dentro: a lacuna foi fechada de um lado e deixada aberta do outro. Medido no CI —

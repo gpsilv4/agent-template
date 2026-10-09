@@ -90,6 +90,8 @@ const CONFIG_CONTAVEIS = [
   // O `.githooks/` nao tem extensao (o git exige o nome exato do evento), logo nao ha sufixo
   // por onde o apanhar.
   /(^|\/)\.githooks\/[^/]+$/,
+  // E a logica deles em `lib/` (#278): o `commit-msg` e um ponteiro, e o que decide vive la.
+  /(^|\/)\.githooks\/lib\/[^/]+\.mjs$/,
   // As tabelas de padroes deste verificador (`lib/surface-patterns.mjs`) ficam na superficie
   // pelo glob de `lib/` abaixo. Tinham linha propria de antes de se mudarem para la — redundante
   // desde entao, e por isso impossivel de testar (#183).

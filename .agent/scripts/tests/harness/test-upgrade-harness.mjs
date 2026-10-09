@@ -290,6 +290,8 @@ export function templateSintetico(extra = {}) {
     ".agent/scripts/guards/versions.mjs": "const CHECKS = [\n];\n",
     ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n];\nconst CONFIG_GLOBS = [\n];\n",
     ".agent/scripts/lib/surface-patterns.mjs": "const CONTAGENS = [\n];\n",
+    // A lista de nomes de IA do `commit-msg` (#278), tambem preservada pelo nome.
+    ".githooks/lib/commit-msg.mjs": "const IA = /claude/i;\n",
     // O guard dos tamanhos exporta TRES coisas que a adaptacao 2b usa: a tabela que reescreve, e
     // a contagem/limite que importa dele para nao existir uma segunda copia da mesma regra. Uma
     // fixture so com a tabela fazia o import trazer `undefined` e a simulacao rebentava — a

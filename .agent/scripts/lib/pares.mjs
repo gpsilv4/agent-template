@@ -298,12 +298,21 @@ const PARES_DO_TEMPLATE = [
   {
     // O hook `commit-msg` do git. Nao vive em `.claude/hooks/` porque nao e so-Claude-Code: e
     // o git que o corre, logo vale para qualquer ferramenta e qualquer pessoa. O `sinal` e o
-    // `console.error(` — e por ai que ele explica a recusa antes de sair `!= 0`.
-    alvo: ".githooks/commit-msg",
+    // `recusar(` — e por ai que ele explica a recusa antes de sair `!= 0`. O alvo e o MODULO:
+    // o `.githooks/commit-msg` e so um ponteiro que o importa (#278).
+    alvo: ".githooks/lib/commit-msg.mjs",
     suite: ".agent/scripts/tests/test-commit-msg.mjs",
     // : sem isto o padrao casava a DEFINICAO, e mutar uma definicao da erro
     // de sintaxe — a suite ficava vermelha pela razao errada e contava como cobertura.
     sinal: /(?<![\w.$])(?<!function\s)recusar\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // O PONTEIRO que o git chama pelo nome (#278). O unico sitio e a chamada ao modulo: sem ela o
+    // hook sai 0 com qualquer mensagem — e a suite, que o corre como o git, tem de o notar.
+    alvo: ".githooks/commit-msg",
+    suite: ".agent/scripts/tests/test-commit-msg.mjs",
+    sinal: /(?<![\w.$])correr\(/,
     neutro: "(() => {})(",
   },
   {

@@ -1,12 +1,13 @@
 # Onde vive o codigo deste template (#277). **So do template**: num projeto derivado este ficheiro
 # sai, com o `codeql.yml` (ver o cabecalho dele). As pastas comecam por `.`, e por omissao o CodeQL
 # ignora-as: sem esta lista, a analise de JavaScript nao via nenhum ficheiro.
-# `.github` fica para a analise dos workflows (linguagem `actions`).
-# Lacuna conhecida: o `.githooks/commit-msg` e JavaScript sem extensao, e o extrator escolhe os
-# ficheiros pela extensao — fica fora da analise.
+# `.github` fica para a analise dos workflows (linguagem `actions`). Do `.githooks/` entra o
+# `lib/commit-msg.mjs`: o `commit-msg` do git nao tem extensao e o extrator escolhe os ficheiros
+# por ela, por isso a logica vive no modulo e o hook so o importa (#278).
 name: agent-template
 
 paths:
   - .agent/scripts
   - .claude/hooks
+  - .githooks
   - .github

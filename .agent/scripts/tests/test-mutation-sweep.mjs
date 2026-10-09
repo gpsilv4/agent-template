@@ -479,6 +479,7 @@ registarResultado(
     ".claude/hooks/",
     ".claude/hooks/lib/",
     ".githooks/",
+    ".githooks/lib/",
   ];
   registarResultado(
     "descoberta: a lista cobre todas as pastas com sitios de recusa",

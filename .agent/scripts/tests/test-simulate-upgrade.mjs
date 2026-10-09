@@ -35,6 +35,7 @@ import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { registar as registarMedida2b } from "./tests-medida-2b.mjs";
 import { registar as registarForaDoTemplate } from "./tests-upgrade-fora-do-template.mjs";
 import { registar as registarPlaceholders } from "./tests-upgrade-placeholders.mjs";
+import { registar as registarConstantes } from "./tests-upgrade-constantes.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
@@ -48,6 +49,7 @@ registarMotor();
 registarMedida2b();
 registarForaDoTemplate();
 registarPlaceholders();
+registarConstantes();
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 
@@ -326,11 +328,14 @@ test("ficheiro NOVO do template chega ao consumidor", () => {
 
 // `.github/scripts/` e maquinaria como `.agent/scripts/` (#277): a suite do `release-da-tag.sh`
 // vive em `.agent/scripts/tests/`, e copiada sem o script reprovava em todo o projeto atualizado.
-test("`.github/scripts/` do template chega ao consumidor", () => {
+test("`.github/scripts/` e `.githooks/lib/` do template chegam ao consumidor", () => {
   let c;
   try {
-    c = cenario({ ontem: {}, hoje: { ".github/scripts/novo.sh": "#!/bin/bash\necho novo\n" } });
-    return c.ler(".github/scripts/novo.sh") === "#!/bin/bash\necho novo\n" ? [] : ["o `.github/scripts/` nao chegou ao consumidor"];
+    c = cenario({ ontem: {}, hoje: { ".github/scripts/novo.sh": "#!/bin/bash\necho novo\n", ".githooks/lib/novo.mjs": "// novo\n" } });
+    return [
+      ...(c.ler(".github/scripts/novo.sh") === "#!/bin/bash\necho novo\n" ? [] : ["o `.github/scripts/` nao chegou ao consumidor"]),
+      ...(c.ler(".githooks/lib/novo.mjs") === "// novo\n" ? [] : ["o `.githooks/lib/` nao chegou ao consumidor (#278)"]),
+    ];
   } finally {
     limpa(c);
   }

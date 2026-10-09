@@ -51,5 +51,8 @@ export function alvosNoDisco(listarDir) {
     // buraco que esta descoberta existe para nao ter. Os ficheiros nao tem extensao (o git
     // exige o nome exacto do evento), logo nao ha filtro por sufixo.
     ...listarDir(".githooks").map((f) => `.githooks/${f}`),
+    // E a logica deles em `lib/` (#278): a matriz manda por la cada hook novo, e um segundo modulo
+    // entrava sem par e sem suite — a lacuna que o `.claude/hooks/lib/` ja teve.
+    ...listarDir(".githooks/lib").filter((f) => f.endsWith(".mjs")).map((f) => `.githooks/lib/${f}`),
   ];
 }
