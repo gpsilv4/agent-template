@@ -22,7 +22,7 @@ cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 > **E preciso um clone local do template**: `$TPL` e um **diretorio**, nao uma URL. So com a
 > URL: `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
 
-Isto decide o modo (o B e o normal num projeto anterior a marca).
+Isto decide o modo.
 
 ### Modo A — com marca (`.agent/.template-version` existe)
 
@@ -77,7 +77,7 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | O estado e a historia deste projeto, so existem aqui |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards proprios deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) e `.github/scripts/` | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) e `.github/scripts/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
 | **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | O que o git do `$TPL` **ignora**, e nomes de segredo | **Nunca copiar** | Nao e do template. A mao, so o que `git -C "$TPL" ls-files` lista (`upgrade-why.md`) |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |

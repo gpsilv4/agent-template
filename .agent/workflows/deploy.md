@@ -175,7 +175,9 @@ git tag -a vX.Y.Z -F <ficheiro-com-a-mensagem>
 git push origin vX.Y.Z
 
 # 4. O GitHub Release cria-se SOZINHO (`.github/workflows/release.yml`, #277): titulo e notas
-#    da tag, e a lista de PRs desde a versao final anterior. Esperar o run (`gh run watch`) e confirmar (`gh release view vX.Y.Z`).
+#    da tag, e a lista de PRs desde a versao final anterior. Esperar o run e confirmar:
+#    `id=$(gh run list --workflow=release.yml --event=push --limit 1 --json databaseId --jq '.[0].databaseId')`
+#    (vazio logo a seguir ao push: repetir), `gh run watch "$id" --exit-status`, `gh release view vX.Y.Z`.
 #    Nao aparece se o commit da tag for anterior ao `release.yml`, ou se o push levar mais de 3
 #    tags (o GitHub nao gera eventos): uma tag por push. Nesses casos, cria-lo a mao com
 #    `bash .github/scripts/release-da-tag.sh vX.Y.Z` (idempotente), **com aprovacao**: publica.

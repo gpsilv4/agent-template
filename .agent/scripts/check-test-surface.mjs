@@ -30,6 +30,7 @@ import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs";
+import { ehDerivado } from "./lib/derivado.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -365,10 +366,10 @@ if (tocados.length === 0) {
       }
       // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
       // APAGADO reprovava o PR do bootstrap e confirmava em falso o passo "apaga uma suite e
-      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra. SO num derivado (a marca
-      // `.agent/.template-version`, que o bootstrap cria): no proprio template, apaga-lo e perder
-      // a analise dele, e continua APAGADO.
-      if (SO_DO_TEMPLATE.has(f) && existsSync(join(ROOT, ".agent/.template-version"))) {
+      // corre" do BOOTSTRAP (auditoria do #277). A linha fica no ecra. SO num derivado
+      // (`lib/derivado.mjs`; no template, apaga-lo e perder a analise dele) e SO se o apagado era
+      // o do template (o cabecalho): o `codeql.yml` e tambem o nome do "Advanced setup" do GitHub.
+      if (SO_DO_TEMPLATE.has(f) && antes.includes("SO DO TEMPLATE") && ehDerivado((r) => (existsSync(join(ROOT, r)) ? "" : null))) {
         ok(`${f}: removido (so do template; o BOOTSTRAP remove-o num derivado)`);
         continue;
       }

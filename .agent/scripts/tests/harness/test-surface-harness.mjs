@@ -189,7 +189,11 @@ function seOGlobExistir(glob, nome, regista) {
   else registarResultado(nome, [`o glob por omissao ${glob} saiu da config do TEMPLATE — repor, ou mudar este teste com ele`]);
 }
 
-export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir };
+/** Uma chave irma LOGO DEPOIS de um `if:` nas fixtures: o lookahead da continuacao YAML tem de a
+ *  deixar passar. Sem ela, um lookahead alargado passava a suite inteira (auditoria do #277). */
+const DEPOIS_DO_IF = "        with:\n          a: b\n";
+
+export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir, DEPOIS_DO_IF };
 
 /** Imprime o resumo e sai. Ver a nota no cabecalho sobre porque vive aqui. */
 export function resumo() {

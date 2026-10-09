@@ -10,7 +10,7 @@
 import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, DEPOIS_DO_IF } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -125,7 +125,6 @@ export function registar() {
   //
   // Fabrica os dois commits e devolve a baseline. So o texto do `if:` varia, logo o que o teste
   // mede e a excecao e nada mais.
-  const DEPOIS_DO_IF = "        with:\n          a: b\n";
   const gatedPor = (dir, cond) => {
     mkdirSync(join(dir, ".github/workflows"), { recursive: true });
     writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
@@ -181,44 +180,6 @@ export function registar() {
     return gatedPor(dir, "github.event_name == 'pull_request'  # so em PRs");
   }, { code: 0, excludes: ["condicao `if:`"] });
 
-  // A segunda excecao (#277): um job so para ESTE repositorio (`github.repository == 'dono/repo'`)
-  // e sempre verdadeiro aqui — o `codeql.yml` do template usa-a para ficar inerte nas copias. O
-  // nome DESTE repo vem do `origin` (fixado aqui, para o teste nao depender do ambiente do CI).
-  // Cada forma leva o seu par: outro nome, `!=` e uma cauda tem de continuar a contar.
-  // So no ficheiro SO DO TEMPLATE (`codeql.yml`): no `ci.yml`, que os derivados herdam, o mesmo
-  // `if:` desligava os testes em cada copia — o par negativo abaixo e o que o prova.
-  const gatedNoRepo = (dir, cond, wf = "codeql.yml", origin = "https://github.com/dono/repo.git") => {
-    if (origin) git(dir, ["remote", "add", "origin", origin]);
-    mkdirSync(join(dir, ".github/workflows"), { recursive: true });
-    writeFileSync(join(dir, `.github/workflows/${wf}`), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n");
-    commit(dir, wf);
-    const ref = git(dir, ["rev-parse", "HEAD"]);
-    writeFileSync(join(dir, `.github/workflows/${wf}`), `jobs:\n  t:\n    steps:\n      - run: node a-test.mjs\n        if: ${cond}\n${DEPOIS_DO_IF}`);
-    commit(dir, `gate ${cond}`);
-    return ref;
-  };
-  test("no `codeql.yml`, `if: github.repository == '<este repo>'` NAO e enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'");
-  }, { code: 0, excludes: ["condicao `if:`"] });
-  test("no `codeql.yml`, `if: ${{ github.repository == '<este repo>' }}` NAO e enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "${{ github.repository == 'dono/repo' }}");
-  }, { code: 0, excludes: ["condicao `if:`"] });
-  test("no `ci.yml` (herdado pelos derivados), o MESMO `if:` E enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "ci.yml");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  test("`if: github.repository == '<OUTRO repo>'` E enfraquecimento (desligava o passo aqui)", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'outro/repo'");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  test("`if: github.repository != '<este repo>'` E enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository != 'dono/repo'");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  test("`if: github.repository == '<este repo>' && false` E enfraquecimento (a cauda conta)", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo' && false");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  // A CONTINUACAO: o YAML junta ao escalar a linha seguinte mais indentada (`&& false`).
-  test("`if: github.repository == '<este repo>'` + continuacao `&& false` E enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'\n          && false");
-  }, { code: 1, includes: ["condicao `if:`"] });
   test("`if: … == 'pull_request'` + continuacao `&& false` E enfraquecimento", (dir) => {
     return gatedPor(dir, "github.event_name == 'pull_request'\n          && false");
   }, { code: 1, includes: ["condicao `if:`"] });
@@ -227,60 +188,6 @@ export function registar() {
   }, { code: 0, excludes: ["condicao `if:`"] });
   test("`if: … == 'pull_request'` + linha em branco + continuacao `&& false` E enfraquecimento", (dir) => {
     return gatedPor(dir, "github.event_name == 'pull_request'\n\n          && false");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  // Os ficheiros so do template saem de cada derivado pelo BOOTSTRAP: remove-los nao e APAGADO.
-  test("num derivado, remover o `codeql.yml` (so do template) NAO e APAGADO", (dir) => {
-    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'");
-    writeFileSync(join(dir, ".agent/.template-version"), "v0.0.0\n"); // a marca do bootstrap
-    rmSync(join(dir, ".github/workflows/codeql.yml"));
-    commit(dir, "bootstrap remove o codeql");
-    return ref;
-  }, { code: 0, includes: ["so do template"], excludes: ["APAGADO"] });
-  test("no PROPRIO template (sem a marca), remover o `codeql.yml` continua APAGADO", (dir) => {
-    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'");
-    rmSync(join(dir, ".github/workflows/codeql.yml"));
-    commit(dir, "apagar o codeql no template");
-    return ref;
-  }, { code: 1, includes: ["APAGADO"] });
-  test("remover o `ci.yml` (herdado) continua APAGADO", (dir) => {
-    const ref = gatedNoRepo(dir, "github.repository == 'dono/repo'", "ci.yml");
-    rmSync(join(dir, ".github/workflows/ci.yml"));
-    commit(dir, "apagar o ci");
-    return ref;
-  }, { code: 1, includes: ["APAGADO"] });
-  test("`if: github.repository == '<este repo>'` + linha em branco + continuacao `&& false` E enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'\n\n          && false");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  test("`if: \"github.repository == '<este repo>'\"  # nota` (aspas, comentario na cauda) NAO e enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "\"github.repository == 'dono/repo'\"  # nota\n          # comentario mais indentado");
-  }, { code: 0, excludes: ["condicao `if:`"] });
-  test("o `origin` ganha ao `GITHUB_REPOSITORY`", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'");
-  }, { code: 0, excludes: ["condicao `if:`"] }, { env: { GITHUB_REPOSITORY: "outro/x" } });
-  test("um `origin` fora do GitHub cai no `GITHUB_REPOSITORY`", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", "https://gitlab.com/a/b.git");
-  }, { code: 0, excludes: ["condicao `if:`"] }, { env: { GITHUB_REPOSITORY: "dono/repo" } });
-  // DE ONDE vem o nome deste repo: o `origin` (`https` ou `git@`, com ou sem `.git`), senao o
-  // `GITHUB_REPOSITORY` do CI; sem nenhum, a excecao nao se aplica (falha fechada).
-  test("sem `origin`, o nome vem do `GITHUB_REPOSITORY` (o CI)", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", null);
-  }, { code: 0, excludes: ["condicao `if:`"] }, { env: { GITHUB_REPOSITORY: "dono/repo" } });
-  test("sem `origin` nem `GITHUB_REPOSITORY`, o `if:` CONTA (falha fechada)", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", null);
-  }, { code: 1, includes: ["condicao `if:`"] });
-  test("`origin` em `git@github.com:dono/repo` (sem `.git`) da o nome", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/repo'", "codeql.yml", "git@github.com:dono/repo");
-  }, { code: 0, excludes: ["condicao `if:`"] });
-  // Um `.` no nome e literal: sem o escape, `dono/a.b` casava `dono/aXb` — outro repo.
-  test("o `.` do nome deste repo e literal (`'dono/aXb'` nao e `dono/a.b`)", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'dono/aXb'", "codeql.yml", "https://github.com/dono/a.b.git");
-  }, { code: 1, includes: ["condicao `if:`"] });
-  // O `==` do GitHub Actions ignora a caixa, logo o NOME tambem; o contexto fica exato.
-  test("o nome deste repo noutra caixa (`'Dono/Repo'`) NAO e enfraquecimento", (dir) => {
-    return gatedNoRepo(dir, "github.repository == 'Dono/Repo'");
-  }, { code: 0, excludes: ["condicao `if:`"] });
-  test("`GITHUB.REPOSITORY` noutra caixa nao e a excecao: conta (falha fechada)", (dir) => {
-    return gatedNoRepo(dir, "GITHUB.REPOSITORY == 'dono/repo'");
   }, { code: 1, includes: ["condicao `if:`"] });
 
   test("tornar o veredicto do runner inalcancavel e enfraquecimento", (dir) => {

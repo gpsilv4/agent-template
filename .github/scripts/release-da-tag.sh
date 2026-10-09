@@ -18,13 +18,22 @@ fi
 # O checkout de uma tag pode trazer so a referencia leve, sem o objecto da tag anotada; e, corrido
 # a mao, as tags locais podem estar atrasadas (a "Latest" abaixo compara-as). Buscar TODAS as tags
 # garante as duas coisas. Sem esconder o erro: se falhar, quer-se ve-lo no log.
-git fetch --force --tags origin
+# O `--force` (substituir uma tag local diferente da do origin) so no CI: a mao, reescrevia uma
+# tag local sem aviso — e sem ele o fetch recusa-a e o erro fica no ecra.
+if [ "${GITHUB_ACTIONS:-}" = true ]; then
+  git fetch --force --tags origin
+else
+  git fetch --tags origin
+fi
 
 # Numa tag LEVE, `%(contents:...)` devolve a mensagem do COMMIT, e o Release saia com o titulo de
 # um commit qualquer, em silencio. A tag leve fica so com o nome no titulo, e di-lo.
 if [ "$(git cat-file -t "refs/tags/$TAG")" = "tag" ]; then
-  subj=$(git tag -l --format='%(contents:subject)' "$TAG")
-  body=$(git tag -l --format='%(contents:body)' "$TAG")
+  # A 1.a LINHA e o titulo e o resto as notas. Nao o `%(contents:subject)`: esse e o primeiro
+  # PARAGRAFO, logo uma mensagem sem a linha em branco colava as notas ao titulo.
+  conteudo=$(git tag -l --format='%(contents)' "$TAG")
+  subj=$(printf '%s\n' "$conteudo" | head -n 1)
+  body=$(printf '%s\n' "$conteudo" | tail -n +2 | sed '/./,$!d')
 else
   echo "::warning::$TAG e uma tag LEVE (sem mensagem): o Release fica so com o nome no titulo. Usar \`git tag -a\` (ver /deploy)."
   subj=""
