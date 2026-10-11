@@ -37,7 +37,7 @@ export function registar() {
     writeFileSync(join(dir, ".github/workflows/ci.yml"), "jobs:\n  t:\n    steps:\n      - run: node a-test.mjs || true\n");
     commit(dir, "neutralizar");
     return ref;
-  }, { code: 1, includes: ["|| true"] });
+  }, { code: 1, includes: ["step de teste neutralizado com `|| true`"] });
 
   test("`continue-on-error: true` num step e enfraquecimento", (dir) => {
     mkdirSync(join(dir, ".github/workflows"), { recursive: true });
