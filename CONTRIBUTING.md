@@ -41,6 +41,24 @@ message is immutable once merged, which is why this is enforced by the versioned
 hook rather than left to review — run step 3 of Getting Started and it applies to every tool
 and every person, agents included. A human co-author is fine.
 
+**Changing the gate on purpose: the `Test-Surface:` trailer.** In a workflow that runs tests
+(a `node ...test` step, or `npm|pnpm|yarn|bun test`, `npm run test:*`, `npx vitest|jest|playwright test|cypress run|mocha`,
+`pytest`, `python -m unittest`, `go|cargo|dotnet|make test`, `node --test`), changing the top-level `on:`, `env:` or
+`defaults:`, or changing or removing a STEP that mentions `.agent/scripts/`, `.claude/hooks/` or
+`.githooks/` (or the job it runs in: its `if:`, `needs:`, `env:`...), fails the
+`check-test-surface` step — it changes the gate without touching a test (#285). Adding a new
+step does not. When the change is deliberate, add a trailer to the LAST commit of the PR that
+touches that file, with the file and the reason (`—`, `--` or ` - ` as the separator):
+
+```
+Test-Surface: .github/workflows/ci.yml — the release branch needs the gate too
+```
+
+The warning becomes a note that shows the reason. A trailer with no reason does not count, it
+only covers that file, and a trailer in an earlier commit does not cover a later change to it.
+The trailer is read from the commits, so an uncommitted change always warns locally. Removing
+tests or lowering a count has no such exit.
+
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```

@@ -381,6 +381,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O gate do `check-test-surface` (#285): o `on:` e os passos da maquinaria. O sitio e o `warn(`
+    // injetado — desliga-lo deixava passar `paths-ignore: ['**']`.
+    alvo: ".agent/scripts/lib/superficie-gate.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A adocao num projeto existente (#288). Os sitios de recusa sao os `throw`: cada um impede
     // escrever num sitio errado (o proprio template, um projeto ja adotado, um ficheiro que
     // apareceu entretanto). Desligar um deixa a copia seguir em frente sobre o que nao devia.
