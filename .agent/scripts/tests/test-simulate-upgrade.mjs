@@ -18,7 +18,7 @@
  * `lib/upgrade-categorias.mjs` (em `tests-upgrade-motor.mjs`), a
  * fixture `lib/projeto-de-ontem.mjs`, o instrumento da seccao 2b em `lib/medida-upgrade.mjs`
  * (em `tests-medida-2b.mjs`), o filtro do que nao e do template em `lib/fora-do-template.mjs`
- * (em `tests-upgrade-fora-do-template.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`
+ * (em `tests-upgrade-fora-do-template.mjs`), o projeto ADOTADO (em `tests-upgrade-adotado.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`
  * e a comparacao de `lib/intacto.mjs`, que tem tambem os seus casos puros no `tests-intacto.mjs`.
  * O `lib/mapa-suites.mjs` manda verificar estes modulos com esta suite.
  *
@@ -34,6 +34,7 @@ import { git, repo, corre, exige, cenario, limpa, templateSintetico, pontaAPonta
 import { registar as registarMotor } from "./tests-upgrade-motor.mjs";
 import { registar as registarMedida2b } from "./tests-medida-2b.mjs";
 import { registar as registarForaDoTemplate } from "./tests-upgrade-fora-do-template.mjs";
+import { registar as registarAdotado } from "./tests-upgrade-adotado.mjs";
 import { registar as registarPlaceholders } from "./tests-upgrade-placeholders.mjs";
 import { registar as registarConstantes } from "./tests-upgrade-constantes.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
@@ -48,6 +49,7 @@ const CONST_FIXTURE = CONSTANTES_DO_PROJETO[0];
 registarMotor();
 registarMedida2b();
 registarForaDoTemplate();
+registarAdotado();
 registarPlaceholders();
 registarConstantes();
 

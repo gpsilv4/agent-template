@@ -19,9 +19,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. Ver `lib/registo.mjs`. */
 export const entryPoint = "test-guards.mjs";
 
-const VAZIO = { substituidos: [], naoCopiados: [], migracoes: [], removidos: [] };
+const VAZIO = { substituidos: [], doProjeto: [], naoCopiados: [], migracoes: [], removidos: [] };
 const CHEIO = {
   substituidos: [".agent/scripts/x.mjs"],
+  doProjeto: [".githooks/commit-msg"],
   naoCopiados: [{ caminho: ".env", razao: "segredo" }],
   migracoes: [{ nome: "K", de: "a.mjs", para: "config/a.mjs" }],
   removidos: [{ caminho: ".agent/scripts/velho.mjs", migrado: false }],
@@ -30,8 +31,8 @@ const CHEIO = {
 export function registar() {
   {
     const titulos = blocosAntesDeAprovar({ medido: CHEIO, agentes: ["leitor.md"], desde: "v1.0.0" }).map(([t]) => t);
-    const ordem = [/ALTEROU/, /NAO foram copiados/, /agente\(s\)/, /mudaram de casa/, /sairam do template desde v1\.0\.0/];
-    registarResultado("saida-upgrade: os cinco blocos, pela ordem que os dois modos partilham",
+    const ordem = [/ALTEROU/, /do PROJETO/, /NAO foram copiados/, /agente\(s\)/, /mudaram de casa/, /sairam do template desde v1\.0\.0/];
+    registarResultado("saida-upgrade: os seis blocos, pela ordem que os dois modos partilham",
       titulos.length === ordem.length && ordem.every((re, i) => re.test(titulos[i])) ? [] : [`ficou: ${JSON.stringify(titulos)}`]);
   }
   registarResultado("saida-upgrade: sem nada a mostrar, nenhum bloco (e sem `migracoes`, nao rebenta)",
@@ -47,7 +48,7 @@ export function registar() {
   // Os dois chamadores usam a funcao e mais nada: uma lista impressa a parte voltava a divergir —
   // por uma chamada `linhas*(`, ou por uma copia a mao do texto (a nota da migracao ficou assim
   // duplicada na 2b, apanhado pelo leitor independente).
-  const aParte = /\blinhas(?:Substituidos|NaoCopiados|Agentes|Migracoes|Removidos)\(|MIGRACAO, nao limpeza|sairam do template/;
+  const aParte = /\blinhas(?:Substituidos|DoProjeto|NaoCopiados|Agentes|Migracoes|Removidos)\(|MIGRACAO, nao limpeza|sairam do template/;
   registarResultado("saida-upgrade: o simulador e a 2b imprimem so pela funcao partilhada",
     [".agent/scripts/simulate-upgrade.mjs", ".agent/scripts/lib/medida-upgrade.mjs"].flatMap((rel) => {
       const src = readFileSync(join(ROOT, rel), "utf8");
