@@ -12,6 +12,14 @@ Workflow para refactoring que garante seguranca e nao introduz regressoes no {{P
 
 - Correr `npx tsc --noEmit` e guardar o resultado (deve ser 0 erros)
 - Correr `npm run build` e registar os tamanhos do bundle
+- **Codigo sem testes que cubram o alvo:** antes de mudar, escrever **testes de caracterizacao** —
+  fixam o que o codigo FAZ hoje (entradas reais -> saidas observadas, casos estranhos incluidos), nao
+  o que devia fazer. O typecheck e o build provam que compila, nao que se comporta igual. **Cada um
+  com o seu controlo negativo** (o `ticket-method`): mudar o codigo coberto e ver o teste ficar
+  vermelho, antes do refactor — um teste que nao afirma nada passa antes e depois. Se um teste
+  revelar um bug, propoe-se um item de backlog (ou um issue, no template) e o teste fixa o
+  comportamento ATUAL: corrigir e outro ticket (`/debug`), senao o refactor muda comportamento. Feito
+  o refactor, os mesmos testes passam **sem mudar uma assercao**. Em codigo ja coberto, este passo salta.
 
 ## 2. Verificar Backlog
 

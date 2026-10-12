@@ -2,8 +2,7 @@
 
 > **Quando usar:** num derivado · **Quando NAO usar:** no proprio template (#246).
 
-Workflow para atualizar um projeto **derivado** com melhorias feitas no template de origem,
-sem apagar o que e deste projeto.
+Atualiza um **derivado** com o template de origem, sem apagar o que e dele.
 
 > **E o inverso da Matriz de Propagacao** (`.agent/rules/sync-docs.md`): _"o template ganhou X,
 > o que trago"_. Decide por **categoria de ficheiro**, nao por uma lista de nomes, que envelhece.
@@ -77,10 +76,10 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | O estado e a historia deste projeto, so existem aqui |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards proprios deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**), `.github/scripts/` e `.githooks/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
-| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade copia e **nunca apaga**: um renomeado fica ao lado do novo e a descoberta exige-lhe par. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**), `.github/scripts/` e `.githooks/` (so os do template; num adotado, nunca as `colisoes` do `.agent/adocao.json`) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
+| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag** — o do projeto nunca esteve; num adotado, as `colisoes` do `.agent/adocao.json` sao dele. Ver `upgrade-why.md` |
 | O que o git do `$TPL` **ignora**, e nomes de segredo | **Nunca copiar** | Nao e do template. A mao, so o que `git -C "$TPL" ls-files` lista (`upgrade-why.md`) |
-| `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Foram gerados no bootstrap a partir das respostas |
+| `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Gerados no bootstrap |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova): os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** (`APn`) nunca se tocam; o **cabecalho** intacto vem novo, customizado integra-se a mao so a **regra duravel** (`upgrade-why.md`). As citacoes `TPn` copiam-se como estao | Os prefixos tornam isto copia, nao reescrita a mao |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |

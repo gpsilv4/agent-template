@@ -129,6 +129,8 @@ export const PREFIXOS_DE_TESTE = [
   "t-limpo-",
   "sim-test-",
   "fuga-2b-",
+  // A suite da adocao num projeto existente (#288).
+  "adotar-test-",
 ];
 
 /**

@@ -58,6 +58,23 @@ cd my-project
 # Or via GitHub UI: "Use this template" -> "Create a new repository"
 ```
 
+> **Already have a project?** Don't create a new repo — bring the template into yours. From the
+> project's root, with the template cloned NEXT to it (not inside, and not in a temp dir: the
+> bootstrap reads it until the end):
+>
+> ```bash
+> git clone --depth 1 https://github.com/gpsilv4/agent-template ../agent-template
+> node ../agent-template/.agent/scripts/adotar-template.mjs --simular   # what it would copy/collide
+> node ../agent-template/.agent/scripts/adotar-template.mjs
+> ```
+>
+> It copies only the files you don't have, never overwrites, leaves `LICENSE` for you to decide, and
+> writes `.agent/adocao.json` — what was copied and what **collides** (decided before copying). The
+> bootstrap reads it: Phase 0-R skips the copied files and merges the collisions with the clone's copy.
+> If you already had a `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`, the AI won't find the template's
+> instructions on its own: start it with *"Read .agent/BOOTSTRAP.md and configure the project"*.
+> Delete `../agent-template` once the bootstrap is committed.
+
 ### 2. Open AI and let BOOTSTRAP.md guide you
 
 ```bash
@@ -70,8 +87,9 @@ claude
 ```
 
 The AI will:
+0. **Phase 0-R (existing project)** — If the repo already has an app's code, the AI offers to read it and proposes the answers (stack, pages, env vars, business rules with `file:line`, initial backlog), each with where it came from; you confirm instead of typing
 1. **Phase 0 (if needed)** — If you don't know what stack/architecture to use, the AI analyzes your project description and recommends platforms, stack, architecture, and flags risks — step by step, waiting for your confirmation at each step
-2. Ask questions about your project (or auto-fill from Phase 0 decisions)
+2. Ask questions about your project (or auto-fill from Phase 0 / 0-R)
 3. Replace all `{{PLACEHOLDER}}` values across files
 4. Generate `business-logic.md` and `pages-architecture.md` from scratch
 5. Adapt workflows, CI/CD, and scripts to your stack
@@ -84,19 +102,16 @@ The AI will:
 # Verify no placeholders remain. Must return zero lines.
 #   git grep --untracked  -> every tracked AND newly generated file, but nothing
 #                            .gitignore'd (no node_modules/dist/.next noise)
-#   sed                   -> blanks out the two non-placeholder uses of {{ }}:
-#                            GitHub Actions ${{ ... }} expressions and Gemini's
-#                            own {{args}} token. Blanking (not dropping the line)
-#                            keeps a line that mixes one of those with a REAL
-#                            placeholder visible.
+#   {{UPPER_CASE}} only   -> the template's placeholders; GitHub Actions ${{ ... }},
+#                            Gemini's {{args}} and an app's {{ user.name }} don't match
 #   the two excluded files are the placeholder catalogs themselves — drop the
 #   README exclusion once you replace it with your project's own.
-# NOTE: clean means "no output"; the pipeline then exits 1 (grep found nothing).
+# NOTE: clean means "no output"; git grep then exits 1 (found nothing).
 #       Invert it if you ever wire this into CI as a gate.
-git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
-  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
+git grep -nE --untracked '\{\{[A-Z_]+\}\}' -- ':!.agent/BOOTSTRAP.md' ':!README.md'
 
-# Initial commit — on a branch, not on `main`.
+# Initial commit — on a branch, not on `main`. (Existing project: not `git add .` — the
+# bootstrap adds only what the template brought; see BOOTSTRAP.md, final step.)
 # The bundled hook denies `git commit` on a protected branch, and the project's own Branch
 # Rule says the same to every agent. Bootstrapping is a change like any other: branch, PR,
 # green CI, merge — so day 1 already runs the flow the project will use.
@@ -150,7 +165,7 @@ not to* line, so every agent sees it.
 
 ```
 .agent/                         <- AI knowledge management
-├── BOOTSTRAP.md                <- Setup guide: Phase 0 (analysis) + Phase 1 (config) — run once
+├── BOOTSTRAP.md                <- Setup guide: Phase 0-R (existing code) or Phase 0 (analysis) + Phase 1 (config) — run once
 ├── TEMPLATE_VERSION            <- the template's version (`vX.Y.Z`); travels with the files, so
 │                                 "Use this template" (no tags) still knows where it came from
 ├── rules/                     <- loaded (core, process, anti-patterns) + reference,
@@ -192,12 +207,14 @@ not to* line, so every agent sees it.
 │   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/                    <- 8 entry points at the root: what you INVOKE
+└── scripts/                    <- 9 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── check-codigo-morto.mjs  <- Imports nobody uses: dead code travels to derived projects
+    ├── adotar-template.mjs     <- Brings the template into an EXISTING project: copies only what
+    │                              is missing, writes .agent/adocao.json (copied + collisions)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
