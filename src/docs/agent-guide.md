@@ -62,6 +62,8 @@ Cada passo para e espera confirmacao. No final, a AI preenche automaticamente os
 
 > Se o utilizador ja sabe as respostas, a Fase 0 e saltada e vai direto para as perguntas.
 
+**Fase 0-R (projeto existente):** se o repo ja tem o codigo de uma app, a AI pergunta se o pode ler e propoe as respostas da Fase 1 a partir dele — stack, paginas, nomes das env vars, regras de negocio, backlog inicial — cada uma com a origem (o ficheiro, ou o `ficheiro:linha`). O template entra no projeto pelo `adotar-template.mjs` (o procedimento do `README.md`): copia so o que falta, nunca sobrescreve, e escreve `.agent/adocao.json` com o que copiou e o que colide. A 0-R ignora os copiados e funde as colisoes com o clone do template. O utilizador confirma em vez de escrever; o que o codigo nao diz fica `[a confirmar]`. Extrai o que esta escrito, nao a intencao, e nao grava nada antes da confirmacao.
+
 ---
 
 ## 4. Regras de Inteligencia (`.agent/rules/`)

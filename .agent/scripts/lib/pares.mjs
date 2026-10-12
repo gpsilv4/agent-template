@@ -381,6 +381,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // A adocao num projeto existente (#288). Os sitios de recusa sao os `throw`: cada um impede
+    // escrever num sitio errado (o proprio template, um projeto ja adotado, um ficheiro que
+    // apareceu entretanto). Desligar um deixa a copia seguir em frente sobre o que nao devia.
+    alvo: ".agent/scripts/adotar-template.mjs",
+    suite: ".agent/scripts/tests/test-adotar-template.mjs",
+    sinal: /(?<![\w.$])throw new Error\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-backlog.mjs",
     suite: ".agent/scripts/tests/test-backlog.mjs",
     sinal: /(?<![\w.$])warn\(/,

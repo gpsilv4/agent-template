@@ -44,7 +44,7 @@ const ciYml = (comandos) =>
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 export const ap = (n) => "AP" + n;
 
-export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {} } = {}) {
+export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semFase0R = null, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {} } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -54,7 +54,11 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
 
   w(".agent/BOOTSTRAP.md", bootstrapQuebrado
     ? "# Bootstrap\n\nSem a seccao que o simulador procura.\n"
-    : "# Bootstrap\n\n- **Modo minimo**: manter so os essenciais e **remover os restantes** (`podado` — sem uso) na Fase 2.\n\n" +
+    : "# Bootstrap\n\n" +
+      // A Fase 0-R e a instrucao que la leva (#288): `semFase0R` tira uma ou a outra.
+      (semFase0R === "instrucao" ? "" : "Com codigo existente, comecar pela **Fase 0-R**.\n\n") +
+      (semFase0R === "secao" ? "" : `## Fase 0-R — Projeto existente\n\nLer e propor.${semFase0R === "regras" ? "" : " **So leitura.**"}\n\n`) +
+      "## Fase 1\n\n- **Modo minimo**: manter so os essenciais e **remover os restantes** (`podado` — sem uso) na Fase 2.\n\n" +
       "### 2.2 Ficheiros a GERAR do zero\n\n| Ficheiro |\n|---|\n" +
       "| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra coisa\n\nTexto.\n");
 

@@ -9,12 +9,119 @@
 
 ## Instrucoes para a AI
 
-Le este ficheiro completo. Antes de avancar, pergunta ao utilizador:
+Le este ficheiro completo. **Primeiro, verifica se o repo ja tem o codigo de uma app** — um
+manifesto (`package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, `composer.json`, ...), um
+lockfile, ou pastas de codigo (`src/`, `app/`, `lib/`) que nao sejam do template. Se tiver, pergunta:
+
+> _"Encontrei codigo existente. Queres que o leia e te proponha as respostas a partir dele (Fase 0-R)?"_
+
+- **Se sim**: comecar pela **Fase 0-R** (Projeto existente).
+- **Se nao, ou se nao ha codigo**, pergunta ao utilizador:
 
 > _"Ja sabes que stack, backend e arquitetura queres usar, ou preferes que te ajude a decidir?"_
 
 - **Se ja sabe**: saltar para a Fase 1 (Perguntas ao Utilizador).
 - **Se nao sabe ou tem duvidas**: comecar pela Fase 0 (Analise e Decisoes). No final da Fase 0, as respostas da Fase 1 sao preenchidas automaticamente com base no que foi decidido — o utilizador so confirma.
+
+---
+
+## Fase 0-R — Projeto existente (engenharia reversa)
+
+> **Quando usar:** o repo ja tem o codigo de uma app e o utilizador aceitou que o leias. Num projeto
+> existente, as respostas da Fase 1 **ja estao no codigo** — responde-las de memoria e fazer nascer
+> as rules geradas (`business-logic.md`, `pages-architecture.md`) do que alguem se lembra, e nao do
+> que o codigo faz.
+>
+> **Regras criticas:**
+> - **Ler e PROPOR, nunca gravar.** Nada da Fase 2 corre antes de o utilizador confirmar as respostas.
+> - **Cada resposta leva a ORIGEM** — o ficheiro, ou o `ficheiro:linha`. Uma resposta sem origem e
+>   uma suposicao, e marca-se `[a confirmar]`.
+> - **Extrair o que esta ESCRITO, nao a intencao.** Uma validacao, uma constante, um limite, uma
+>   formula le-se no codigo; o *porque* de uma regra, nao — pergunta-se. Nao inferir regras a partir
+>   de nomes de funcoes.
+> - **So leitura.** Nesta fase nao se instala, nao se corre build nem testes, e nao se muda codigo.
+
+### Passo 1 — Inventario
+
+**O que veio do template nao e codigo da app.** O template entrou pelo `adotar-template.mjs` (o
+procedimento do `README.md`, "Already have a project?"), que escreveu `.agent/adocao.json`: os
+ficheiros em `copiados` e em `iguais` (ja la estavam, identicos aos do template) sao do TEMPLATE — o `CLAUDE.md`, o `ci.yml`, o `.editorconfig` que la
+estiverem so por isso nao dizem nada sobre o projeto, e nao se leem como tal. Sem o manifesto, o
+template nao entrou pelo procedimento: parar e pedir ao utilizador que o corra. Com `estado: "a copiar"`,
+a copia foi interrompida e as listas sao as PLANEADAS: parar e pedir que o volte a correr (retoma).
+
+Ler, sem correr nada: os manifestos e o lockfile (dependencias, `scripts`, `engines`), a config de
+TypeScript e do runner de testes, o CI que ja exista (`.github/workflows/`, outro), o router (`app/`,
+`pages/`, ficheiro de rotas), os ficheiros de deploy (`vercel.json`, `netlify.toml`, `Dockerfile`,
+`fly.toml`), o `LICENSE`, e a arvore de pastas ate dois niveis. **Os `.env*` nao se leem** — nem o
+`.env.example`, que costuma ter valores realistas (o template nega-o de proposito, ver o §2.9): os
+NOMES das variaveis vem dos usos no codigo.
+
+### Passo 2 — As respostas propostas
+
+Apresentar uma tabela **Resposta | Valor proposto | Origem**, para as perguntas da Fase 1 que o
+codigo responde:
+
+| Pergunta da Fase 1 | Onde se le |
+|---|---|
+| 1-2. Nome e slug | o `name` do manifesto |
+| 5. Stack (framework, backend, styling, state, libs, runner de testes) | dependencias do manifesto e a config do runner |
+| 7. Hosting/Deploy | `vercel.json`, `netlify.toml`, `Dockerfile`, `fly.toml` |
+| 8. Ficheiro de tipos principal | o ficheiro de tipos partilhados mais importado |
+| 9. Paginas principais | o router: cada rota com o ficheiro que a define |
+| 10. Paywall/roles | o middleware de autenticacao, os enums/constantes de roles (`ficheiro:linha`) |
+| 11. Variaveis de ambiente | so os NOMES, dos usos de `process.env`/`import.meta.env` (`ficheiro:linha`) |
+| 12. Estrutura de diretorios | a arvore |
+| 13. Regras de negocio | ver o Passo 3 |
+| 14. Items iniciais de backlog | `TODO`/`FIXME` (`ficheiro:linha`), ficheiros > 500 linhas, areas sem testes |
+| 15. CI/CD | o CI que ja existe |
+| 18. Copyright holder | o `LICENSE` |
+| Versao do Node (§2.7) | `.nvmrc` ou `engines` |
+
+As restantes (descricao, dominio, lingua da UI, email de seguranca, tier de qualidade, ...) nao
+estao no codigo de forma fiavel: ficam `[a confirmar]` e perguntam-se na Fase 1.
+
+### Passo 3 — Regras de negocio (a base do `business-logic.md`)
+
+So as que estao **escritas** no codigo: validacoes (limites, formatos), constantes de dominio,
+formulas e calculos, estados e transicoes. **Cada uma com o `ficheiro:linha`.** Para cada uma,
+perguntar ao utilizador se e intencional — um limite pode ser um bug que o codigo ja tem, e a rule
+gerada nao o deve consagrar. Agrupar por conceito de dominio, como no formato do §2.2.
+
+### Passo 4 — Conflitos com o template
+
+O que o projeto ja tinha esta em `colisoes` no `.agent/adocao.json` — decidido ANTES da copia, logo
+e so isso: o script nao tocou em nenhum. A versao do template de cada um esta no clone, em
+`template.caminho` (`<template.caminho>/<ficheiro>`). Para cada colisao, **propor** a fusao, sem a
+fazer sozinho:
+- **`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`** (e `.cursor/rules/project.mdc`, `.github/copilot-instructions.md`):
+  o do projeto fica, e acrescenta-se o do template — as Fronteiras, os `@imports` das rules e do
+  contexto, a tabela de workflows. Sem isto o agente nunca carrega as regras.
+- **`.claude/settings.json`**: fundir o `deny`, o `ask`, o `allow` e a chave `hooks` do template com
+  os do projeto. Sem os hooks e o `deny`, a fronteira nao existe.
+- **`.gitignore`**: acrescentar as entradas do template (entre elas o `settings.local.json`).
+- **O CI** (`.github/workflows/ci.yml`, ou o do projeto com outro nome): ver o §2.7.
+- **Scripts com outros nomes** dos que o template espera (`test:unit`, `test:e2e`, `test:security`,
+  `test:audit`, `test:all`, `lint`, `build`): propor o mapeamento, e renomear so com aprovacao.
+- **Hooks de git que o projeto ja usa** (`.husky/`, `lefthook.yml`, ou um `git config core.hooksPath`
+  que ja aponta para outro sitio): **nao** trocar o `core.hooksPath` para `.githooks` — desligava os
+  do projeto. Propor chamar o do template a partir do `commit-msg` existente
+  (`node .githooks/commit-msg "$1"`).
+- **O resto** (`README.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.nvmrc`,
+  `CODEOWNERS`, `dependabot.yml`, `pull_request_template.md`, ...): diff e decidir, nunca overwrite.
+- **Guards que leem ficheiros do projeto**: o 13 (placeholders `{{MAIUSCULAS}}`) e o 15 (IDs
+  `TPn`/`APn`) varrem tambem `CONTRIBUTING.md`, o PR template, `.github/workflows/` e `src/docs/`.
+  Fundidas as colisoes, correr `node .agent/scripts/check-doc-versions.mjs`: um `{{TICKET_ID}}` ou
+  um `TP1` (plano de testes) que ja eram do projeto resolvem-se com o utilizador, nunca apagando-os.
+- **`perguntar`** (o `LICENSE`, quando o projeto nao tinha): o script nao o copiou. Perguntar se o
+  projeto quer a licenca do template (pergunta 18) — uma licenca nao se herda por omissao.
+
+### Transicao para a Fase 1
+
+Apresentar a tabela do Passo 2 e a lista do Passo 4. O que o utilizador confirmar fica preenchido; o
+que corrigir, corrige-se; o resto pergunta-se na Fase 1 (`[a confirmar]`). A **decisao de arranque**
+(Modo minimo vs completo) pergunta-se na mesma, ANTES de validar a tabela. **PARA AQUI** ate a
+confirmacao.
 
 ---
 
@@ -131,7 +238,7 @@ Se algum campo nao foi discutido na Fase 0, assinalar com `[a confirmar]` e perg
 
 ## Fase 1 — Perguntas ao Utilizador
 
-> **Se veio da Fase 0:** Os campos abaixo ja foram preenchidos automaticamente. Apresentar ao utilizador para validacao — so pedir input nos campos marcados `[a confirmar]`.
+> **Se veio da Fase 0 ou da Fase 0-R:** Os campos abaixo ja foram preenchidos automaticamente (na 0-R, cada um com a origem). Apresentar ao utilizador para validacao — so pedir input nos campos marcados `[a confirmar]`.
 >
 > **Se saltou a Fase 0:** Fazer estas perguntas **uma a uma** ou em bloco (conforme preferencia do utilizador).
 
@@ -189,10 +296,10 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 11. **Variaveis de ambiente** (lista das env vars necessarias para dev)
     → Substitui `{{ENV_VARS_TEMPLATE}}` e `{{TEST_ENV_VARS}}`
 
-12. **Estrutura de diretorios** (se ja existir codigo, a AI pode ler automaticamente)
+12. **Estrutura de diretorios** (se ja existir codigo, le-se na Fase 0-R)
     → Substitui `{{PROJECT_STRUCTURE}}`
 
-13. **Regras de negocio conhecidas** (formulas, limites, calculos, workflows do dominio)
+13. **Regras de negocio conhecidas** (formulas, limites, calculos, workflows do dominio; num projeto existente, as escritas no codigo vem da Fase 0-R com o `ficheiro:linha`)
     → Base para gerar `business-logic.md`
 
 14. **Items iniciais de backlog** (bugs conhecidos, melhorias planeadas, features futuras)
@@ -243,6 +350,17 @@ printf 'template: %s\ncommit: %s\nversao: %s\ndata: %s\n' \
   "$(date +%F)" > .agent/.template-version
 ```
 
+**Projeto existente (o template entrou pelo `adotar-template.mjs` — Fase 0-R):** aqui o `HEAD` e as
+tags sao do PROJETO. Gravar a partir do manifesto, que o script escreveu com os dados do CLONE, e
+**nunca** com `git describe` no projeto — uma tag `v0.12.0` do projeto passava a ser a baseline do
+`/upgrade`, em silencio:
+
+```bash
+node -e 'const fs = require("fs"); const t = JSON.parse(fs.readFileSync(".agent/adocao.json", "utf8")).template;
+fs.writeFileSync(".agent/.template-version", `template: ${t.origem ?? "desconhecido"}\ncommit: ${t.commit}\n` +
+  `versao: ${t.versao ?? "desconhecida"}\ndata: ${new Date().toISOString().slice(0, 10)}\n`)'
+```
+
 - [ ] `.agent/.template-version` criado e **commitado** (nao esta no `.gitignore` de propósito)
 
 ### 2.1 Substituicao de Placeholders (em TODOS os ficheiros do template)
@@ -279,7 +397,7 @@ Percorrer todos os `.md`, `.mdc` (regras do Cursor), **`.toml` (`.gemini/command
 
 ### 2.2 Ficheiros a GERAR do zero
 
-Estes ficheiros nao existem no template — devem ser criados pela AI com base nas respostas:
+Estes ficheiros nao existem no template — devem ser criados pela AI com base nas respostas. **Vindo da Fase 0-R**, cada regra e cada pagina cita a origem no codigo (`ficheiro:linha`), para quem le a rule a poder verificar:
 
 | Ficheiro | Base | Conteudo |
 |----------|------|----------|
@@ -449,11 +567,18 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 ### 2.7 Customizar GitHub CI/CD e Governance
 
-- **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check se aplicavel (os guards `check-doc-versions` e `check-backlog` ja correm sempre, no job `guard-tests`). Duas decisoes a tomar **com o utilizador**:
+- **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check se aplicavel (os guards `check-doc-versions` e `check-backlog` ja correm sempre, no job `guard-tests`). Tres decisoes a tomar **com o utilizador**, e uma remocao sem perguntar:
   - **Guards por step** (`if [ -f tsconfig.json ]`, `scripts?.lint`, …): existem para o template puro nao ficar vermelho. Assim que a stack estiver fixa, **remover o guard** dos steps que o projeto usa de facto — senao um script apagado por acidente passa a "skip" silencioso em vez de falhar.
   - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`.
+  - **Projeto com CI proprio** (Fase 0-R): nao ficam dois CIs a fazer o mesmo. O CI do projeto
+    continua a correr typecheck/lint/build/test; do `ci.yml` do template ficam **so** os jobs que ele
+    nao tem — `guard-tests` (os guards e os testes deles, que nao dependem do `package.json`) e
+    `secret-scan` —, e saem os outros. Se o `ci.yml` colidiu (o CI do projeto ja se chama assim),
+    esses dois jobs entram nele. **Os nomes `ci.yml` e `guard-tests` mantem-se**: o Guard 11 e a
+    medicao do `/upgrade` leem-nos por esse nome, e o `/upgrade` acrescenta la os passos novos. O
+    `npm audit` decide-se como no bullet acima. Se o projeto nao tinha CI, o `ci.yml` do template e o CI.
   - **Job `simulators`**: **remover o job inteiro**, sem perguntar. E so do template — os dois simuladores dao `SKIP` num derivado —, e deixa-lo era um job verde em cada PR que nao mede nada (num repo privado, +1 min faturado por PR: cada job arredonda ao minuto). A mesma regra que o `/upgrade` aplica (`src/docs/upgrade-why.md`).
-- **`.github/workflows/codeql.yml` e `.github/codeql/`**: **remover os dois**, sem perguntar. Sao so do template: analisam a maquinaria dele (`.agent/`, `.claude/`), nao o codigo do projeto. O CodeQL do projeto e o "Default setup" do GitHub num repo publico (ou num privado com licenca Code Security), ligado quando houver codigo da aplicacao; num privado sem licenca, nenhum — ver o `SECURITY.md` abaixo. E apagar o que os cita: no `SECURITY.md`, o bullet "This template's own repository"; no `src/docs/agent-guide.md`, a linha do `codeql.yml`; o ponto 19 do `.agent/rules/sync-docs.md` passa a acabar em "`release.yml` (Release por tag) coerente com o `/deploy` e o `SECURITY.md`".
+- **`.github/workflows/codeql.yml` e `.github/codeql/`**: **remover os dois**, sem perguntar — num projeto existente, **so** o que estiver em `copiados` ou `iguais` no `.agent/adocao.json` (um `codeql.yml` que colidiu e do projeto, e fica). Sao so do template: analisam a maquinaria dele (`.agent/`, `.claude/`), nao o codigo do projeto. O CodeQL do projeto e o "Default setup" do GitHub num repo publico (ou num privado com licenca Code Security), ligado quando houver codigo da aplicacao; num privado sem licenca, nenhum — ver o `SECURITY.md` abaixo. E apagar o que os cita: no `SECURITY.md`, o bullet "This template's own repository"; no `src/docs/agent-guide.md`, a linha do `codeql.yml`; o ponto 19 do `.agent/rules/sync-docs.md` passa a acabar em "`release.yml` (Release por tag) coerente com o `/deploy` e o `SECURITY.md`".
 - **`.github/workflows/release.yml`** + **`.github/scripts/release-da-tag.sh`**: manter os dois (andam juntos); nada a configurar. Cada tag `vX.Y.Z` cria o seu GitHub Release. O Release e criado pelo `GITHUB_TOKEN`, logo nao dispara workflows `on: release`. Se o projeto nasceu de um `git clone` do template (e nao de "Use this template"), o utilizador apaga as tags herdadas (`git tag -l 'v*' | xargs git tag -d` — o hook nega `tag -d` ao agente; e, se ja foram publicadas, tambem no remoto: `git push origin --delete <tags>`): senao a primeira release conta as notas desde uma versao do template, e as do projeto abaixo dela nunca sao a Latest.
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
@@ -547,15 +672,14 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
   abaixo continua util para ver as linhas exatas, e deve devolver **zero**:
 
   ```bash
-  git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
-    | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
+  git grep -nE --untracked '\{\{[A-Z_]+\}\}' -- ':!.agent/BOOTSTRAP.md' ':!README.md'
   ```
 
   Cobre o repo inteiro (incl. `.github/CODEOWNERS`, `.agent/scripts/`, `.claude/`, `.gemini/`). Notas:
   - `git grep --untracked` inclui os ficheiros **gerados** nesta fase (ainda sem `git add`) e exclui automaticamente o que esta em `.gitignore` — sem `node_modules/`, `dist/`, `.next/` a poluir. **Nao** trocar por `grep -r`, que os apanharia todos.
-  - O `sed` **anula** (nao descarta a linha) os dois usos legitimos de `{{ }}`: as expressoes `${{ ... }}` do GitHub Actions e o token `{{args}}` dos wrappers do Gemini. Anular em vez de filtrar a linha e deliberado — assim uma linha que misture um destes com um placeholder **real** continua a aparecer.
+  - So casa os placeholders deste template (`{{MAIUSCULAS}}`), logo os usos legitimos de `{{ }}` ficam de fora sem filtro: as expressoes `${{ ... }}` do GitHub Actions, o `{{args}}` dos wrappers do Gemini e, num projeto existente, o `{{ user.name }}` de Vue, Jinja ou Handlebars.
   - `BOOTSTRAP.md`/`README.md` sao os catalogos de placeholders — remover a exclusao do `README.md` depois de o substituir pelo do projeto.
-  - Limpo = **sem output**; o pipeline sai com codigo `1` (o `grep` nao encontrou nada). Inverter se algum dia for usado como gate de CI.
+  - Limpo = **sem output**; o `git grep` sai com codigo `1` (nao encontrou nada). Inverter se algum dia for usado como gate de CI.
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
 - [ ] `anti-patterns.md`: exemplo comentado removido, `anti-patterns-template.md` **mantido** (apagar um `TPn` exige apagar as citacoes dele — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
@@ -573,14 +697,14 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `.github/pull_request_template.md` reflete checklist do projeto?
 - [ ] `.editorconfig` reflete coding standards?
 - [ ] `LICENSE` tem copyright holder correto?
-- [ ] Definicoes de seguranca do GitHub ligadas conforme o `SECURITY.md` (publico vs privado)? O `codeql.yml` e a `.github/codeql/` removidos, e o CodeQL "Default setup" ligado **so** num publico (ou num privado com licenca Code Security), e so com codigo da aplicacao?
+- [ ] Definicoes de seguranca do GitHub ligadas conforme o `SECURITY.md` (publico vs privado)? O `codeql.yml` e a `.github/codeql/` removidos (num projeto existente, so os do template — §2.7), e o CodeQL "Default setup" ligado **so** num publico (ou num privado com licenca Code Security), e so com codigo da aplicacao?
 - [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 - [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS_DO_PROJETO` (`config/superficie-de-teste.mjs`) nao casam com a tua stack e o gate esta a medir zero
 - [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o
   `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
 
-> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Apos o bootstrap, integrar num projeto existente ou fazer scaffold da app, garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, **`test:e2e`**, `test:security`, `test:audit`, `test:all`, `test:e2e:ui`, `test:e2e:headed`) — **os nomes sao estes**: o `e2e.yml` procura `test:e2e` e **salta em silencio** se nao o encontrar, logo um `test` simples da um job verde que nunca correu nada. **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
+> **Nota (app):** este template e a camada de **agente + governance** — nao traz `package.json` nem codigo. Num projeto novo, fazer o scaffold da app depois do bootstrap (num existente, o template entra antes — Fase 0-R), garantindo que o `package.json` expoe os scripts referenciados (`dev`, `build`, `lint`, `test:unit`, **`test:e2e`**, `test:security`, `test:audit`, `test:all`, `test:e2e:ui`, `test:e2e:headed`) — **os nomes sao estes**: o `e2e.yml` procura `test:e2e` e **salta em silencio** se nao o encontrar, logo um `test` simples da um job verde que nunca correu nada. **`test:all` = unit + E2E + security + audit** — fixar esta definicao, que os workflows citam. Ate la, o CI salta os jobs (via `detect`) e os workflows apontam para scripts que ainda nao existem.
 
 ### Resumo de ficheiros
 
@@ -607,9 +731,10 @@ nao existir, voltar ao 2.0 e cria-lo agora:
 > `git log <sha>..<branch>` no template falha com `unknown revision`.
 
 ```bash
-# Verificar que nao ficou nenhum placeholder (mesmo sweep da Fase 3 — zero linhas)
-git grep -n --untracked "{{" -- ':!.agent/BOOTSTRAP.md' ':!README.md' \
-  | sed -e 's/\${{[^}]*}}//g' -e 's/{{args}}//g' | grep "{{"
+# Verificar que nao ficou nenhum placeholder (mesmo sweep da Fase 3 — zero linhas). So os
+# placeholders DESTE template (`{{MAIUSCULAS}}`): num projeto existente, `{{ user.name }}` de Vue,
+# Jinja ou Handlebars e codigo da app, nao um placeholder por substituir.
+git grep -nE --untracked '\{\{[A-Z_]+\}\}' -- ':!.agent/BOOTSTRAP.md' ':!README.md'
 
 # Primeiro commit — NUM BRANCH, e nao em `main`
 #
@@ -622,6 +747,35 @@ git switch -c chore/bootstrap
 git add .
 git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 ```
+
+**Projeto existente:** **nao** `git add .` — apanhava o que o projeto tem por commitar e nao e deste
+trabalho. Em duas partes:
+- **O que veio do template** — `copiados` e `iguais` do manifesto (os que ainda existem: o §2.7
+  apaga alguns), a marca e as rules geradas: pela lista. Um aviso de caminhos **ignorados** (o
+  `.gitignore` do projeto apanha, por exemplo, `.claude/`) diz-se ao utilizador: sem o
+  `settings.json` e os hooks commitados, a fronteira nao viaja com o repo.
+- **Ficheiros do PROJETO que o bootstrap mudou** — as `colisoes` fundidas, o CI do projeto (§2.7),
+  o `package.json` (scripts renomeados), os hooks de git (Passo 4), o `LICENSE` se o utilizador
+  aceitou o do template: um a um, com `git add -p` e com o utilizador. Podem ter alteracoes dele por
+  commitar, e essas nao sao deste commit.
+
+```bash
+git switch -c chore/bootstrap
+node -e 'const fs = require("fs"); const m = JSON.parse(fs.readFileSync(".agent/adocao.json", "utf8"));
+for (const f of [...m.copiados, ...m.iguais]) if (fs.existsSync(f)) console.log(f)' | git add --pathspec-from-file=-
+git add .agent/.template-version .agent/rules/business-logic.md .agent/rules/pages-architecture.md
+git add -p <ficheiro>   # cada ficheiro do projeto que o bootstrap mudou
+# O manifesto fica, SEM o caminho local do clone: o /upgrade le as `colisoes` dele.
+node -e 'const fs = require("fs"); const f = ".agent/adocao.json"; const m = JSON.parse(fs.readFileSync(f, "utf8"));
+delete m.template.caminho; m.estado = "commitado"; fs.writeFileSync(f, JSON.stringify(m, null, 2) + "\n")'
+git add .agent/adocao.json
+git status --short      # o que sobrar: perguntar ao utilizador, nunca assumir
+git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
+```
+
+> O manifesto **commita-se**: o `/upgrade` precisa de saber que um `CONTRIBUTING.md` ou um `ci.yml`
+> que tambem existem no template sao do PROJETO (as `colisoes`). O clone do template apaga-o o
+> utilizador — o agente nao corre `rm -rf`.
 
 > Depois: abrir o PR (`gh pr create --fill`), esperar o CI, e so entao mergear. Se este
 > projeto nao vai usar PRs, dizer ao utilizador **antes** de mergear a mao — a alternativa
@@ -650,7 +804,7 @@ git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 
 ## Notas para a AI
 
-- **Nao inventar regras de negocio** que o utilizador nao mencionou. Se nao ha informacao suficiente, criar seccoes com placeholders e comentarios `<!-- A preencher -->`.
+- **Nao inventar regras de negocio** que o utilizador nao mencionou (vindo da Fase 0-R, as escritas no codigo e confirmadas por ele nao sao inventadas). Se nao ha informacao suficiente, criar seccoes com placeholders e comentarios `<!-- A preencher -->`.
 - **Nao remover seccoes** dos workflows — apenas adaptar ou marcar como N/A.
 - **Manter o formato** das tabelas markdown exatamente como esta no template.
 - **Perguntar ao utilizador** se tem duvidas em vez de assumir.

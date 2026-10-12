@@ -265,6 +265,17 @@ const geradas = rulesGeradasDe(leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")));
 if (geradas.length === 0) {
   fatal("nao derivei nenhuma rule gerada da seccao 2.2 do BOOTSTRAP.md — o formato mudou?");
 }
+// O caminho do projeto EXISTENTE (#288): a Fase 0-R serve quem adota o template num repo com codigo,
+// e a instrucao de arranque (antes da primeira `## Fase`) e o que la leva o agente. Sem uma ou outra,
+// o bootstrap de um projeto existente voltava a responder de memoria — e nada o diria. A instrucao tem
+// de MANDAR comecar por ela, e a seccao tem de trazer a regra que a torna segura (so leitura).
+{
+  const b = leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) ?? "";
+  const secao = b.split(/^## Fase 0-R\b/m)[1]?.split(/^## /m)[0] ?? "";
+  if (!secao || !/So leitura/.test(secao) || !/comecar pela \*\*Fase 0-R\*\*/.test(b.split(/^## Fase /m)[0])) {
+    fatal("o BOOTSTRAP.md perdeu a Fase 0-R (projeto existente) ou a instrucao que la leva — ver o #288");
+  }
+}
 for (const rel of geradas) {
   const p = join(dir, rel);
   mkdirSync(dirname(p), { recursive: true });

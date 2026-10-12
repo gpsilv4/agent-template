@@ -19,7 +19,7 @@
 > **A suite de cada peca deriva do nome**: um `check-*` tem o seu `tests/test-*`, e um modulo de
 > `guards/` tem o seu `tests/tests-*`. E uma regra, nao um inventario.
 >
-> **Onde vive o que** (arvore no `README.md`): a raiz tem os **8 pontos de entrada** — o que se
+> **Onde vive o que** (arvore no `README.md`): a raiz tem os **9 pontos de entrada** — o que se
 > invoca — e **`tests/`** tudo o que os testa, com os construtores de fixture em
 > `tests/harness/`. `test-*` e entry point, `tests-*` e modulo descoberto (porque: `scripts-guide-why.md` § "Racional que saiu do `scripts-guide.md` no #106").
 

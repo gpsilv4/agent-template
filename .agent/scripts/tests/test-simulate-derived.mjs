@@ -165,6 +165,11 @@ test("BOOTSTRAP sem a seccao 2.2 reprova, em vez de gerar nada em silencio", { b
   includes: ["nenhuma rule gerada"],
 });
 
+// O caminho do projeto existente (#288): a seccao e a instrucao de arranque que la leva.
+test("BOOTSTRAP sem a Fase 0-R reprova", { semFase0R: "secao" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
+test("BOOTSTRAP sem a instrucao que leva a Fase 0-R reprova", { semFase0R: "instrucao" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
+test("BOOTSTRAP com a Fase 0-R sem a regra \"So leitura\" reprova", { semFase0R: "regras" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
+
 test("`--only` que nao selecciona nada reprova", {}, {
   code: 1,
   args: ["--only=nao-existe-nenhum"],
