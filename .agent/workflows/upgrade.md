@@ -67,7 +67,8 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 ## 2. Decidir por categoria, nao por ficheiro
 
 > **Regra geral, antes da tabela.** Um ficheiro que o projeto **nao modificou** desde o
-> bootstrap traz-se por inteiro. O "diff e decidir" da tabela aplica-se ao que ele **customizou**.
+> bootstrap traz-se por inteiro. Num **adotado**, as `colisoes` do `.agent/adocao.json` sao
+> dele em TODAS as linhas: nunca se copiam nem se apagam. O "diff e decidir" da tabela aplica-se ao que ele **customizou**.
 >
 > Compara-se contra a versao do template **de onde o projeto saiu** (`.template-version`), com
 > os placeholders ja substituidos — nao contra o template nu, ou tudo aparece customizado.
@@ -76,8 +77,8 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | O estado e a historia deste projeto, so existem aqui |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards proprios deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**), `.github/scripts/` e `.githooks/` (so os do template; num adotado, nunca as `colisoes` do `.agent/adocao.json`) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
-| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag** — o do projeto nunca esteve; num adotado, as `colisoes` do `.agent/adocao.json` sao dele. Ver `upgrade-why.md` |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**), `.github/scripts/` e `.githooks/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
+| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | O que o git do `$TPL` **ignora**, e nomes de segredo | **Nunca copiar** | Nao e do template. A mao, so o que `git -C "$TPL" ls-files` lista (`upgrade-why.md`) |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Gerados no bootstrap |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova): os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** (`APn`) nunca se tocam; o **cabecalho** intacto vem novo, customizado integra-se a mao so a **regra duravel** (`upgrade-why.md`). As citacoes `TPn` copiam-se como estao | Os prefixos tornam isto copia, nao reescrita a mao |

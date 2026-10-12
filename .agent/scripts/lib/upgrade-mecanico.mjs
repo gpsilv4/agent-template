@@ -14,7 +14,7 @@
  * ficheiros customizados. Isso e leitura, nao mecanica.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, statSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, cpSync, existsSync, statSync, lstatSync } from "fs";
 import { execFileSync } from "child_process";
 import { join, dirname, sep, relative } from "path";
 
@@ -39,7 +39,7 @@ export { substituivel, PLACEHOLDER, andaFicheiros, MIGRACOES, CONSTANTES_DO_PROJ
  * seguranca tem de parar tudo. Escrever por cima dos ficheiros de um consumidor as cegas e
  * pior do que nao fazer upgrade nenhum.
  *
- * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: object[], migracoes: object[], naoCopiados: object[], substituidos: string[]}}
+ * @returns {{repostas: number, trazidos: number, placeholders: number, removidos: object[], migracoes: object[], naoCopiados: object[], substituidos: string[], doProjeto: string[]}}
  *          o que mediu. `naoCopiados` sao `{caminho, razao}`: o que estava no disco do template
  *          e NAO e dele (ignorado pelo git, ou nome de segredo/lixo) — ver `lib/fora-do-template.mjs`. `removidos` sao `{caminho, migrado}`: os ficheiros que sairam do template e o
  *          consumidor ainda tem. `migrado: true` quando o mesmo NOME existe noutro caminho — ou
@@ -99,6 +99,29 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   if (semIgnorados !== undefined) {
     fatal(`nao consegui perguntar ao git o que o template ignora (${semIgnorados}) — sem isso copiava-se o que nao e do template, segredos incluidos`);
   }
+  // As `colisoes` de um projeto ADOTADO (#288): ficheiros DELE com o caminho de um do template.
+  // Nao se copiam, nao sao "alterados" nem "removidos" — sao do projeto (#290). Um manifesto que
+  // nao se le e PARAR, e nao "nao ha colisoes": seria medir por cima do que e dele sem o saber.
+  const doProjeto = (() => {
+    const c = leOuNull(join(dir, ".agent/adocao.json"));
+    if (c === null) return new Set();
+    let m = null;
+    try {
+      m = JSON.parse(c);
+    } catch {
+      // cai no fatal abaixo, com a razao
+    }
+    if (!Array.isArray(m?.colisoes) || !m.colisoes.every((x) => typeof x === "string")) {
+      fatal(".agent/adocao.json ilegivel — sem ele nao sei que ficheiros sao do projeto adotado (#290)");
+    }
+    // `a copiar` e uma adocao interrompida: as colisoes que apareceram durante a copia so entram
+    // no manifesto final, logo esta lista pode estar incompleta.
+    if (m.estado !== "completo" && m.estado !== "commitado") {
+      fatal(`.agent/adocao.json com estado "${m.estado}" — a adocao nao acabou, e as colisoes podem estar incompletas (#290)`);
+    }
+    return new Set(m.colisoes);
+  })();
+
   // Nunca em silencio: o que fica de fora vai no resultado, e quem chama mostra-o.
   const naoCopiados = new Map();
   const podeCopiar = (rel) => {
@@ -128,7 +151,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     fatal(`nao consegui listar a arvore do ${tag} — sem ela nao sei o que saiu do template`);
   }
   const agora = arvoreNoDisco();
-  const saiu = [...naTag].filter((p) => !agora.has(p) && existsSync(join(dir, p))).sort();
+  const saiu = [...naTag].filter((p) => !agora.has(p) && existsSync(join(dir, p)) && !doProjeto.has(p)).sort();
 
   // MIGRACAO vs LIMPEZA, e a distincao decide se a remocao e opcional.
   //
@@ -163,7 +186,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       return bloco === null ? acc : acc.replace(bloco, `<${nome} preservada>`);
     }, t);
   const substituidos = [...agora]
-    .filter((p) => !p.includes("/config/") && !p.endsWith("/protegidos.json"))
+    .filter((p) => !p.includes("/config/") && !p.endsWith("/protegidos.json") && !doProjeto.has(p))
     .filter((p) => {
       const doConsumidor = leOuNull(join(dir, p));
       const referencia = naTag.has(p) ? tagFicheiro(p) : leOuNull(join(root, p));
@@ -241,7 +264,20 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // Trazer a logica sem a configuracao que ela importa nao e proteger a configuracao — e
       // partir o consumidor para a proteger.
       filter: (src) => {
-        if (!podeCopiar(relative(root, src).split(sep).join("/"))) return false;
+        const relSrc = relative(root, src).split(sep).join("/");
+        if (!podeCopiar(relSrc)) return false;
+        if (doProjeto.has(relSrc)) return false; // do projeto adotado (#290)
+        // Uma PASTA cujo destino e um symlink (`.githooks` -> `.husky`) ou um ficheiro, num adotado
+        // com colisoes la dentro: o `cpSync` rebentava, ou escrevia no alvo do link. Fica como e.
+        if (doProjeto.size && statSync(src).isDirectory() && [...doProjeto].some((c) => c.startsWith(`${relSrc}/`))) {
+          let st = null;
+          try {
+            st = lstatSync(join(dir, relSrc));
+          } catch {
+            // nao existe: copia-se normalmente
+          }
+          if (st && (st.isSymbolicLink() || !st.isDirectory())) return false;
+        }
         const p = src.split(sep).join("/");
         if (!p.includes("/.agent/scripts/config/") && !p.endsWith("/.claude/hooks/protegidos.json")) return true;
         // Descer sempre nas pastas: recusar a pasta `config/` porque ela ja existe saltava
@@ -280,6 +316,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     trazerDoHead(rel);
   }
   for (const rel of [".agent/rules/anti-patterns-template.md"]) {
+    if (doProjeto.has(rel)) continue; // do projeto adotado (#290)
     const c = leOuNull(join(root, rel));
     if (c === null) fatal(`${rel} nao existe no HEAD`);
     writeFileSync(join(dir, rel), c);
@@ -305,7 +342,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   // projeto). Intacto contra a tag, a menos dos placeholders, traz-se o novo; customizado, nao se
   // toca — trazer o inteiro apagava o que o projeto condensou e rebentava o tecto (#178). A prosa
   // velha aponta-a o Guard 15 (ID morto) ou o G12g (intervalo), com ficheiro e linha.
-  {
+  if (!doProjeto.has(".agent/rules/anti-patterns.md")) {
     const rel = ".agent/rules/anti-patterns.md";
     // O `---` separa cabecalho de entradas nos dois lados. Se mudar, ISTO REPROVA em vez de
     // adivinhar: uma divisao errada aqui apaga anti-padroes que nao existem noutro sitio.
@@ -315,15 +352,15 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       return i > 0 ? [t.slice(0, i + 5), t.slice(i + 5)] : null;
     };
     const doTemplate = corta(leOuNull(join(root, rel)));
-    const doProjeto = corta(leOuNull(join(dir, rel)));
-    if (doTemplate === null || doProjeto === null) {
+    const doProjetoAP = corta(leOuNull(join(dir, rel)));
+    if (doTemplate === null || doProjetoAP === null) {
       fatal(`nao consegui separar o cabecalho das entradas em ${rel} — o separador '---' mudou de forma`);
     }
     const naTag = corta(tagFicheiro(rel));
-    const vals = naTag === null ? null : capturaPlaceholders(doProjeto[0], naTag[0]);
+    const vals = naTag === null ? null : capturaPlaceholders(doProjetoAP[0], naTag[0]);
     if (vals !== null) {
       recolhe(vals);
-      writeFileSync(join(dir, rel), doTemplate[0] + doProjeto[1]);
+      writeFileSync(join(dir, rel), doTemplate[0] + doProjetoAP[1]);
     }
   }
   
@@ -395,7 +432,8 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   const usados = new Set();
   const nomesEm = (t) => { for (const m of t.matchAll(PLACEHOLDER)) usados.add(m[0].slice(2, -2)); };
   for (const [, c] of [...novos, ...atualizados]) nomesEm(c);
-  andaFicheiros(dir, (sub, nome) => substituivel(sub, nome) && nomesEm(readFileSync(join(dir, sub), "utf8")));
+  // As colisoes de um adotado sao do projeto: nem decidem conflitos, nem levam a fachada (#290).
+  andaFicheiros(dir, (sub, nome) => !doProjeto.has(sub) && substituivel(sub, nome) && nomesEm(readFileSync(join(dir, sub), "utf8")));
   const conflito = emConflito(usados);
   if (conflito) fatal(`placeholders com mais de um valor nos ficheiros intactos: ${conflito} — sem consenso nao sei o que escrever`);
   for (const [sub, c, escreve] of [...atualizados.map(([s, c]) => [s, c, (t) => t]), ...novos.map(([s, c]) => [s, c, substitui])]) {
@@ -411,7 +449,7 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   // esta simulacao, na primeira corrida, que o mostrou.
   let repostosPh = 0;
   andaFicheiros(dir, (sub, nome) => {
-    if (!substituivel(sub, nome)) return;
+    if (doProjeto.has(sub) || !substituivel(sub, nome)) return;
     const p = join(dir, sub);
     const c = readFileSync(p, "utf8");
     const n = substitui(c);
@@ -427,6 +465,11 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
     placeholders: repostosPh,
     removidos,
     substituidos,
+    // As colisoes do adotado que caem no que o motor copia, que o projeto AINDA tem e de que o
+    // template AINDA tem o caminho: ficaram como o projeto as tinha. As outras nao sao noticia.
+    doProjeto: [...doProjeto]
+      .filter((p) => PREFIXOS_COPIADOS.some((pre) => p.startsWith(pre)) && agora.has(p) && existsSync(join(dir, p)))
+      .sort(),
     migracoes,
     naoCopiados: [...naoCopiados].map(([caminho, razao]) => ({ caminho, razao })).sort((a, b) => a.caminho.localeCompare(b.caminho)),
   };

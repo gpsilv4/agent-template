@@ -196,7 +196,9 @@ export const BASE = {
 /** `tag` e a versao de onde o consumidor saiu. Parametrizavel porque ha um caminho de recusa que
  *  so se alcanca com uma tag que o `git` nao resolve — e sem ele a lista do que saiu do template
  *  sairia VAZIA, que se le como "nada saiu" (`TP2`). */
-export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir(), tag = "v1.0.0" }) {
+/** `prepara(dir)`: mexe na copia do consumidor depois de escrita e antes do motor — o que um mapa
+ *  `{caminho: conteudo}` nao exprime (um symlink, #290). */
+export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir(), tag = "v1.0.0", prepara = null }) {
   ontem = { ...BASE, ...ontem };
   hoje = { ...BASE, ...hoje };
   if (consumidor) consumidor = { ...BASE, ...consumidor };
@@ -238,6 +240,7 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
     }
     mkdirSync(join(dir, ".agent", "context"), { recursive: true });
     writeFileSync(join(dir, ".agent/context/session.md"), "# estado do projeto\n");
+    if (prepara) prepara(dir);
 
     const razoes = [];
     const medido = aplicaUpgradeMecanico({

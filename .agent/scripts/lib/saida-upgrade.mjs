@@ -41,6 +41,17 @@ export const linhasAgentes = (agentes) =>
         "        O motor nao os actualizou (estao customizados), e o hook guard-subagent-bash impoe o tools: deles.",
       ];
 
+/** As colisoes de um projeto ADOTADO (#290): ficheiros do projeto com o caminho de um do template.
+ *  O motor nao os trouxe; o que fazer com a versao nova do template decide-se a mao. */
+export const linhasDoProjeto = (doProjeto = []) =>
+  doProjeto.length === 0
+    ? []
+    : [
+        `${doProjeto.length} ficheiro(s) do PROJETO (adotado: as colisoes de .agent/adocao.json) com o caminho de um do template — NAO se trazem:`,
+        ...doProjeto.map((c) => `        ${c}`),
+        "        Comparar com a versao do template e decidir a mao; o motor deixou-os como estavam.",
+      ];
+
 /** Os ficheiros que sairam do template e o projeto ainda tem. Numa MIGRACAO (o mesmo nome noutra
  *  pasta) adiar a remocao deixa as duas estruturas, e e isso que poe o gate vermelho. */
 export const linhasRemovidos = (removidos, desde) => {
@@ -60,12 +71,13 @@ export const linhasRemovidos = (removidos, desde) => {
 
 /**
  * Tudo o que se le antes de aprovar, pela MESMA ordem nos dois modos: o que vai ser substituido,
- * o que nao foi copiado, os agentes, as constantes que mudaram de casa, e o que saiu do template.
+ * o que e do projeto adotado e fica, o que nao foi copiado, os agentes, as constantes que mudaram de casa, e o que saiu do template.
  * @returns {string[][]} so os blocos nao vazios; o primeiro elemento de cada um e o titulo.
  */
 export const blocosAntesDeAprovar = ({ medido, agentes, desde }) =>
   [
     linhasSubstituidos(medido.substituidos),
+    linhasDoProjeto(medido.doProjeto),
     linhasNaoCopiados(medido.naoCopiados),
     linhasAgentes(agentes),
     linhasMigracoes(medido.migracoes ?? []),
