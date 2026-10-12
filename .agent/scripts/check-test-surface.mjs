@@ -389,12 +389,13 @@ if (tocados.length === 0) {
   // contribui com o mesmo numero para os dois lados e cancela-se. Um ficheiro novo nao existe
   // na baseline (contribui 0 antes); um APAGADO ja avisou por nome proprio acima, e a ORIGEM de um
   // MIGRADO entra com a baseline e o lado "agora" vazio (#279).
-  // Um ficheiro SO DO TEMPLATE conta, do lado "agora", so o que ja tinha (#279): sai de cada
+  // Um ficheiro SO DO TEMPLATE (com o cabecalho na baseline, #281) conta, do lado "agora", so o que ja tinha (#279): sai de cada
   // derivado, logo um passo movido PARA ele nao e "movido, nao perdido"; um que saia dele, sim.
   const total = (lado, c) =>
     medidos.reduce((n, m) => {
       const k = (t) => m.conta(t, c.re, c.cru);
-      return n + (lado === "agora" && SO_DO_TEMPLATE.has(m.f) ? Math.min(k(m.antes), k(m.agora)) : k(m[lado]));
+      const doTemplate = SO_DO_TEMPLATE.has(m.f) && m.antes.includes("SO DO TEMPLATE"); // o do PROJETO conta (#281)
+      return n + (lado === "agora" && doTemplate ? Math.min(k(m.antes), k(m.agora)) : k(m[lado]));
     }, 0);
   // Com a semantica de cada contagem: uma `zero` (o veredicto do runner) so desce quando chega a zero —
   // juntar tres `process.exit(1)` num helper, e renomear o ficheiro no mesmo commit, nao e perda (#279).
@@ -418,7 +419,7 @@ if (tocados.length === 0) {
       ? []
       : ((gate) => {
           const [a, d] = [gate(paraMarcas(f, antesMarcas)), gate(paraMarcas(f, agora))];
-          return MARCAS.filter((m) => conta(d, m.re, m.cru) > conta(a, m.re, m.cru));
+          return MARCAS.filter((m) => (!m.so || m.so.test(f)) && conta(d, m.re, m.cru) > conta(a, m.re, m.cru));
         })(SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t);
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);

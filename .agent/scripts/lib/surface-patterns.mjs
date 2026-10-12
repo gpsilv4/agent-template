@@ -155,10 +155,43 @@ const CONTAGENS = [
 // `only` de uma query dao falso positivo.
 const MARCAS = [
   // Neutralizar um step de teste **sem o apagar**: a contagem de steps nao se move e nenhuma
-  // marca de `skip` aparece. Medido: `|| true` num step do `ci.yml` passava com exit 0. As
-  // tres formas abaixo removem falhas sem tocar em nenhum ficheiro de teste.
-  { re: /run:[^\n]*\|\|\s*true/, msg: "step de teste neutralizado com `|| true`" },
-  { re: /^\s*continue-on-error:\s*true/m, msg: "`continue-on-error: true`" },
+  // marca de `skip` aparece. Medido: `|| true` num step do `ci.yml` passava com exit 0.
+  // A marca LARGA: qualquer comando numa linha `run:` (o runner de qualquer stack: `make test`).
+  { re: /run:[^\n]*\|\|\s*(?:true|:|exit\s+0)(?=[\s;)&|"'}]|$)/, msg: "step de teste neutralizado com `|| true`" },
+  // Qualquer valor que nao seja `false` (`"false"`, `${{ false }}`) desliga a falha, ou pode
+  // desliga-la: `true`, `True`, `${{ !false }}`, `${{ matrix.x }}` (#281). O idioma da matriz e
+  // legitimo e raro: um novo pede confirmacao. Le o texto CRU (`"false"` nao pode virar `""`), e por
+  // isso so nos workflows: as fixtures dos testes escrevem `continue-on-error` dentro de strings.
+  { re: /^\s*continue-on-error:\s*(?!["']?false["']?\s*(?:#|$)|\$\{\{\s*false\s*\}\}\s*(?:#|$))\S/im, msg: "`continue-on-error: true`", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  // As marcas seguintes sao SO dos workflows (`so`, #281): em JavaScript `x || true` e `a | b` sao
+  // codigo normal, e um `.yml` de fixture nao corre nada. Leem o texto CRU e saltam as linhas de
+  // comentario. As duas primeiras so contam nas linhas que CORREM uma verificacao — as suites deste
+  // repo (`node ...test`, `node .githooks/...`, com `test`/`check` como palavra: nao `latest`) e os
+  // runners de um derivado (`npm test`/`t`, `npm run test|lint|build|typecheck` — nao `lint:fix` —,
+  // `pnpm -r test`, `pnpm exec vitest`, `npx [--yes] tsc|vitest|jest|playwright test`, `pytest` — nao
+  // `pip install pytest`): um `grep ... || true` noutro comando e shell normal (o `ci.yml` deste repo
+  // tem um), e reprova-lo era o falso alarme que ensina a ignorar o gate. O grupo repete-se nas
+  // duas entradas DE PROPOSITO: a varredura de mutacao so ve entradas `{ re: /.../ }` literais.
+  //  - a falha engolida (tambem no corpo de um `run: |`): QUALQUER `||` depois do runner, no mesmo
+  //    comando (o segmento acaba num `;` ou num comentario; um `||` dentro de `${{ ... }}` e uma
+  //    expressao do GitHub, nao shell), menos os ramos que mantem a falha: `exit` com codigo != 0 ou
+  //    com uma variavel (`exit $rc`, `exit $?`), `exit` sozinho, `var=$?`, `false`, ou um grupo
+  //    `{ ...; exit 1; }`/`( ... && false)`. So o RAMO: um `exit 1` noutro `||` da linha, ou num
+  //    comentario, nao desculpa um `|| true`; e num grupo o `$?` e o do comando anterior (`echo`).
+  { re: /^(?![ \t]*#)[^\n]*(?:\bnode[ \t]+\S*?(?<![a-zA-Z])(?:tests?|checks?|sweep|simulate)(?![a-z])[^\s;|&]*|\bnode[ \t]+\S*\.githooks\/[^\s;|&]*|\b(?:npm|pnpm|yarn)(?:[ \t]+-{1,2}[\w-]+(?:[ \t]+[\w@.\/-]+)?)*[ \t]+(?:t\b|test\b|run(?:-script)?[ \t]+(?:test|lint(?!:fix)|build|typecheck)[^\s;|&]*|exec[ \t]+(?:vitest|jest)\b|vitest\b|jest\b)|\bnpx(?:[ \t]+-\S+)*[ \t]+(?:tsc|vitest|jest|playwright[ \t]+test)(?![\w-])|(?<!install[ \t]{1,20})\bpytest\b)(?:[^;#\n]|(?<=\S)#)*?(?<!\$\{\{[^}\n]*)\|\|[ \t]*(?!exit[ \t]+["']?(?:[1-9]|\$))(?!exit[ \t]*(?:$|[;)&|}]))(?!\w+=\$\?)(?!false\b)(?![{(][^})\n]*\b(?:exit[ \t]+["']?[1-9]|false\b))\S/m, msg: "falha engolida (`|| true`, `|| :`, `|| echo`, ...)", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  //  - a saida canalizada (`|`, e `|&`, cujo `&` ja casa o `\S`) no mesmo comando (o `|` entre aspas,
+  //    `grep -E 'a|b'`, nao conta): a shell por omissao do GitHub Actions e `bash -e {0}`, sem
+  //    `pipefail`, logo o exit e o do ultimo comando. Com `shell: bash` ou `set -o pipefail` (o `ci.yml`
+  //    deste repo usa-o) a falha NAO se perde — dai o aviso pedir confirmacao (e reprova na mesma).
+  { re: /^(?![ \t]*#)[^\n]*(?:\bnode[ \t]+\S*?(?<![a-zA-Z])(?:tests?|checks?|sweep|simulate)(?![a-z])[^\s;|&]*|\bnode[ \t]+\S*\.githooks\/[^\s;|&]*|\b(?:npm|pnpm|yarn)(?:[ \t]+-{1,2}[\w-]+(?:[ \t]+[\w@.\/-]+)?)*[ \t]+(?:t\b|test\b|run(?:-script)?[ \t]+(?:test|lint(?!:fix)|build|typecheck)[^\s;|&]*|exec[ \t]+(?:vitest|jest)\b|vitest\b|jest\b)|\bnpx(?:[ \t]+-\S+)*[ \t]+(?:tsc|vitest|jest|playwright[ \t]+test)(?![\w-])|(?<!install[ \t]{1,20})\bpytest\b)(?:[^|;#\n'"]|'[^'\n]*'|"[^"\n]*"|\|\||(?<=\S)#)*\|(?!\|)[ \t]*\S/m, msg: "saida de um step canalizada (`| tee`, `| cat`, ...): sem `pipefail` esconde a falha — confirmar", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  //  - `set +e` (ou `+o errexit`) desliga o `-e` da shell no resto do bloco: um runner que falhe ja nao
+  //    para o passo. Nao exige runner na linha.
+  { re: /^(?![ \t]*#)[^\n]*\bset[ \t]+(?:\+[a-zA-Z]*e|\+o[ \t]+errexit\b)/m, msg: "`set +e` (o passo deixa de parar numa falha)", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  //  - um passo em flow mapping com `if:`/`continue-on-error:` (`- {name: t, if: false, run: ...}`, a
+  //    chave tambem entre aspas): nao abre a linha e escapa as marcas dessas chaves. Nao exige runner. So
+  //    com a chave: uma entrada de matriz (`- { os: ubuntu-latest }`) e idioma corrente e nao conta.
+  //    (O `-` do item ja chega aqui como espaco: o `paraMarcas` troca-o.)
+  { re: /^[ \t]*\{[^\n]*["']?\b(?:if|continue-on-error)["']?[ \t]*:/m, msg: "passo em flow mapping com `if:`/`continue-on-error:` — confirmar", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
   // DUAS falhas empilhadas na versao anterior desta linha, e cada uma sozinha ja matava a
   // excecao do `pull_request`:
   //   1. `\s*` e guloso mas recua: o lookahead falhava, o `\s*` voltava a largura ZERO, e
