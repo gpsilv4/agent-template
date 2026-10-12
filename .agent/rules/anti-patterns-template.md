@@ -67,6 +67,8 @@
   **e** config do runner congelados, contagens que nao descem, abortar se o git falhar.
 - **Detecao em review**: `node .agent/scripts/check-test-surface.mjs <baseline>`. E um passo e
   nao uma barreira (essa e o CI), e mede volume e nao forca — os limites estao no `-why`.
+- **Sem tocar num teste** (#285): o `on:`/`env:`/`defaults:` de um workflow, ou um passo da
+  maquinaria (e o seu job) que muda, muda o gate — avisa. Saida: o trailer `Test-Surface:`.
 
 ## TP5 — `.trim()` no output de um comando cujas colunas significam algo
 

@@ -37,13 +37,13 @@ const bloco = (nome, ...linhas) =>
   `      - name: ${nome}\n        run: |\n` + linhas.map((l) => `          ${l}\n`).join("");
 
 /** Baseline com `antes`, commit com `depois`; devolve o ref da baseline. */
-function muda(dir, antes, depois) {
+function muda(dir, antes, depois, msg = "alteracao") {
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
   writeFileSync(join(dir, ".github/workflows/ci.yml"), antes);
   commit(dir, "baseline");
   const ref = git(dir, ["rev-parse", "HEAD"]);
   writeFileSync(join(dir, ".github/workflows/ci.yml"), depois);
-  commit(dir, "alteracao");
+  commit(dir, msg);
   return ref;
 }
 
@@ -93,7 +93,10 @@ export function registar() {
   test("passar um step de `run: node x` para `run: |` NAO e enfraquecimento", (dir) =>
     muda(dir,
       ci(sweep, "      - run: node .agent/scripts/check-backlog.mjs\n"),
-      ci(sweep, bloco("backlog", "set -euo pipefail", "node .agent/scripts/check-backlog.mjs"))),
+      ci(sweep, bloco("backlog", "set -euo pipefail", "node .agent/scripts/check-backlog.mjs")),
+      // O passo do gate MUDOU (ganhou o `set -euo pipefail`): o gate do #285 avisa, e o trailer e a
+      // saida. O que este caso mede continua a ser a CONTAGEM, que nao pode descer.
+      "alteracao\n\nTest-Surface: .github/workflows/ci.yml — so ganha o pipefail"),
     { code: 0, excludes: [`${MSG}:`] });
 
   // --- O que NAO pode contar -------------------------------------------------

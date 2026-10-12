@@ -12,6 +12,9 @@
  * o que e so do template) testa-se pelos modulos descobertos: `tests-surface-marks.mjs` (a chave
  * na linha do `-`, entre aspas, o CRLF) e `tests-surface-gate-repo.mjs` (o gate e o SO_DO_TEMPLATE).
  *
+ * O `lib/superficie-gate.mjs` (o `on:`/`env:`/`defaults:` e os passos da maquinaria de um workflow, e o
+ * trailer `Test-Surface:`, #285) testa-se no modulo descoberto `tests-surface-gate.mjs`.
+ *
  *   node .agent/scripts/tests/test-test-surface.mjs
  */
 

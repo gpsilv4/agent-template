@@ -32,6 +32,7 @@ import { dirname, resolve, join } from "path";
 import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { SO_DO_TEMPLATE, paraMarcas, repoDoOrigin, gateDesteRepo } from "./lib/marcas-yaml.mjs";
+import { verificaGate } from "./lib/superficie-gate.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -354,7 +355,7 @@ if (tocados.length === 0) {
         existentes.find((o) => o !== f && o.split("/").pop() === nome);
       if (migradoPara) {
         ok(`${f}: MIGRADO para ${migradoPara} (${renomeados.get(f) === migradoPara ? "renomeado" : "mesmo nome noutra pasta"} da superficie)`);
-        medidos.push({ f, antes, antesMarcas: antes, agora: "", config: false, conta, migrado: true });
+        medidos.push({ f, antes, antesMarcas: antes, agora: "", config: false, conta, migrado: true, para: migradoPara });
         continue;
       }
       // So do template: o BOOTSTRAP manda remove-lo de cada derivado, e nao corre testes. Dar
@@ -404,7 +405,7 @@ if (tocados.length === 0) {
     return [c.msg, c.zero ? a > 0 && d === 0 : d < a];
   }));
 
-  for (const { f, antes, antesMarcas, agora, config, conta, migrado } of medidos) {
+  for (const { f, antes, antesMarcas, agora, config, conta, migrado, para } of medidos) {
     // As MARCAS nao se aplicam ao ficheiro que as DEFINE. Nele, cada entrada e uma definicao e
     // nao uma diretiva: um `xit` ali nao desativa nada, nao ha testes naquele ficheiro. E nao
     // e uma hipotese — os padroes com alternacao casam-se a si mesmos (ver a nota em
@@ -462,6 +463,8 @@ if (tocados.length === 0) {
     // contaveis (steps do CI, pares da varredura), a descida ja foi medida acima e repetir um
     // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
     const contavel = CONTAGENS.some((c) => conta(antes, c.re, c.cru) > 0);
+    // O gate (#285): o `on:` e os passos da maquinaria de um workflow, em `lib/superficie-gate.mjs`.
+    const gateAvisou = verificaGate({ f, antes, agora, para, contavel, base, git, ler: (r) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : null), warn, note });
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
     } else if (movidas.length) {
@@ -477,7 +480,7 @@ if (tocados.length === 0) {
       // ja anunciado (MIGRADO) ao recolher, e nada desceu NESTE ficheiro
     } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
-    } else {
+    } else if (!gateAvisou) {
       ok(`${f} alterado, sem marcas de enfraquecimento`);
     }
   }
