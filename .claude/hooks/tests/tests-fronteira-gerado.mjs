@@ -39,6 +39,7 @@
  */
 import { pathToFileURL } from "url";
 import { porqueAltera } from "../lib/fronteira.mjs";
+import { literalEmRegex, montaFronteira } from "../lib/fronteira-dados.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -237,6 +238,26 @@ export const CORRIGIDO_CABECA = [
 
 export function registar({ test, eq }) {
   const casos = gerar();
+
+  // --- O caminho entra na regex como texto LITERAL (alerta do CodeQL) ------------------------
+  // So o `.` era escapado: um caminho futuro com `+` ou `(` passava a ser um padrao, e a regex da
+  // fronteira deixava de casar o proprio caminho.
+  test("gerado: um caminho com caracteres especiais de regex casa-se a si proprio, e so a si", () => {
+    for (const ch of ".*+?^${}()|[]\\") {
+      const caminho = `.a${ch}b/x`;
+      eq(new RegExp(`^${literalEmRegex(caminho)}$`).test(caminho), true, `"${caminho}" nao se casou a si proprio`);
+    }
+    eq(new RegExp(`^${literalEmRegex(".a+b")}$`).test(".aab"), false, "o `+` foi lido como quantificador");
+  });
+  // E a regex da fronteira USA-o nos tres sitios (caminho com `/`, sem `/`, e a pasta-mae): com os
+  // caminhos de hoje (so `.`) um escape so do `.` dava a mesma regex, e este teste e o que o ve.
+  test("gerado: a regex da fronteira escapa um caminho com `+` nos tres sitios", () => {
+    const re = montaFronteira([".a+b/", ".c+d.json"], [".a+b"]);
+    eq(re.test("rm .a+b/x"), true, "o caminho com `/` final nao casou");
+    eq(re.test("rm .c+d.json"), true, "o caminho sem `/` nao casou");
+    eq(re.test("rm -rf .a+b"), true, "a pasta-mae nao casou");
+    eq(re.test("rm .aab/x") || re.test("rm .ccd.json") || re.test("rm -rf .aab"), false, "o `+` foi lido como quantificador");
+  });
 
   // --- A invariante -----------------------------------------------------------------------
   test("gerado: todo o verbo que ESCREVE e negado, excepto o que esta DECLARADO", () => {

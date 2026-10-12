@@ -18,7 +18,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -42,7 +42,7 @@ function corre(ficheiros) {
       mkdirSync(dirname(join(dir, rel)), { recursive: true });
       writeFileSync(join(dir, rel), conteudo);
     }
-    writeFileSync(join(dir, ".agent/scripts/check-codigo-morto.mjs"), execFileSync("cat", [CHECKER], { encoding: "utf8" }));
+    writeFileSync(join(dir, ".agent/scripts/check-codigo-morto.mjs"), readFileSync(CHECKER, "utf8"));
     try {
       return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/check-codigo-morto.mjs")], { encoding: "utf8" }) };
     } catch (err) {

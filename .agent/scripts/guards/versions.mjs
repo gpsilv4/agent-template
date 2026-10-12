@@ -9,6 +9,7 @@
  *
  * Os avisos vivem aqui, logo este ficheiro esta em `PARES` (`lib/pares.mjs`).
  */
+import { semHtml } from "./anti-patterns.mjs";
 
 // No ficheiro original o `package.json` era lido UMA vez, no Guard 3, e o resultado ficava
 // visivel aos guards de dependencias mais abaixo. Separar as duas funcoes rompeu essa
@@ -53,7 +54,9 @@ if (pkgRaw === null) {
     warn(`${CHANGELOG_PATH} nao encontrado — core-rules.md exige-o atualizado antes de cada commit`);
   } else if (pkgVersion) {
     // Ignorar exemplos dentro de comentarios HTML (ex: o `## [v0.1.0]` de exemplo no template).
-    const clNoComments = changelog.replace(/<!--[\s\S]*?-->/g, "");
+    // O `semHtml` do Guard 15: tambem tira um `<!--` sem fecho (o markdown comenta ate ao fim), que a
+    // regex antiga deixava visivel e cuja versao de exemplo contava como real (alerta do CodeQL).
+    const clNoComments = semHtml(changelog);
     // Aceita `## [v1.2.3]`, `## v1.2.3` e `## 1.2.3`, com sufixos SemVer (pre-release/build).
     const SEMVER = /^##\s*\[?v?([0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?)\]?/gm;
     const found = [...clNoComments.matchAll(SEMVER)].map((m) => m[1]);
