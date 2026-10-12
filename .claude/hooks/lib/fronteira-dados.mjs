@@ -51,16 +51,27 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
   const partes = f.replace(/\/$/, "").split("/");
   return partes.slice(1).map((_, i) => partes.slice(0, i + 1).join("/"));
 }))];
-export const FRONTEIRA = new RegExp(
-  "(?:^|[\\s\"'`=(>|&!])(?:\\./)?(?:" +
-    [
-      ...CAMINHOS_FRONTEIRA.map((f) =>
-        f.endsWith("/") ? `${f.slice(0, -1).replace(/[.]/g, "\\.")}(?:/|(?=[\\s;|&)>"'\`]|$))` : f.replace(/[.]/g, "\\.")
-      ),
-      ...MAES.map((m) => `${m.replace(/[.]/g, "\\.")}(?:/?(?=[\\s;|&)>"'\`]|$)|/\\{)`),
-    ].join("|") +
-    ")"
-);
+/** Um caminho como texto LITERAL numa regex: escapa todos os caracteres especiais, e nao so o `.`.
+ *  Os caminhos de hoje so tem pontos, mas um caminho futuro com `+`, `(` ou `\` passava a ser um
+ *  padrao e a fronteira deixava de casar o que devia (alerta do CodeQL, js/incomplete-sanitization).
+ *  E o mesmo escape do `check-codigo-morto.mjs` e do `test-bundle-sizes.mjs`, COPIADO de proposito:
+ *  este modulo e a folha da fronteira e nao importa de `.agent/scripts/` (camadas separadas). */
+export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** A regex da fronteira para uma lista de caminhos e de pastas-mae. Uma FUNCAO para o teste a poder
+ *  montar com um caminho que tenha caracteres especiais: os de hoje so tem `.`, e com eles um escape
+ *  que so tratasse o `.` dava a mesma regex — nenhum teste o via. */
+export const montaFronteira = (caminhos, maes) =>
+  new RegExp(
+    "(?:^|[\\s\"'`=(>|&!])(?:\\./)?(?:" +
+      [
+        ...caminhos.map((f) =>
+          f.endsWith("/") ? `${literalEmRegex(f.slice(0, -1))}(?:/|(?=[\\s;|&)>"'\`]|$))` : literalEmRegex(f)
+        ),
+        ...maes.map((m) => `${literalEmRegex(m)}(?:/?(?=[\\s;|&)>"'\`]|$)|/\\{)`),
+      ].join("|") +
+      ")"
+  );
+export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
 
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *

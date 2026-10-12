@@ -83,7 +83,8 @@ if (settingsRaw === null) {
           } else if (glob[i] === "*") {
             rxSrc += "[^/]*";
           } else {
-            rxSrc += glob[i].replace(/[.+^${}()|[\]\\?]/, "\\$&");
+            // Um so caracter de cada vez; o `g` nao muda nada, e fecha o alerta do CodeQL.
+            rxSrc += glob[i].replace(/[.+^${}()|[\]\\?]/g, "\\$&");
           }
         }
         const rx = new RegExp(`^${rxSrc}$`);

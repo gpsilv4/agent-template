@@ -109,6 +109,12 @@ export function registar() {
     writeF(dir, "package.json", "{ not json,, }");
   }, { code: 1, includes: ["package.json invalido"] });
 
+  // Um exemplo comentado SEM fecho (o markdown comenta ate ao fim): a versao dele nao conta.
+  test("G3: a versao de um comentario por fechar nao conta", (dir) => {
+    writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
+    writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## [v1.2.3] - Atual\n\n<!-- exemplo:\n## [v9.9.9] - Exemplo\n");
+  }, { code: 0, includes: ["=== package.json"] });
+
   test("G3: heading sem brackets e aceito (## v1.2.3)", (dir) => {
     writeF(dir, "package.json", JSON.stringify({ name: "x", version: "1.2.3" }));
     writeF(dir, "src/docs/CHANGELOG.md", "# CHANGELOG\n\n## v1.2.3 - Atual\n");
