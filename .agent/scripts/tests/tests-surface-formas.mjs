@@ -183,6 +183,8 @@ export function registar() {
   // Sem backtracking catastrofico nas entradas novas (o padrao do `tests-surface-blocos.mjs`): num
   // PROCESSO FILHO com `timeout`, porque um regex exponencial nao devolve.
   {
+    // O ultimo caso e o que o CodeQL apanhou no PR #298 (js/redos): `\r\n#` repetido depois de um `&&`
+    // — o `[^\n]` aceitava o `\r`, e cada linha lia-se de duas formas.
     const nome = "formas: as marcas do #295 medem linhas longas, indentacao funda e flags repetidas em < 5 s";
     // E as duas antigas com o mesmo grupo de runners (a ENGOLIDA e a do pipe), que tinham a mesma
     // ambiguidade nas flags (terceira leitura).
@@ -195,6 +197,7 @@ export function registar() {
         Array(300).fill(fundo + "npm" + " --a".repeat(40)).join("\\n"),
         Array(300).fill("        npm test &&" + " y".repeat(500)).join("\\n"),
         Array(300).fill("        shell: " + "bash ".repeat(400) + "{0}").join("\\n"),
+        "        npm test && x" + "\\r\\n#".repeat(5000) + "\\r\\n",
       ];
       for (const re of res) for (const t of casos) t.match(re);`;
     let problemas = novas.length >= 6 ? [] : [`so ${novas.length} marcas encontradas pela msg`];
