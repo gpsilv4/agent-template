@@ -395,3 +395,8 @@ para nao ser descoberto:
 - **`continue-on-error` condicional** (`${{ matrix.x }}`): conta-se a parte; so a passagem a `true`
   sobe. Um `continue-on-error` em flow mapping (`- { continue-on-error: true, run: ... }`) conta so pela
   marca dessa chave (por ficheiro).
+- **Audit informativo** (#303): um passo ou job cujos `run:` sao TODOS de audit (`npm|pnpm|yarn|bun
+  audit`, `npm run test:audit`) nao conta na marca do `continue-on-error` — e o desenho que o template
+  recomenda, e um derivado que o escalou para gate tem de poder voltar atras. Por isso MOVER a chave do
+  passo de audit para outro passo passa a contar como acrescenta-la a esse (antes a contagem ficava
+  igual, e mover para um `make test` passava calado). Um passo so com `uses:` nao prova que audita: conta.

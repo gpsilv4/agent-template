@@ -56,21 +56,50 @@ const pkg = ({ scripts = { test: "vitest run", "test:unit": "vitest run unit", b
   `${JSON.stringify({ name: "app", version: versao, scripts, dependencies: deps }, null, 2)}\n`;
 
 export function registar() {
+  // --- O audit informativo (#303, R7B-6) ---------------------------------------------
+  // O desenho que o template recomenda — o passo de audit com `continue-on-error` — era inalcancavel
+  // para um derivado que o tinha escalado para gate: a marca da chave contava em qualquer passo, e as
+  // marcas nao tem saida. Um bloco que SO audita sai da contagem; tudo o resto continua a contar.
+  const CRU = "`continue-on-error: true` acrescentado";
+  test("passos: voltar o passo de audit a informativo nao avisa (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("audit")), { code: 0, excludes: [CRU] });
+  test("passos: um job que SO audita, informativo, nao avisa (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("job-audit")), { code: 0, excludes: [CRU] });
+  test("passos: audit em `run: |`, com flags e uma continuacao, informativo, nao avisa (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("audit").replace("        run: npm audit\n", "        run: |\n          # so producao bloqueia noutro passo\n          npm audit \\\n            --omit=dev\n          pnpm audit --audit-level=high\n")),
+  { code: 0, excludes: [CRU] });
+  // Os contra-casos: o que NAO e so audit continua a contar.
+  test("passos: `continue-on-error` num passo que nao e de audit nem de teste continua a avisar (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("eco")), { code: 1, includes: [CRU] });
+  test("passos: `npm audit && npm test` num passo tolerado continua a avisar (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("audit").replace("        run: npm audit\n", "        run: npm audit && npm test\n")), { code: 1, includes: [CRU] });
+  test("passos: audit e teste em linhas do mesmo `run: |` continua a avisar (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("audit").replace("        run: npm audit\n", "        run: |\n          npm audit\n          make test\n")), { code: 1, includes: [CRU] });
+  test("passos: um passo so com `uses:` tolerado continua a avisar (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("").replace("      - name: Audit\n        run: npm audit\n", "      - name: Audit\n        continue-on-error: true\n        uses: actions/dependency-review-action@v4\n")), { code: 1, includes: [CRU] });
+
   // --- O `continue-on-error` que muda de passo ---------------------------------------
   test("passos: mover o `continue-on-error` do Audit para o passo de TESTE avisa", (dir) =>
     muda(dir, CI, wf("audit"), wf("teste")), { code: 1, includes: [TOLERANTE] });
-  test("passos: mover o `continue-on-error` do Audit para um passo que NAO corre testes nao avisa", (dir) =>
-    muda(dir, CI, wf("audit"), wf("eco")), { code: 0, excludes: [TOLERANTE] });
+  // Desde o #303 a chave do Audit nao conta: move-la para um passo que nao audita e ACRESCENTA-LA a
+  // ele, e a marca crua avisa. Antes, a contagem ficava igual — e mover para um `make test` (que a
+  // marca de teste nao conhece) passava calado. A marca de TESTE continua sem disparar aqui.
+  test("passos: mover o `continue-on-error` do Audit para um passo que NAO corre testes nao dispara a marca de teste", (dir) =>
+    muda(dir, CI, wf("audit"), wf("eco")), { code: 1, includes: ["`continue-on-error: true` acrescentado"], excludes: [TOLERANTE] });
   test("passos: um `continue-on-error: false` no passo de teste nao avisa", (dir) =>
     muda(dir, CI, wf("audit"), wf("audit").replace("      - name: Testes\n", "      - name: Testes\n        continue-on-error: false\n")),
   { code: 0, excludes: [TOLERANTE] });
   test("passos: o `continue-on-error` num passo com `run: |` (como o `ci.yml` real) avisa", (dir) =>
     muda(dir, CI, wf("audit"), wf("audit").replace("      - name: Testes\n        run: npm test\n", "      - name: Testes\n        continue-on-error: true\n        run: |\n          npm ci\n          npm run test:unit\n")),
   { code: 1, includes: [TOLERANTE] });
-  test("passos: o `continue-on-error` num passo SEM testes ANTES do de teste nao avisa", (dir) =>
-    // MOVER (do Audit para o passo "Antes"): acrescentar um segundo seria, com razao, a marca antiga.
+  test("passos: o `continue-on-error` num passo SEM testes ANTES do de teste nao dispara a marca de teste", (dir) =>
+    // MOVER (do Audit para o passo "Antes"): desde o #303 e a marca crua que avisa (ver acima).
     muda(dir, CI, wf("audit"), wf("").replace("      - name: Testes\n", "      - name: Antes\n        continue-on-error: true\n        run: echo antes\n      - name: Testes\n")),
-  { code: 0, excludes: [TOLERANTE] });
+  { code: 1, includes: ["`continue-on-error: true` acrescentado"], excludes: [TOLERANTE] });
+  // O caso que o #303 passou a apanhar: mover a chave do Audit para um `make test`.
+  test("passos: mover o `continue-on-error` do Audit para um `make test` avisa (#303)", (dir) =>
+    muda(dir, CI, wf("audit"), wf("").replace("        run: npm test\n", "        continue-on-error: true\n        run: make test\n")),
+  { code: 1, includes: ["`continue-on-error: true` acrescentado"] });
   test("passos: a chave `\"run\":` entre aspas num passo tolerado avisa", (dir) =>
     muda(dir, CI, wf("audit"), wf("audit").replace("      - name: Testes\n        run: npm test\n", "      - name: Testes\n        continue-on-error: true\n        \"run\": npm test\n")),
   { code: 1, includes: [TOLERANTE] });

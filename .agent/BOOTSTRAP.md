@@ -569,7 +569,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 
 - **`.github/workflows/ci.yml`**: ajustar os comandos ao gestor de pacotes/toolchain do projeto (o template assume `npm`/`npx tsc`), descomentar o bundle size check se aplicavel (os guards `check-doc-versions` e `check-backlog` ja correm sempre, no job `guard-tests`). Tres decisoes a tomar **com o utilizador**, e uma remocao sem perguntar:
   - **Guards por step** (`if [ -f tsconfig.json ]`, `scripts?.lint`, …): existem para o template puro nao ficar vermelho. Assim que a stack estiver fixa, **remover o guard** dos steps que o projeto usa de facto — senao um script apagado por acidente passa a "skip" silencioso em vez de falhar.
-  - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`.
+  - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`. A escolha nao e definitiva: voltar a informativo num passo que so audita nao reprova o `check-test-surface` (#303).
   - **Projeto com CI proprio** (Fase 0-R): nao ficam dois CIs a fazer o mesmo. O CI do projeto
     continua a correr typecheck/lint/build/test; do `ci.yml` do template ficam **so** os jobs que ele
     nao tem — `guard-tests` (os guards e os testes deles, que nao dependem do `package.json`) e
