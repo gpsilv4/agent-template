@@ -69,6 +69,7 @@
   nao uma barreira (essa e o CI), e mede volume e nao forca — os limites estao no `-why`.
 - **Sem tocar num teste** (#285): o `on:`/`env:`/`defaults:` de um workflow, ou um passo da
   maquinaria (e o seu job) que muda, muda o gate — avisa. Saida: o trailer `Test-Surface:`.
+- **Limites** (sem parser de YAML/shell): `scripts-guide-why.md`.
 
 ## TP5 — `.trim()` no output de um comando cujas colunas significam algo
 

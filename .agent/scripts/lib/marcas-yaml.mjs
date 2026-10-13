@@ -25,11 +25,95 @@ export const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
 export const paraMarcas = (f, t) =>
   /\.ya?ml$/i.test(f)
     ? comoORunnerExecuta(
-        t
+        tolerantes(t)
           .replace(/^([ \t]*)-(?=[ \t]+\S)/gm, "$1 ")
           .replace(/^([ \t]*)(?:(["'])(if|continue-on-error|shell|run)\2|(if|continue-on-error|shell|run))[ \t]*:/gm, "$1$3$4:")
       )
     : t;
+
+/** `continue-on-error` com um valor que nao e `false` (o mesmo criterio da marca dessa chave). */
+const COE = /^[ \t]*(?:-[ \t]+)?["']?continue-on-error["']?[ \t]*:[ \t]*(?!["']?false["']?[ \t]*(?:#|$)|["']?\$\{\{[ \t]*false[ \t]*\}\}["']?[ \t]*(?:#|$))\S/i;
+/** ...e com um valor CONDICIONAL (`${{ matrix.experimental }}`): so algumas pernas toleram. Ancorado a
+ *  CHAVE: um `${{ }}` num comentario (`true  # ver: ${{ matrix.x }}`) nao torna a chave condicional.
+ *  LIMITE: uma expressao sempre verdadeira (`${{ !false }}`) conta como condicional. */
+const COE_CONDICIONAL = /^[ \t]*(?:-[ \t]+)?["']?continue-on-error["']?[ \t]*:[ \t]*["']?\$\{\{(?![ \t]*(?:true|false)[ \t]*\}\})/i;
+/** Um `run:` cujo corpo sao CHAVES (`defaults: run: shell: ...`): um mapeamento, nao um comando. */
+const RUN_MAPEAMENTO = (ls, j) => {
+  const prox = ls.slice(j + 1).find((l) => l.trim() && !/^[ \t]*#/.test(l));
+  return prox !== undefined && /^[ \t]*[\w-]+[ \t]*:(?:[ \t]|$)/.test(prox);
+};
+
+/**
+ * Os comandos de um PASSO ou JOB com `continue-on-error` levam um prefixo (#296): `@@coe@@; ` (sempre
+ * tolerado) ou `@@coe?@@; ` (condicional, `${{ matrix.x }}`). A marca dessa chave conta por FICHEIRO,
+ * logo move-la do passo `Audit` para o passo que corre os testes deixava a contagem igual; com o
+ * prefixo, uma marca conta os comandos de TESTE sempre tolerados, e mover a chave para um passo de
+ * teste — ou passar uma condicional a `true` — faz essa contagem subir. O `;` deixa um `!` a seguir no
+ * inicio de um comando. Corre sobre o texto ORIGINAL (com o `- `): e o `- ` que diz onde um passo comeca.
+ *
+ * O bloco de uma chave `continue-on-error` na coluna `k`: o item `- ` cujo conteudo comeca em `k`
+ * (um passo), ou a linha anterior menos indentada (um job). Acaba na primeira linha nao vazia (e que
+ * nao seja comentario — um `#` na coluna 0 e YAML valido) com a indentacao do dono, ou menos. O prefixo
+ * vai so no INICIO de cada comando: nao numa linha que continua a anterior (`\` no fim, ou o corpo de
+ * um `>`/simples), senao a juncao do `comoORunnerExecuta` punha o `;` a meio e escondia o `|| true`.
+ * Um `run:` cujo corpo sao chaves (`defaults: run: shell:`) nao e um comando e fica como esta.
+ */
+function tolerantes(t) {
+  const ls = t.split(/\r?\n/);
+  const col = (l) => /^[ \t]*(?:-[ \t]+)?/.exec(l)[0].length; // onde comeca o conteudo
+  const ind = (l) => /^[ \t]*/.exec(l)[0].length;
+  const comentario = (l) => /^[ \t]*#/.test(l);
+  // Um `@@coe@@` (sempre) sobrepoe-se a um `@@coe?@@` (condicional) que ja la esteja: a ordem das chaves
+  // no ficheiro nao pode decidir — um job condicional processado primeiro rebaixava o `true` do passo.
+  const prefixa = (l, p) => (l.includes("@@coe?@@; ") && p === "@@coe@@; " ? l.replace("@@coe?@@; ", p) : l.includes("@@coe") ? l : l.replace(/^([ \t]*(?:-[ \t]+)?(?:["']?run["']?[ \t]*:[ \t]*)?)/, `$1${p}`));
+  for (let i = 0; i < ls.length; i++) {
+    if (!COE.test(ls[i])) continue;
+    const p = COE_CONDICIONAL.test(ls[i]) ? "@@coe?@@; " : "@@coe@@; ";
+    const k = col(ls[i]);
+    let dono = -1;
+    for (let d = /^[ \t]*-[ \t]/.test(ls[i]) ? i : i - 1; d >= 0; d--) {
+      if (!ls[d].trim() || comentario(ls[d])) continue;
+      if ((/^[ \t]*-[ \t]/.test(ls[d]) && col(ls[d]) === k) || col(ls[d]) < k) {
+        dono = d;
+        break;
+      }
+    }
+    if (dono < 0) continue;
+    let fim = dono + 1;
+    while (fim < ls.length && (!ls[fim].trim() || comentario(ls[fim]) || ind(ls[fim]) > ind(ls[dono]))) fim++;
+    for (let j = dono; j < fim; j++) {
+      const r = /^[ \t]*(?:-[ \t]+)?["']?run["']?[ \t]*:[ \t]*(.*)$/.exec(ls[j]);
+      if (!r || (!r[1] && RUN_MAPEAMENTO(ls, j))) continue;
+      const literal = /^\|/.test(r[1]);
+      const dobrado = /^>/.test(r[1]);
+      const base = (() => {
+        const l = ls.slice(j + 1, fim).find((x) => x.trim() && !comentario(x));
+        return l === undefined ? 0 : ind(l);
+      })();
+      if (r[1] && !/^[|>#]/.test(r[1])) ls[j] = prefixa(ls[j], p);
+      // O corpo do `run:`: as linhas mais indentadas que a CHAVE (a coluna do conteudo, nao a do `- `).
+      let continua = !!r[1] && !/^[|>#]/.test(r[1]); // um valor simples na propria linha: o corpo continua-o
+      for (let c = j + 1; c < fim && (!ls[c].trim() || ind(ls[c]) > col(ls[j])); c++) {
+        if (!ls[c].trim()) {
+          continua = false; // uma linha em branco separa comandos (no `>` e no simples)
+          continue;
+        }
+        if (comentario(ls[c])) continue;
+        // No `>`, uma linha MAIS indentada que o corpo fica uma linha a parte (o YAML nao a dobra): e
+        // um comando, e a seguinte tambem comeca um.
+        const aParte = dobrado && ind(ls[c]) > base;
+        if (!continua || aParte) ls[c] = prefixa(ls[c], p);
+        if (aParte) {
+          continua = false;
+          continue;
+        }
+        // No literal, so o `\` no fim continua; no `>`/simples, o corpo inteiro e um comando.
+        continua = literal ? /\\$/.test(ls[c]) : true;
+      }
+    }
+  }
+  return ls.join("\n");
+}
 
 /**
  * O `run:` como o RUNNER o executa, e nao como esta escrito (#295). As marcas leem linha a linha, e
@@ -64,10 +148,13 @@ function comoORunnerExecuta(t) {
       out.push(ls[i]);
       for (let k = 0; k < corpo.length; k++) {
         let l = corpo[k];
-        while (/\\$/.test(l) && k + 1 < corpo.length) l = `${l.slice(0, -1)} ${corpo[++k].trim()}`;
+        // Um COMENTARIO que acaba em `\` nao continua: a shell nao junta comentarios.
+        while (/\\$/.test(l) && !/^[ \t]*#/.test(l) && k + 1 < corpo.length) l = `${l.slice(0, -1)} ${corpo[++k].trim()}`;
         out.push(l);
       }
-    } else if (valor.startsWith(">") || (corpo.length && !valor.startsWith("|"))) {
+    } else if (valor.startsWith(">") || (corpo.length && !valor.startsWith("|") && !(!valor && RUN_MAPEAMENTO(ls, i)))) {
+      // (Um `run:` vazio com CHAVES no corpo — `defaults: run: shell:` — e um mapeamento, e nao se dobra:
+      // dobrado, o `shell:` desaparecia da marca dele.)
       // Dobrado (`>`) ou simples em varias linhas (com valor, vazio ou so comentario): o YAML junta as
       // linhas, MAS uma linha em branco — e, no `>`, uma linha mais indentada — fica uma quebra. Cada
       // pedaco e um comando, ate ao primeiro `#` (comentario de shell). Um pedaco que comece no CORPO

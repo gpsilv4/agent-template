@@ -368,3 +368,30 @@ a dono do `test-harness.mjs`. O `test-guards.mjs` ficou o entry point e a baseli
 
 **A licao**: a convencao de dono so rende se os testes de um ficheiro viverem no ficheiro que tem o
 nome dele. Dos tres alvos sem dono do #156, dois tinham-no — so com o nome errado.
+
+## Limites assumidos do `check-test-surface` (#285)
+
+O verificador le texto, sem parser de YAML nem de shell (os scripts nao tem dependencias). As tres
+partes do #285 fecharam o que se le por linha e por passo; o que fica de fora, de proposito e escrito
+para nao ser descoberto:
+
+- **YAML**: ancoras e aliases (`<<: *base`, `- *gate`); jobs reutilizaveis
+  (`uses: ./.github/workflows/x.yml`); `defaults: {run: {shell: ...}}` em flow; um heredoc
+  (`npm test && cat <<EOF` com `chave: valor` na linha seguinte le-se como chave YAML).
+- **Shell**: `trap 'exit 0' EXIT`; `npm test &` + `wait` (sem pid devolve 0); `timeout N`, `VAR=x`,
+  `(` ou `{` entre o `if` e o runner; uma linha NOVA que neutraliza noutro passo (`git checkout` da
+  base, `ref:` no `actions/checkout`).
+- **Selecao de testes**: um caminho posicional (`vitest run src/um`, `pytest tests/um.py::t`); o
+  `--project` do Playwright, fora de proposito — `--project=${{ inputs.project || 'chromium' }}` e
+  idioma corrente.
+- **Fora da superficie**: um `Makefile` e uma composite action; um clone raso (`fetch-depth` curto)
+  pode por em `base..HEAD` commits que nao sao do PR.
+- **Local**: o trailer `Test-Surface:` le-se dos commits, logo uma alteracao por commitar avisa sempre.
+- **`package.json`** (#296): so os nomes que o BOOTSTRAP fixa e o CI chama (`test`, `test:unit`,
+  `test:e2e`, `test:security`, `test:all`) e so com um runner no valor. Ficam fora: outros nomes
+  (`unit`, `test-ci`, `spec`), uma cadeia `npm run x` que leva a um script com outro nome, um
+  `package.json` minificado numa linha, e a configuracao do `jest` embebida no `package.json`. Os
+  avisos do `package.json` nao tem trailer — e o mesmo regime das contagens.
+- **`continue-on-error` condicional** (`${{ matrix.x }}`): conta-se a parte; so a passagem a `true`
+  sobe. Um `continue-on-error` em flow mapping (`- { continue-on-error: true, run: ... }`) conta so pela
+  marca dessa chave (por ficheiro).

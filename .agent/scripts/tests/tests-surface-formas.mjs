@@ -180,6 +180,12 @@ export function registar() {
     muda(dir, wf(), wf("      - run: >\n          npm test\n\n          tar -t -f x.tar\n")),
   { code: 0, excludes: [SELECAO] });
 
+  // Do #295, na leitura de confirmacao do #296: um COMENTARIO que acaba em `\\` nao junta a linha
+  // seguinte (a shell nao continua comentarios), e o `npm test || true` seguinte continua a contar.
+  test("formas: `# nota \\` seguido de `npm test || true` num `run: |` avisa", (dir) =>
+    muda(dir, wf(), wf("      - run: |\n          # nota \\\n          npm test || true\n")),
+  { code: 1, includes: [ENGOLIDA] });
+
   // Sem backtracking catastrofico nas entradas novas (o padrao do `tests-surface-blocos.mjs`): num
   // PROCESSO FILHO com `timeout`, porque um regex exponencial nao devolve.
   {
