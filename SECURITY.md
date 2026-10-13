@@ -42,51 +42,10 @@ This template enforces security through:
 ## Enable on GitHub (public vs. private repository)
 
 These are **repository settings**, not files: a project created from this template does **not**
-inherit them, and an `/upgrade` does not change them — check them after either. Turn them on in
-`Settings > Advanced Security` (branch protection: `Settings > Branches` or `Settings > Rules`).
-Availability depends on the repository's visibility and plan (checked against docs.github.com on 2026-10-08 — plans change,
-so confirm there):
-
-| Setting | Public repo | Private repo, free personal account |
-|---|---|---|
-| **Private vulnerability reporting** | free | not available (public repositories only) |
-| **Dependency graph + Dependabot alerts** | free | free |
-| **Dependabot security updates** (and grouped) | free | needs the two above; plan not stated in the docs — check whether it appears |
-| **Code scanning (CodeQL)** | free | not available: the **GitHub Code Security** license is sold only to organizations (Team/Enterprise) — and without it, CodeQL must **not** run at all (below) |
-| **Secret scanning + push protection** | free | not available for user-owned private repos (GitHub Enterprise only) |
-| **Branch protection / rulesets** | free | can be configured, but is **not enforced** without **GitHub Pro** (or an organization on Team) |
-
-The private column is for a **personal** account on the free plan. A private repository owned by
-an **organization** has other options (e.g. buying GitHub Secret Protection or Code Security on
-Team) — see [GitHub's plans](https://docs.github.com/en/get-started/learning-about-github/githubs-plans).
-
-**CodeQL, case by case:**
-
-- **Your project, public repository:** once it has application code, turn on **"Default setup"** (`Settings > Advanced
-  Security > CodeQL analysis`). It analyses your source folders, picks the languages itself, runs
-  on GitHub's infrastructure and needs no file in the repository.
-- **Your project, private repository without a Code Security license:** **do not run CodeQL**.
-  Its [terms](https://github.com/github/codeql-cli-binaries/blob/main/LICENSE.md) forbid using it
-  on code that is not open source ("e.g., code in a private repo in GitHub") — with or without
-  uploading results — and it would spend Actions minutes for nothing visible.
-- **This template's own repository:** `.github/workflows/codeql.yml` (with
-  `.github/codeql/codeql-config.yml`) analyses the template's machinery, which lives in hidden
-  folders that "Default setup" ignores. **It is template-only**: the bootstrap removes both files
-  from a new project, and `/upgrade` does not bring them. Its job runs only while the repository
-  is `gpsilv4/agent-template` (an `if:`): after a rename or a transfer it skips in silence —
-  update the `if:` in `codeql.yml`.
-
-### On a private repository without a paid plan
-
-Nothing breaks — the settings above that are unavailable simply do not appear (except branch
-protection/rulesets, which can be saved but are not enforced), and no workflow
-of the template needs them (CodeQL is not in a derived project's CI). What keeps protecting the
-project, on any plan:
-
-- **Gitleaks** (`ci.yml`, `secret-scan` job) — the replacement for secret scanning (below)
-- **Dependabot** alerts, and the weekly version updates from `.github/dependabot.yml`
-- The **guards** (`.agent/scripts/`), the **`commit-msg`** hook (`.githooks/`, checked again in CI)
-- Without branch protection, CI is an **informative traffic light**: never merge with red checks
+inherit them, and an `/upgrade` does not change them. What is free on a public vs. a private
+repository, and how to read and enable them with `gh api`, lives in
+[`src/docs/github-security.md`](src/docs/github-security.md) — one place, so that deleting this file
+does not delete the reminder.
 
 ## Secret Scanning (Zero Secrets)
 
