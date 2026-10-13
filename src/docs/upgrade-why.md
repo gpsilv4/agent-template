@@ -365,8 +365,9 @@ suave do `TP2`. Num derivado basta tirar os dois passos do seu `guard-tests`; na
 nem menos coberto, porque eles ja davam `SKIP` la.
 
 **E num repo com branch protection**: se o `Guard Tests` for required check, os simuladores deixam de
-bloquear o merge ate o `Simuladores` passar tambem a required. Neste template nao ha protecao
-configurada (#161); fica dito para quem a ligar.
+bloquear o merge ate o `Simuladores` passar tambem a required. Este template tem um ruleset no `main`
+desde 2026-10-09 (exige `Guard Tests`, `Secret Scan`, `Detect Project` e os dois `Analyze`) — e o
+`Simuladores` nao esta nele (medido a 2026-10-13, #308).
 
 ## Porque o que o git do template IGNORA nao se copia (R7-D)
 
@@ -449,3 +450,58 @@ a exija, num `tests-surface-*.mjs` dele. O upgrade nunca apaga esse ficheiro, e 
 encontra-o. Sem o teste, o primeiro PR que toque em `.agent/scripts/` depois do upgrade da
 `INCOMPLETA` na varredura do CI, a nomear a linha. A §2b nao o mostra antes, porque a bateria
 dela nao corre a varredura (minutos).
+
+## Porque a varredura saiu do `guard-tests` para um job seu (#308)
+
+Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #80 do
+`referee-exam-study`), com as suites e as duas varreduras **em serie** (os tempos de cada uma: o
+cabecalho do `mutation-sweep.mjs`).
+A margem era mais ou menos uma ronda do tamanho da 8, e um job morto pelo tecto le-se como defeito.
+O job `sweep` corre as duas varreduras como duas pernas de uma matriz, em paralelo, e partilha a
+mesma condicao ("o PR toca nos verificadores") — o tempo de parede passa a ser o da maior.
+
+No #158 ela tinha ficado de proposito no `guard-tests`: move-la poria a correr DUAS vezes num
+derivado que ja a tem. O que torna o movimento seguro agora e que cada estado mau de um derivado
+tem quem o diga (todos medidos, com teste — duas leituras independentes do #308):
+
+| Estado do derivado depois do `/upgrade` | Quem o diz |
+|---|---|
+| varredura ausente ou comentada (pode ser decisao: a regra diz "nenhum dos dois") | 2b: "o template corre ... (job `sweep`)" |
+| varredura ainda no `guard-tests` | 2b: "corre no job `guard-tests` deste projeto, e no `sweep` do template" |
+| varredura nos dois jobs (corre 2x) | 2b, e o `check-test-surface` (a §3 manda correr a 2b de novo depois de aplicar) |
+| `sweep` trazido sem o `guard-gate` (a varredura fica fora do check exigido) | `check-test-surface`: "sem um agregador que leia `needs.sweep.result`" |
+| `guard-gate` trazido sem o `sweep` (`needs:` partido: o GitHub rejeita o workflow inteiro) | `check-test-surface` |
+| o `guard-tests` e o `guard-gate` com o mesmo nome (dois `Guard Tests`) | `check-test-surface` |
+| o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
+
+Os defeitos de estrutura (as tres linhas do `check-test-surface` sem trailer) so se dizem quando o PR
+os INTRODUZ: um defeito que ja existia deixava vermelho cada PR que tocasse no workflow — os do
+Dependabot incluidos, que nao escrevem trailer. E so contam nomes repetidos que envolvam a
+maquinaria: `name: Deploy` em staging e prod e idioma legitimo. Um derivado com um `name:` proprio
+no `guard-tests` (o que a sua protecao exige) passa-o ao `guard-gate` — a regra da §2 diz "herda".
+Agregador e quem LE `needs.<X>.result` de um job com maquinaria, e nao quem so depende dele: um
+`deploy` a jusante das suites nao decide gate nenhum (duas leituras independentes do #308).
+
+A uniao dos dois jobs nao chegava: um derivado com a varredura no `guard-tests` dava o MESMO
+conjunto que o template com ela no `sweep`. Por isso a 2b compara job a job (`comandosPorJob`).
+
+**E o nome do check.** Uma protecao exige checks pelo NOME, e a deste repo exige `Guard Tests`. Mover a
+varredura para um job seu tirava-a desse check: um PR com a varredura vermelha passava a poder ser
+mergeado, sem nenhuma definicao mudada. Por isso `Guard Tests` passou a ser um job AGREGADOR
+(`guard-gate`, `needs: [guard-tests, sweep]`, `if: always()`), e o das suites chama-se `Guard Suites`.
+Nenhum repo precisa de mexer na protecao. O `always()` e excecao a marca do `if:` (so alarga onde o
+job corre; sem ele, um `needs` vermelho SALTAVA o gate, e um check saltado conta como passado).
+
+**O custo num privado free** (minutos faturados; cada job arredonda ao minuto): as duas pernas
+fazem checkout e setup em todo o PR, mesmo quando "nao aplicavel", e o gate corre sempre — ~+3 min
+por PR e +1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
+gasta ~40 min a medir um gate ja condenado. Num publico nao se paga. Os tempos medidos (o do derivado
+incluido) vivem so no cabecalho do `mutation-sweep.mjs` (`TP8`).
+
+## O que a medicao da 2b faz, e nao faz
+
+Corre sobre uma copia em `tmpdir`: **nao toca neste projeto**. Sai `0` mesmo com lista cheia — uma
+lista cheia e o output da secao, nao uma reprovacao. So a impossibilidade de medir sai `!= 0`, e ai
+diz porque. Sem `.agent/.template-version` utilizavel recusa-se: e o **Modo B**, e ai a lista faz-se a
+mao com a tabela da §2. (Saiu do `upgrade.md` no #308, quando a regra da varredura precisou do espaco.)
+

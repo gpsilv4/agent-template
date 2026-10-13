@@ -572,10 +572,13 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   - **`npm audit`**: vem `continue-on-error: true` (informativo). Perguntar se o projeto quer **gate duro** (remover a linha) ou manter informativo — e refletir a escolha em `SECURITY.md` e `README.md`. A escolha nao e definitiva: voltar a informativo num passo que so audita nao reprova o `check-test-surface` (#303).
   - **Projeto com CI proprio** (Fase 0-R): nao ficam dois CIs a fazer o mesmo. O CI do projeto
     continua a correr typecheck/lint/build/test; do `ci.yml` do template ficam **so** os jobs que ele
-    nao tem — `guard-tests` (os guards e os testes deles, que nao dependem do `package.json`) e
-    `secret-scan` —, e saem os outros. Se o `ci.yml` colidiu (o CI do projeto ja se chama assim),
-    esses dois jobs entram nele. **Os nomes `ci.yml` e `guard-tests` mantem-se**: o Guard 11 e a
-    medicao do `/upgrade` leem-nos por esse nome, e o `/upgrade` acrescenta la os passos novos. O
+    nao tem — `guard-tests` (os guards e os testes deles, que nao dependem do `package.json`),
+    `sweep` (a varredura de mutacao, em paralelo, #308), `guard-gate` (o check `Guard Tests` que uma
+    protecao exige: so verde com os dois anteriores) e `secret-scan` —, e saem os outros. Se o
+    `ci.yml` colidiu (o CI do projeto ja se chama assim), esses quatro jobs entram nele. **Os nomes
+    `ci.yml`, `guard-tests` e `sweep` mantem-se**: a medicao do `/upgrade` (2b) le esses dois jobs
+    pelo id, o `needs:` do `guard-gate` aponta para eles, e o `/upgrade` acrescenta la os passos novos.
+    O nome de check `Guard Tests` e so do `guard-gate` (o `guard-tests` chama-se `Guard Suites`). O
     `npm audit` decide-se como no bullet acima. Se o projeto nao tinha CI, o `ci.yml` do template e o CI.
   - **O trailer `Test-Surface:`** (`CONTRIBUTING.md`): mudar o `on:` do `ci.yml`, ou um passo que cite
     `.agent/scripts/`, faz o `check-test-surface` do PR do bootstrap avisar — muda o gate sem tocar

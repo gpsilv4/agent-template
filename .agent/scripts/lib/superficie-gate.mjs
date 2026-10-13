@@ -120,6 +120,163 @@ function agrupa(ls, ind, abre = () => true) {
   return grupos;
 }
 
+/** O id de um job a partir da sua linha (`  guard-tests:` -> `guard-tests`). */
+const idDe = (l) => l.trim().replace(/^["']?([^"':]+)["']?[ \t]*:.*$/, "$1");
+
+/** As chaves de PRIMEIRO nivel de um job (as linhas a indentacao da primeira chave). */
+function chavesDoJob(job) {
+  const ne = job.slice(1).filter((l) => l.trim());
+  if (ne.length === 0) return [];
+  const ind = Math.min(...ne.map(indent));
+  return job.slice(1).map((l, k) => ({ l, k: k + 1 })).filter(({ l }) => l.trim() && indent(l) === ind);
+}
+
+/** O `needs:` de um job: `needs: x`, `needs: [x, y]` (tambem em varias linhas), ou a lista em bloco
+ *  (`- x`). Um alias YAML (`*deps`) nao se resolve: fica de fora — dizer que o job nao existe era um
+ *  falso positivo (leitura independente do #308). */
+function needsDe(job) {
+  const c = chavesDoJob(job).find(({ l }) => /^[ \t]*needs[ \t]*:/.test(l));
+  if (!c) return [];
+  let valor = c.l.replace(/^[ \t]*needs[ \t]*:[ \t]*/, "").trim();
+  if (valor.startsWith("[")) {
+    for (let k = c.k + 1; !valor.includes("]") && k < job.length; k++) valor += ` ${job[k].trim()}`;
+  }
+  const limpa = (xs) => xs.map((x) => x.trim().replace(/^["']|["']$/g, "")).filter((x) => x && !/^[*&]/.test(x));
+  if (valor) return limpa(valor.replace(/^\[|\].*$/g, "").split(","));
+  const out = [];
+  for (const l of job.slice(c.k + 1)) {
+    if (!l.trim()) continue;
+    const m = /^[ \t]*-[ \t]*(\S+)[ \t]*$/.exec(l);
+    if (!m) break; // a primeira linha que nao e um item da lista acaba-a
+    out.push(m[1]);
+  }
+  return limpa(out);
+}
+
+/** O `name:` de um job lido da linha CRUA: um `#` dentro de aspas (`"Shard #1"`) e do nome, e o
+ *  `semComentario` cortava-o (leitura independente do #308). `null` quando nao ha nome LITERAL —
+ *  uma expressao (`${{ matrix.os }}`), um escalar em bloco, um alias: o check real nao se le daqui. */
+function nomeLiteral(cru, id) {
+  const linha = cru.find((l) => /^[ \t]*name[ \t]*:/.test(l));
+  if (!linha) return id;
+  const v = linha.replace(/^[ \t]*name[ \t]*:[ \t]*/, "");
+  const aspas = /^(["'])(.*?)\1/.exec(v);
+  const nome = aspas ? aspas[2] : v.replace(/(^|[ \t])#.*$/, "").trim();
+  return !nome || /\$\{\{|^[|>*&]/.test(nome) ? null : nome;
+}
+
+/** Os jobs de um workflow: `{ id, ls, cru }` (as linhas sem comentarios, e as cruas, alinhadas). */
+function jobsDe(texto) {
+  if (!texto) return [];
+  const crus = texto.split(/\r\n|\r|\n/);
+  const ls = crus.map(semComentario);
+  const iJobs = ls.findIndex((l) => /^jobs[ \t]*:/.test(l));
+  if (iJobs < 0) return [];
+  const fimJobs = ls.findIndex((l, j) => j > iJobs && /^[^\s#]/.test(l));
+  const fim = fimJobs < 0 ? ls.length : fimJobs;
+  const ne = ls.slice(iJobs + 1, fim).filter((l) => l.trim());
+  if (ne.length === 0) return [];
+  const ind = Math.min(...ne.map(indent));
+  const jobs = [];
+  for (let i = iJobs + 1; i < fim; i++) {
+    if (ls[i].trim() && indent(ls[i]) === ind) jobs.push({ id: idDe(ls[i]), ls: [ls[i]], cru: [crus[i]] });
+    else if (jobs.length) {
+      jobs.at(-1).ls.push(ls[i]);
+      jobs.at(-1).cru.push(crus[i]);
+    }
+  }
+  // So as chaves do PROPRIO job contam para o nome (um `- name:` de passo, ou um `name:` em `with:`,
+  // nao): o `cru` fica reduzido as linhas de primeiro nivel.
+  for (const j of jobs) {
+    const nivel = new Set(chavesDoJob(j.ls).map(({ k }) => k));
+    j.cru = j.cru.filter((_, k) => nivel.has(k));
+  }
+  return jobs;
+}
+
+/** A varredura de mutacao: o comando, pelo NOME do ficheiro — a suite dela (`test-mutation-sweep.mjs`)
+ *  corre nas suites e nao e a varredura. */
+const VARREDURA = /\bnode[ \t]+(?:\S*\/)?mutation-sweep\.mjs\b/;
+/** As suites da maquinaria (o que o `guard-tests` corre). */
+const SUITES = /\bnode[ \t]+\S*\.agent\/scripts\/tests\//;
+
+/**
+ * Os AGREGADORES (#308): jobs que LEEM o resultado (`needs.<X>.result`) de um job com maquinaria, ou de
+ * outro agregador — o `guard-gate` deste repo e um, e e o que decide o check `Guard Tests` que a
+ * protecao exige. So depender (`needs:`) nao chega: um `deploy` a jusante das suites nao decide gate
+ * nenhum, e vigia-lo inteiro avisava a cada `actions/checkout` subido (leitura independente do #308).
+ * Em cadeia: um agregador de agregadores tambem conta.
+ */
+function agregadoresDe(jobs) {
+  const vigiados = new Set(jobs.filter((j) => j.ls.some((l) => MAQUINARIA.test(l))).map((j) => j.id));
+  const agregadores = new Set();
+  for (let mudou = true; mudou; ) {
+    mudou = false;
+    for (const j of jobs) {
+      if (agregadores.has(j.id)) continue;
+      const le = [...j.ls.join("\n").matchAll(/\bneeds\.([\w-]+)\.result\b/g)].map((m) => m[1]);
+      if (le.some((x) => vigiados.has(x) || agregadores.has(x))) {
+        agregadores.add(j.id);
+        mudou = true;
+      }
+    }
+  }
+  return { vigiados, agregadores };
+}
+
+/**
+ * Defeitos de ESTRUTURA de um workflow que o GitHub nao perdoa, ou que tiram a maquinaria do check que
+ * uma protecao exige (#308), em ABSOLUTO — quem os avisa so diz os NOVOS (`defeitosNovos`):
+ *  - um `needs:` para um job que nao existe: o GitHub rejeita o workflow INTEIRO e nenhum job corre;
+ *  - a varredura num job que NAO corre as suites (correndo elas noutro), sem um agregador que leia o
+ *    resultado dele: fica fora do check exigido (um derivado que traga o `sweep` e esqueca o `guard-gate`);
+ *  - a varredura em DOIS jobs: corre duas vezes (um derivado que traga o `sweep` e a deixe no antigo);
+ *  - dois jobs com o MESMO nome de check, sendo um deles da maquinaria ou um agregador: uma protecao
+ *    exige checks pelo nome e pode dar-se por satisfeita com o primeiro a acabar (um derivado que
+ *    traga o `guard-gate` e nao renomeie o `guard-tests`). Nomes nao literais e colisoes so entre
+ *    jobs alheios a maquinaria nao contam: `name: Deploy` em staging e prod e idioma legitimo.
+ * @param {string | null} texto
+ * @returns {string[]} uma mensagem por defeito
+ */
+export function defeitosDeEstrutura(texto) {
+  const jobs = jobsDe(texto);
+  const ids = new Set(jobs.map((j) => j.id));
+  const { vigiados, agregadores } = agregadoresDe(jobs);
+  const out = [];
+  for (const j of jobs) {
+    for (const n of needsDe(j.ls)) if (!ids.has(n)) out.push(`o job \`${j.id}\` tem \`needs: ${n}\`, e o job \`${n}\` nao existe — o GitHub rejeita o workflow inteiro`);
+  }
+  const varrem = jobs.filter((j) => j.ls.some((l) => VARREDURA.test(l)));
+  if (varrem.length > 1) out.push(`a varredura de mutacao corre em ${varrem.length} jobs (${varrem.map((j) => `\`${j.id}\``).join(", ")}) — corre duas vezes; um passo que mudou de job sai do antigo`);
+  // So quando as suites correm NOUTRO job deste workflow: um job que so corre a varredura, num
+  // workflow sem suites, e ele proprio o check — nao ha nada de que ficar de fora (as fixtures do
+  // `check-test-surface` tem esse workflow, e foi o controlo negativo do diferencial que o mostrou).
+  const haSuites = jobs.some((j) => j.ls.some((l) => SUITES.test(l)));
+  for (const j of varrem) {
+    const lida = jobs.some((a) => agregadores.has(a.id) && new RegExp(`\\bneeds\\.${j.id}\\.result\\b`).test(a.ls.join("\n")));
+    if (haSuites && !j.ls.some((l) => SUITES.test(l)) && !lida) out.push(`a varredura corre no job \`${j.id}\`, sem as suites e sem um agregador que leia \`needs.${j.id}.result\` — fica fora do check que a protecao exige`);
+  }
+  const nomes = new Map();
+  for (const j of jobs) {
+    const nome = nomeLiteral(j.cru, j.id);
+    if (nome !== null) nomes.set(nome, [...(nomes.get(nome) ?? []), j.id]);
+  }
+  for (const [nome, js] of nomes) {
+    if (js.length > 1 && js.some((id) => vigiados.has(id) || agregadores.has(id))) {
+      out.push(`os jobs ${js.map((j) => `\`${j}\``).join(" e ")} tem o mesmo nome de check, \`${nome}\` — uma protecao que o exija pode dar-se por satisfeita com o primeiro a acabar`);
+    }
+  }
+  return out;
+}
+
+/** So o que o PR INTRODUZIU (leitura independente do #308): um defeito que ja existia antes nao e deste
+ *  PR, e sem saida pelo trailer deixava vermelho cada PR que tocasse no ficheiro — um do Dependabot a
+ *  subir uma action incluido, que nao escreve trailer. */
+export const defeitosNovos = (antes, depois) => {
+  const ja = new Set(defeitosDeEstrutura(antes));
+  return defeitosDeEstrutura(depois).filter((d) => !ja.has(d));
+};
+
 /**
  * As UNIDADES da maquinaria de um workflow: cada passo que a cite, com o cabecalho do job onde
  * esta (o id, `if:`, `needs:`, `env:`, `continue-on-error:`, ... — menos os `steps:` e as chaves
@@ -141,7 +298,17 @@ export function unidadesDaMaquinaria(texto) {
   const unidades = [...soltas(ls.slice(0, iJobs)), ...(fimJobs < 0 ? [] : soltas(ls.slice(fimJobs)))];
   const naoVazias = corpo.filter((l) => l.trim());
   if (naoVazias.length === 0) return unidades;
-  for (const job of agrupa(corpo, Math.min(...naoVazias.map(indent)))) {
+  const jobs = agrupa(corpo, Math.min(...naoVazias.map(indent)));
+  // Os AGREGADORES (`agregadoresDe`): mudar-lhes o `case`, tirar o `always()` ou um job do `needs:`
+  // desligava o gate sem tocar numa linha de maquinaria — por isso cada um e uma unidade, o job
+  // inteiro menos as chaves inofensivas do cabecalho (`timeout-minutes`, `runs-on`, ...).
+  const { agregadores } = agregadoresDe(jobs.map((j) => ({ id: idDe(j[0]), ls: j })));
+  for (const job of jobs) {
+    if (!agregadores.has(idDe(job[0]))) continue;
+    const inteiro = cabecalhoQueConta(job);
+    unidades.push({ chave: inteiro, rotulo: `o job ${idDe(job[0])} (agrega o resultado da maquinaria)`, job: job[0].trim(), passo: inteiro });
+  }
+  for (const job of jobs) {
     const id = job[0].trim();
     const iSteps = job.findIndex((l) => /^[ \t]*steps[ \t]*:/.test(l));
     // `steps: [...]` (flow) nao se parte em passos: o job inteiro e uma unidade (falha fechada).
@@ -222,8 +389,14 @@ const RUNNER = /^(?![ \t]*#)[^\n]*(?:\b(?:npm|pnpm|yarn|bun)(?:[ \t]+run)?[ \t]+
  * @returns {boolean} `true` se avisou (quem chama nao diz "sem marcas" a seguir)
  */
 export function verificaGate({ f, antes, agora, para, contavel, base, git, ler, warn, note }) {
+  // Os defeitos de estrutura (#308) primeiro, e em QUALQUER workflow da raiz que mudou — tambem num
+  // novo: um `needs:` partido invalida-o inteiro, corra testes ou nao. So os que o PR introduziu.
+  // So na entrada do proprio ficheiro: numa renomeacao, o destino entra por si — correr aqui tambem
+  // dizia cada defeito duas vezes (leitura independente do #308).
+  const estrutura = WORKFLOW_DA_RAIZ.test(f) && para === undefined ? defeitosNovos(antes, agora) : [];
+  for (const d of estrutura) warn(`${f}: ${d}`);
   // Um workflow novo so alarga a rede (`antes` vazio); um apagado ja avisa pela contagem que desce.
-  if (!WORKFLOW_DA_RAIZ.test(f) || !antes || !(contavel || RUNNER.test(antes))) return false;
+  if (!WORKFLOW_DA_RAIZ.test(f) || !antes || !(contavel || RUNNER.test(antes))) return estrutura.length > 0;
   const sinais = [];
   // Renomeado: compara-se com o DESTINO. Para fora da raiz, o GitHub deixa de o correr.
   let depois = agora;
@@ -246,7 +419,7 @@ export function verificaGate({ f, antes, agora, para, contavel, base, git, ler, 
     else sinais.push(`passo da maquinaria mudou ou saiu: ${u.rotulo}`);
   }
   for (const job of cabecalhos) sinais.push(`o cabecalho do job \`${job.replace(/:$/, "")}\` mudou (if:/needs:/env:/continue-on-error:...)`);
-  if (sinais.length === 0) return false;
+  if (sinais.length === 0) return estrutura.length > 0;
   let motivo = null;
   try {
     // Numa renomeacao o ultimo commit pode tocar so no DESTINO: procura-se nos dois, e o trailer
@@ -259,7 +432,7 @@ export function verificaGate({ f, antes, agora, para, contavel, base, git, ler, 
   }
   if (motivo) {
     note(`${f}: ${sinais.join("; ")} — aceite (Test-Surface: ${motivo})`);
-    return false;
+    return estrutura.length > 0;
   }
   warn(
     `${f}: ${sinais.join("; ")} desde ${base} — muda o gate sem tocar num teste; se e deliberado, ` +

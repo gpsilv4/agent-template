@@ -9,7 +9,7 @@
  * envelhecia sem ninguem reparar.
  *
  * O QUE DA:
- *   - `comandosDoCI(raiz)` — os verificadores que o job `guard-tests` corre, DERIVADOS do
+ *   - `comandosDoCI(raiz)` — os verificadores que os jobs `guard-tests` e `sweep` correm, DERIVADOS do
  *     `ci.yml` dessa raiz e nao escritos a mao;
  *   - `correBateria({dir, comandos})` — corre-os dentro de uma copia e devolve os que reprovam;
  *   - `adapta2bGuard17({dir, fatal})` — a unica adaptacao da 2b que e mecanica.
@@ -30,15 +30,34 @@ import { imprimeAntesDeAprovar } from "./saida-upgrade.mjs";
 import { agentesDesatualizados } from "./agentes.mjs";
 import { regrasEmFalta } from "./permissoes.mjs";
 
-/** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
+/** Os comandos que o consumidor corre, DERIVADOS dos jobs `guard-tests` e `sweep` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
  *  Devolve `null` quando o job nao aparece: "nao derivei nada" e "nao ha nada" pedem accoes
  *  diferentes, e quem chama e que decide (`TP2`). */
 export function comandosDoCI(raiz) {
+  const porJob = comandosPorJob(raiz);
+  return porJob && [...new Set(Object.values(porJob).flat())];
+}
+
+/** Os jobs que a 2b le: o `guard-tests`, e o `sweep` (#308), para onde a varredura saiu dele. */
+export const JOBS_DA_2B = ["guard-tests", "sweep"];
+
+/** Os comandos de `comandosDoCI`, POR JOB (#308): `{ "guard-tests": [...], sweep: [...] }`, ou `null`
+ *  sem `guard-tests`. A uniao nao chega: um derivado com a varredura ainda no `guard-tests` dava o
+ *  mesmo conjunto que o template com ela no `sweep` — e a 2b nao via que ela corre duas vezes, ou
+ *  fora do check que a protecao exige (leitura independente do #308). */
+export function comandosPorJob(raiz) {
   const ci = leOuNull(join(raiz, ".github/workflows/ci.yml"));
   // So ate ao job SEGUINTE: o `split` sozinho levava todos os jobs que vem depois.
-  const job = ci?.split(/^  guard-tests:/m)[1]?.split(/^  [\w-]+:\s*$/m)[0];
-  if (!job) return null;
+  // Um comentario na linha do job (`  guard-tests:   # suites`) nao a desfaz — nem a do job seguinte,
+  // senao os comandos dele eram atribuidos a este (leitura independente do #308).
+  const doJob = (nome) => ci?.split(new RegExp(`^  ${nome}:[ \t]*(?:#.*)?$`, "m"))[1]?.split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
+  if (!doJob("guard-tests")) return null;
+  return Object.fromEntries(JOBS_DA_2B.map((n) => [n, comandosDe(doJob(n) ?? "")]));
+}
+
+/** Os `node X.mjs` dos `run:` de um job (o texto dele). */
+function comandosDe(job) {
   // EXCLUSOES, cada uma por uma razao concreta:
   //  - `check-test-surface`: precisa de um `.git` com historia, e um archive nao traz nenhum;
   //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao.
@@ -303,11 +322,24 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // NOTE e nao `warn`: pode ser uma decisao legitima do projeto, e um gate que reprova por uma
   // escolha alheia e desligado na primeira semana. O que nao pode e ser invisivel.
   const soNoTemplate = cmdDepois.filter((c) => !cmdAntes.includes(c));
+  const [jobsAntes, jobsDepois] = [comandosPorJob(raiz), comandosPorJob(template)];
+  const ondeCorre = (porJob, c) => JOBS_DA_2B.filter((j) => porJob[j].includes(c));
   if (soNoTemplate.length) {
     note(
-      `o \`guard-tests\` do template corre ${soNoTemplate.length} verificacao(oes) que o ci.yml deste projeto nao corre: ` +
-        `${soNoTemplate.join(", ")} — se alguma esta COMENTADA aqui, conta como ausente`
+      `o template corre ${soNoTemplate.length} verificacao(oes) que o ci.yml deste projeto nao corre: ` +
+        `${soNoTemplate.map((c) => `${c} (job \`${ondeCorre(jobsDepois, c).join("`, `")}\`)`).join(", ")} — se alguma esta COMENTADA aqui, conta como ausente`
     );
+  }
+  // A COLOCACAO (#308): o mesmo comando noutro job, ou em dois. A varredura saiu do `guard-tests`
+  // para o `sweep`; um derivado que a deixe no antigo corre-a DUAS vezes se trouxer o `sweep`.
+  for (const c of cmdDepois.filter((x) => cmdAntes.includes(x))) {
+    const [aqui, la] = [ondeCorre(jobsAntes, c), ondeCorre(jobsDepois, c)];
+    if (aqui.join() !== la.join()) {
+      note(
+        `${c} corre no job \`${aqui.join("` e `")}\` deste projeto, e no \`${la.join("` e `")}\` do template — ` +
+          "um passo que o template moveu sai do job antigo (senao corre 2x); o `check-test-surface` reprova os estados que tiram a varredura do check exigido"
+      );
+    }
   }
 
   // O MESMO, para a fronteira de permissoes (#301, R7B-1). O motor nao toca no `settings.json` — e

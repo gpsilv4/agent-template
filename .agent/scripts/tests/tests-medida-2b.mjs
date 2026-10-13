@@ -17,6 +17,9 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { git, corre, exige, contraProjeto, limpaTmpsDaSuite, test } from "./harness/test-upgrade-harness.mjs";
+// Os casos da configuracao (`settings.json`, jobs do `ci.yml`) vivem a parte; registam-se daqui, no fim,
+// para o `test-simulate-upgrade.mjs` (no limite das 500 linhas) nao ganhar mais uma linha.
+import { registar as registarConfig } from "./tests-medida-2b-config.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -179,41 +182,6 @@ export function registar() {
     exige(
       contraProjeto({ hoje: { [AGENTE]: agente("Read, Bash(git diff:*)") }, projeto: { [AGENTE]: agente("Read, Bash(git diff:*)") } }),
       { codigo: 0, exclui: ["agente(s) com `tools:` diferente"] }
-    ));
-
-  // #301 (R7B-1): o motor nao toca no `settings.json`, e um derivado passou rondas sem o `ask` dos
-  // hooks. A 2b lista as regras do template que faltam, literalmente.
-  const SETTINGS = ".claude/settings.json";
-  const perms = (deny, ask) => `${JSON.stringify({ permissions: { deny, ask, allow: [] } })}\n`;
-  test("regras de deny/ask do template em falta no projeto aparecem na 2b (#301)", () =>
-    exige(
-      contraProjeto({
-        hoje: { [SETTINGS]: perms(["Read(./.env)", "Read(~/.ssh/**)"], ["Bash(git push:*)", "Edit(./.claude/hooks/**)"]) },
-        projeto: { [SETTINGS]: perms(["Read(./.env)"], ["Bash(git push:*)"]) },
-      }),
-      { codigo: 0, inclui: ["o `deny` do settings.json do template tem 1 regra(s)", "Read(~/.ssh/**)", "o `ask` do settings.json do template tem 1 regra(s)", "Edit(./.claude/hooks/**)"] }
-    ));
-
-  // O contra-caso: as mesmas regras dos dois lados (e uma do `ask` posta no `deny`, mais estrito) nao
-  // se anunciam.
-  test("as mesmas regras dos dois lados nao aparecem na 2b (#301)", () =>
-    exige(
-      contraProjeto({
-        hoje: { [SETTINGS]: perms(["Read(./.env)"], ["Edit(./.claude/hooks/**)"]) },
-        projeto: { [SETTINGS]: perms(["Read(./.env)", "Edit(./.claude/hooks/**)"], []) },
-      }),
-      { codigo: 0, exclui: ["do settings.json do template tem"] }
-    ));
-
-  // E a direcao contraria: uma regra do `deny` do template que o projeto so tem no `ask` e MAIS FRACA, e
-  // falta (leitura independente do #301).
-  test("uma regra do deny do template que o projeto so tem no ask aparece na 2b (#301)", () =>
-    exige(
-      contraProjeto({
-        hoje: { [SETTINGS]: perms(["Bash(rm -rf:*)"], []) },
-        projeto: { [SETTINGS]: perms([], ["Bash(rm -rf:*)"]) },
-      }),
-      { codigo: 0, inclui: ["o `deny` do settings.json do template tem 1 regra(s)", "Bash(rm -rf:*)"] }
     ));
 
   test("upgrade puramente aditivo diz-o em vez de nao dizer nada", () =>
@@ -481,4 +449,6 @@ export function registar() {
       contraProjeto({ projeto: { ".agent/scripts/check-test-surface.mjs": "const TEST_GLOBS = [\n  /meu-padrao/,\n];\nconst CONFIG_GLOBS = [\n];\n" } }),
       { codigo: 0, inclui: ["mudaram de casa", "TEST_GLOBS"] }
     ));
+
+  registarConfig();
 }

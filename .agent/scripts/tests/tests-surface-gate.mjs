@@ -16,9 +16,11 @@
  */
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { ehDerivado } from "../lib/derivado.mjs";
+import { leOuNull } from "../lib/ficheiros.mjs";
 import { pathToFileURL } from "url";
-import { test, commit, git, registarResultado } from "./harness/test-surface-harness.mjs";
-import { blocoOn, unidadesDaMaquinaria, perdidas, aceites } from "../lib/superficie-gate.mjs";
+import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
+import { blocoOn, unidadesDaMaquinaria, perdidas, aceites, defeitosDeEstrutura } from "../lib/superficie-gate.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -245,5 +247,110 @@ export function registar() {
       m: aceites("x\n\nTest-Surface: a.yml — porque sim\ntest-surface: b.yml -- outro\nTest-Surface: c.yml - mais um\n"),
     })),
     ...(aceites("Test-Surface: a.yml —   \nTest-Surface: b.yml\n").size === 0 ? [] : ["um motivo vazio contou"]),
+  ]);
+
+  // --- O AGREGADOR e a ESTRUTURA (#308) ------------------------------------------
+  // O check que a protecao exige passou a ser um job sem maquinaria, que AGREGA os que a tem
+  // (`guard-gate`: `needs: [guard-tests, sweep]`). Desliga-lo sem tocar numa linha de maquinaria
+  // tem de avisar; e um `needs:` partido ou dois checks com o mesmo nome sao defeitos sem trailer.
+  // Um agregador LE o resultado (`needs.guard.result`): so depender nao chega (ver o `deploy` abaixo).
+  const gate = ({ caso = "success) ;;", needs = "[guard]", nome = "Guard Tests", sempre = "    if: always()\n", id = "gate", le = "guard" } = {}) =>
+    `  ${id}:\n    name: ${nome}\n    runs-on: ubuntu-latest\n    needs: ${needs}\n${sempre}    steps:\n` +
+    `      - env:\n          R: \${{ needs.${le}.result }}\n        run: |\n          case "$R" in\n            ${caso}\n            *) exit 1 ;;\n          esac\n`;
+  const comGate = (o) => workflow() + gate(o);
+  test("gate: o `case` do agregador que passa a aceitar `failure` avisa (#308)", (dir) =>
+    muda(dir, comGate(), comGate({ caso: "success|failure) ;;" })),
+  { code: 1, includes: ["passo da maquinaria mudou ou saiu: o job gate (agrega o resultado da maquinaria)"] });
+  test("gate: tirar o `if: always()` do agregador avisa (#308)", (dir) =>
+    muda(dir, comGate(), comGate({ sempre: "" })),
+  { code: 1, includes: ["o job gate (agrega o resultado da maquinaria)"] });
+  // O contra-caso: um agregador NOVO so alarga a rede, e um intacto nao avisa.
+  test("gate: acrescentar um agregador nao avisa (#308)", (dir) =>
+    muda(dir, workflow(), comGate()),
+  { code: 0, excludes: ["agrega o resultado", "mudou ou saiu"] });
+  test("gate: um `needs:` para um job que nao existe avisa, mesmo com o trailer (#308)", (dir) =>
+    muda(dir, comGate(), comGate({ needs: "[guard, sweep]" }), { msg: `muda\n\nTest-Surface: ${CI} — de proposito` }),
+  { code: 1, includes: ["o job `gate` tem `needs: sweep`, e o job `sweep` nao existe"] });
+  test("gate: dois jobs com o mesmo nome de check avisam (#308)", (dir) =>
+    muda(dir, comGate(), comGate().replace("  guard:\n    runs-on: ubuntu-latest\n", "  guard:\n    name: Guard Tests\n    runs-on: ubuntu-latest\n")),
+  { code: 1, includes: ["os jobs `guard` e `gate` tem o mesmo nome de check, `Guard Tests`"] });
+  // Segunda ronda de leituras do #308.
+  // So o que o PR INTRODUZ: um defeito que ja la estava nao deixa vermelho cada PR que toque no ficheiro.
+  test("gate: um `needs:` partido que JA existia nao avisa num PR que muda outra coisa (#308)", (dir) =>
+    muda(dir, comGate({ needs: "[guard, ausente]" }), comGate({ needs: "[guard, ausente]" }).replace("echo ola", "echo ola2")),
+  { code: 0, excludes: ["nao existe — o GitHub rejeita"] });
+  // A varredura num job seu SEM um agregador que leia o resultado dele: fora do check exigido.
+  const sweepJob = "  sweep:\n    needs: guard\n    runs-on: ubuntu-latest\n    steps:\n      - run: node .agent/scripts/mutation-sweep.mjs\n";
+  test("gate: a varredura num job sem agregador avisa (#308)", (dir) =>
+    muda(dir, comGate(), comGate() + sweepJob),
+  { code: 1, includes: ["a varredura corre no job `sweep`, sem as suites e sem um agregador que leia `needs.sweep.result`"] });
+  // A partir de um workflow SEM agregador: mudar um agregador que ja existia avisa (e outro caso).
+  test("gate: com um agregador que a le, nao avisa (#308)", (dir) =>
+    muda(dir, workflow(), workflow() + sweepJob + gate({ needs: "[guard, sweep]", le: "sweep" })),
+  { code: 0, excludes: ["sem um agregador"] });
+  test("gate: a varredura em dois jobs avisa (corre 2x) (#308)", (dir) =>
+    muda(dir, comGate(), workflow({ extra: "      - run: node .agent/scripts/mutation-sweep.mjs\n" }) + sweepJob + gate({ needs: "[guard, sweep]", le: "sweep" })),
+  { code: 1, includes: ["a varredura de mutacao corre em 2 jobs (`guard`, `sweep`)"] });
+  // O contra-caso da invariante: num workflow SEM suites, o job que so corre a varredura e o proprio
+  // check — e num workflow NOVO o diferencial nao protege (tudo o que la esta e "novo").
+  test("gate: um workflow novo so com a varredura (sem suites) nao avisa (#308)", (dir) =>
+    muda(dir, null, "name: V\non:\n  pull_request:\njobs:\n  v:\n    runs-on: x\n    steps:\n      - run: node .agent/scripts/mutation-sweep.mjs\n", { ficheiro: ".github/workflows/varredura.yml" }),
+  { code: 0, excludes: ["sem um agregador"] });
+  // So depender nao e agregar: um `deploy` a jusante pode subir o `timeout-minutes` em paz.
+  const deploy = (t) => `  deploy:\n    needs: [guard]\n    runs-on: ubuntu-latest\n    timeout-minutes: ${t}\n    steps:\n      - uses: actions/checkout@v4\n`;
+  test("gate: um job que so depende da maquinaria (sem ler o resultado) nao e vigiado (#308)", (dir) =>
+    muda(dir, workflow() + deploy(5), workflow() + deploy(9).replace("checkout@v4", "checkout@v5")),
+  { code: 0, excludes: ["agrega o resultado", "mudou ou saiu"] });
+  // Um agregador de agregadores tambem e vigiado.
+  test("gate: um agregador que le outro agregador e vigiado (#308)", (dir) => {
+    const cadeia = (caso) => comGate() + gate({ id: "final", nome: "Final", needs: "[gate]", le: "gate", caso });
+    return muda(dir, cadeia("success) ;;"), cadeia("success|failure) ;;"));
+  }, { code: 1, includes: ["o job final (agrega o resultado da maquinaria)"] });
+  // Nomes repetidos FORA da maquinaria sao idioma legitimo; um `#` entre aspas e do nome.
+  test("gate: dois jobs `name: Deploy` alheios a maquinaria nao avisam (#308)", (dir) =>
+    muda(dir, comGate(), comGate() + "  a:\n    name: Deploy\n    runs-on: x\n  b:\n    name: Deploy\n    runs-on: x\n"),
+  { code: 0, excludes: ["mesmo nome de check"] });
+  registarResultado("gate: nomes com `#` entre aspas, aliases e `needs:` em varias linhas leem-se certo (#308)", [
+    ...(defeitosDeEstrutura('jobs:\n  a:\n    name: "Shard #1"\n    runs-on: y\n    steps:\n      - run: node .agent/scripts/x.mjs\n  b:\n    name: "Shard #2"\n    runs-on: y\n').length === 0 ? [] : ["`\"Shard #1\"` e `\"Shard #2\"` colidiram"]),
+    ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: y\n  b:\n    needs: *deps\n    runs-on: y\n").length === 0 ? [] : ["um alias foi lido como um job em falta"]),
+    ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: y\n  b:\n    needs: [\n      a,\n      zz]\n    runs-on: y\n").some((d) => d.includes("`needs: zz`")) ? [] : ["o `needs:` em varias linhas nao foi lido"]),
+  ]);
+  // O que o bootstrap deixa: o `ci.yml` do TEMPLATE sem o job `simulators` (o §2.7 remove-o) nao tem
+  // defeitos. So no template: num derivado, o `ci.yml` e do projeto.
+  {
+    const lerRaiz = (rel) => leOuNull(join(ROOT, rel));
+    const ci = lerRaiz(".github/workflows/ci.yml");
+    if (ehDerivado(lerRaiz) || ci === null) console.log("  SKIP  gate: o ci.yml do template sem o `simulators` (so no template)");
+    else {
+      const semSimuladores = ci.replace(/^  simulators:[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$)/m, "");
+      registarResultado("gate: o ci.yml do template, sem o job `simulators` (o bootstrap), nao tem defeitos de estrutura (#308)", [
+        ...(semSimuladores !== ci ? [] : ["nao encontrei o job `simulators` para o tirar"]),
+        ...defeitosDeEstrutura(semSimuladores),
+        ...defeitosDeEstrutura(ci),
+      ]);
+    }
+  }
+
+  // A excecao do `always()` na marca do `if:` (#308): o agregador precisa dele, e ele so alarga onde o
+  // job corre. Cada forma excluida tem o seu par que CONTA — sem o par, alargar a excecao "resolvia"
+  // o falso positivo desligando a marca (o mesmo cuidado da excecao do `pull_request`).
+  const comIf = (cond) => `jobs:\n  t:\n    if: ${cond}\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n`;
+  const IF = "condicao `if:`";
+  for (const cond of ["always()", "${{ always() }}", '"always()"', "always()  # o agregador"]) {
+    test(`gate: \`if: ${cond}\` nao conta como condicao acrescentada (#308)`, (dir) =>
+      muda(dir, "jobs:\n  t:\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n", comIf(cond)),
+    { code: 0, excludes: [IF] });
+  }
+  for (const cond of ["always() && false", "${{ always() && github.event_name == 'push' }}", "${{ !always() }}", "failure()"]) {
+    test(`gate: \`if: ${cond}\` continua a contar (#308)`, (dir) =>
+      muda(dir, "jobs:\n  t:\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n", comIf(cond)),
+    { code: 1, includes: [IF] });
+  }
+  registarResultado("gate: defeitosDeEstrutura le o `needs:` em bloco, e o id como nome quando falta o `name:` (#308)", [
+    ...(JSON.stringify(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    needs:\n      - a\n      - c\n    runs-on: x\n")) === JSON.stringify(["o job `b` tem `needs: c`, e o job `c` nao existe — o GitHub rejeita o workflow inteiro"]) ? [] : ["o `needs:` em bloco nao foi lido"]),
+    // So contam colisoes que envolvam a maquinaria (#308, segunda leitura): com ela no `a`, colide; sem ela, nao.
+    ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n    steps:\n      - run: node .agent/scripts/x.mjs\n  b:\n    name: a\n    runs-on: x\n").length === 1 ? [] : ["o id `a` (com maquinaria) e o `name: a` deviam colidir"]),
+    ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    name: a\n    runs-on: x\n").length === 0 ? [] : ["uma colisao sem maquinaria avisou"]),
+    ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    needs: a\n    runs-on: x\n").length === 0 ? [] : ["um workflow certo deu defeitos"]),
   ]);
 }

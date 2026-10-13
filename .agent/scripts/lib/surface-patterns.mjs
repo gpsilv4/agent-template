@@ -295,7 +295,11 @@ const MARCAS = [
   // seguinte mais indentada (`if: github.event_name == 'pull_request'` + `\n    && false`). A
   // excecao recusa-a: depois do `$`, nenhuma linha seguinte (saltando as em branco) mais indentada
   // que a chave (`\1`, a indentacao capturada) que nao seja comentario.
-  { re: /^([ \t]*)if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#]))/m, msg: "condicao `if:`", cru: true },
+  //
+  // E o `always()` (#308), com as mesmas ancoras: faz o job correr MAIS vezes (tambem com uma
+  // dependencia vermelha), nunca menos — e e o que um job AGREGADOR precisa para nao ficar `skipped`,
+  // que uma protecao conta como passado. `always() && false` (qualquer cauda) volta a contar.
+  { re: /^([ \t]*)if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?(?:github\.event_name[ \t]*==[ \t]*'pull_request'|always\(\))[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#]))/m, msg: "condicao `if:`", cru: true },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },
