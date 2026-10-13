@@ -119,7 +119,8 @@ const CONFIG_CONTAVEIS = [
   // Em CONTAVEIS e nao em GLOBS: o que aqui interessa mede-se por contagem, e o aviso generico
   // de "confirmar" em cada alteracao a configuracao do proprio projeto seria ruido diario.
   /(^|\/)\.agent\/scripts\/config\/[^/]+\.mjs$/,
-  /(^|\/)(pyproject\.toml|setup\.cfg)$/i,
+  // E o `package.json` (#296): so os scripts de TESTE contam (`lib/surface-patterns.mjs`), sem o generico.
+  /(^|\/)(pyproject\.toml|setup\.cfg|package\.json)$/i,
 ];
 
 /** O ficheiro que DEFINE as marcas. As MARCAS nao se lhe aplicam (ver o uso, abaixo); as

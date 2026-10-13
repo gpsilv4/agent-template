@@ -104,6 +104,13 @@ const CONTAGENS = [
     cru: true,
   },
   { re: /\balvo:\s*"/, msg: "pares alvo/suite da varredura" },
+  // Os SCRIPTS de teste do `package.json` (#296): os NOMES que o BOOTSTRAP fixa e o CI chama, com o
+  // runner como COMANDO (no inicio, ou depois de `&&`; `echo vitest` e `exit 0; vitest` nao correm testes)
+  // (`test`, `test:unit`, `test:e2e`, `test:security`, `test:all` — o `ci.yml` faz `if scripts?.['test:unit']
+  // ... else skipping`), e so com um RUNNER no valor. Apagar, renomear (`test:units`) ou trocar o
+  // valor por `true`/`echo ok` faz descer; um `test:watch` (o CI nao o corre), deps e versao nao contam
+  // — o ruido que tirou o `pyproject.toml` dos GLOBS. CRU: num `package.json` tudo e string.
+  { re: /^[ \t]*"(?:test|test:(?:unit|e2e|security|all))"[ \t]*:[ \t]*"(?:(?:[^"\\\n]|\\.)*?&&)?[ \t]*(?:(?:cross-env|env)[ \t]+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*[ \t]+)*(?:vitest|jest|mocha|ava|jasmine|tap|uvu|wdio|testcafe|karma[ \t]+start|playwright[ \t]+test|cypress[ \t]+run|node[ \t]+--test|tsx[ \t]+--test|(?:bun|deno|ng|react-scripts|craco)[ \t]+test|vue-cli-service[ \t]+test|pytest|run-[sp]|npm-run-all|concurrently|lerna[ \t]+run[ \t]+test|turbo[ \t]+(?:run[ \t]+)?test|nx[ \t]+(?:test|(?:run-many|affected)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.:\/-]+)?)*?[ \t]+--?t(?:arget)?[ \t]+test)|(?:npm|pnpm|yarn)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.\/-]+)?)*[ \t]+(?:run[ \t]+)?(?:t|test))\b/m, msg: "scripts de teste do package.json (os que o CI corre, com um runner)", cru: true },
   // A selecao de testes dentro de um `pyproject.toml`/`setup.cfg`, que trazem muito mais que
   // isso: estreitar o `testpaths` ou o `addopts` conta; mudar a versao ou as deps, nao.
   { re: /^\s*(?:testpaths|addopts|python_files|python_classes|python_functions)\s*=/m, msg: "selecao de testes do pytest" },
@@ -165,7 +172,7 @@ const MARCAS = [
   // desliga-la: `true`, `True`, `${{ !false }}`, `${{ matrix.x }}` (#281). O idioma da matriz e
   // legitimo e raro: um novo pede confirmacao. Le o texto CRU (`"false"` nao pode virar `""`), e por
   // isso so nos workflows: as fixtures dos testes escrevem `continue-on-error` dentro de strings.
-  { re: /^\s*continue-on-error:\s*(?!["']?false["']?\s*(?:#|$)|\$\{\{\s*false\s*\}\}\s*(?:#|$))\S/im, msg: "`continue-on-error: true`", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  { re: /^\s*continue-on-error:\s*(?!["']?false["']?\s*(?:#|$)|["']?\$\{\{\s*false\s*\}\}["']?\s*(?:#|$))\S/im, msg: "`continue-on-error: true`", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
   // As marcas seguintes sao SO dos workflows (`so`, #281): em JavaScript `x || true` e `a | b` sao
   // codigo normal, e um `.yml` de fixture nao corre nada. Leem o texto CRU e saltam as linhas de
   // comentario. As duas primeiras so contam nas linhas que CORREM uma verificacao — as suites deste
@@ -224,6 +231,17 @@ const MARCAS = [
   //    O `\r` fica fora das classes `[^...]`: aceita-lo deixava cada `\r\n#` ler-se de duas formas, e o
   //    CodeQL apanhou o backtracking exponencial no PR #298 (`js/redos`).
   { re: /^([ \t]*)(?![ \t#])[^\n]*(?:\bnode[ \t]+\S*?(?<![a-zA-Z])(?:tests?|checks?|sweep|simulate)(?![a-z])[^\s;|&]*|\bnode[ \t]+\S*\.githooks\/[^\s;|&]*|\b(?:npm|pnpm|yarn)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.\/-]+)?)*[ \t]+(?:t\b|test\b|run(?:-script)?[ \t]+(?:test|lint(?!:fix)|build|typecheck)[^\s;|&]*|exec[ \t]+(?:vitest|jest)\b|vitest\b|jest\b)|\bnpx(?:[ \t]+-\S+)*[ \t]+(?:tsc|vitest|jest|playwright[ \t]+test)(?![\w-])|(?<!install[ \t]{1,20})\bpytest\b)[^\r\n;|#]*&&[^\r\n]*(?:\r?\n[ \t]*(?:#[^\r\n]*)?)*?\r?\n\1(?![ \t#])(?![\w-]+[ \t]*:(?:[ \t]|$))\S/m, msg: "comando de teste usado como condicao de um `&&` com mais comandos depois: a falha nao para o passo — confirmar", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  //  - um comando de teste num PASSO ou JOB com `continue-on-error` nao-falso (#296): o
+  //    `paraMarcas` poe `@@coe@@;` a frente dos comandos desse bloco. A marca `continue-on-error: true`
+  //    conta por ficheiro, logo MOVER a chave do passo `Audit` para o de teste deixava a contagem
+  //    igual — esta conta onde ela esta. So o `@@coe@@` (sempre tolerado): o `@@coe?@@` (condicional)
+  //    nao conta, mas passa-lo a `true` sobe. O `npm run test:audit` fica fora (informativo de proposito).
+  { re: /^(?![ \t]*#)[^\n]*@@coe@@;[^\n]*(?:\bnode[ \t]+\S*?(?<![a-zA-Z])(?:tests?|checks?|sweep|simulate)(?![a-z])[^\s;|&]*|\bnode[ \t]+\S*\.githooks\/[^\s;|&]*|\b(?:npm|pnpm|yarn)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.\/-]+)?)*[ \t]+(?:t\b|test\b|run(?:-script)?[ \t]+(?:test(?!:audit\b)|lint(?!:fix)|build|typecheck)[^\s;|&]*|exec[ \t]+(?:vitest|jest)\b|vitest\b|jest\b)|\bnpx(?:[ \t]+-\S+)*[ \t]+(?:tsc|vitest|jest|playwright[ \t]+test)(?![\w-])|(?<!install[ \t]{1,20})\bpytest\b)/m, msg: "comando de teste num passo ou job com `continue-on-error`: a falha nao reprova — confirmar", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
+  // Os scripts de TESTE do `package.json` (#296), os mesmos nomes: o valor neutralizado (`|| :` incluido, e
+  // as aspas escapadas `\"` atravessam-se), ou um argumento que estreita a selecao DEPOIS do runner (um
+  // `-t` de outra ferramenta, `wait-on -t 60000 ... && playwright test`, nao conta).
+  { re: /^[ \t]*"(?:test|test:(?:unit|e2e|security|all))"[ \t]*:[ \t]*"(?:[^"\\\n]|\\.)*(?:\|\|[ \t]*(?:(?:true|exit[ \t]+0|echo)\b|:)|;[ \t]*(?:(?:true|exit[ \t]+0|echo)\b|:))/m, msg: "script de teste do package.json neutralizado (`|| true`, `; true`, ...)", cru: true, so: /(^|\/)package\.json$/i },
+  { re: /^[ \t]*"(?:test|test:(?:unit|e2e|security|all))"[ \t]*:[ \t]*"(?:(?:[^"\\\n]|\\.)*?&&)?[ \t]*(?:(?:cross-env|env)[ \t]+)?(?:[A-Za-z_][A-Za-z0-9_]*=\S*[ \t]+)*(?:vitest|jest|mocha|ava|jasmine|tap|uvu|wdio|testcafe|karma[ \t]+start|playwright[ \t]+test|cypress[ \t]+run|node[ \t]+--test|tsx[ \t]+--test|(?:bun|deno|ng|react-scripts|craco)[ \t]+test|vue-cli-service[ \t]+test|pytest|run-[sp]|npm-run-all|concurrently|lerna[ \t]+run[ \t]+test|turbo[ \t]+(?:run[ \t]+)?test|nx[ \t]+(?:test|(?:run-many|affected)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.:\/-]+)?)*?[ \t]+--?t(?:arget)?[ \t]+test)|(?:npm|pnpm|yarn)(?:[ \t]+--?\w[\w-]*(?:[ \t]+(?!-)[\w@.\/-]+)?)*[ \t]+(?:run[ \t]+)?(?:t|test))\b(?:[^"\\\n&;|]|\\.)*?[ \t](?:--passWithNoTests|--testNamePattern|--testPathPattern\w*|--grep[\w-]*|--lf|--last-failed|--onlyChanged|--only-changed|--changed\w*|--findRelatedTests|-[tkgm])(?=[\s="\\]|$)/m, msg: "script de teste do package.json com a selecao estreitada — confirmar", cru: true, so: /(^|\/)package\.json$/i },
   //  - um passo em flow mapping com `if:`/`continue-on-error:`/`shell:` (`- {name: t, if: false, run: ...}`, a
   //    chave tambem entre aspas): nao abre a linha e escapa as marcas dessas chaves. Nao exige runner. So
   //    com a chave E um `run:`/`uses:` no mesmo `{}`: uma entrada de matriz (`- { os: x, shell: msys2 }`)

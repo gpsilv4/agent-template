@@ -57,7 +57,8 @@ Test-Surface: .github/workflows/ci.yml — the release branch needs the gate too
 The warning becomes a note that shows the reason. A trailer with no reason does not count, it
 only covers that file, and a trailer in an earlier commit does not cover a later change to it.
 The trailer is read from the commits, so an uncommitted change always warns locally. Removing
-tests or lowering a count has no such exit.
+tests or lowering a count has no such exit, and neither have the `package.json` test scripts (`test`,
+`test:unit`, `test:e2e`, `test:security`, `test:all`): renaming one, or replacing its runner, warns.
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/):
 
