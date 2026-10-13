@@ -103,7 +103,7 @@ test("G11: settings.json invalido avisa", (dir) => {
 
 test("G11: settings.json ausente da SKIP visivel", (dir) => {
   rmSync(file(dir, ".claude/settings.json"));
-}, { code: 0, includes: ["SKIP  Guard 11"] });
+}, { code: 0, includes: ["SKIP  Guard 11 (.claude/settings.json) — ficheiro ausente"] });
 
 // --- Guard 11: formas de bypass que uma versao anterior aprovava ---------------
 // Estas existem porque a primeira versao do Guard 11 so olhava para o `*` precedido de
@@ -325,7 +325,7 @@ test("G11c: um script novo no `ci.yml` sem entrada no `allow` reprova no templat
 test("G11c: num DERIVADO, o que falta no `allow` e nota, e nao reprova", (dir) => {
   bootstrapado(dir); // o derivado completo: so com o marcador, o bootstrap a meio avisava por tudo
   writeF(dir, ".github/workflows/ci.yml", ci("node .agent/scripts/novo.mjs --modo"));
-}, { code: 0, anyOut: ["NOTE", "node .agent/scripts/novo.mjs --modo"] });
+}, { code: 0, anyOut: ["NOTE  .claude/settings.json: o `ci.yml` corre `node .agent/scripts/novo.mjs --modo`"] });
 
 // Um prefixo `Bash(<comando>:*)` cobre o comando com argumentos — e a forma do `check-test-surface` —,
 // uma entrada exacta cobre o comando exacto, e uma linha comentada nao corre. No TEMPLATE (onde o

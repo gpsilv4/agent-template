@@ -130,7 +130,7 @@ export function registar() {
     // deixava o outro a definir tudo, e o SKIP nunca disparava.
     rmSync(file(dir, ".agent/rules/anti-patterns.md"));
     rmSync(file(dir, ".agent/rules/anti-patterns-template.md"));
-  }, { code: 1, anyOut: ["SKIP  Guard 15"] });
+  }, { code: 1, anyOut: ["SKIP  Guard 15 (referencias a anti-padroes) — sem "] });
 
   /** Mesma nocao de "codigo" que o guard usa (`guards/anti-patterns.mjs`): se as duas
    *  divergirem, os testes deixam de medir os ramos que o guard tem. */
@@ -390,7 +390,7 @@ export function registar() {
   // guards reprovar; aqui nao ha nada a reprovar, e copiar aquele numero era medir o ruido.)
   test("G18: sem o ficheiro de evidencia da SKIP visivel, nao silencio", (dir) => {
     rmSync(file(dir, WHY));
-  }, { code: 0, anyOut: ["SKIP  Guard 18"] });
+  }, { code: 0, anyOut: ["SKIP  Guard 18 (evidencia dos anti-padroes do template) — sem "] });
 
   test("G15: o projeto a definir e citar o seu primeiro `APn` NAO e colisao", (dir) => {
     const idProprio = "AP" + "1";

@@ -114,7 +114,7 @@ export function registar() {
 
   test("G1e: workflow perto do tecto da NOTE, nao WARN", (dir) => {
     writeF(dir, ".agent/workflows/debug.md", "# debug\n\n" + "z".repeat(11700));
-  }, { code: 0, includes: ["NOTE", "perto do limite"] });
+  }, { code: 0, includes: ["NOTE  .agent/workflows/debug.md = ", "(workflow, perto do limite"] });
 
   // O veredicto de sucesso nomeia o MAIOR e o numero. Um "ok" sem numero e indistinguivel de
   // um guard que nao mediu nada (`TP2`), e com 14 ficheiros ninguem os conta a mao.
@@ -225,7 +225,7 @@ export function registar() {
     // o exit e 1 e as linhas WARN nao contem o SKIP. O que se afirma aqui e que o guard **diz**
     // que nao correu, em vez de desaparecer — a regra de "todo o skip e visivel".
     rmSync(file(dir, "CLAUDE.md"));
-  }, { code: 1, anyOut: ["SKIP  Guard 1c"] });
+  }, { code: 1, anyOut: ["SKIP  Guard 1c — sem CLAUDE.md"] });
 
   // --- Os SKIP/NOTE que ninguem observava (varredura `--skips`) -----------------
   // "Todo o skip e visivel" e uma regra que o repo repete em dezenas de comentarios, e nada
@@ -249,14 +249,14 @@ export function registar() {
       .filter((l) => !l.startsWith("@.agent/context/")).join("\n"));
     writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md").split("\n")
       .filter((l) => !l.startsWith("@./.agent/context/")).join("\n"));
-  }, { code: 0, includes: ["SKIP  Guard 1c"] });
+  }, { code: 0, includes: ["SKIP  Guard 1c — nenhum @import de .agent/context/"] });
 
   test("G1d: sem bloco de Fronteiras no CLAUDE.md da SKIP visivel", (dir) => {
     // Remocao CIRURGICA do bloco: reescrever o ficheiro inteiro levava tambem a tabela de
     // workflows, e o teste falhava com 14 avisos do Guard 7 — sem relacao com o que afirma.
     const semFronteiras = (t) => t.replace(/^## Fronteiras[\s\S]*?(?=^## )/m, "");
     for (const f of ["CLAUDE.md", "GEMINI.md"]) writeF(dir, f, semFronteiras(readF(dir, f)));
-  }, { code: 0, includes: ["SKIP  Guard 1d"] });
+  }, { code: 0, includes: ["SKIP  Guard 1d — sem CLAUDE.md ou sem bloco de Fronteiras"] });
 
   test("G1d: sem nenhum ponteiro fino da SKIP visivel", (dir) => {
     // Derivado do PONTEIROS real, e nao fixado aqui: o `AGENTS.md` foi acrescentado a lista
@@ -265,7 +265,7 @@ export function registar() {
     for (const f of PONTEIROS_1D) {
       try { rmSync(file(dir, f)); } catch {}
     }
-  }, { code: 0, includes: ["SKIP  Guard 1d"] });
+  }, { code: 0, includes: ["SKIP  Guard 1d — nenhum ponteiro fino presente"] });
 
   // A outra metade: o `AGENTS.md` esta DENTRO do alcance. Sem este teste, tira-lo da lista
   // nao partia nada — e foi assim que a deriva passou despercebida.
