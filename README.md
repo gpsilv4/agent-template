@@ -226,8 +226,9 @@ not to* line, so every agent sees it.
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
     │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
-    │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary,
-    │   │                          and that every hook on disk is wired to the `hooks` key
+    │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
+    │   │                          (deny/ask cover every rule the template ships, hooks
+    │   │                          included), and that every hook on disk is wired to the `hooks` key
     │   │                          (an unwired hook looks exactly like a working one); what
     │   │                          `ci.yml` runs is in `allow`; agents declare `tools:`
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
@@ -247,6 +248,7 @@ not to* line, so every agent sees it.
     │   ├── alvos-no-disco.mjs  <- Which verifier files exist on disk (what the sweep must cover)
     │   ├── alcance.mjs         <- Which files a guard reaches (instructions vs fixtures)
     │   ├── agentes.mjs         <- Reads the `tools:` of `.claude/agents/*` (Guard 11 + the subagent hook)
+    │   ├── permissoes.mjs      <- Guard 11's probes for deny/ask, and the deny/ask a project lacks (2b)
     │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)

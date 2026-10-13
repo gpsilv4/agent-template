@@ -142,10 +142,13 @@ test("G11: `allow` que nao e array nao rebenta nem imprime o OK tranquilizador",
      excludes: ["is not iterable", "allow sem concessoes largas"] });
 
 test("G11: deny mais ESTRITO nao e falso positivo", (dir) => {
-  // Supersets estritos dos padroes do template: um por classe de secret.
-  patchSettings(dir, (c) => (c.permissions.deny = [
+  // Supersets estritos dos padroes do template: um por classe de secret. So as regras de `Read`
+  // mudam — as outras sondas do guard (#301) nao sao o que este caso afirma.
+  patchSettings(dir, (c) => (c.permissions.deny = [...c.permissions.deny.filter((r) => !r.startsWith("Read(")),
     "Read(./.env*)", "Read(./**/.env*)", "Read(./**/*.pem)", "Read(./**/*.key)",
-    "Read(./**/id_rsa*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)",
+    "Read(./**/id_*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)",
+    "Read(./**/.netrc*)", "Read(./**/.pgpass*)", "Read(./**/.git-credentials*)", "Read(./**/*.p1*)", "Read(./**/*.pf*)", "Read(./**/*.jk*)",
+    "Read(~/.ssh*/**)", "Read(~/.aws*/**)", "Read(~/.npm*)", "Read(~/.config/**)",
   ]));
 }, { code: 0, excludes: ["nenhuma regra `deny` cobre"] });
 
