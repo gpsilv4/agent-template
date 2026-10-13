@@ -28,6 +28,7 @@ import { leOuNull } from "./ficheiros.mjs";
 import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
 import { imprimeAntesDeAprovar } from "./saida-upgrade.mjs";
 import { agentesDesatualizados } from "./agentes.mjs";
+import { regrasEmFalta } from "./permissoes.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS do job `guard-tests` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
@@ -307,6 +308,17 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
       `o \`guard-tests\` do template corre ${soNoTemplate.length} verificacao(oes) que o ci.yml deste projeto nao corre: ` +
         `${soNoTemplate.join(", ")} — se alguma esta COMENTADA aqui, conta como ausente`
     );
+  }
+
+  // O MESMO, para a fronteira de permissoes (#301, R7B-1). O motor nao toca no `settings.json` — e
+  // do projeto —, e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
+  // passou varias rondas sem o `ask` dos hooks. Lista LITERAL, para copiar; o que deixa a
+  // fronteira aberta, o Guard 11 novo ja o faz reprovar na lista de baixo.
+  const falta = regrasEmFalta(leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json")));
+  for (const lista of ["deny", "ask"]) {
+    if (falta?.[lista].length) {
+      note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s) que o deste projeto nao tem, literalmente: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
+    }
   }
 
   const naoCorre = [...new Set([...cmdAntes, ...cmdDepois].filter((c) => !correNaBateria(c)))];

@@ -45,6 +45,9 @@ export const SUITES = [
   // O "intacto a menos dos placeholders" (#176): os seus casos estao no `tests-intacto.mjs` (corre no
   // `test-guards`) e o motor do upgrade usa-o — mexer nele manda correr os dois.
   { re: /^\.agent\/scripts\/lib\/intacto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // As sondas do Guard 11 e a comparacao do `deny`/`ask` com o template (#301): o guard as usa (e o
+  // anti-`TP8` vive no `tests-settings.mjs`), e a 2b imprime a lista.
+  { re: /^\.agent\/scripts\/lib\/permissoes\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   // O que os dois modos do `/upgrade` imprimem: a ordem e a promessa tem casos puros no
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
@@ -154,8 +157,11 @@ export const SUITES = [
   // ANTES da regra generica de `lib/`: a ordem da tabela e a semantica, e o `lib/` generico
   // manda tudo para a suite do registo — que nao toca nestes dois.
   // O `lib/ficheiros.mjs` serve os dois simuladores: o `blocoDaConstante` mudou-se para la (#179).
-  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs")] },
-  { re: /^\.agent\/scripts\/(simulate-derived|lib\/derivado)\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
+  // E os dois, com o `lib/derivado.mjs`, servem tambem o `tests-settings-sondas.mjs` (#301), que
+  // decide "template ou derivado" pela mesma regra do resto da maquinaria.
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
   // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A

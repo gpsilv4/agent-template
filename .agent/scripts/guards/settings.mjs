@@ -14,6 +14,7 @@
  * sem isso a varredura passaria a cobrir 645 linhas em vez de 911 e reportaria 100% a mentir.
  */
 import { ferramentasDe } from "../lib/agentes.mjs";
+import { descreve, emFalta } from "../lib/permissoes.mjs";
 
 /** @returns {number} guards executados (0 se o ficheiro nao existe) */
 export function guardSettings({ read, warn, ok, note, skip, listDir, ehDerivado = () => false }) {
@@ -62,43 +63,6 @@ if (settingsRaw === null) {
       flag(`entrada do \`deny\` que nao e string (${JSON.stringify(r)})`);
       return false;
     });
-
-    // Cobertura do deny de secrets: verificar que ALGUM padrao cobre cada caminho tipico,
-    // em vez de exigir os 4 literais. Um projeto com `Read(./**/.env*)` (superset estrito)
-    // era reportado como tendo o deny em falta.
-    const denyCovers = (target) =>
-      deny.some((rule) => {
-        const m = /^Read\((.*)\)$/.exec(rule);
-        if (!m) return false;
-        // Traducao glob->regex numa passagem unica. Fazer os `replace` em cadeia era
-        // um bug: o `.*` inserido pelo passo do `**` continha um `*` que o passo
-        // seguinte voltava a reescrever, produzindo `(?:.[^/]*/)?` — que nao casa com
-        // caminhos aninhados, e o guard reportava um deny correcto como estando em falta.
-        const glob = m[1].replace(/^\.\//, "");
-        let rxSrc = "";
-        for (let i = 0; i < glob.length; i++) {
-          if (glob[i] === "*" && glob[i + 1] === "*") {
-            if (glob[i + 2] === "/") { rxSrc += "(?:[^/]+/)*"; i += 2; }
-            else { rxSrc += ".*"; i += 1; }
-          } else if (glob[i] === "*") {
-            rxSrc += "[^/]*";
-          } else {
-            // Um so caracter de cada vez; o `g` nao muda nada, e fecha o alerta do CodeQL.
-            rxSrc += glob[i].replace(/[.+^${}()|[\]\\?]/g, "\\$&");
-          }
-        }
-        const rx = new RegExp(`^${rxSrc}$`);
-        return rx.test(target);
-      });
-    // Alvos de TODAS as classes de secret que o template protege — nao so `.env*`.
-    // Apagar as regras de `*.pem`/`id_rsa`/`secrets/**` era invisivel.
-    for (const target of [
-      ".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local",
-      "chave.pem", "a/b/tls.key", "id_rsa", "a/id_rsa.pub", ".npmrc",
-      "credentials.json", "a/secrets/db.json",
-    ]) {
-      if (!denyCovers(target)) flag(`nenhuma regra \`deny\` cobre a leitura de \`${target}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
-    }
 
     // Um `allow` demasiado largo anula o deny ao lado. Casos que ja foram reais aqui:
     // `Bash(npm run lint*)` cobria `npm run lint-and-deploy`; `Bash(node .agent/scripts/*)`
@@ -265,15 +229,18 @@ if (settingsRaw === null) {
       }
     }
 
-    // Cobertura do `ask`: `process-rules.md` declara commit/push/merge e instalacao de
-    // dependencias como "perguntar primeiro". Apagar a lista inteira era invisivel.
+    // A cobertura do `deny` e do `ask`, sonda a sonda (`lib/permissoes.mjs`, #301). Era so o `.env*`
+    // e afins no `deny`, e commit/push/npm install no `ask`: um derivado ficou sem o `ask` dos hooks —
+    // um agente podia edita-los sem perguntar — e sem metade do `deny`, e nada o disse. Um superset
+    // estrito (`Read(./**/.env*)`) cobre; uma sonda de `ask` aceita o `deny` (e mais estrito), uma de
+    // `deny` nao aceita o `ask`. As da fronteira so contam com a pasta no disco.
     const ask = asList(perms.ask, "ask");
-    const askCovers = (cmd) => ask.some((r) => {
-      const m = /^Bash\((.*?):?\*?\)$/.exec(typeof r === "string" ? r : "");
-      return m ? cmd.startsWith(m[1].trim()) : false;
-    });
-    for (const cmd of ["git commit", "git push", "npm install"]) {
-      if (!askCovers(cmd)) flag(`\`${cmd}\` nao esta em \`ask\` nem em \`deny\` — o CLAUDE.md declara-o como "perguntar primeiro"`);
+    for (const { tipo, sonda } of emFalta({ deny, ask }, (pasta) => listDir(pasta, "") !== null)) {
+      if (tipo === "leitura") flag(`nenhuma regra \`deny\` cobre a leitura de \`${sonda.alvo}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
+      else if (tipo === "deny" && sonda.nota) note(`${SETTINGS_PATH}: ${descreve(sonda)} nao esta em \`deny\` — o template nega-o; se o fluxo do projeto o usa, fica a decisao escrita`);
+      else if (tipo === "deny") flag(`${descreve(sonda)} nao esta em \`deny\` — o template nega-o, e nada neste settings.json o trava`);
+      else if (sonda.nota) note(`${SETTINGS_PATH}: ${descreve(sonda)} nao esta em \`ask\` nem em \`deny\` — o template pergunta antes; se a stack o usa, acrescentar`);
+      else flag(`${descreve(sonda)} nao esta em \`ask\` nem em \`deny\` — o template pergunta antes`);
     }
 
     // Um `allow` que caia dentro de um prefixo negado ou perguntado e contradicao
