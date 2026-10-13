@@ -92,7 +92,7 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 | `.claude/hooks/*` + a chave `hooks` do `settings.json` | **Substituidos pelo motor** (menos o `protegidos.json`); comparar a mao o `SEGUROS` (`lib/verbos-git.mjs`) e ligar cada hook novo | So-Claude Code (`upgrade-why.md`) |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` | Metade e do projeto |
-| **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego. Um `SECURITY.md` novo: rever com o utilizador as definicoes do GitHub (o mesmo §2.7) | As categorias acima tambem envelhecem; esta linha e a rede |
+| **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego. | As categorias acima tambem envelhecem; esta linha e a rede |
 
 ## 2b. Mudancas que REPROVAM um projeto que estava verde
 
@@ -157,8 +157,9 @@ printf 'template: %s\ncommit: %s\ndata: %s\n' \
   "$SHA" "$(date +%F)" > .agent/.template-version
 ```
 
-Sem isto, o proximo `/upgrade` cai outra vez no Modo B. **E o unico passo que torna o
-proximo upgrade barato**, e e o que faltava a este.
+Sem isto, o proximo `/upgrade` cai no Modo B.
+
+**E confirmar as definicoes de seguranca do GitHub** (nao vem com ficheiro nenhum): ler com `gh api`, propor ligar o que falta e esperar o sim — `src/docs/github-security.md`.
 
 ## 5. Relatorio (Fase 5) e so depois o commit
 

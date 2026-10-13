@@ -375,6 +375,7 @@ src/docs/
 ├── anti-patterns-why.md        <- Evidence behind each anti-pattern: what it cost, how it was caught
 ├── scripts-guide-why.md        <- Why each checker is shaped the way it is
 ├── sync-docs-why.md            <- Why the pre-commit checklist has the points it has
+├── github-security.md         <- GitHub security settings: public vs. private, read/enable with `gh api`
 ├── upgrade-why.md              <- Why /upgrade decides by category, and what it measured
 └── CHANGELOG.md                <- Changelog template
 ```
