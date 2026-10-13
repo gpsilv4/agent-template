@@ -58,6 +58,33 @@ const RUN_MAPEAMENTO = (ls, j) => {
  * um `>`/simples), senao a juncao do `comoORunnerExecuta` punha o `;` a meio e escondia o `|| true`.
  * Um `run:` cujo corpo sao chaves (`defaults: run: shell:`) nao e um comando e fica como esta.
  */
+/** Um comando que SO audita dependencias: `npm|pnpm|yarn|bun audit` (com flags), ou o
+ *  `npm run test:audit` do template. Nada a seguir que encadeie outro comando (`&&`, `;`, `|`). */
+const AUDIT = /^(?:(?:npm|pnpm|yarn|bun)[ \t]+audit|npm[ \t]+run[ \t]+test:audit)(?:[ \t]+[^\s;&|]+)*$/;
+
+/** Os comandos dos `run:` de um bloco, um por linha, com as continuacoes `\` juntas e sem
+ *  comentarios. Um `run:` que e um mapeamento (`defaults: run: shell:`) nao e um comando. */
+function comandosDoBloco(bloco, col) {
+  const cmds = [];
+  for (let j = 0; j < bloco.length; j++) {
+    const r = /^[ \t]*(?:-[ \t]+)?["']?run["']?[ \t]*:[ \t]*(.*)$/.exec(bloco[j]);
+    if (!r || (!r[1] && RUN_MAPEAMENTO(bloco, j))) continue;
+    const linhas = r[1] && !/^[|>]/.test(r[1]) ? [r[1]] : [];
+    for (let c = j + 1; c < bloco.length && (!bloco[c].trim() || /^[ \t]*/.exec(bloco[c])[0].length > col(bloco[j])); c++) linhas.push(bloco[c]);
+    let acc = "";
+    for (const l of linhas.map((x) => x.trim()).filter((x) => x && !x.startsWith("#"))) {
+      acc = acc ? `${acc} ${l}` : l;
+      if (/\\$/.test(acc)) acc = acc.slice(0, -1).trim();
+      else {
+        cmds.push(acc.replace(/[ \t]+#.*$/, "").replace(/^["']|["']$/g, "").trim());
+        acc = "";
+      }
+    }
+    if (acc) cmds.push(acc);
+  }
+  return cmds;
+}
+
 function tolerantes(t) {
   const ls = t.split(/\r?\n/);
   const col = (l) => /^[ \t]*(?:-[ \t]+)?/.exec(l)[0].length; // onde comeca o conteudo
@@ -81,6 +108,16 @@ function tolerantes(t) {
     if (dono < 0) continue;
     let fim = dono + 1;
     while (fim < ls.length && (!ls[fim].trim() || comentario(ls[fim]) || ind(ls[fim]) > ind(ls[dono]))) fim++;
+    // Um bloco que SO corre audit (#303, R7B-6): e o desenho que o proprio template recomenda — o
+    // `npm audit` informativo, com `continue-on-error` —, e a marca da chave nao deixava um derivado
+    // que o tinha escalado para gate voltar atras, nem com a razao escrita. A chave sai da contagem
+    // (fica `@@coe-audit@@`), e o bloco nao leva prefixo. So com TODOS os comandos de audit, e pelo
+    // menos um: um passo so com `uses:` nao prova nada, e um `npm audit && npm test` corre testes.
+    const cmds = comandosDoBloco(ls.slice(dono, fim), col);
+    if (cmds.length && cmds.every((c) => AUDIT.test(c))) {
+      ls[i] = ls[i].replace(/continue-on-error/i, "@@coe-audit@@");
+      continue;
+    }
     for (let j = dono; j < fim; j++) {
       const r = /^[ \t]*(?:-[ \t]+)?["']?run["']?[ \t]*:[ \t]*(.*)$/.exec(ls[j]);
       if (!r || (!r[1] && RUN_MAPEAMENTO(ls, j))) continue;
