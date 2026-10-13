@@ -115,7 +115,7 @@ test("G12b: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => 
 
 test("G12: sync-docs.md ausente da SKIP visivel, nao silencio", (dir) => {
   rmSync(file(dir, SYNC));
-}, { code: 0, includes: ["SKIP  Guard 12"] });
+}, { code: 0, includes: ["SKIP  Guard 12 — sem .agent/rules/sync-docs.md"] });
 
 // --- Guard 12c: contagem de fases do metodo por ticket ------------------------
 // O defeito original: o ficheiro tinha 6 fases (0-5) e tres sitios diziam "5 fases",
@@ -171,7 +171,7 @@ test("G12c: zero citacoes avisa (o ponteiro obrigatorio desapareceu)", (dir) => 
 
 test("G12c: metodo ausente da SKIP visivel, nao silencio", (dir) => {
   rmSync(file(dir, METODO));
-}, { code: 0, includes: ["SKIP  Guard 12c"] });
+}, { code: 0, includes: ["SKIP  Guard 12c — "] });
 
 // --- A ancora do 12c: "N fases" nem sempre e o TOTAL -------------------------
 // Sem ancora, o guard mandava reescrever prosa CORRETA — e o caminho de menor resistencia

@@ -162,6 +162,9 @@ export async function comFicheirosGrandes({ dir, ok, fatal }) {
 //  - (d) ficheiros do projeto no `.agent/context/`, e decisoes escritas;
 //  - (e) o `README.md` substituido (a §2.7 do bootstrap manda-o) e o `review.md` reescrito sem
 //    citar o intervalo do template.
+//  - (f) uma rule CARREGADA perto do tecto (#302, R7B-7): o dominio cresce nas rules do projeto, e
+//    num derivado real ha sempre uma — a NOTE dela tem a mesma frase que a dos workflows, e uma
+//    assercao que so dizia "perto do limite" passava com o sitio dos workflows calado.
 export function comoUmDerivadoReal({ dir, ok, fatal }) {
   const w = (rel, txt) => {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
@@ -185,7 +188,12 @@ export function comoUmDerivadoReal({ dir, ok, fatal }) {
   const relReview = ".agent/workflows/review.md";
   const review = leOuNull(join(dir, relReview));
   if (review !== null) w(relReview, review.replace(/`TP\d+`-`TP\d+`/g, "os do template"));
-  ok("derivado como os reais: guard proprio com SKIP declarado, CHANGELOG com historia, contexto e README do projeto");
+  const relRule = ".agent/rules/business-logic.md";
+  let rule = leOuNull(join(dir, relRule));
+  if (rule === null) fatal(`${relRule} nao existe na copia — o bootstrap gera-a, e sem ela nao ha rule do projeto a crescer`);
+  while (Buffer.byteLength(rule) < 11700) rule += "\n- Regra de dominio do projeto, escrita ao longo de cem dias de trabalho.";
+  w(relRule, rule);
+  ok("derivado como os reais: guard proprio com SKIP declarado, CHANGELOG com historia, contexto e README do projeto, uma rule perto do tecto");
 }
 
 // --- 3g. o derivado que usa os OPT-OUTS ------------------------------------------

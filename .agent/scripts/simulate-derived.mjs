@@ -331,8 +331,10 @@ comOptOuts({ dir, ok, fatal });
 // MEDIDO ANTES DE APAGAR, porque um verde depois de remover um ficheiro pode ser "menos coisas
 // verificadas" em vez de "tudo continua verificado" — que e o `TP2`. Montou-se o derivado,
 // correram-se os guards com e sem o ficheiro, e compararam-se as listas de `SKIP`: **4 e 4,
-// identicas**. O Guard 12e (numero de workflows) continua a validar, com a citacao que vive
-// fora deste ficheiro. Nao se perde verificacao nenhuma.
+// identicas**. (Medido de novo no #302: com o derivado maduro montado como esta hoje, o Guard 12e
+// da `SKIP` — nenhuma citacao propria do numero de workflows sobra fora deste ficheiro —, e e
+// esse o estado de um derivado real. O SKIP e visivel, e uma assercao sobre ele tem de o nomear
+// inteiro: `SKIP  Guard 12` casava-o.)
 rmSync(join(dir, ".agent/BOOTSTRAP.md"), { force: true });
 ok("BOOTSTRAP.md apagado (passo final da checklist) — o segundo sinal do ehDerivado() fica montado");
 

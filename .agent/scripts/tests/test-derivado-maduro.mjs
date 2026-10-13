@@ -216,10 +216,12 @@ await test("comFicheirosGrandes: RECUSA quando os TETOS mudaram de forma", async
 
 // --- 3f: o derivado como os reais ficam (#177) ------------------------------------
 const CFG_VAZIA = "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\nexport const SKIPS_DO_PROJETO = [];\n";
-const comCfg = (txt) => {
+const comCfg = (txt, { rule = true } = {}) => {
   const dir = copia();
   mkdirSync(join(dir, ".agent/scripts/config"), { recursive: true });
   if (txt !== null) writeFileSync(join(dir, ".agent/scripts/config/guards-do-projeto.mjs"), txt);
+  mkdirSync(join(dir, ".agent/rules"), { recursive: true });
+  if (rule) writeFileSync(join(dir, ".agent/rules/business-logic.md"), "# Logica de negocio\n");
   mkdirSync(join(dir, ".agent/context"), { recursive: true });
   mkdirSync(join(dir, "src/docs"), { recursive: true });
   return dir;
@@ -233,6 +235,9 @@ await test("comoUmDerivadoReal: declara o guard proprio E o seu SKIP na config",
     if (!c.includes("guardDoProjeto")) p.push("o guard nao ficou declarado em GUARDS");
     if (!c.includes("Guard do projeto (simulacao)")) p.push("o SKIP nao ficou declarado em SKIPS_DO_PROJETO");
     if (!le(dir, "src/docs/CHANGELOG.md").includes("`TP1`-`TP2`")) p.push("o CHANGELOG nao ganhou historia");
+    // (f) entre a NOTE (11 500) e o tecto (12 000) das rules carregadas (#302).
+    const bytes = Buffer.byteLength(le(dir, ".agent/rules/business-logic.md"));
+    if (bytes <= 11500 || bytes > 12000) p.push(`a rule do projeto devia ficar perto do tecto (11 500-12 000); ficou com ${bytes}`);
     return p;
   } finally {
     limpa(dir);
@@ -245,6 +250,19 @@ await test("comoUmDerivadoReal: sem a config, REPROVA", async () => {
     return ["devia ter reprovado sem a config"];
   } catch (err) {
     return err instanceof Recusa && /nao existe na copia/.test(err.message) ? [] : [`razao errada: ${err.message}`];
+  } finally {
+    limpa(dir);
+  }
+});
+// A rule que (f) faz crescer e gerada no bootstrap: sem ela o passo nao tem onde agir, e um passo
+// que nao faz nada em silencio deixava o derivado sem a NOTE que a ronda 8 mostrou faltar (#302).
+await test("comoUmDerivadoReal: sem a rule do projeto, REPROVA", async () => {
+  const dir = comCfg(CFG_VAZIA, { rule: false });
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    return ["devia ter reprovado sem a business-logic.md"];
+  } catch (err) {
+    return err instanceof Recusa && /business-logic\.md nao existe na copia/.test(err.message) ? [] : [`razao errada: ${err.message}`];
   } finally {
     limpa(dir);
   }

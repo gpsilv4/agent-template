@@ -131,7 +131,7 @@ test("TEMPLATE_VERSION com a ultima tag v9.9.9: so ATRAS conta um problema a mai
 test("num projeto derivado (com marca), da SKIP visivel e sai 0", () => {
   const dir = repo({ comMarca: true, comTag: "v1.0.0" });
   try {
-    return exige(corre(dir), { codigo: 0, inclui: ["SKIP", "e um projeto derivado, nao o template"] });
+    return exige(corre(dir), { codigo: 0, inclui: ["SKIP  simulacao de /upgrade — este repo e um projeto derivado, nao o template"] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -142,7 +142,7 @@ test("num projeto derivado (com marca), da SKIP visivel e sai 0", () => {
 test("sem BOOTSTRAP.md (o outro sinal de derivado), tambem da SKIP", () => {
   const dir = repo({ semBootstrap: true, comTag: "v1.0.0" });
   try {
-    return exige(corre(dir), { codigo: 0, inclui: ["SKIP", "e um projeto derivado"] });
+    return exige(corre(dir), { codigo: 0, inclui: ["SKIP  simulacao de /upgrade — este repo e um projeto derivado, nao o template"] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
