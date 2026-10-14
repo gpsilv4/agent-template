@@ -17,7 +17,7 @@
 #     analisa o codigo da APLICACAO (`src/`...), escolhe as linguagens e nao precisa de ficheiro;
 #   - repo PRIVADO sem licenca GitHub Code Security: nao ligar nada. Os termos do CodeQL proibem
 #     usa-lo em codigo que nao e open source ("e.g., code in a private repo"), com ou sem upload —
-#     e gastava minutos do plano sem resultado visivel. Ver `SECURITY.md`.
+#     e gastava minutos do plano sem resultado visivel. Ver `src/docs/github-security.md`.
 #
 # Com este workflow, o "Default setup" deste repo fica DESLIGADO: os dois nao coexistem.
 #

@@ -25,11 +25,49 @@ export const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
 export const paraMarcas = (f, t) =>
   /\.ya?ml$/i.test(f)
     ? comoORunnerExecuta(
-        tolerantes(t)
+        tolerantes(agregadoresSempre(t))
           .replace(/^([ \t]*)-(?=[ \t]+\S)/gm, "$1 ")
           .replace(/^([ \t]*)(?:(["'])(if|continue-on-error|shell|run)\2|(if|continue-on-error|shell|run))[ \t]*:/gm, "$1$3$4:")
       )
     : t;
+
+/**
+ * O `if: always()` de um job AGREGADOR sai da marca do `if:` (#308): sem ele, uma dependencia
+ * vermelha SALTAVA o agregador — e um check saltado conta como passado para a protecao. So num job
+ * que LE o resultado de outro (`needs.<X>.result`), e so a forma exacta (a do `pull_request`, com as
+ * mesmas ancoras: aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma continuacao na linha
+ * seguinte). Num job a jusante que nao le resultados — um `deploy` com `needs: [test]` —, o
+ * `always()` faz correr com os testes vermelhos, e CONTA: a primeira versao desta excecao vivia no
+ * regex da marca, sem saber de que job era, e deixava-o passar (auditoria do #308).
+ */
+function agregadoresSempre(t) {
+  const ls = t.split(/\r?\n/);
+  const iJobs = ls.findIndex((l) => /^["']?jobs["']?[ \t]*:/.test(l));
+  if (iJobs < 0) return t;
+  const ind = (l) => /^[ \t]*/.exec(l)[0].length;
+  const fimJobs = ls.findIndex((l, j) => j > iJobs && /^[^\s#]/.test(l));
+  const fim = fimJobs < 0 ? ls.length : fimJobs;
+  const ne = ls.slice(iJobs + 1, fim).filter((l) => l.trim() && !/^[ \t]*#/.test(l));
+  if (ne.length === 0) return t;
+  const jInd = Math.min(...ne.map(ind));
+  const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+  for (let i = iJobs + 1; i < fim; i++) {
+    if (!ls[i].trim() || ind(ls[i]) !== jInd || /^[ \t]*#/.test(ls[i])) continue;
+    let f = i + 1;
+    while (f < fim && (!ls[f].trim() || /^[ \t]*#/.test(ls[f]) || ind(ls[f]) > jInd)) f++;
+    const bloco = ls.slice(i + 1, f);
+    if (!bloco.some((l) => !/^[ \t]*#/.test(l) && /\bneeds\.[\w-]+\.result\b/.test(l))) continue;
+    const kInd = Math.min(...bloco.filter((l) => l.trim() && !/^[ \t]*#/.test(l)).map(ind));
+    for (let k = i + 1; k < f; k++) {
+      if (ind(ls[k]) !== kInd || !SEMPRE.test(ls[k])) continue;
+      const prox = ls.slice(k + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));
+      if (prox !== undefined && ind(prox) > kInd) continue; // uma continuacao muda a condicao
+      ls[k] = ls[k].replace(SEMPRE, "$1@@if-agregador@@$2always()");
+    }
+    i = f - 1;
+  }
+  return ls.join("\n");
+}
 
 /** `continue-on-error` com um valor que nao e `false` (o mesmo criterio da marca dessa chave). */
 const COE = /^[ \t]*(?:-[ \t]+)?["']?continue-on-error["']?[ \t]*:[ \t]*(?!["']?false["']?[ \t]*(?:#|$)|["']?\$\{\{[ \t]*false[ \t]*\}\}["']?[ \t]*(?:#|$))\S/i;
@@ -112,9 +150,13 @@ function tolerantes(t) {
     // `npm audit` informativo, com `continue-on-error` —, e a marca da chave nao deixava um derivado
     // que o tinha escalado para gate voltar atras, nem com a razao escrita. A chave sai da contagem
     // (fica `@@coe-audit@@`), e o bloco nao leva prefixo. So com TODOS os comandos de audit, e pelo
-    // menos um: um passo so com `uses:` nao prova nada, e um `npm audit && npm test` corre testes.
+    // menos um, e nenhum `uses:`: um passo com uma action nao prova o que faz, e um `npm audit &&
+    // npm test` corre testes.
     const cmds = comandosDoBloco(ls.slice(dono, fim), col);
-    if (cmds.length && cmds.every((c) => AUDIT.test(c))) {
+    // Sem `uses:` no bloco: um job tolerado que corre os testes por uma action e so audita no `run:`
+    // escondia os testes atras do audit (auditoria do #308).
+    const usa = ls.slice(dono, fim).some((l) => /^[ \t]*(?:-[ \t]+)?["']?uses["']?[ \t]*:/.test(l));
+    if (cmds.length && !usa && cmds.every((c) => AUDIT.test(c))) {
       ls[i] = ls[i].replace(/continue-on-error/i, "@@coe-audit@@");
       continue;
     }

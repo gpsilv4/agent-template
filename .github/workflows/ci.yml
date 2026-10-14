@@ -196,33 +196,13 @@ jobs:
   # they need no package.json and no dependencies, and the bare template is exactly the
   # case they cover — gating them behind a package.json would mean they never run here.
   guard-tests:
-    name: Guard Tests
+    # `Guard Suites`, e nao `Guard Tests`: esse nome e o do job `guard-gate`, abaixo — o check que a
+    # protecao exige (#308).
+    name: Guard Suites
     runs-on: ubuntu-latest
-    # 75, e o numero vem de MEDICOES sucessivas e nao de um palpite. O historico e o que
-    # interessa aqui, porque mostra uma TENDENCIA e nao um valor:
-    #
-    #   PR #36   20m29s   primeira corrida com a varredura ligada
-    #   PR #47   39m09s   depois de o template ganhar guards e suites
-    #   PR #56   >40m     **morreu no tecto de 40** — 163 sitios, e a medir ainda
-    #
-    # O comentario anterior dizia "cada verificador novo empurra isto para cima" e
-    # "sobe-se antes de doer, nao depois". Doeu: o job foi cancelado a meio da varredura e o
-    # PR ficou bloqueado por **falta de tempo**, nao por defeito. E o pior modo de falha
-    # possivel — parece um erro e nao e.
-    #
-    # 75 nao e generosidade: a varredura cresce com o produto (sitios x tamanho das suites), e
-    # cada teste novo no `test-guards` multiplica-se pelos sitios dele. A margem que conta e a
-    # de um derivado PRIVADO (2 vCPU, metade do runner deste repo). Os tempos atuais, por
-    # visibilidade e com o `n`, vivem SO no cabecalho do `mutation-sweep.mjs` (`TP8`: um numero
-    # medido escrito em dois sitios envelhece num deles — este comentario ja o provou).
-    #
-    # O `--diff` (varrer so os alvos tocados) existe, mas e so LOCAL, por decisao (#57): o CI e
-    # o portao e varre tudo. O que encurta o portao sem medir menos esta no plano do #161; ate
-    # la, o tecto e que segura isto, e um tecto apertado transforma crescimento em CI vermelho.
-    #
-    # Quando o PR NAO toca nos verificadores a varredura salta, e o job fica nas suites: ~1 min.
-    # Os dois simuladores correm no job `simulators`, em paralelo (#158).
-    timeout-minutes: 75
+    # Sem a varredura (#308): as suites e os verificadores, ~3 min no template e num derivado. A
+    # varredura de mutacao vive no job `sweep`, em paralelo — o tecto dela e o historico dele estao la.
+    timeout-minutes: 20
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
@@ -230,7 +210,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          # O token nao fica em `.git/config` enquanto corre codigo do PR (a varredura). E so
+          # O token nao fica em `.git/config` enquanto corre codigo do PR (as suites). E so
           # `contents: read`, mas nenhum step deste job o usa: custo zero.
           persist-credentials: false
       - uses: actions/setup-node@v7
@@ -340,13 +320,80 @@ jobs:
         # base exata desse merge. Com `base.sha` (que pode estar atras da ponta do base) um
         # PR que nao tocou em testes ficava vermelho por causa de um merge feito noutro PR.
         run: node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD^1)"
+
+  # A VARREDURA DE MUTACAO num job proprio (#308, R7B-8), com DUAS pernas em paralelo: a completa
+  # (cada `warn()`/`fatal()`) e a `--skips` (cada `skip()`/`note()`, #192). Corriam em SERIE no
+  # `guard-tests`, depois das suites: num derivado privado (2 vCPU) o job chegou aos 51 dos 75 min
+  # (os tempos vivem SO no cabecalho do `mutation-sweep.mjs`, `TP8`). Em paralelo, o tempo de parede
+  # e o da perna maior.
+  #
+  # Ficou no `guard-tests` no #158 de proposito ("move-la poria a correr DUAS vezes num derivado que
+  # ja a tem"). O que mudou: a 2b compara job a job (`comandosPorJob`), e o `check-test-surface`
+  # reprova os estados maus de um derivado (a varredura em dois jobs, ou fora de um agregador; um
+  # `needs:` partido; dois checks com o mesmo nome) — `src/docs/upgrade-why.md`, #308.
+  #
+  # A MESMA condicao para as duas pernas, num passo so: uma matriz, e nao dois jobs com a condicao
+  # copiada (`TP8`). `fail-fast: false`: uma perna vermelha nao cancela a outra a meio da medicao.
+  #
+  # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as duas pernas fazem
+  # checkout e setup em TODO o PR, mesmo quando a condicao diz "nao aplicavel", e o `guard-gate`
+  # corre sempre — ~+3 min por PR e +1 por push, contra o job unico de antes. Num publico nao se
+  # paga. O ganho e o tempo de parede de um PR que toca nos verificadores.
+  sweep:
+    name: Mutation sweep (${{ matrix.modo }})
+    runs-on: ubuntu-latest
+    # Depois das SUITES: com elas vermelhas o gate ja esta condenado, e as duas pernas faturavam ~40
+    # min num privado a medir para nada (antes, um passo vermelho saltava o da varredura). Custa ~3
+    # min de parede; o paralelismo das duas pernas, que e o ganho, fica.
+    needs: guard-tests
+    # Tambem ao nivel do JOB: num `push` o job arrancava, fazia o checkout e ficava VERDE sem ter
+    # medido nada (`TP2`). Assim aparece como `skipped`.
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        modo: [completa, skips]
+    # 75 (a perna completa; a `--skips` cabe folgada), e o numero vem de MEDICOES sucessivas e nao de um palpite. O historico e o que
+    # interessa aqui, porque mostra uma TENDENCIA e nao um valor:
+    #
+    #   PR #36   20m29s   primeira corrida com a varredura ligada
+    #   PR #47   39m09s   depois de o template ganhar guards e suites
+    #   PR #56   >40m     **morreu no tecto de 40** — 163 sitios, e a medir ainda
+    #
+    # O comentario anterior dizia "cada verificador novo empurra isto para cima" e
+    # "sobe-se antes de doer, nao depois". Doeu: o job foi cancelado a meio da varredura e o
+    # PR ficou bloqueado por **falta de tempo**, nao por defeito. E o pior modo de falha
+    # possivel — parece um erro e nao e.
+    #
+    # 75 nao e generosidade: a varredura cresce com o produto (sitios x tamanho das suites), e
+    # cada teste novo no `test-guards` multiplica-se pelos sitios dele. A margem que conta e a
+    # de um derivado PRIVADO (2 vCPU, metade do runner deste repo). Os tempos atuais, por
+    # visibilidade e com o `n`, vivem SO no cabecalho do `mutation-sweep.mjs` (`TP8`: um numero
+    # medido escrito em dois sitios envelhece num deles — este comentario ja o provou).
+    #
+    # O `--diff` (varrer so os alvos tocados) existe, mas e so LOCAL, por decisao (#57): o CI e
+    # o portao e varre tudo. O que encurta o portao sem medir menos esta no plano do #161; ate
+    # la, o tecto e que segura isto, e um tecto apertado transforma crescimento em CI vermelho.
+    #
+    timeout-minutes: 75
+    steps:
+      # `fetch-depth: 0`: a condicao compara contra a base do PR (`HEAD^1`).
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # O token nao fica em `.git/config` enquanto corre codigo do PR (a varredura).
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       # A varredura de mutacao recorre cada suite uma vez POR sitio de aviso (quantos: `--list`),
       # logo custa minutos, nao segundos. Estava COMENTADA — o instrumento que prova que as
       # suites afirmam algo era o unico verificador que nao corria automaticamente em lado
       # nenhum, e a regra "cada verificador tem a sua suite" ficava em "corre se te lembrares".
-      # Agora corre onde e relevante: quando o PR toca nos verificadores ou nos hooks.
+      # Corre onde e relevante: quando o PR toca nos verificadores ou nos hooks.
       - name: Mutation sweep — cada aviso tem de ficar vermelho
-        if: github.event_name == 'pull_request'
+        env:
+          MODO: ${{ matrix.modo }}
         run: |
           set -euo pipefail
           # Commit-RAIZ. AQUI, com o `if: pull_request` acima, este ramo nao corre (o merge ref
@@ -369,11 +416,15 @@ jobs:
           tocados="$(git diff --name-only "$base..HEAD")"
           rc=0
           grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
-          if [ "$rc" -eq 0 ]; then
+          if [ "$rc" -eq 0 ] && [ "$MODO" = completa ]; then
             node .agent/scripts/mutation-sweep.mjs
-            # E os `skip()`/`note()`, completos (#192): ~3 min, e um guard que deixa de dizer que
-            # nao correu e o `TP2`. Completos e nao `--diff`: o portao nao depende do mapa.
+          elif [ "$rc" -eq 0 ] && [ "$MODO" = skips ]; then
+            # Os `skip()`/`note()`, completos (#192): um guard que deixa de dizer que nao correu e o
+            # `TP2`. Completos e nao `--diff`: o portao nao depende do mapa.
             node .agent/scripts/mutation-sweep.mjs --skips
+          elif [ "$rc" -eq 0 ]; then
+            echo "::error::modo da matriz desconhecido: '$MODO' — nao sei que varredura correr."
+            exit 1
           elif [ "$rc" -eq 1 ]; then
             echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
           else
@@ -381,13 +432,54 @@ jobs:
             exit 1
           fi
 
+  # O CHECK QUE A PROTECAO EXIGE (#308). Um ruleset ou uma branch protection exige checks pelo NOME,
+  # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13). Com a varredura num job
+  # seu, `Guard Tests` deixava de a incluir — um PR com a varredura vermelha passava a poder ser
+  # mergeado, sem nenhuma definicao mudada. Este job tem o nome antigo e so fica verde com as suites
+  # verdes E a varredura verde (ou saltada: so corre em `pull_request`, e num PR que nao toca nos
+  # verificadores as pernas saem verdes sem medir). Assim nenhum repo — este, ou um derivado com a
+  # protecao ligada — precisa de mudar as definicoes. Num privado de conta free a protecao nao e
+  # imposta (`src/docs/github-security.md`): ai e so o semaforo. O required e SO este nome: os das
+  # pernas (`Mutation sweep (completa|skips)`) nao sao estaveis num `push` (saltadas, sem expandir).
+  #
+  # NAO espera pelo `simulators`: o bootstrap remove esse job num derivado, e um `needs:` para um job
+  # que nao existe invalida o workflow inteiro.
+  guard-gate:
+    name: Guard Tests
+    runs-on: ubuntu-latest
+    needs: [guard-tests, sweep]
+    # `always()`: sem ele, uma dependencia vermelha SALTAVA este job — e um check saltado conta como
+    # passado para a protecao.
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Suites e varredura verdes
+        env:
+          SUITES: ${{ needs.guard-tests.result }}
+          VARREDURA: ${{ needs.sweep.result }}
+          EVENTO: ${{ github.event_name }}
+        run: |
+          echo "  suites: $SUITES · varredura: $VARREDURA"
+          if [ "$SUITES" != success ]; then
+            echo "::error::as suites (Guard Suites) nao passaram: $SUITES"
+            exit 1
+          fi
+          # `skipped` so FORA de um `pull_request` (o job `sweep` e so de PR: num `push`, num `merge_group`
+          # ou num `workflow_dispatch` que um derivado acrescente, salta). Num PR, saltada e "nao
+          # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
+          # Qualquer outro estado (`failure`, `cancelled`) reprova.
+          if [ "$VARREDURA" = success ] || { [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; }; then
+            exit 0
+          fi
+          echo "::error::a varredura de mutacao nao passou ($EVENTO): $VARREDURA"
+          exit 1
+
   # Os dois SIMULADORES num job proprio (#158), em paralelo com o `guard-tests`: ~4 min que
   # corriam em serie ANTES da varredura, e nao dependem dela nem ela deles. Sao so do template —
   # num projeto derivado dao `SKIP` em segundos —, logo um derivado que os tenha ainda no seu
   # `guard-tests` paga segundos, nao minutos (o `upgrade.md` manda tira-los de la, e o
   # `BOOTSTRAP.md` remove ESTE job num derivado novo — la ficava verde sem medir). A varredura
-  # ficou no `guard-tests` de proposito: move-la poria a correr DUAS vezes num derivado que ja a
-  # tem, ~30 min num privado (Fase 0 do #158).
+  # tem o job dela, `sweep` (#308).
   simulators:
     name: Simuladores
     runs-on: ubuntu-latest

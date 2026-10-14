@@ -43,6 +43,9 @@
  *   (o dono primeiro, #156: alvos `guards/` 542 -> 209-213 s a 8 workers, 1022 -> 343 s a 2)
  *   ubuntu-latest, repo privado  (2/2)  ~51 min   (n=2, 2026-09-18, 208 sitios — ANTES do
  *                                                  fail-fast; por medir de novo)
+ *   publico (4/4), job com completa+`--skips` em serie: 24-29 min (n=3, PRs #310/#313/#314)
+ *   derivado privado (2/2), PR #80: completa 29m14s + `--skips` 10m49s no 1.o CI; no verde, 48 min
+ *     de varredura num job de 51m12s, suites ~3 min (n=2). Desde o #308: pernas paralelas (`sweep`).
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
  * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.

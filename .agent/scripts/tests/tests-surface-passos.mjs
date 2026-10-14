@@ -75,6 +75,9 @@ export function registar() {
     muda(dir, CI, wf(""), wf("audit").replace("        run: npm audit\n", "        run: npm audit && npm test\n")), { code: 1, includes: [CRU] });
   test("passos: audit e teste em linhas do mesmo `run: |` continua a avisar (#303)", (dir) =>
     muda(dir, CI, wf(""), wf("audit").replace("        run: npm audit\n", "        run: |\n          npm audit\n          make test\n")), { code: 1, includes: [CRU] });
+  // A auditoria do #308: um job tolerado que corre os testes por uma action e so audita no `run:`.
+  test("passos: um job tolerado com testes por `uses:` e so audit no `run:` continua a avisar (#303)", (dir) =>
+    muda(dir, CI, wf(""), wf("").replace("  a:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Audit\n        run: npm audit\n", "  a:\n    runs-on: ubuntu-latest\n    continue-on-error: true\n    steps:\n      - uses: ./.github/actions/run-tests\n      - name: Audit\n        run: npm audit\n")), { code: 1, includes: [CRU] });
   test("passos: um passo so com `uses:` tolerado continua a avisar (#303)", (dir) =>
     muda(dir, CI, wf(""), wf("").replace("      - name: Audit\n        run: npm audit\n", "      - name: Audit\n        continue-on-error: true\n        uses: actions/dependency-review-action@v4\n")), { code: 1, includes: [CRU] });
 

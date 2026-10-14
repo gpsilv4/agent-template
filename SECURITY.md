@@ -8,7 +8,7 @@ If you discover a security vulnerability in this project, please report it respo
 
 - **Preferred — GitHub private vulnerability reporting:** on the repository's **Security** tab,
   click **Report a vulnerability**. The report stays private between you and the maintainers.
-  (Only exists on **public** repositories, once the maintainers turn it on — see the table below.)
+  (Only exists on **public** repositories, once the maintainers turn it on — see [`src/docs/github-security.md`](src/docs/github-security.md).)
 - **Or email** **{{SECURITY_EMAIL}}** — the only channel on a private repository.
 
 Include:
@@ -34,7 +34,7 @@ This template enforces security through:
 - **CI Pipeline**: Automated `npm audit --audit-level=high` on every PR — reported, but **non-blocking** by default (`continue-on-error` in `ci.yml`), since transitive high-severity advisories are often unfixable without a breaking bump. Remove `continue-on-error` to make it a hard gate once your dependency tree is clean.
 - **Dependabot**: Weekly automatic dependency updates
 - **CodeQL**: static analysis — in a project, GitHub's "Default setup" on a **public** repository,
-  turned on by hand; none on a private one without a license (see below)
+  turned on by hand; none on a private one without a license (see `src/docs/github-security.md`)
 - **Security Tests**: {{TEST_FRAMEWORK}}-based security test suite (headers, XSS, auth bypass, CSRF, IDOR)
 - **RLS / Auth**: Backend security policies documented in `.agent/rules/core-rules.md`
 - **Zero Secrets**: No credentials in committed files — enforced by rules, PR checklist, and automated scanning (below)
@@ -51,8 +51,8 @@ does not delete the reminder.
 
 The rule "ZERO sensitive data in committed files" (`.agent/rules/core-rules.md`) is enforced at three layers:
 
-1. **Prevention — GitHub Secret Scanning + Push Protection** (public repositories; see the table
-   above): `Settings > Advanced Security` → **Secret Protection** and **Push protection**.
+1. **Prevention — GitHub Secret Scanning + Push Protection** (public repositories; see
+   `src/docs/github-security.md`): `Settings > Advanced Security` → **Secret Protection** and **Push protection**.
    Push protection **blocks the push** if a secret is detected — the cheapest, strongest gate.
 2. **CI gate — Gitleaks** (`.github/workflows/ci.yml`, `secret-scan` job): scans the full git
    history on every push/PR. Runs even on the bare template, on any plan — the layer that covers

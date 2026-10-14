@@ -108,7 +108,7 @@ process.on("SIGINT", () => {
   process.exit(130);
 });
 
-// Os comandos que um derivado corre, DERIVADOS do job `guard-tests` do `ci.yml` (uma lista a mao
+// Os comandos que um derivado corre, DERIVADOS dos jobs `guard-tests` e `sweep` do `ci.yml` (uma lista a mao
 // media menos a cada suite nova). O leitor vive num sitio so, `lib/medida-upgrade.mjs`, com as
 // exclusoes e as razoes delas: havia uma segunda copia aqui, e ficou para tras nos tres defeitos
 // que a do `lib/` corrigiu — corria passos comentados, lia os jobs seguintes, e nao via os blocos

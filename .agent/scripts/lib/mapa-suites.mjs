@@ -159,8 +159,9 @@ export const SUITES = [
   // O `lib/ficheiros.mjs` serve os dois simuladores: o `blocoDaConstante` mudou-se para la (#179).
   // E os dois, com o `lib/derivado.mjs`, servem tambem o `tests-settings-sondas.mjs` (#301), que
   // decide "template ou derivado" pela mesma regra do resto da maquinaria.
-  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
+  // ...e o `tests-surface-gate.mjs` (#308), pela mesma razao.
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },

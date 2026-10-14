@@ -86,7 +86,7 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Os wrappers sao ponteiros finos; a logica esta no workflow |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
 | **So do template**: o job `simulators`, `codeql.yml`, `.github/codeql/` | **Nunca copiar** (modo A ou B); apagar o que os cita nos trazidos (`$TPL/.agent/BOOTSTRAP.md` §2.7) | So servem o repo do template |
-| `.github/workflows/*` | **So os jobs em falta** (ex: `guard-tests`), contra o ficheiro do **TEMPLATE** (um passo **comentado** conta como AUSENTE). Um passo **movido** de job sai do antigo, ou corre 2x. Um workflow AUSENTE copia-se inteiro. Nao substituir o CI do projeto; nos passos que ja tem, trazer as flags novas (`--skips`), e o trailer `Test-Surface:` | O CI tem passos do projeto |
+| `.github/workflows/*` | **So os jobs em falta**, contra o ficheiro do **TEMPLATE** (um passo **comentado** conta como AUSENTE). Um passo **movido** de job sai do antigo, ou corre 2x. A varredura ligada: `sweep` e `guard-gate` juntos, o `guard-gate` herda o `name:` do `guard-tests` (o que a protecao exige) e este muda; desligada, nenhum dos dois. Um workflow AUSENTE copia-se inteiro. Nao substituir o CI do projeto; nos passos que ja tem, trazer as flags novas, e o trailer `Test-Surface:` | O CI tem passos do projeto |
 | `.claude/settings.json` | Trazer o `deny`/`ask` em falta (2b lista; Guard 11 avisa); **acrescentar** ao `allow` os scripts novos | O `allow` e o que o projeto corre |
 | `.claude/agents/*` | Copia se ausentes; se existem, **trazer o `tools:` novo** (a 2b lista os customizados; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
 | `.claude/hooks/*` + a chave `hooks` do `settings.json` | **Substituidos pelo motor** (menos o `protegidos.json`); comparar a mao o `SEGUROS` (`lib/verbos-git.mjs`) e ligar cada hook novo | So-Claude Code (`upgrade-why.md`) |
@@ -100,8 +100,7 @@ Nem toda a melhoria e aditiva: quando o template **aperta** um criterio, um proj
 deixa de passar. Nao se trazem em silencio — **dizem-se na Fase 0, com o numero que cada uma custa
 neste projeto, medido ANTES de aplicar** (porque: `upgrade-why.md` § "Porque as mudancas que REPROVAM se anunciam antes de aplicar").
 
-A taxonomia serve para **reconhecer** uma destas, e para as fazer a mao no Modo B. A lista em si
-nao se escreve: mede-se, logo abaixo.
+A taxonomia serve para **reconhecer** uma destas (e para o Modo B); a lista mede-se, abaixo.
 
 | Classe | Como reconhecer | A decisao |
 |--------|-----------------|-----------|
@@ -119,10 +118,7 @@ contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.m
 (subtraido, linha a linha, o que ja falhava), o que **saiu** do template com a marca migracao/limpeza,
 e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precisa de decisao.
 
-> Corre sobre uma copia em `tmpdir`: **nao toca neste projeto**. Sai `0` mesmo com lista cheia —
-> uma lista cheia e o output desta secao, nao uma reprovacao. So a impossibilidade de medir sai
-> `!= 0`, e ai diz porque. Sem `.agent/.template-version` utilizavel recusa-se: e o **Modo B**, e
-> ai a lista faz-se a mao com a tabela acima.
+> Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela).
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
@@ -135,6 +131,8 @@ node .agent/scripts/tests/test-guards.mjs            # e as outras suites test-*
 node .agent/scripts/mutation-sweep.mjs         # custa minutos; e o que interessa
 git add -A && node .agent/scripts/check-test-surface.mjs   # `git add` ANTES: ele le `git ls-files`
 ```
+
+E a 2b outra vez: a colocacao dos jobs so se ve depois de mexer no `ci.yml`.
 
 Ler com atencao dois resultados da varredura:
 
@@ -159,7 +157,7 @@ printf 'template: %s\ncommit: %s\ndata: %s\n' \
 
 Sem isto, o proximo `/upgrade` cai no Modo B.
 
-**E confirmar as definicoes de seguranca do GitHub** (nao vem com ficheiro nenhum): ler com `gh api`, propor ligar o que falta e esperar o sim — `src/docs/github-security.md`.
+**E confirmar as definicoes de seguranca do GitHub**: ler com `gh api`, propor ligar o que falta e esperar o sim — `src/docs/github-security.md`.
 
 ## 5. Relatorio (Fase 5) e so depois o commit
 

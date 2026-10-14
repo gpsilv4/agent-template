@@ -21,7 +21,7 @@ A pasta `.github/` complementa o `.agent/` com automacao e governance do reposit
 - **`workflows/`**: Pipelines automaticos de CI/CD
   - `ci.yml`: Validacoes obrigatorias em cada PR/push (TypeScript, lint, build, tests, audit) + `secret-scan` (gitleaks, corre sempre). O bundle size check e opt-in (descomentar no ficheiro); os doc guards e o backlog correm sempre, no job `guard-tests`. `permissions: contents: read`; Dependabot no `pull_request` normal.
   - `e2e.yml`: Testes E2E e seguranca (trigger manual; trigger em PRs e opt-in, descomentar no ficheiro)
-  - `codeql.yml` (+ `.github/codeql/`): CodeQL da maquinaria do template (pastas ocultas). **So do template**: o bootstrap remove-o; o projeto usa o "Default setup" num repo publico (ver `SECURITY.md`)
+  - `codeql.yml` (+ `.github/codeql/`): CodeQL da maquinaria do template (pastas ocultas). **So do template**: o bootstrap remove-o; o projeto usa o "Default setup" num repo publico (ver `src/docs/github-security.md`)
   - `release.yml`: cada push de uma tag `vX.Y.Z` cria o GitHub Release (titulo e notas da tag anotada)
   - `dependabot-auto-merge.yml`: auto-merge de PRs patch/minor do Dependabot — **opt-in** (desligado; requer a label `automerge` no `dependabot.yml` + "Allow auto-merge" + branch protection). Majors ficam sempre para review. Ver o cabecalho do ficheiro (inclui aviso para repos privados)
 - **`pull_request_template.md`**: Checklist que sincroniza com o workflow `/review`
