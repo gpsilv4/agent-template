@@ -119,7 +119,7 @@ export function corre(dir, args = [], sobrepoe = {}) {
  * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
  * @param {object} o.ontem   ficheiros do template JA na tag (o projeto herda-os intactos)
  */
-export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir() } = {}) {
+export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {} } = {}) {
   const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
   const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
@@ -166,7 +166,16 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   git(tpl, ["add", "-A"]);
   git(tpl, ["commit", "-q", "--allow-empty", "-m", "hoje"]);
 
-  return { tpl, proj, ...corre(tpl, [`--projeto=${proj}`]) };
+  // Alteracoes POR COMMITAR (#304): a fronteira compara com o commit, e diz o que esta por commitar.
+  escreve(tpl, sujoNoTemplate);
+  escreve(proj, sujoNoProjeto);
+
+  // O staging da fronteira (#304) numa pasta da SUITE: o do simulador persiste de proposito, e a
+  // varredura corre esta suite dezenas de vezes. `fronteiraEm: null` corre SEM a opcao (o staging por
+  // omissao, que o teste apaga); uma string e passada tal e qual (os casos de recusa).
+  const fronteira = fronteiraEm === undefined ? registaTmp(mkdtempSync(join(base, "sim-up-fronteira-"))) : fronteiraEm;
+  const args = [`--projeto=${proj}`, ...(fronteira === null ? [] : [`--fronteira-em=${fronteira}`])];
+  return { tpl, proj, fronteira, ...corre(tpl, args) };
 }
 
 export const exige = ({ code, out }, { codigo, inclui = [], exclui = [] }) => {

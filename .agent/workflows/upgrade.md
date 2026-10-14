@@ -61,7 +61,7 @@ ls .agent/scripts/ ; ls "$TPL/.agent/scripts/"
 ls .agent/workflows/ ; ls "$TPL/.agent/workflows/"
 ```
 
-O que esta **ausente** e candidato a copia, **menos o que e so do template** (secao 2). O que
+O que esta **ausente** e candidato a copia, **menos o que e so do template** (secao 2); na fronteira, pelo utilizador. O que
 existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca por overwrite cego.
 
 ## 2. Decidir por categoria, nao por ficheiro
@@ -77,8 +77,8 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | O estado e a historia deste projeto, so existem aqui |
 | **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards proprios deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
-| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**), `.github/scripts/` e `.githooks/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
-| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
+| `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) e `.github/scripts/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
+| **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao (os da fronteira: a 2b da o `rm`) | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag** — o do projeto nunca esteve. Ver `upgrade-why.md` |
 | O que o git do `$TPL` **ignora**, e nomes de segredo | **Nunca copiar** | Nao e do template. A mao, so o que `git -C "$TPL" ls-files` lista (`upgrade-why.md`) |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Gerados no bootstrap |
 | `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova): os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** (`APn`) nunca se tocam; o **cabecalho** intacto vem novo, customizado integra-se a mao so a **regra duravel** (`upgrade-why.md`). As citacoes `TPn` copiam-se como estao | Os prefixos tornam isto copia, nao reescrita a mao |
@@ -87,9 +87,9 @@ existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
 | **So do template**: o job `simulators`, `codeql.yml`, `.github/codeql/` | **Nunca copiar** (modo A ou B); apagar o que os cita nos trazidos (`$TPL/.agent/BOOTSTRAP.md` §2.7) | So servem o repo do template |
 | `.github/workflows/*` | **So os jobs em falta**, contra o ficheiro do **TEMPLATE** (um passo **comentado** conta como AUSENTE). Um passo **movido** de job sai do antigo, ou corre 2x. A varredura ligada: `sweep` e `guard-gate` juntos, o `guard-gate` herda o `name:` do `guard-tests` (o que a protecao exige) e este muda; desligada, nenhum dos dois. Um workflow AUSENTE copia-se inteiro. Nao substituir o CI do projeto; nos passos que ja tem, trazer as flags novas, e o trailer `Test-Surface:` | O CI tem passos do projeto |
-| `.claude/settings.json` | Trazer o `deny`/`ask` em falta (2b lista; Guard 11 avisa); **acrescentar** ao `allow` os scripts novos | O `allow` e o que o projeto corre |
-| `.claude/agents/*` | Copia se ausentes; se existem, **trazer o `tools:` novo** (a 2b lista os customizados; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
-| `.claude/hooks/*` + a chave `hooks` do `settings.json` | **Substituidos pelo motor** (menos o `protegidos.json`); comparar a mao o `SEGUROS` (`lib/verbos-git.mjs`) e ligar cada hook novo | So-Claude Code (`upgrade-why.md`) |
+| `.claude/settings.json` | **Do UTILIZADOR** (o `deny` proibe-o ao agente): o `deny`/`ask` em falta (2b lista; Guard 11 avisa), o `allow` dos scripts novos, os hooks novos | O agente propoe o texto |
+| `.claude/agents/*` | Como a fronteira (linha abaixo). Os customizados: o `tools:` novo por `Edit` (a 2b lista-os; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
+| `.claude/hooks/*`, `.githooks/*` | **Aprovados um a um pelo utilizador**: os comandos da 2b (o staging dela ja traz placeholders e constantes deste projeto), ou `Edit`/`Write` com aprovacao — nunca `cp` do `$TPL`. Por `Edit` (e no Modo B): substituir os placeholders, manter `CONSTANTES_DO_PROJETO` e o `protegidos.json` | Fronteira (`upgrade-why.md`) |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` | Metade e do projeto |
 | **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, `BOOTSTRAP.md`, ...) | **Diff e decidir caso a caso** — nunca overwrite cego. | As categorias acima tambem envelhecem; esta linha e a rede |
@@ -100,14 +100,7 @@ Nem toda a melhoria e aditiva: quando o template **aperta** um criterio, um proj
 deixa de passar. Nao se trazem em silencio — **dizem-se na Fase 0, com o numero que cada uma custa
 neste projeto, medido ANTES de aplicar** (porque: `upgrade-why.md` § "Porque as mudancas que REPROVAM se anunciam antes de aplicar").
 
-A taxonomia serve para **reconhecer** uma destas (e para o Modo B); a lista mede-se, abaixo.
-
-| Classe | Como reconhecer | A decisao |
-|--------|-----------------|-----------|
-| **Limiar apertado** | um numero desceu num guard (bytes, tamanho, cobertura) | encolher ate caber, ou congelar em catraca |
-| **Alcance alargado** | o guard le ficheiros que antes ignorava | dizer quais, e o que aparece neles hoje |
-| **Verbo negado** | um hook recusa algo que o projeto usa | listar esses comandos antes de trazer o hook |
-| **Verificacao nova sem dados** | um guard novo exige algo que o projeto nao tem | acrescentar o que falta, ou nao trazer o guard — **nunca** trazer e deixar vermelho |
+As classes que a reconhecem (limiar apertado, alcance alargado, verbo negado, verificacao nova sem dados) estao no `upgrade-why.md`; a lista mede-se:
 
 ```bash
 node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
@@ -115,14 +108,14 @@ node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
 
 Corre-se **do clone do template** (`$TPL`, o da secao 1) apontado a este projeto, e nao ao
 contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **passa** a reprovar aqui
-(subtraido, linha a linha, o que ja falhava), o que **saiu** do template com a marca migracao/limpeza,
+(subtraido, linha a linha, o que ja falhava), a **fronteira** (os comandos do utilizador), o que **saiu** do template com a marca migracao/limpeza,
 e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precisa de decisao.
 
 > Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela).
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
-Depois de aplicar, correr **nesta ordem**:
+Depois de aplicar — **e de o utilizador aplicar a fronteira** (2b) —, correr **nesta ordem** (com o `node .claude/hooks/tests/test-hooks.mjs`):
 
 ```bash
 node .agent/scripts/check-doc-versions.mjs     # paridade, orcamentos, placeholders
@@ -155,7 +148,7 @@ printf 'template: %s\ncommit: %s\ndata: %s\n' \
   "$SHA" "$(date +%F)" > .agent/.template-version
 ```
 
-Sem isto, o proximo `/upgrade` cai no Modo B.
+Sem isto, o proximo `/upgrade` cai no Modo B. So com a fronteira aplicada: senao o proximo ja nao lista o que dela saiu.
 
 **E confirmar as definicoes de seguranca do GitHub**: ler com `gh api`, propor ligar o que falta e esperar o sim — `src/docs/github-security.md`.
 
@@ -163,4 +156,4 @@ Sem isto, o proximo `/upgrade` cai no Modo B.
 
 O relatorio diz o que foi trazido **por categoria**, o que foi deliberadamente ignorado e
 porque, os conflitos que exigiram integracao a mao, e o resultado dos verificadores da secao
-3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe.
+3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou.

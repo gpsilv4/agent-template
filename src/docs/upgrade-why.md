@@ -506,3 +506,49 @@ lista cheia e o output da secao, nao uma reprovacao. So a impossibilidade de med
 diz porque. Sem `.agent/.template-version` utilizavel recusa-se: e o **Modo B**, e ai a lista faz-se a
 mao com a tabela da §2. (Saiu do `upgrade.md` no #308, quando a regra da varredura precisou do espaco.)
 
+## Porque a fronteira e passo do utilizador (#304, R7B-2)
+
+A tabela dizia, para `.claude/hooks/*`: "Substituidos pelo motor". Mas o motor (`aplicaUpgradeMecanico`)
+so corre sobre COPIAS — o simulador e a 2b —, e nao ha ponto de entrada que o aplique ao projeto real.
+Um derivado (ronda 8) leu a linha a letra, correu o motor num clone em scratch, trouxe tudo **menos** a
+fronteira, e o utilizador copiou-a a mao: funcionou, mas a decisao foi do agente e contra a letra do
+workflow. E a letra estava errada por outra razao: um agente que copie `.claude/hooks/**` ou
+`.githooks/**` reescreve a propria fronteira — o hook nega-o por `Bash`, e o `ask` do settings pede
+aprovacao por `Edit` (#301). E por isso que e do utilizador, fora do agente, e nao uma decisao
+caso a caso. A 2b aplica o motor a uma copia, lista o que la mudou (`lib/fronteira-upgrade.mjs`) e deixa num
+staging que persiste a versao PROCESSADA — nunca a do `$TPL`, que as duas leituras independentes
+mostraram partir o derivado: os hooks trazem `{{ PROJECT_NAME }}` (o Guard 13 reprovava cada um), o
+`IA` do `commit-msg` e constante do projeto, e o `protegidos.json` MIGRADO do hook (#257) e a lista
+dos branches dele — sem ele, o hook novo caia nos de omissao. Os comandos vem prontos para um
+terminal novo: `cd` absoluto, plicas, `mkdir -p` onde falta a pasta, `rm` do que saiu, e — num ficheiro
+que o projeto alterou (um `SEGUROS` customizado) — um `diff -u` e o `cp` COMENTADO, para decidir antes. O `.githooks/` saiu,
+pela mesma razao, da linha da "copia limpa".
+
+**"Do utilizador" e aprovacao humana por ficheiro**, nao um tipo de comando: o `cp` que ele corre, ou
+um `Edit`/`Write` do agente que o `ask` faz aprovar (o caminho que a mensagem do hook ja indica). O que
+fica fechado e o caminho que ninguem aprova: o motor, ou um `cp` do agente. O `.claude/settings.json`
+e so dele — o `deny` proibe-o ao agente por inteiro; o agente propoe o texto. E os `.claude/agents/`
+pelo mesmo `ask`, nunca por `cp` (que o contornava): o `tools:` deles e o que o hook impoe aos
+subagentes. A §3 corre depois da fronteira aplicada, e a marca da §4 so se grava com ela — senao o
+proximo `/upgrade` ja nao listava o que dela SAIU (os `muda`/`novo` voltavam, as remocoes nao).
+
+## As classes de "mudancas que reprovam" (taxonomia da 2b)
+
+Saiu do `upgrade.md` no #304, quando a fronteira precisou do espaco. Serve para **reconhecer** uma
+destas, e para as fazer a mao no Modo B; a lista em si mede-se (`simulate-upgrade.mjs --projeto`).
+
+| Classe | Como reconhecer | A decisao |
+|--------|-----------------|-----------|
+| **Limiar apertado** | um numero desceu num guard (bytes, tamanho, cobertura) | encolher ate caber, ou congelar em catraca |
+| **Alcance alargado** | o guard le ficheiros que antes ignorava | dizer quais, e o que aparece neles hoje |
+| **Verbo negado** | um hook recusa algo que o projeto usa | listar esses comandos antes de trazer o hook |
+| **Verificacao nova sem dados** | um guard novo exige algo que o projeto nao tem | acrescentar o que falta, ou nao trazer o guard — **nunca** trazer e deixar vermelho |
+
+**A auditoria do #304** (dois auditores, depois de quatro leitores) acrescentou cinco regras ao bloco: o
+Modo B, que nao tem 2b, faz a fronteira por `Edit` com as mesmas tres regras que o staging aplica
+(placeholders, `CONSTANTES_DO_PROJETO`, `protegidos.json`) — a tabela do `main` dizia-as, e a primeira
+versao do #304 tinha-as perdido; um projeto sem nada em `.claude/` nao recebe hooks nem agentes; uma
+pasta da fronteira que e symlink (`.githooks` -> `.husky`) e as colisoes de um adotado ficam de fora;
+o que a arvore de trabalho ja tem igual ao staging conta como aplicado (a 2b corrida outra vez na §3
+nao o repete); e os `.claude/agents/` intactos saem no mesmo bloco. Os achados baixos ficaram no #317.
+
