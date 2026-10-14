@@ -706,6 +706,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] Definicoes de seguranca do GitHub ligadas conforme o `src/docs/github-security.md` (publico vs privado)? O `codeql.yml` e a `.github/codeql/` removidos (num projeto existente, so os do template — §2.7), e o CodeQL "Default setup" ligado **so** num publico (ou num privado com licenca Code Security), e so com codigo da aplicacao?
 - [ ] **Guards passam**: `check-doc-versions.mjs`, `check-backlog.mjs`, `test-guards.mjs`, `test-bundle-sizes.mjs`, `test-backlog.mjs`, `test-mutation-sweep.mjs`, `test-test-surface.mjs` e `.claude/hooks/tests/test-hooks.mjs` (todos exit 0 — apanham drift CLAUDE/GEMINI e workflows introduzido pela customizacao/traducao)
 - [ ] **O `check-test-surface.mjs` ve os teus testes**: apagar uma suite (sem commitar) da `APAGADO` e exit `!= 0`? Se der `superficie intacta`, os `TEST_GLOBS_DO_PROJETO` (`config/superficie-de-teste.mjs`) nao casam com a tua stack e o gate esta a medir zero
+- [ ] **`.agent/BOOTSTRAP.md` apagado** no passo do primeiro commit (abaixo) — e o ultimo passo deste guiao (#305).
 - [ ] **`.agent/.template-version` gravado** com o commit do template de origem? Sem ele o
   `/upgrade` deste projeto cai no modo por deteccao, que propoe mais e acerta menos
 - [ ] **Varredura de mutacao**: `node .agent/scripts/mutation-sweep.mjs` exit 0. Se adaptaste ou substituiste um `check-*.mjs`, ela diz se a suite correspondente ainda afirma algo — e reprova se o verificador novo vier sem suite nenhuma
@@ -750,6 +751,9 @@ git grep -nE --untracked '\{\{[A-Z_]+\}\}' -- ':!.agent/BOOTSTRAP.md' ':!README.
 # e, pior, o primeiro convite a desliga-la. O bootstrap e uma alteracao como as outras:
 # branch, PR, CI verde, merge. E assim o dia 1 ja demonstra o fluxo que o projeto vai usar.
 git switch -c chore/bootstrap
+# Este guiao SAI, e e o ultimo passo dele (#305): e de uma vez, num derivado so desatualiza, o
+# `ehDerivado()` usa a ausencia dele como sinal, e o `/upgrade` nunca o traz.
+rm -f .agent/BOOTSTRAP.md
 git add .
 git commit -m "chore: bootstrap agent config for {{PROJECT_NAME}}"
 ```
@@ -767,6 +771,7 @@ trabalho. Em duas partes:
 
 ```bash
 git switch -c chore/bootstrap
+rm -f .agent/BOOTSTRAP.md   # este guiao sai, como no projeto novo (#305); o `existsSync` abaixo ja o salta
 node -e 'const fs = require("fs"); const m = JSON.parse(fs.readFileSync(".agent/adocao.json", "utf8"));
 for (const f of [...m.copiados, ...m.iguais]) if (fs.existsSync(f)) console.log(f)' | git add --pathspec-from-file=-
 git add .agent/.template-version .agent/rules/business-logic.md .agent/rules/pages-architecture.md
