@@ -192,8 +192,8 @@ git push origin vX.Y.Z
 |---|---|
 | "O CI esta verde." | Com zero checks, o `gh pr checks --watch` sai 0: o gate conta os checks antes de esperar (secao 2). |
 | "A tag chega, o Release faz-se depois." | O Release cria-se sozinho da tag; sem o `release.yml` ficaram 50 de 55 tags sem ele (#277). Confirmar que apareceu (secao 7). |
-| "Subo a versao depois da tag." | No template, o `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
-| "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
+| **No template:** "Subo a versao depois da tag." | O `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
+| **No template:** "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
 | "O Security Audit esta verde." | Por omissao e informativo (`continue-on-error`): verde nao e limpo. Ler o relatorio (secao 2). |
 
 ## 8. Verificacao Pos-Deploy
