@@ -343,7 +343,7 @@ export function registar() {
     { code: 0, excludes: [IF] });
   }
   for (const cond of ["always() && false", "${{ always() && github.event_name == 'push' }}", "${{ !always() }}", "failure()", "always()\n      && false"]) {
-    test(`gate: \`if: ${cond.replace("\n", " ")}\` num agregador continua a contar (#308)`, (dir) =>
+    test(`gate: \`if: ${cond.replace(/\n/g, " ")}\` num agregador continua a contar (#308)`, (dir) =>
       muda(dir, agregador(null), agregador(cond)),
     { code: 1, includes: [IF] });
   }
