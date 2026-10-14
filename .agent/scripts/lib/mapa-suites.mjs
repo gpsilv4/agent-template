@@ -53,7 +53,7 @@ export const SUITES = [
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|medida-upgrade|projeto-de-ontem)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|medida-upgrade|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },

@@ -9,6 +9,10 @@
  * NAO e um entry point. O `tests-medida-2b.mjs` importa-o e chama `registar()` no fim do seu (o
  * `test-simulate-upgrade.mjs`, que o corre, esta no limite das 500 linhas).
  */
+import { readFileSync, rmSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "fs";
+import { tmpdir } from "os";
+import { comFachada, fronteiraQueMuda } from "../lib/fronteira-upgrade.mjs";
+import { join } from "path";
 import { pathToFileURL } from "url";
 import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
 
@@ -113,4 +117,176 @@ export function registar() {
       hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V], extra: "  depois:\n    steps:\n      - run: node .agent/scripts/depois.mjs\n" }), ...OUTRO },
       projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO },
     }), { codigo: 0, exclui: ["depois.mjs"] }));
+
+  // #304 (R7B-2): a fronteira e passo do UTILIZADOR. A 2b deixa num staging a versao PROCESSADA pelo
+  // motor (placeholders e constantes deste projeto) e imprime os comandos — nunca `cp "$TPL/..."`, que
+  // trazia o template cru (duas leituras independentes do #304).
+  const H = ".claude/hooks/h.mjs";
+  const cpDe = (r, rel, como) => `cp '${join(r.fronteira, rel)}' '${rel}'   # ${como}`;
+  const lido = (r, rel) => { try { return readFileSync(join(r.fronteira, rel), "utf8"); } catch { return null; } };
+  test("um hook que o template mudou sai no staging, com o cp a partir dele (#304)", () => {
+    const r = contraProjeto({ hoje: { [H]: "// hook novo\n" } });
+    return [
+      ...exige(r, { codigo: 0, inclui: ["--- A FRONTEIRA: passo do UTILIZADOR, fora do agente ---", "o upgrade muda 1 ficheiro(s) da fronteira", `cd '${r.proj}'`, cpDe(r, H, "muda")], exclui: ["$TPL"] }),
+      ...(lido(r, H) === "// hook novo\n" ? [] : [`o staging nao tem a versao do upgrade: ${JSON.stringify(lido(r, H))}`]),
+    ];
+  });
+  // O que o `cp "$TPL/..."` perdia: o placeholder substituido.
+  test("o staging leva o hook com os placeholders ja substituidos (#304)", () => {
+    // Montado por partes: um placeholder literal aqui seria ele proprio substituido pelo bootstrap.
+    const r = contraProjeto({ hoje: { [H]: `// hook — {${"{"}PROJECT_NAME}}\n` } });
+    const c = lido(r, H);
+    // E a fixture nao deixa derivar o nome do projeto: o motor pos a FACHADA, e a 2b tem de o dizer —
+    // copiar sem ler punha "EsteProjeto" nos cabecalhos (a `--skips` mostrou este sitio por cobrir).
+    return [
+      ...(c !== null && !c.includes("{{") ? [] : [`o staging ficou com o placeholder: ${JSON.stringify(c)}`]),
+      ...exige(r, { codigo: 0, inclui: [`o nome do projeto nao se derivou: ${H} tem a fachada "EsteProjeto"`] }),
+    ];
+  });
+  // ...e a constante do projeto (`IA` do `commit-msg`, em CONSTANTES_DO_PROJETO).
+  const CM = ".githooks/lib/commit-msg.mjs";
+  test("o staging leva a constante `IA` deste projeto, e nao a do template (#304)", () => {
+    const r = contraProjeto({
+      ontem: { [CM]: "const IA = /claude/i;\n// velho\n" },
+      hoje: { [CM]: "const IA = /claude|novo/i;\n// NOVO\n" },
+      projeto: { [CM]: "const IA = /claude|meubot/i;\n// velho\n" },
+    });
+    const c = lido(r, CM) ?? "";
+    return c.includes("meubot") && c.includes("// NOVO") ? [] : [`o staging perdeu a constante do projeto: ${JSON.stringify(c)}`];
+  });
+  // Uma pasta que o projeto ainda nao tem: `mkdir -p` antes do `cp` (sem ela, o `commit-msg` partia).
+  test("um ficheiro novo numa pasta que o projeto nao tem leva o mkdir -p (#304)", () => {
+    // (A fixture ja tem `.githooks/lib/`; a que falta e `.claude/hooks/lib/`.)
+    const r = contraProjeto({ hoje: { ".claude/hooks/lib/novo.mjs": "// novo\n" } });
+    return exige(r, { codigo: 0, inclui: ["mkdir -p '.claude/hooks/lib'", cpDe(r, ".claude/hooks/lib/novo.mjs", "novo")] });
+  });
+  test("com a pasta ja no projeto, nao ha mkdir (#304)", () =>
+    exige(contraProjeto({ hoje: { ".githooks/lib/novo.mjs": "// novo\n" } }), { codigo: 0, inclui: ["cp '"], exclui: ["mkdir -p"] }));
+  // Um hook que o PROJETO alterou (um `SEGUROS` customizado) leva a nota: o `cp` esmagava-o.
+  test("um hook que o projeto alterou leva a nota de comparar antes (#304)", () =>
+    exige(contraProjeto({ ontem: { [H]: "// hook\n" }, projeto: { [H]: "// hook do projeto\n" }, hoje: { [H]: "// hook novo\n" } }),
+      { codigo: 0, inclui: [`diff -u '${H}'`, "# o projeto ALTEROU-o: decidir antes", `# cp '`] , exclui: [`# muda — o projeto ALTEROU-o`] }));
+  // O que SAIU do template sai pela mao do utilizador (o `rm` do agente e negado).
+  test("um hook que saiu do template sai com o rm (#304)", () => {
+    const r = contraProjeto({ ontem: { ".claude/hooks/velho.mjs": "// velho\n" }, hoje: { ".claude/hooks/velho.mjs": null } });
+    return exige(r, { codigo: 0, inclui: ["rm '.claude/hooks/velho.mjs'   # sai", "a DESLIGAR da chave `hooks` do .claude/settings.json (a mao): .claude/hooks/velho.mjs"] });
+  });
+  // Um hook novo copiado e nao ligado nunca dispara.
+  test("um hook NOVO pede para ser ligado na chave `hooks` (#304)", () =>
+    exige(contraProjeto({ hoje: { ".claude/hooks/novo.mjs": "// novo\n" } }), { codigo: 0, inclui: ["a ligar na chave `hooks` do .claude/settings.json (a mao): .claude/hooks/novo.mjs"] }));
+  // O contra-caso: sem mudancas na fronteira, nada a pedir ao utilizador.
+  test("sem mudancas na fronteira a 2b nao pede nada ao utilizador (#304)", () =>
+    exige(contraProjeto({ hoje: { "NOVO.md": "# doc\n" } }), { codigo: 0, inclui: ["a fronteira (.claude/hooks/, .githooks/, .claude/agents/) nao muda neste upgrade"], exclui: ["A FRONTEIRA", "da fronteira;"] }));
+  // O `protegidos.json` MIGRADO do hook (#257) e a lista deste projeto: entra, e com os branches dele.
+  const GUARD = ".claude/hooks/guard-protected-branch.mjs";
+  const P = ".claude/hooks/protegidos.json";
+  test("o protegidos.json migrado do hook entra no staging, com os branches do projeto (#304)", () => {
+    const r = contraProjeto({
+      ontem: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "master", "develop"];\n' },
+      projeto: { [GUARD]: 'const PROTEGIDOS_LISTA = ["main", "staging"];\n' },
+    });
+    return [
+      ...exige(r, { codigo: 0, inclui: ["1 constante(s) preservada(s)", `${cpDe(r, P, "novo")} — os branches protegidos DESTE projeto, migrados do hook (#257)`] }),
+      ...((lido(r, P) ?? "").includes("staging") ? [] : [`o staging nao tem os branches do projeto: ${JSON.stringify(lido(r, P))}`]),
+    ];
+  });
+  // ...e um `protegidos.json` que o projeto JA tem e dele: nunca entra.
+  test("o protegidos.json que o projeto ja tem nao entra (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" }, projeto: { [P]: '["main","prod"]\n' } }), { codigo: 0, exclui: ["protegidos.json'"] }));
+  // Segunda leitura do #304. O staging nunca dentro do projeto: com `--fronteira-em=.` (ou `$PWD`, ou
+  // vazio) a propria 2b escrevia a fronteira, por um caminho que o hook nao ve.
+  test("--fronteira-em dentro do projeto e recusado (#304)", () => {
+    const r = contraProjeto({ hoje: { [H]: "// novo\n" }, fronteiraEm: "" });
+    // `.`: o simulador corre na pasta do template (cada `contraProjeto` cria um projeto novo, logo nao
+    // ha como apontar para dentro do proximo) — e la dentro tambem e recusado.
+    const dentro = contraProjeto({ hoje: { [H]: "// novo\n" }, fronteiraEm: "." });
+    return [
+      ...exige(r, { codigo: 1, inclui: ["o staging tem de ficar FORA do projeto e do template"] }),
+      ...(readFileSync(join(r.proj, H), "utf8") === "// hook\n" ? [] : ["a 2b escreveu o hook no projeto"]),
+      ...exige(dentro, { codigo: 1, inclui: ["o staging tem de ficar FORA do projeto e do template"] }),
+    ];
+  });
+  // Sem a opcao, o staging vai para uma pasta nova no tmpdir — que persiste, e por isso o teste a apaga.
+  test("sem --fronteira-em o staging vai para o tmpdir (#304)", () => {
+    const r = contraProjeto({ hoje: { [H]: "// novo\n" }, fronteiraEm: null });
+    const m = /ficou em (\S*agent-template-fronteira-\S+) \(/.exec(r.out);
+    if (m) rmSync(m[1], { recursive: true, force: true });
+    return m ? [] : [`o staging por omissao nao apareceu: ${r.out.slice(0, 300)}`];
+  });
+  // Uma edicao POR COMMITAR num hook que o template nao mudou nao e "muda": a copia sai do commit.
+  test("uma edicao por commitar no projeto nao vira um cp, e diz-se (#304)", () =>
+    exige(contraProjeto({ hoje: { ".claude/hooks/outro.mjs": "// novo\n" }, sujoNoProjeto: { [H]: "// edicao por commitar\n" } }),
+      { codigo: 0, inclui: ["este projeto tem alteracoes por commitar na fronteira"], exclui: [`'${H}'   # muda`] }));
+  // O template sujo na fronteira: o staging leva-o, e a marca grava so o commit.
+  test("o template com alteracoes por commitar na fronteira diz-se (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { ".claude/hooks/sujo.mjs": "// sujo\n" } }),
+      { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
+  test("o template limpo na fronteira nao o diz (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" } }), { codigo: 0, exclui: ["o template tem alteracoes por commitar"] }));
+  // A fachada do nome: um ficheiro do staging com "EsteProjeto" diz-se (funcao pura).
+  test("comFachada apanha a fachada do nome no staging (#304)", () => {
+    const st = mkdtempSync(join(tmpdir(), "sim-up-fachada-"));
+    try {
+      mkdirSync(join(st, ".claude/hooks"), { recursive: true });
+      writeFileSync(join(st, ".claude/hooks/a.mjs"), "// a — EsteProjeto\n");
+      writeFileSync(join(st, ".claude/hooks/b.mjs"), "// b — Projeto Real\n");
+      const fora = comFachada(st, [{ rel: ".claude/hooks/a.mjs", como: "muda" }, { rel: ".claude/hooks/b.mjs", como: "novo" }, { rel: ".claude/hooks/c.mjs", como: "sai" }], "EsteProjeto");
+      return JSON.stringify(fora) === JSON.stringify([".claude/hooks/a.mjs"]) ? [] : [`apanhou ${JSON.stringify(fora)}`];
+    } finally {
+      rmSync(st, { recursive: true, force: true });
+    }
+  });
+  // A auditoria do #304 (os medios).
+  // Um projeto SEM a camada Claude (nada em `.claude/`): os hooks e os agentes nao se aplicam.
+  test("um projeto sem a camada Claude nao recebe hooks (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" }, projeto: { [H]: null } }),
+      { codigo: 0, inclui: ["este projeto nao tem a camada Claude (nada em .claude/)"], exclui: [`'${H}'   #`] }));
+  // A 2b corrida outra vez na §3: o que o utilizador ja aplicou (igual ao staging, por commitar) nao se repete.
+  test("a fronteira ja aplicada e por commitar nao se repete (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// hook novo\n" }, sujoNoProjeto: { [H]: "// hook novo\n" } }),
+      { codigo: 0, exclui: [`'${H}'   # muda`] }));
+  // Um agente INTACTO com `tools:` novo: o motor actualiza-o na copia, e sai no bloco (o `ask` pede-o).
+  const AG = ".claude/agents/leitor.md";
+  test("um agente intacto com tools: novo sai no bloco da fronteira (#304)", () => {
+    const r = contraProjeto({ ontem: { [AG]: "---\nname: leitor\ntools: Read\n---\n" }, hoje: { [AG]: "---\nname: leitor\ntools: Read, Grep\n---\n" } });
+    return exige(r, { codigo: 0, inclui: [cpDe(r, AG, "muda")] });
+  });
+  // Puras: uma pasta que e symlink (`.githooks` -> `.husky`) e as colisoes de um ADOTADO ficam de fora;
+  // um ficheiro NOVO que o projeto alterou tambem leva o `diff` (nao so os `muda`).
+  test("fronteiraQueMuda: symlink e colisoes do adotado ficam de fora; novo alterado leva nota (#304)", () => {
+    const base = mkdtempSync(join(tmpdir(), "sim-up-fronteira-pura-"));
+    try {
+      const [proj, copia] = [join(base, "proj"), join(base, "copia")];
+      for (const d of [proj, copia]) {
+        mkdirSync(join(d, ".husky"), { recursive: true });
+        writeFileSync(join(d, ".husky/pre-commit"), d === proj ? "velho\n" : "novo\n");
+        symlinkSync(".husky", join(d, ".githooks"));
+        mkdirSync(join(d, ".claude/hooks"), { recursive: true });
+      }
+      writeFileSync(join(copia, ".claude/hooks/colisao.mjs"), "do template\n");
+      writeFileSync(join(proj, ".claude/hooks/colisao.mjs"), "do projeto\n");
+      writeFileSync(join(copia, ".claude/hooks/x.mjs"), "x\n");
+      const fora = fronteiraQueMuda(proj, copia, { doProjeto: [".claude/hooks/colisao.mjs"], substituidos: [".claude/hooks/x.mjs"] });
+      const esperado = [{ rel: ".claude/hooks/x.mjs", como: "novo", nota: "o projeto ALTEROU-o: comparar antes (diff)" }];
+      return JSON.stringify(fora) === JSON.stringify(esperado) ? [] : [`deu ${JSON.stringify(fora)}`];
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+  // A leitura final do #304: os avisos de "por commitar" olham para TODA a fronteira (os agentes
+  // incluidos), e dizem a verdade — onde o template tambem mudou, o `cp` ESMAGA a edicao.
+  test("uma edicao por commitar num hook que o template TAMBEM mudou: o aviso diz que o cp a esmaga (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// hook novo\n" }, sujoNoProjeto: { [H]: "// edicao local\n" } }),
+      { codigo: 0, inclui: [`'${H}'   # muda`, "os cp/rm acima ESMAGAM-nas onde o template tambem mudou"] }));
+  test("uma edicao por commitar num AGENTE tambem e avisada (#304)", () => {
+    const r = contraProjeto({
+      ontem: { [AG]: "---\nname: leitor\ntools: Read\n---\n" },
+      hoje: { [AG]: "---\nname: leitor\ntools: Read, Grep\n---\n" },
+      sujoNoProjeto: { [AG]: "---\nname: leitor\ntools: Read, Bash\n---\n" },
+    });
+    return exige(r, { codigo: 0, inclui: ["este projeto tem alteracoes por commitar na fronteira"] });
+  });
+  test("um agente por commitar no TEMPLATE tambem e avisado (#304)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { [AG]: "---\nname: leitor\ntools: Read\n---\n" } }),
+      { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
 }

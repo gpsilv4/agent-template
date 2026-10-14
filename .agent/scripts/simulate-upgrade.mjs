@@ -149,7 +149,10 @@ if (argProjeto) {
   }
   const dirAqui = criaTmp("upgrade-2b-");
   copiaAtiva = dirAqui;
-  const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, note, fatal });
+  // `--fronteira-em=<pasta>`: onde deixar a versao da fronteira para o utilizador (#304). Por omissao,
+  // uma pasta nova no tmpdir, que persiste — e la que ele a vai buscar. As suites passam a sua.
+  const fronteiraEm = process.argv.find((a) => a.startsWith("--fronteira-em="))?.slice("--fronteira-em=".length) ?? null;
+  const codigo = await medeImpactoAqui({ raiz: projeto, template: ROOT, dir: dirAqui, git, ok, note, fatal, fronteiraEm });
   limpaCopia();
   process.exit(codigo);
 }
