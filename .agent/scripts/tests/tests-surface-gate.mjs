@@ -331,21 +331,28 @@ export function registar() {
     }
   }
 
-  // A excecao do `always()` na marca do `if:` (#308): o agregador precisa dele, e ele so alarga onde o
-  // job corre. Cada forma excluida tem o seu par que CONTA — sem o par, alargar a excecao "resolvia"
-  // o falso positivo desligando a marca (o mesmo cuidado da excecao do `pull_request`).
-  const comIf = (cond) => `jobs:\n  t:\n    if: ${cond}\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n`;
+  // A excecao do `always()` na marca do `if:` (#308): so num AGREGADOR (um job que le `needs.<X>.result`),
+  // e so a forma exacta. Cada forma excluida tem o seu par que CONTA — sem o par, alargar a excecao
+  // "resolvia" o falso positivo desligando a marca (o mesmo cuidado da excecao do `pull_request`).
   const IF = "condicao `if:`";
+  const base = "jobs:\n  x:\n    runs-on: y\n    steps:\n      - run: node a-test.mjs\n";
+  const agregador = (cond) => `${base}  t:\n    needs: x\n${cond === null ? "" : `    if: ${cond}\n`}    runs-on: y\n    steps:\n      - env:\n          R: \${{ needs.x.result }}\n        run: echo "$R"\n`;
   for (const cond of ["always()", "${{ always() }}", '"always()"', "always()  # o agregador"]) {
-    test(`gate: \`if: ${cond}\` nao conta como condicao acrescentada (#308)`, (dir) =>
-      muda(dir, "jobs:\n  t:\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n", comIf(cond)),
+    test(`gate: \`if: ${cond}\` num agregador nao conta como condicao acrescentada (#308)`, (dir) =>
+      muda(dir, agregador(null), agregador(cond)),
     { code: 0, excludes: [IF] });
   }
-  for (const cond of ["always() && false", "${{ always() && github.event_name == 'push' }}", "${{ !always() }}", "failure()"]) {
-    test(`gate: \`if: ${cond}\` continua a contar (#308)`, (dir) =>
-      muda(dir, "jobs:\n  t:\n    runs-on: x\n    steps:\n      - run: node a-test.mjs\n", comIf(cond)),
+  for (const cond of ["always() && false", "${{ always() && github.event_name == 'push' }}", "${{ !always() }}", "failure()", "always()\n      && false"]) {
+    test(`gate: \`if: ${cond.replace("\n", " ")}\` num agregador continua a contar (#308)`, (dir) =>
+      muda(dir, agregador(null), agregador(cond)),
     { code: 1, includes: [IF] });
   }
+  // A auditoria do #308: um job a jusante dos testes que NAO le resultados (um `deploy`) com `always()`
+  // corre com os testes vermelhos — conta. A primeira versao da excecao vivia no regex e deixava-o passar.
+  test("gate: `if: always()` num job que nao le resultados (um deploy) conta (#308)", (dir) =>
+    muda(dir, `${base}  deploy:\n    needs: x\n    runs-on: y\n    steps:\n      - run: ./deploy.sh\n`,
+      `${base}  deploy:\n    needs: x\n    if: always()\n    runs-on: y\n    steps:\n      - run: ./deploy.sh\n`),
+  { code: 1, includes: [IF] });
   registarResultado("gate: defeitosDeEstrutura le o `needs:` em bloco, e o id como nome quando falta o `name:` (#308)", [
     ...(JSON.stringify(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    needs:\n      - a\n      - c\n    runs-on: x\n")) === JSON.stringify(["o job `b` tem `needs: c`, e o job `c` nao existe — o GitHub rejeita o workflow inteiro"]) ? [] : ["o `needs:` em bloco nao foi lido"]),
     // So contam colisoes que envolvam a maquinaria (#308, segunda leitura): com ela no `a`, colide; sem ela, nao.

@@ -346,7 +346,11 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // do projeto —, e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
   // passou varias rondas sem o `ask` dos hooks. Lista LITERAL, para copiar; o que deixa a
   // fronteira aberta, o Guard 11 novo ja o faz reprovar na lista de baixo.
-  const falta = regrasEmFalta(leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json")));
+  const [setAqui, setLa] = [leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json"))];
+  const falta = regrasEmFalta(setAqui, setLa);
+  // Os dois existem e nao se comparam (um nao e JSON valido): dize-lo — "nao comparei" nao e "nao falta
+  // nada" (auditoria do #308). Sem o do projeto e um projeto sem Claude Code: nada a dizer.
+  if (falta === null && setAqui !== null && setLa !== null) note("nao consegui comparar o `deny`/`ask` com o do template: um dos settings.json nao e JSON valido");
   for (const lista of ["deny", "ask"]) {
     if (falta?.[lista].length) {
       note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s) que o deste projeto nao tem, literalmente: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);

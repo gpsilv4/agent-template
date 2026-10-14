@@ -423,7 +423,7 @@ src/docs/
 
 ### `codeql.yml` and `release.yml`
 
-- **CodeQL** (`codeql.yml`) is **template-only**: it analyses this repository's machinery, which lives in hidden folders that GitHub's "Default setup" ignores. The bootstrap removes it from a new project, and `/upgrade` does not bring it. A project uses **"Default setup"** on a public repository (it analyses the project's own source) and **no CodeQL** on a private one without a license — CodeQL's terms forbid it on non-open-source code. See `SECURITY.md` for what each GitHub security setting offers on public vs. private repositories.
+- **CodeQL** (`codeql.yml`) is **template-only**: it analyses this repository's machinery, which lives in hidden folders that GitHub's "Default setup" ignores. The bootstrap removes it from a new project, and `/upgrade` does not bring it. A project uses **"Default setup"** on a public repository (it analyses the project's own source) and **no CodeQL** on a private one without a license — CodeQL's terms forbid it on non-open-source code. See `src/docs/github-security.md` for what each GitHub security setting offers on public vs. private repositories.
 - **Release**: pushing a `vX.Y.Z` tag creates the GitHub Release — title from the annotated tag's first line, notes from its body plus the PRs since the previous **final** version. A tag with `-` (`v1.1.0-rc1`) is published as a pre-release, never as "Latest".
 
 ### Dependabot

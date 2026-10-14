@@ -6,7 +6,8 @@
  * e o `ci.yml` sao do projeto) e a 2b tem de comparar com o template: as regras de `deny`/`ask` em
  * falta, e onde corre cada verificacao.
  *
- * NAO e um entry point. O `test-simulate-upgrade.mjs` importa-o e chama `registar()`.
+ * NAO e um entry point. O `tests-medida-2b.mjs` importa-o e chama `registar()` no fim do seu (o
+ * `test-simulate-upgrade.mjs`, que o corre, esta no limite das 500 linhas).
  */
 import { pathToFileURL } from "url";
 import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
@@ -48,6 +49,19 @@ export function registar() {
         projeto: { [SETTINGS]: perms(["Read(./.env)", "Edit(./.claude/hooks/**)"], []) },
       }),
       { codigo: 0, exclui: ["do settings.json do template tem"] }
+    ));
+
+  // Os dois existem e um nao se le: "nao comparei" tem de se dizer (auditoria do #308).
+  test("um settings.json invalido no projeto diz que nao comparou (#308)", () =>
+    exige(
+      contraProjeto({ hoje: { [SETTINGS]: perms(["Read(./.env)"], []) }, projeto: { [SETTINGS]: "{ nao e json" } }),
+      { codigo: 0, inclui: ["nao consegui comparar o `deny`/`ask` com o do template"] }
+    ));
+  // ...e um projeto sem settings.json (sem Claude Code) nao tem nada a dizer.
+  test("um projeto sem settings.json nao fala de deny/ask (#308)", () =>
+    exige(
+      contraProjeto({ hoje: { [SETTINGS]: perms(["Read(./.env)"], []) }, projeto: { [SETTINGS]: null } }),
+      { codigo: 0, exclui: ["nao consegui comparar", "do settings.json do template tem"] }
     ));
 
   // E a direcao contraria: uma regra do `deny` do template que o projeto so tem no `ask` e MAIS FRACA, e

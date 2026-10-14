@@ -353,7 +353,8 @@ O #158 tirou os dois simuladores do `guard-tests` para um job `simulators`. Num 
 segundos — os simuladores dao `SKIP` fora do template —, e foi por isso que a variante escolhida foi
 essa. A variante recusada mostra o custo do caso geral: mover a **varredura de mutacao** pu-la-ia a
 correr duas vezes em cada PR de um derivado que ja a tem no `guard-tests`, ~30 min a mais num repo
-privado, sem nada que o apanhasse.
+privado, sem nada que o apanhasse. (Ate ao #308: hoje a varredura tem o job dela, e a 2b e o
+`check-test-surface` apanham esse estado — § "Porque a varredura saiu do `guard-tests` para um job seu".)
 
 **Nao e mecanico, e fica dito**: o `lib/upgrade-mecanico.mjs` nao toca no `.github/` (os jobs em
 falta sao categoria de julgamento), logo o `simulate-upgrade` nao mede esta linha. E uma instrucao a

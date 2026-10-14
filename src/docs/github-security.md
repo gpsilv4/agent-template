@@ -18,7 +18,7 @@ so confirm there):
 | **Private vulnerability reporting** | free | not available (public repositories only) |
 | **Dependency graph + Dependabot alerts** | free | free |
 | **Dependabot security updates** (and grouped) | free | needs the two above; plan not stated in the docs — check whether it appears |
-| **Code scanning (CodeQL)** | free | not available: the **GitHub Code Security** license is sold only to organizations (Team/Enterprise) — and without it, CodeQL must **not** run at all (below) |
+| **Code scanning (CodeQL)** | free | not available: the **GitHub Code Security** license is sold only to organizations (Team/Enterprise) — and without it, CodeQL must **not** run at all ("CodeQL, case by case", below) |
 | **Secret scanning + push protection** | free | not available for user-owned private repos (GitHub Enterprise only) |
 | **Branch protection / rulesets** | free | can be configured, but is **not enforced** without **GitHub Pro** (or an organization on Team) |
 
@@ -49,7 +49,7 @@ protection/rulesets, which can be saved but are not enforced), and no workflow
 of the template needs them (CodeQL is not in a derived project's CI). What keeps protecting the
 project, on any plan:
 
-- **Gitleaks** (`ci.yml`, `secret-scan` job) — the replacement for secret scanning (below)
+- **Gitleaks** (`ci.yml`, `secret-scan` job) — the replacement for secret scanning (`SECURITY.md` § Secret Scanning)
 - **Dependabot** alerts, and the weekly version updates from `.github/dependabot.yml`
 - The **guards** (`.agent/scripts/`), the **`commit-msg`** hook (`.githooks/`, checked again in CI)
 - Without branch protection, CI is an **informative traffic light**: never merge with red checks

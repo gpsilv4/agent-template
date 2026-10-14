@@ -164,7 +164,9 @@ export async function comFicheirosGrandes({ dir, ok, fatal }) {
 //    citar o intervalo do template.
 //  - (f) uma rule CARREGADA perto do tecto (#302, R7B-7): o dominio cresce nas rules do projeto, e
 //    num derivado real ha sempre uma — a NOTE dela tem a mesma frase que a dos workflows, e uma
-//    assercao que so dizia "perto do limite" passava com o sitio dos workflows calado.
+//    assercao que so dizia "perto do limite" passava com o sitio dos workflows calado. HOJE e so
+//    REALISMO da fixture: o defeito so aparece na `--skips`, e o simulador nao corre a varredura
+//    (medido a mao no #302; correr a `--skips` sobre este derivado e a parte 3 do #308).
 export function comoUmDerivadoReal({ dir, ok, fatal }) {
   const w = (rel, txt) => {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
