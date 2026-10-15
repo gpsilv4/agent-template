@@ -219,7 +219,9 @@ export function executar({ tpl, proj, retomar = false, ...plano }) {
   return final;
 }
 
-const lista = (titulo, xs) => xs.length && console.log(`\n${titulo} (${xs.length}):\n${xs.map((x) => `  ${x}`).join("\n")}`);
+const lista = (titulo, xs) => {
+  if (xs.length) console.log(`\n${titulo} (${xs.length}):\n${xs.map((x) => `  ${x}`).join("\n")}`);
+};
 
 // `realpath` dos dois lados: o node resolve symlinks no `import.meta.url` e nao no `argv[1]`, logo num
 // caminho com um (o `/var` do macOS e um) a comparacao crua dava falso e a CLI saia 0 sem fazer nada.
@@ -247,7 +249,9 @@ if (principal) {
     console.error(`  ERRO  ${err instanceof Error ? err.message : String(err)}`);
     process.exit(1);
   }
-  const { tpl: _t, proj, retomar, ...manifesto } = plano;
+  // O manifesto e o plano: os campos a mais (`tpl`/`proj`, e `retomar` numa retoma) nao se leem aqui (#312).
+  const { proj, retomar } = plano;
+  const manifesto = plano;
   if (retomar) console.log("\nA retomar uma adocao interrompida (o manifesto ficou `a copiar`).");
   lista("A copiar", manifesto.copiados);
   lista("Colidem — fundir na Fase 0-R, Passo 4 (nada foi tocado)", manifesto.colisoes);

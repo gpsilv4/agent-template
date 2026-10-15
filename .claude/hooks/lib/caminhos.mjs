@@ -98,8 +98,15 @@ function mascaraSubstituicoes(t) {
   const c = t.split("");
   let fundo = 0;
   for (let k = 0; k < c.length; k++) {
-    if (c[k] === "$" && c[k + 1] === "(") (fundo++, (c[k] = c[k + 1] = "_"), k++);
-    else if (fundo) (c[k] === "(" ? fundo++ : c[k] === ")" ? fundo-- : 0), (c[k] = "_");
+    if (c[k] === "$" && c[k + 1] === "(") {
+      fundo++;
+      c[k] = c[k + 1] = "_";
+      k++;
+    } else if (fundo) {
+      if (c[k] === "(") fundo++;
+      else if (c[k] === ")") fundo--;
+      c[k] = "_";
+    }
   }
   return c.join("");
 }
