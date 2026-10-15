@@ -49,7 +49,7 @@ import { comPrazo, negar } from "./lib/resposta.mjs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA, valoresQueExecutam, executaAlgo } from "./lib/verbos-git.mjs";
-import { porqueAltera, contextoFronteira, RAZAO_FRONTEIRA } from "./lib/fronteira.mjs";
+import { porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -453,8 +453,9 @@ try {
   );
 
   // A fronteira nao se reescreve a si propria. A logica vive em `lib/fronteira.mjs`, que agora
-  // diz QUAL das oito condicoes negou — reconstruir o comando depois nao chega (#101).
-  { const porque = porqueAltera(texto, contextoFronteira(payload?.cwd)); if (porque) negar(`${RAZAO_FRONTEIRA}\n\n(condicao: ${porque})`); }
+  // diz QUAL das condicoes negou — reconstruir o comando depois nao chega (#101). E a razao
+  // segue a condicao: escrita vista, ou leitura que nao se conseguiu provar (#307).
+  { const porque = porqueAltera(texto, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque)}\n\n(condicao: ${porque})`); }
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando

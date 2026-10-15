@@ -13,7 +13,7 @@ export const PARES_DOS_HOOKS = [
     // silencio, que e exatamente a falha que uma suite tem de apanhar.
     alvo: ".claude/hooks/lib/fronteira.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
-    // As sete condicoes da decisao, marcadas com `nega(` para terem a forma que a varredura ja
+    // As condicoes da decisao, marcadas com `nega(` para terem a forma que a varredura ja
     // le. Sem o marcador, o sinal teria de casar tres sintaxes de `return` — string literal,
     // template literal e um ternario — sem casar o `return null`, e isso e fragil ao ponto de
     // ser o proximo `TP8`. O neutro devolve `null`, que e a forma de PERMITIR deste ficheiro:

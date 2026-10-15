@@ -3,7 +3,7 @@
  *
  * NAO e um entry point: o `test-hooks.mjs` descobre este modulo e chama `registar()`.
  *
- * PORQUE EXISTE: a decisao de `lib/fronteira.mjs` combina OITO condicoes com alcances
+ * PORQUE EXISTE: a decisao de `lib/fronteira.mjs` combina varias condicoes com alcances
  * diferentes — umas por segmento, outras sobre o comando inteiro — e bastava uma disparar para
  * o comando ser negado com uma razao generica. Quem levava com a negacao nao sabia qual.
  *
@@ -24,7 +24,7 @@
  */
 import { pathToFileURL } from "url";
 import { rmSync } from "fs";
-import { porqueAltera } from "../lib/fronteira.mjs";
+import { porqueAltera, razaoDe, RAZAO_OPACA, RAZAO_FRONTEIRA } from "../lib/fronteira.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -37,9 +37,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-hooks.mjs";
 
-/** Um comando por condicao, e o rotulo que ele tem de produzir. Sao OITO porque sao oito os
- *  ramos da decisao — um caso a menos e um ramo que ninguem exercita, e um rotulo que pode
- *  estar errado sem nada o denunciar. */
+/** Um comando por condicao, e o rotulo que ele tem de produzir. Nasceu com os oito ramos da
+ *  decisao do #101 — um caso a menos e um ramo que ninguem exercita, e um rotulo que pode estar
+ *  errado sem nada o denunciar — e o #307 juntou os de opacidade e os blocos de shell. */
 const CONDICOES = [
   // O verbo do segmento que toca a fronteira nao esta na lista de leitura. E o caso comum, e o
   // rotulo inclui o verbo porque e ele que se discute quando a negacao e indevida.
@@ -69,7 +69,59 @@ const CONDICOES = [
   ["find que escreve", "find .claude/hooks/ -delete", "find-que-escreve"],
   // A fronteira so aparece dentro de aspas — e texto — MAS o comando executa esse texto.
   ["citado mas executado", 'sh -c "cat .claude/settings.json > /tmp/x"', "citado-mas-executado"],
+  // Os dois medidos do #307: nenhum escrevia, e os dois levavam a razao de escrita.
+  ["ciclo de shell", "for t in .claude/hooks/tests/test-*.mjs; do node $t; done", "verbo-nao-e-leitura:for"],
+  ["interpretador inline que so le", "python3 -c \"print(open('.claude/settings.json').read())\"", "citado-mas-executado"],
+  ["bloco que so le", "{ cat .claude/settings.json; }", "verbo-nao-e-leitura:{"],
+  ["ciclo que le da fronteira", "while read f; do cat $f; done < .claude/hooks/x", "verbo-nao-e-leitura:done"],
+  // E o contrario (leituras do #307): um bloco de shell com uma escrita A VISTA leva a razao de
+  // escrita — a de opacidade aconselha a reescrever o comando, e aqui o hook viu o que ele faz.
+  ["bloco que redireciona", "{ echo a; echo b; } > .claude/settings.json", "redireciona"],
+  ["bloco que apaga", "{ rm -rf .claude/hooks; }", "verbo-nao-e-leitura:rm"],
+  ["ciclo que apaga", "while rm .claude/hooks/x; do :; done", "verbo-nao-e-leitura:rm"],
+  ["ciclo que redireciona", "for f in a; do echo x; done > .claude/hooks/x.mjs", "redireciona"],
+  ["apaga na lista do ciclo", "for f in $(rm -rf .claude/hooks); do :; done", "verbo-nao-e-leitura:rm"],
+  ["ciclo que apaga com cabecas", "while ! sudo rm .claude/hooks/x; do :; done", "verbo-nao-e-leitura:rm"],
+  // Uma por condicao de escrita dentro do bloco: com o rotulo escolhido por condicao, cada braco
+  // sem caso era uma razao que podia mudar sem nada o denunciar.
+  ["bloco que edita no sitio", "{ sed -i '' s/a/b/ .claude/settings.json; }", "edita-no-sitio"],
+  // O `git`/`find` que escreve so se ve num segmento SEU. Colado ao `{` o rotulo e o do bloco (ja
+  // era antes do #307, e nega na mesma) — e por isso leva a razao de OPACIDADE: uma escrita que o
+  // hook nao separa do bloco. Fixado abaixo; seguimento no #307.
+  ["bloco com git que escreve", "{ cat .claude/settings.json; git rm .claude/hooks/x; }", "git-que-escreve"],
+  ["bloco com find que escreve", "{ cat .claude/settings.json; find .claude/hooks -delete; }", "find-que-escreve"],
+  ["git colado ao bloco", "{ git rm .claude/hooks/x; }", "verbo-nao-e-leitura:{"],
+  // A variavel de um `for` e o sujeito de um `case` sao TEXTO: um `rm` ali nao e um comando.
+  ["rm como variavel do for", "for rm in .claude/hooks/*; do cat $rm; done", "verbo-nao-e-leitura:for"],
+  ["rm no sujeito do case", "case rm in x) cat .claude/hooks/x;; esac", "verbo-nao-e-leitura:case"],
+  // Os limites (2.a passagem das leituras): na duvida, a razao e a de opacidade. Uma cabeca ou um
+  // `!` nao sao o verbo, e um `case` nao se abre.
+  ["bloco que le com cabeca", "{ sudo cat .claude/settings.json; }", "verbo-nao-e-leitura:{"],
+  ["ciclo que le negado", "while ! grep -q ok .claude/hooks/x; do sleep 1; done", "verbo-nao-e-leitura:while"],
+  ["bloco com builtin", "{ cd .claude/hooks && ls; }", "verbo-nao-e-leitura:{"],
+  ["case fica opaco", "case $x in a) rm .claude/hooks/x;; esac", "verbo-nao-e-leitura:case"],
 ];
+
+/** A razao que cada rotulo leva (#307): a de escrita so quando o hook VIU uma escrita; nas outras,
+ *  so nao conseguiu provar que o comando le. Comparado por uma frase de cada, que a outra nao tem. */
+const OPACA = "nao consegue provar que este comando so LE";
+const ESCRITA = "nao se altera por `Bash`";
+const RAZAO_DO_ROTULO = {
+  "verbo-nao-e-leitura:cp": ESCRITA,
+  "edita-no-sitio": ESCRITA,
+  "codigo-inline": OPACA,
+  "wrapper-opaco": OPACA,
+  redireciona: ESCRITA,
+  "git-que-escreve": ESCRITA,
+  "find-que-escreve": ESCRITA,
+  "citado-mas-executado": OPACA,
+  "verbo-nao-e-leitura:for": OPACA,
+  "verbo-nao-e-leitura:rm": ESCRITA,
+  "verbo-nao-e-leitura:{": OPACA,
+  "verbo-nao-e-leitura:done": OPACA,
+  "verbo-nao-e-leitura:while": OPACA,
+  "verbo-nao-e-leitura:case": OPACA,
+};
 
 export function registar({ test, corre, repo, eq, contem }) {
   // --- Ponta a ponta: o rotulo CHEGA a mensagem -----------------------------
@@ -80,6 +132,9 @@ export function registar({ test, corre, repo, eq, contem }) {
         const r = corre({ tool_input: { command: comando }, cwd: d });
         eq(r.decisao, "deny", `"${comando}" tinha de ser negado`);
         contem(r.razao, `condicao: ${rotulo}`);
+        const certa = RAZAO_DO_ROTULO[rotulo];
+        contem(r.razao, certa);
+        eq(r.razao.includes(certa === OPACA ? ESCRITA : OPACA), false, `"${comando}" levou as duas razoes`);
       } finally {
         rmSync(d, { recursive: true, force: true });
       }
@@ -110,5 +165,19 @@ export function registar({ test, corre, repo, eq, contem }) {
     }
     if (porqueAltera("grep -n x .claude/hooks/lib/fronteira.mjs") !== null) problemas.push("um grep legitimo passou a ser negado");
     eq(problemas.length, 0, problemas.join(" | "));
+  });
+
+  // --- Os rotulos que nenhum comando acima produz (#307) ---------------------
+  // A tabela de cima so cobre os que tem um comando curto; estes tambem sao de opacidade, e os
+  // verbos que escrevem de facto (`rm`, `mv`) tem de manter a razao de escrita.
+  test("porque: a razao segue a condicao em todos os rotulos de opacidade e nos verbos que escrevem", () => {
+    const esperado = {
+      "erro-ao-analisar": RAZAO_OPACA, "execucao-adiada": RAZAO_OPACA, "substituicoes-demais": RAZAO_OPACA,
+      "verbo-nao-e-leitura:done": RAZAO_OPACA, "verbo-nao-e-leitura:{": RAZAO_OPACA, "verbo-nao-e-leitura:while": RAZAO_OPACA,
+      "verbo-nao-e-leitura:rm": RAZAO_FRONTEIRA, "verbo-nao-e-leitura:mv": RAZAO_FRONTEIRA,
+      "git-que-executa": RAZAO_FRONTEIRA,
+    };
+    const errados = Object.entries(esperado).filter(([c, r]) => razaoDe(c) !== r).map(([c]) => c);
+    eq(errados.length, 0, `razao errada para: ${errados.join(", ")}`);
   });
 }
