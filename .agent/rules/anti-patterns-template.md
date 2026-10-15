@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP13) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP14) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -7,13 +7,10 @@
 > **Porque vive aqui e nao no `anti-patterns.md`**: sao licoes sobre a maquinaria do TEMPLATE,
 > e um projeto que nao a use pagava-as em todas as sessoes. A medicao esta no `-why`.
 >
-> **Continuam a ser citaveis e citadas.** Dezenas de ficheiros do template (`.agent/scripts/`,
-> `.claude/hooks/`, as rules e os workflows) referem os `TPn`, e o Guard 15 varre os DOIS
-> ficheiros — apagar uma entrada daqui deixa essas citacoes penduradas e o guard reprova,
-> dizendo quais. Nao as substituas pelas tuas: os teus vao para
-> `.agent/rules/anti-patterns.md` com o prefixo `AP`, que esta todo livre. Sao **espacos de
-> nomes separados**: o quarto daqui e o teu quarto nunca se confundem, e um `/upgrade` traz as
-> citacoes do template sem reescrever nenhuma.
+> **Continuam a ser citaveis e citadas** por dezenas de ficheiros do template, e o Guard 15 varre
+> os DOIS ficheiros: apagar uma entrada daqui deixa citacoes penduradas, e ele diz quais. Os
+> teus vao para `.agent/rules/anti-patterns.md` com o prefixo `AP`: espacos de nomes separados,
+> e um `/upgrade` traz as citacoes do template sem reescrever nenhuma.
 
 ## TP1 — Teste cuja assercao e satisfeita por outra verificacao
 
@@ -27,8 +24,7 @@
   escrever contagens que nao se derivaram no momento: correr o comando e colar, ou escrever **o
   comando** em vez do numero.
 - **Detecao em review**: sabotar, nao contar a olho — `node .agent/scripts/mutation-sweep.mjs`
-  desliga cada sitio de erro, um a um, e exige a suite vermelha em cada um. Sai `!= 0` tambem
-  se um verificador nao tiver suite nenhuma.
+  desliga cada sitio de erro e exige a suite vermelha em cada um.
 
 ## TP2 — Zero resultados lido como zero problemas
 
@@ -95,10 +91,8 @@
 - **Correto**: enumerar o que e **seguro** e negar o resto (falha **fechada**). A lista de
   verbos inofensivos e finita; a de comandos ofuscados nao e. Onde falhar fechado bloquearia
   trabalho legitimo, a mensagem de negacao diz o que acrescentar a lista.
-- **Detecao em review**: **uma tabela de formas, nao uma leitura da regex** — a varredura de
-  mutacao deu `2/2` com os 32 defeitos e sem eles. O instrumento e a tabela `BYPASSES` em
-  `.claude/hooks/tests/tests-bypasses.mjs`: cada forma conhecida e um caso, e cresce quando
-  aparece outra. O tamanho nao se cita em prosa; esta a um `grep -c` de distancia.
+- **Detecao em review**: uma tabela de formas, nao uma leitura da regex (a varredura deu `2/2`
+  com os 32 defeitos e sem eles): a `BYPASSES` de `tests-bypasses.mjs`, um caso por forma.
 
 ## TP7 — Ramo inalcancavel, justificado por prosa em vez de medido
 
@@ -175,3 +169,11 @@
   que o nome sugere — "prefixos declarados, impostos por hook".
 - **Detecao em review**: `git grep -nE "so (de )?leitura|read-only" -- .claude/agents .agent/rules README.md`:
   cada sitio diz o que o impoe, ou e prosa sobre a intencao.
+
+## TP14 — Um squash merge com corpo proprio deixa cair o `Test-Surface:`
+
+- **Origem**: o PR #316 (#308): trailer aceite no CI, perdido no squash (`8fcf397`).
+- **Anti-padrao**: escrever o `--body` do squash de raiz. O `main` so guarda esse commit.
+- **Correto**: `git log main..HEAD --format=%B | grep '^Test-Surface:'` vai para o `--body`,
+  ao lado do `Closes #N`.
+- **Detecao em review**: `git log -1 --format=%B <squash>` contra a lista acima.

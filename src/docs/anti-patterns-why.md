@@ -551,3 +551,24 @@ garantia que so as opcoes da versao instalada podiam dar ou tirar.
 **O que se escreve em vez disso.** O que esta IMPOSTO e por quem: "prefixos declarados, impostos
 por hook". O hook nega as opcoes que escrevem ou executam (`ESCREVE` em `ambito-agente.mjs`), e a
 prosa descreve isso — nao uma propriedade do comando que ninguem mediu.
+
+## TP14 — Um squash merge com corpo proprio deixa cair o `Test-Surface:`
+
+**Origem**: o PR #316 (#308, parte 1) moveu a varredura de mutacao do `ci.yml` para um job seu, e
+o `check-test-surface` assinalou o passo que saiu. O aviso so se aceita com um trailer
+`Test-Surface: <ficheiro> — <porque>` no ULTIMO commit do PR que mexe nesse ficheiro
+(`lib/superficie-gate.mjs`), e o PR levava-o: o CI ficou verde. O merge foi um squash com
+`--body` escrito de novo — "Refs #308" — e o commit que ficou no `main` (`8fcf397`) nao tem o
+trailer. Apareceu dias depois, na auditoria do #304: a superficie medida contra a v0.57.0 voltou
+a avisar desse passo, sem explicacao nenhuma no historico.
+
+**Porque e um anti-padrao e nao um bug pontual.** O trailer e uma decisao escrita junto ao codigo
+que a justifica, e o squash e o momento em que o historico do branch deixa de existir. Tudo o que
+o CI do PR leu nos commits do branch — trailers, `Closes`, notas — so sobrevive se o corpo do
+squash o levar. Hoje nao partiu nada: contra o `main` nao avisa, e um derivado mede contra a base
+dele. Mas a proxima medicao contra uma tag, ou o proximo `git blame` sobre o passo, encontra o
+aviso sem a razao, e a razao so existia num commit que o squash apagou.
+
+**O que se faz em vez disso.** O corpo do squash e construido a partir do branch, nao de memoria:
+as linhas `Test-Surface:` vao todas, ao lado do `Closes #N` — o mesmo cuidado que ja se tem com o
+`Closes`, que tambem so fecha o issue se estiver no corpo final.
