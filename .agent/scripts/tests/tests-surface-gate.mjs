@@ -315,6 +315,18 @@ export function registar() {
     ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: y\n  b:\n    needs: *deps\n    runs-on: y\n").length === 0 ? [] : ["um alias foi lido como um job em falta"]),
     ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: y\n  b:\n    needs: [\n      a,\n      zz]\n    runs-on: y\n").some((d) => d.includes("`needs: zz`")) ? [] : ["o `needs:` em varias linhas nao foi lido"]),
   ]);
+  // Os SHARDS (#308): a matriz repartida sem o portao que confere os relatorios e falha aberta; com ele,
+  // nada a dizer; e um `SWEEP_SHARD` so num comentario nao reparte nada.
+  {
+    const shards = "jobs:\n  sweep:\n    runs-on: y\n    steps:\n      - env:\n          SWEEP_SHARD: 1/2\n        run: node .agent/scripts/mutation-sweep.mjs\n";
+    const portao = "  gate:\n    runs-on: y\n    steps:\n      - run: node .agent/scripts/lib/varredura-shards.mjs x\n";
+    const diz = (t) => defeitosDeEstrutura(t).some((d) => d.includes("nenhum job confere os relatorios"));
+    registarResultado("gate: shards sem o portao que os confere sao um defeito; com ele, nao (#308)", [
+      ...(diz(shards) ? [] : ["a matriz em shards sem portao passou"]),
+      ...(!diz(shards + portao) ? [] : ["com o portao, continuou a reprovar"]),
+      ...(!diz(shards.replace("SWEEP_SHARD: 1/2", "# SWEEP_SHARD: 1/2")) ? [] : ["um SWEEP_SHARD comentado contou"]),
+    ]);
+  }
   // O que o bootstrap deixa: o `ci.yml` do TEMPLATE sem o job `simulators` (o §2.7 remove-o) nao tem
   // defeitos. So no template: num derivado, o `ci.yml` e do projeto.
   {

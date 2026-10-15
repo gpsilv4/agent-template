@@ -32,11 +32,13 @@
  * a ser o **Guard 19** (`guards/isolamento.mjs`).
  */
 
-import { writeFileSync, readFileSync, readdirSync, mkdtempSync, rmSync } from "fs";
+import { writeFileSync, readFileSync, readdirSync, mkdtempSync, rmSync, cpSync } from "fs";
+import { criaTmp } from "./tmp-limpo.mjs";
 import { spawn } from "child_process";
 import { cpus, tmpdir } from "os";
 import { join, dirname, basename } from "path";
 import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE_TESTE, donoDe } from "./ordem-por-alvo.mjs";
+import { ENV_SHARD, ENV_RELATORIO } from "./varredura-fatia.mjs";
 
 /** Quantos processos em paralelo, a partir do que o utilizador pediu.
  *
@@ -71,9 +73,10 @@ const passa = (suiteCopia, cwd, extraEnv, limiteMs = TETO_BASELINE_MS) =>
     // O ambiente HERDADO perde as chaves da propria varredura antes de levar as desta corrida
     // (leitor independente do #156): com um `SWEEP_ALVO`/`SWEEP_SO_DONO` exportado a mao, a
     // BASELINE corria so o dono e saia 0 — verde sobre uma suite parcial, falha aberta. E a mesma
-    // defesa do `tests-fail-fast.mjs`, aplicada no unico sitio por onde as suites sao lancadas.
+    // defesa do `tests-fail-fast.mjs`, aplicada no unico sitio por onde as suites sao lancadas. E os
+    // shards (#308): com o `SWEEP_SHARD` do job herdado, a suite da propria varredura corria partida.
     const env = { ...process.env };
-    for (const k of [...Object.keys(FAIL_FAST_ENV), ENV_ALVO, ENV_SO_DONO]) delete env[k];
+    for (const k of [...Object.keys(FAIL_FAST_ENV), ENV_ALVO, ENV_SO_DONO, ENV_SHARD, ENV_RELATORIO]) delete env[k];
     const opts = { cwd, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], env: { ...env, ...(extraEnv ?? {}) } };
     const t0 = Date.now();
     let estourou = false;
@@ -466,4 +469,18 @@ export function resumoDeTempos({ resultados, msBaselines, paredeMs, workers }) {
     ...linhas,
     `    ${pct(msBaselines)}  ${s(msBaselines).padStart(8)}  baselines (1 corrida por suite)`,
   ].join("\n");
+}
+
+/** Uma copia do repo onde a mutacao acontece, sem `.git` (grande e irrelevante), `node_modules`
+ *  e `.next`. Saiu do `mutation-sweep.mjs` quando ele chegou as 500 linhas (#308); quem limpa as
+ *  copias de corridas interrompidas, e o diz, continua a ser ele.
+ * @param {string} raiz o repo real
+ * @returns {string} a pasta da copia */
+export function copiaDoRepo(raiz) {
+  const dir = criaTmp("mutation-sweep-");
+  const excluir = new Set([".git", "node_modules", ".next", ".DS_Store"]);
+  for (const entrada of readdirSync(raiz)) {
+    if (!excluir.has(entrada)) cpSync(join(raiz, entrada), join(dir, entrada), { recursive: true });
+  }
+  return dir;
 }

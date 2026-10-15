@@ -256,6 +256,8 @@ not to* line, so every agent sees it.
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
+    │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
+    │   ├── varredura-shards.mjs <- The gate's check that every sweep shard reported, and all sites were measured
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved
     │   ├── fora-do-template.mjs   <- What sits on the template's disk but is NOT the template's
@@ -402,7 +404,7 @@ src/docs/
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every push/PR in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
-| Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks**, in its own `sweep` job with two legs in parallel (full sweep and `--skips`); run locally after touching a `check-*.mjs` |
+| Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks**, in its own `sweep` job, in parallel: the full sweep split into 2 shards (the `Guard Tests` gate checks every shard reported) and `--skips`; run locally after touching a `check-*.mjs` |
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |

@@ -29,6 +29,7 @@
  *   node .agent/scripts/mutation-sweep.mjs --list             # so contar, sem correr
  *   node .agent/scripts/mutation-sweep.mjs --workers=1        # sequencial (para comparar)
  *   node .agent/scripts/mutation-sweep.mjs --timeout-piso=2000 # piso do timeout por mutante (testes)
+ *   node .agent/scripts/mutation-sweep.mjs --shard=1/2        # so a fatia 1 de 2 (o CI reparte por maquinas, #308)
  *
  * CUSTO: recorre a suite inteira por sitio. Corre em ate 8 processos, cada um com a SUA copia do
  * repo. Correr apos mexer num verificador, nao a cada commit. Condicional no CI (so quando o
@@ -73,8 +74,8 @@
  * primeiro, senao ela passa a reprovar de origem.
  */
 
-import { readFileSync, cpSync, rmSync, readdirSync } from "fs";
-import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
+import { readFileSync, rmSync, readdirSync, writeFileSync } from "fs";
+import { limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -95,8 +96,8 @@ import { PARES } from "./lib/pares.mjs";
 // exactamente 500 linhas contra um limite de 500 (ver o cabecalho dela).
 import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
-import { medeCobertura, quantosWorkers, resumoDeTempos } from "./lib/varredura-paralela.mjs";
-
+import { medeCobertura, quantosWorkers, resumoDeTempos, copiaDoRepo } from "./lib/varredura-paralela.mjs";
+import { qualShard, particao, totalDeSitios, ENV_SHARD, ENV_RELATORIO } from "./lib/varredura-fatia.mjs";
 
 const listarSo = process.argv.includes("--list");
 // `--only=<parte-do-nome>`: varrer so um verificador. Ao mexer num `check-*.mjs` nao ha
@@ -129,6 +130,10 @@ const modoDiff = process.argv.includes("--diff");
 // (#192): um sitio novo sem teste reprova o PR que o traz.
 const modoSkips = process.argv.includes("--skips");
 const SINAL_SKIPS = /(?<![\w.$])(?:skip|note)\(/;
+// `--shard=k/n` (#308): so a fatia `k` de `n` dos sitios, para o CI repartir a perna completa
+// por maquinas (no CI vem em `SWEEP_SHARD`: o comando fica o de sempre, e o `allow` tambem); com
+// `SWEEP_RELATORIO=<ficheiro>` deixa a prova que o portao confere (`lib/varredura-shards.mjs`).
+const shard = qualShard(process.argv.find((a) => a.startsWith("--shard="))?.slice("--shard=".length) ?? process.env[ENV_SHARD]);
 
 let falhou = false;
 // Quantos sitios foram DE FACTO desligados e medidos. Sem esta conta, uma varredura que nao
@@ -137,6 +142,8 @@ let falhou = false;
 // como zero problemas e o `TP2`, e ve-lo no proprio script escrito para o combater era o
 // defeito mais caro possivel: a frase que toda a gente cita como prova.
 let sitiosMedidos = 0;
+/** Os sitios da arvore inteira, antes da fatia do shard: o portao confere a soma dos shards com ele. */
+let totalDaArvore = 0;
 
 // DESCOBERTA: `PARES` e mantido a mao, logo um verificador novo entrava no repo sem rede
 // nenhuma — e a documentacao afirmava, em quatro sitios, que a varredura o detetava. Nao
@@ -278,32 +285,15 @@ if (diffSemAlvos) {
   console.log("");
   process.exit(0);
 }
-if (only && selecionados.length === 0) {
-  console.log(`  --only=${only} nao casa nenhum alvo. Conhecidos:`);
-  for (const p of PARES) console.log(`    ${p.alvo}`);
+// Um `--shard` mal escrito reprova pelo MESMO sitio (tambem no `--list`): nao ha fatia a medir.
+if (shard?.erro) selecionados = [];
+if ((only || shard?.erro) && selecionados.length === 0) {
+  console.log(shard?.erro ? `  SHARD INVALIDO  ${shard.erro}` : `  --only=${only} nao casa nenhum alvo. Conhecidos:`);
+  if (only) for (const p of PARES) console.log(`    ${p.alvo}`);
   // `falhou`, e nao um `process.exit(1)` proprio: um unico mecanismo de reprovacao faz com
   // que a varredura DESTE ficheiro cubra todos os caminhos de reprovacao. Com dois
   // mecanismos ela reportava 4/4 e omitia este em silencio.
   falhou = true;
-}
-
-/**
- * Copia do repo onde toda a mutacao acontece. Exclui `.git` (grande e irrelevante),
- * `node_modules` e `.next` (idem). Devolve o caminho, ou null se nao for preciso copiar.
- */
-function criarCopia() {
-// A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha, e foi assim que
-// ficaram 33 MB por corrida interrompida. Quem varre o que sobrou e a corrida SEGUINTE, no
-// arranque — e so o que ja nao tem dono vivo, porque duas corridas em paralelo acontecem.
-  const abandonadas = limpaTmpsAntigos("mutation-sweep-") + limpaFixturesDeTeste();
-  if (abandonadas) console.log(`  OK  ${abandonadas} copia(s) de corridas interrompidas apagadas`);
-  const dir = criaTmp("mutation-sweep-");
-  const excluir = new Set([".git", "node_modules", ".next", ".DS_Store"]);
-  for (const entrada of readdirSync(ROOT)) {
-    if (excluir.has(entrada)) continue;
-    cpSync(join(ROOT, entrada), join(dir, entrada), { recursive: true });
-  }
-  return dir;
 }
 
 /** Uma copia POR WORKER. Ver o cabecalho de `mede()`: a copia unica dava 12% de veredictos
@@ -343,7 +333,8 @@ const pisoMs = Number.isFinite(pisoPedido) && pisoPedido > 0 && pisoPedido <= 2 
 async function mede() {
   if (listarSo || medir.length === 0) return;
   const t0 = Date.now();
-  const { baselinesVermelhas, ordemDependente, resultados, msBaselines } = await medeCobertura({ medir, copias, pisoMs });
+  totalDaArvore = totalDeSitios(medir);
+  const { baselinesVermelhas, ordemDependente, resultados, msBaselines } = await medeCobertura({ medir: shard?.n ? particao(medir, shard) : medir, copias, pisoMs });
   // A linha ORDEM DEPENDENTE ja saiu do motor no momento; aqui so se decide que reprova (#156).
   if (ordemDependente.length) falhou = true;
 
@@ -370,7 +361,13 @@ async function mede() {
 }
 
 try {
-  if (!listarSo) copias = Array.from({ length: WORKERS }, () => criarCopia());
+  if (!listarSo) {
+    // A copia so se limpa a saida no caso NORMAL: um `SIGKILL` nao se apanha (33 MB por corrida
+    // interrompida). Quem varre o que sobrou e a corrida SEGUINTE, so o que ja nao tem dono vivo.
+    const abandonadas = limpaTmpsAntigos("mutation-sweep-") + limpaFixturesDeTeste();
+    if (abandonadas) console.log(`  OK  ${abandonadas} copia(s) de corridas interrompidas apagadas`);
+    copias = Array.from({ length: WORKERS }, () => copiaDoRepo(ROOT));
+  }
   // Se o pre-voo do --only ja reprovou, nao ha alvos para varrer.
   if (selecionados.length === 0) throw { __preflight: true };
 
@@ -492,9 +489,11 @@ if (!falhou && sitiosMedidos === 0) {
   // `falhou = true;`) exige-lhe um teste como a qualquer outro.
   falhou = true;
 }
+// A prova do shard para o portao (#308) — escrita tambem quando reprova: e o portao que decide.
+if (process.env[ENV_RELATORIO]) writeFileSync(process.env[ENV_RELATORIO], JSON.stringify({ modo: modoSkips ? "skips" : "completa", k: shard?.k ?? 1, n: shard?.n ?? 1, total: totalDaArvore, medidos: sitiosMedidos, aplicavel: true }));
 console.log(
   falhou
     ? "\n  VARREDURA NAO CONCLUSIVA — ver as linhas acima.\n"
-    : `\n  Cobertura de mutacao completa — ${sitiosMedidos} sitios medidos.\n`
+    : `\n  Cobertura de mutacao completa — ${sitiosMedidos} sitios medidos${shard?.n ? ` (shard ${shard.k}/${shard.n}, de ${totalDaArvore})` : ""}.\n`
 );
 process.exit(falhou ? 1 : 0);

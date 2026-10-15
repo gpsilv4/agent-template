@@ -256,6 +256,13 @@ export function defeitosDeEstrutura(texto) {
     const lida = jobs.some((a) => agregadores.has(a.id) && new RegExp(`\\bneeds\\.${j.id}\\.result\\b`).test(a.ls.join("\n")));
     if (haSuites && !j.ls.some((l) => SUITES.test(l)) && !lida) out.push(`a varredura corre no job \`${j.id}\`, sem as suites e sem um agregador que leia \`needs.${j.id}.result\` — fica fora do check que a protecao exige`);
   }
+  // Os SHARDS (#308): cada shard so ve a sua fatia, e "todos verdes" nao prova que todos correram — quem
+  // o prova e o portao (`lib/varredura-shards.mjs`). Um derivado que traga a matriz em shards SEM o
+  // portao ficava com um shard em falta verde: falha aberta (leitor do #308). O `ls` ja vem sem comentarios.
+  const ativa = (j, re) => j.ls.some((l) => re.test(l));
+  if (jobs.some((j) => ativa(j, /\bSWEEP_SHARD\b/)) && !jobs.some((j) => ativa(j, /\bvarredura-shards\.mjs\b/))) {
+    out.push("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
+  }
   const nomes = new Map();
   for (const j of jobs) {
     const nome = nomeLiteral(j.cru, j.id);
