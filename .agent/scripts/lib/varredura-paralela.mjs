@@ -35,7 +35,7 @@
 import { writeFileSync, readFileSync, readdirSync, mkdtempSync, rmSync, cpSync } from "fs";
 import { criaTmp } from "./tmp-limpo.mjs";
 import { spawn } from "child_process";
-import { cpus, tmpdir } from "os";
+import { availableParallelism, tmpdir } from "os";
 import { join, dirname, basename } from "path";
 import { ORDENA_POR_ALVO, ENV_ALVO, ENV_SO_DONO, MARCA_FIM_DO_DONO, EH_MODULO_DE_TESTE, donoDe } from "./ordem-por-alvo.mjs";
 import { ENV_SHARD, ENV_RELATORIO } from "./varredura-fatia.mjs";
@@ -47,10 +47,24 @@ import { ENV_SHARD, ENV_RELATORIO } from "./varredura-fatia.mjs";
  *  ganho. A medicao, e a frase anterior que a contradizia: `scripts-guide-why.md`.
  *
  *  `1` devolve o comportamento sequencial por inteiro, e existe para quem precise de comparar um
- *  resultado sem mudar mais nada. */
-export function quantosWorkers(pedido) {
-  const n = Number(pedido);
-  return Math.max(1, Math.min(8, Number.isFinite(n) && n > 0 ? n : cpus().length || 1));
+ *  resultado sem mudar mais nada.
+ *
+ *  NUMA MAQUINA PESSOAL deixa um core livre (#327): a formula antiga ocupava todos ate 8, e com os
+ *  processos que cada worker lanca (`node`, `git`) uma maquina de 8 cores ou menos ficava sem folga
+ *  nenhuma durante 7-15 min — visto num M1 Pro (8+2 cores) a 8 workers. No CI (`CI=true`, maquina
+ *  dedicada) usa todos. `SWEEP_WORKERS` fixa a preferencia uma vez; `--workers` ganha a tudo.
+ *  `availableParallelism()` e nao `cpus().length`: conta o que o sistema diz que o processo pode
+ *  usar (a afinidade de CPU), e nao a maquina inteira. A prioridade e por VALIDADE (leitor do #327):
+ *  um `--workers=` vazio ou mal escrito nao apaga o `SWEEP_WORKERS`.
+ * @param {string|undefined} pedido o valor de `--workers=`
+ * @param {{env?: Record<string, string|undefined>, nucleos?: number}} [o] para os testes
+ * @returns {number} */
+export function quantosWorkers(pedido, { env = process.env, nucleos = availableParallelism() } = {}) {
+  const valido = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
+  const n = valido(pedido) ?? valido(env.SWEEP_WORKERS);
+  if (n !== null) return Math.max(1, Math.min(8, n));
+  const teto = Math.max(1, Math.min(8, nucleos));
+  return env.CI === "true" ? teto : Math.max(1, teto - 1);
 }
 
 /** Corre uma suite e diz se passou. Nunca lanca: "falhou" e um resultado, nao um acidente.

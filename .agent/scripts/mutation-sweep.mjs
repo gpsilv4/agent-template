@@ -31,11 +31,11 @@
  *   node .agent/scripts/mutation-sweep.mjs --timeout-piso=2000 # piso do timeout por mutante (testes)
  *   node .agent/scripts/mutation-sweep.mjs --shard=1/2        # so a fatia 1 de 2 (o CI reparte por maquinas, #308)
  *
- * CUSTO: recorre a suite inteira por sitio. Corre em ate 8 processos, cada um com a SUA copia do
+ * CUSTO: recorre a suite inteira por sitio. Ate 8 processos (num PC um a menos; #327), cada um com a SUA copia do
  * repo. Correr apos mexer num verificador, nao a cada commit. Condicional no CI (so quando o
  * diff toca em verificadores/hooks — ver `.github/workflows/ci.yml`).
  *
- * **O tempo depende de ONDE corre, e nao ha um numero so.** Os workers saem de `cpus().length`,
+ * **O tempo depende de ONDE corre, e nao ha um numero so.** Os workers saem dos cores (`quantosWorkers`),
  * e o GitHub da 4 cores a repos publicos e 2 a privados (Free/Pro) — logo a VISIBILIDADE do repo
  * duplica o tempo:
  *

@@ -48,7 +48,7 @@
 | **Local, excepcao** | a completa, sem flags | **So** ao mexer no `mutation-sweep.mjs` ou no `lib/mapa-suites.mjs` (porque: `scripts-guide-why.md` § "Porque a varredura completa e a excepcao local, e nao o habito") |
 | **CI** | a completa (2 shards) e a `--skips` | O CI e o **portao** |
 
-A varredura corre em **8 processos** (ou o numero de cores, o que for menor), cada um com a **sua
+A varredura corre em ate **8 processos** (num PC um a menos; `SWEEP_WORKERS`), cada um com a **sua
 copia do repo** — a copia por worker nao e detalhe. `--workers=1` devolve o sequencial, para
 comparar sem mudar mais nada. Ganho medido e o custo da copia partilhada: `scripts-guide-why.md`.
 Cada corrida mutada tem **timeout** (5x a baseline da suite, piso 60 s): um timeout e **nao
