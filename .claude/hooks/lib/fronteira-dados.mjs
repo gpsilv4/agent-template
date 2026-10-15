@@ -99,6 +99,39 @@ const CABECAS = new Set([
  *  `rm`. E a classe do ciclo, e tem slice propria. */
 const PALAVRAS_SHELL = new Set(["if", "else", "elif", "!"]);
 
+/** As palavras-chave que, essas sim, chegam como "verbo" (#307): um ciclo ou bloco nao escreve
+ *  por si, so esconde o que corre dentro. So as que chegam — as de cima o `resto()` consome, e
+ *  `do`/`then` partem o segmento. Nao servem para DECIDIR (ver acima): so para escolher a razao. */
+export const PALAVRAS_DE_BLOCO = new Set(["for", "while", "until", "select", "case", "done", "fi", "esac", "{", "}"]);
+
+/** As que nao levam comando no proprio segmento (`for x in <palavras>`): o resto e texto. O `case`
+ *  leva-o no primeiro braco (`case $x in a) rm <f>`), e fica aqui de proposito: o padrao e o
+ *  comando nao se separam sem um parser, e na duvida a razao e a de opacidade. */
+const SEM_COMANDO = new Set(["for", "select", "case"]);
+
+/** Os verbos que ESCREVEM de certeza: so com um deles a vista um bloco leva a razao de escrita.
+ *  Fechada de proposito — um verbo que nao esteja aqui (`read`, `cd`, `sleep`, uma atribuicao)
+ *  deixa a razao de opacidade, que e a que diz "nao consegui provar". */
+const ESCREVE = new Set([
+  "rm", "rmdir", "unlink", "mv", "cp", "ln", "install", "rsync", "chmod", "chown", "touch",
+  "truncate", "dd", "tee", "mkdir",
+]);
+
+/** O verbo que escreve num segmento de bloco, depois das palavras-chave e das cabecas
+ *  (`{ rm`, `while ! sudo rm` -> `rm`); `null` se nao corre nada (`for x in ...`, `} > f`) ou se
+ *  o que corre nao e uma escrita certa (`{ sudo cat <f>`).
+ * @param {string[]} toks os tokens do segmento, sem cabecas (`resto()`)
+ * @returns {string|null} */
+export function escritaDoBloco(toks) {
+  let i = 0;
+  while (i < toks.length && PALAVRAS_DE_BLOCO.has(toks[i])) {
+    if (SEM_COMANDO.has(toks[i])) return null;
+    i++;
+  }
+  const v = (resto(toks.slice(i).join(" "))[0] ?? "").replace(/^.*\//, "");
+  return ESCREVE.has(v) ? v : null;
+}
+
 /** Valor de uma cabeca: `timeout 5`, `timeout 60`. A cicatriz esta escrita no guard vizinho —
  *  sem isto, o `5` de `timeout 5 git rm` parava o consumo e o verbo real nao era alcancado. */
 const VALOR_DE_CABECA = /^\d+[smhd]?$/;

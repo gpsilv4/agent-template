@@ -313,8 +313,9 @@ const FECHADO_PELO_CAMINHO = [
   // ou `{` cujo comando escreve, e um verbo inofensivo com uma substituicao dentro.
   ["`sort -o` dentro", "cd .claude/hooks && sort -o x y", CTX, "verbo-nao-e-leitura:sort"],
   ["`uniq` com saida dentro", "cd .claude/hooks && uniq a b", CTX, "verbo-nao-e-leitura:uniq"],
-  ["`while` cujo comando apaga", "cd .claude/hooks && while rm x; do :; done", CTX, "verbo-nao-e-leitura:while"],
-  ["chavetas que apagam", "cd .claude/hooks && { rm x; }", CTX, "verbo-nao-e-leitura:{"],
+  // O rotulo e o do comando la dentro, e ja nao o da palavra-chave (#307): o `rm` esta a vista.
+  ["`while` cujo comando apaga", "cd .claude/hooks && while rm x; do :; done", CTX, "verbo-nao-e-leitura:rm"],
+  ["chavetas que apagam", "cd .claude/hooks && { rm x; }", CTX, "verbo-nao-e-leitura:rm"],
   ["`export` com `$(...)` que apaga", "cd .claude/hooks && export X=$(rm -rf *)", CTX, "verbo-nao-e-leitura:export"],
   ["`sleep` com `$(...)` que apaga", "cd .claude/hooks && sleep $(rm -rf *)", CTX, "verbo-nao-e-leitura:sleep"],
   ["`tee` a jusante", "cd .claude/hooks && cat x | tee y", CTX, "verbo-nao-e-leitura:tee"],
