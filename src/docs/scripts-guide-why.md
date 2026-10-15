@@ -108,8 +108,16 @@ nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
 > 2026-09-18, 208 sitios), por medir de novo. A tabela acima fica como historico.
 
 **O GitHub da runners de 4 cores a repos publicos e 2 a privados** nos planos Free/Pro, e
-`quantosWorkers()` sai de `cpus().length` — logo a visibilidade do repo duplica o tempo. A conta
+`quantosWorkers()` sai dos cores — logo a visibilidade do repo duplica o tempo. A conta
 fecha: 22 x 2 = 44, contra ~48 observados.
+
+**Numa maquina pessoal fica um core livre (#327).** No CI (`CI=true`) a maquina so existe para isto, e
+usa os cores todos ate 8; num PC, `min(8, cores) - 1` — a 8 workers, com os `node`/`git` que cada um
+lanca, um M1 Pro (8+2) ficava sem folga durante a varredura inteira. `SWEEP_WORKERS` fixa outro numero
+uma vez; `--workers` ganha a tudo (o primeiro valor VALIDO). Os cores contam-se com
+`availableParallelism()` (a afinidade de CPU do processo), e nao `cpus().length` (a maquina inteira).
+So `CI=true` conta como CI: o GitHub, o GitLab ou o CircleCI definem-no; num Jenkins ou num Azure
+Pipelines, que nao o definem, a varredura deixa um core livre — `SWEEP_WORKERS` resolve.
 
 ### O runner inteiro, e o que cada recurso muda (#308)
 
