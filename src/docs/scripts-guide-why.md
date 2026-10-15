@@ -111,6 +111,26 @@ nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
 `quantosWorkers()` sai de `cpus().length` — logo a visibilidade do repo duplica o tempo. A conta
 fecha: 22 x 2 = 44, contra ~48 observados.
 
+### O runner inteiro, e o que cada recurso muda (#308)
+
+A especificacao dos runners standard, na fonte (consultada a 2026-10-15 —
+https://docs.github.com/en/actions/reference/runners/github-hosted-runners). E a UNICA copia
+dela no repo. O cabecalho do `mutation-sweep.mjs`, o `ci.yml` e o `upgrade-why.md` dizem so
+"privado (2 vCPU)" — a razao local de uma decisao, que nao envelhece quando a tabela mudar.
+
+| `ubuntu-latest` | Publico | Privado | O que muda no CI |
+|---|---|---|---|
+| CPU | 4 | **2** | **O tempo.** A varredura, as suites, o `next build` e o E2E sao trabalho de CPU: metade dos cores, ~o dobro do tempo |
+| RAM | 16 GB | **8 GB** | Nada na varredura (2 workers sao poucos processos `node`). Pesa no CI proprio de um derivado: `next build` + Playwright podem aproximar-se dos 8 GB, e ai o sintoma e OOM ou swap, nao so lentidao |
+| Disco | 14 GB | 14 GB | Nada: igual, e as fixtures limpam-se (`lib/tmp-limpo.mjs`) |
+| Minutos | gratis, ilimitados | quota da conta, depois ao minuto | **O custo, nao a espera.** Cada job arredonda ao minuto: paralelizar ou partir em shards baixa a parede e nao a fatura |
+
+**O "deploy" nao e o que isto atrasa.** No metodo do template, o deploy de producao e do alojamento
+(depois do merge); o runner atrasa o **portao** antes do merge — o CI do PR.
+
+**Um portatil com `--workers=2` NAO e um runner de 2 vCPU**: cada core dele e mais rapido. Serve
+de proxy so depois de calibrado contra um tempo real do privado, e o factor escreve-se ao lado.
+
 ### O numero do runner publico envelheceu, e a correccao foi um INTERVALO
 
 O `~22 min` da tabela era a primeira medicao, e ficou la. Oito corridas de CI depois, no mesmo

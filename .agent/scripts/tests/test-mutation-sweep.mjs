@@ -109,8 +109,8 @@ test("mutante que IMPRIME sem parar: o tecto de saida corta-o, e e rebentou", { 
 // ser provado: ou veio do dono sobre um prefixo verde, ou foi confirmado na ordem normal.
 test("ordem por alvo: sitio morto SO de fora do dono e confirmado e conta", { suite: ".agent/scripts/tests/test-guards.mjs", ordem: "foraDoDono" }, [], {
   code: 0,
-  includes: ["fake-check.mjs: 2/2 sitios", "[dono primeiro: 1 confirmacao(oes) na ordem normal, 0 divergencia(s)]", "Cobertura de mutacao completa"],
-  excludes: ["ORDEM DEPENDENTE", "ORDEM MUDOU"],
+  includes: ["fake-check.mjs: 2/2 sitios", "[dono primeiro: 1 confirmacao(oes) na ordem normal, 0 divergencia(s)]", "Cobertura de mutacao completa", "TEMPOS (CPU por alvo", "   4 corrida(s)"],
+  excludes: ["ORDEM DEPENDENTE", "ORDEM MUDOU", " 0%  "],
 });
 // O ambiente de QUEM CORRE a varredura nao pode mudar o veredicto (leitor independente do #156):
 // com estas chaves exportadas a mao, a baseline corria so o dono e saia verde sobre uma suite
@@ -157,8 +157,9 @@ test("ordem por alvo: vermelho que so existe na ordem nova -> ORDEM MUDOU O VERE
 test("com todos os sitios cobertos, reporta OK e sai 0", { segundoSitio: false }, [], {
   code: 0,
   // Sem o segundo sitio o verificador falso tem 1 — e a suite exercita-o.
-  includes: ["1/1 sitios", "cada aviso fica vermelho", "Cobertura de mutacao completa"],
-  excludes: ["INCOMPLETA"],
+  // E o resumo de tempos (#308); um `0%` era um tempo que nunca se somou (alvo e baselines custam).
+  includes: ["1/1 sitios", "cada aviso fica vermelho", "Cobertura de mutacao completa", "TEMPOS (CPU por alvo", "  1 sitios     1 corrida(s)  ", "/sitio  ", "baselines (1 corrida por suite)"],
+  excludes: ["INCOMPLETA", " 0%  "],
 });
 
 // --- Uma varredura que nao mediu nada nao e "cobertura completa" (TP2) --------

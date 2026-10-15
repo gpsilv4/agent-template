@@ -224,7 +224,8 @@ export async function emParalelo(lista, n, fn) {
  *                linha ambigua) ja foi decidido por quem chama — aqui so entra o que e para medir.
  * @param copias  uma copia do repo por worker. `copias.length` **e** o grau de paralelismo.
  * @returns {Promise<{baselinesVermelhas: Array<{suite, falhas: string[]}>, ordemDependente: string[],
- *          resultados: Array<{alvo, suite, total, naoCobertos, ordemLigada, confirmacoes, divergencias}>}>}
+ *          msBaselines: number,
+ *          resultados: Array<{alvo, suite, total, ms, corridas, naoCobertos, ordemLigada, confirmacoes, divergencias}>}>}
  *          `resultados` vem na ordem de `medir` — nunca na ordem por que os workers acabaram.
  */
 export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS }) {
@@ -321,8 +322,19 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
   const comDono = medidos.filter((m) => donoDoAlvo(m));
   const ligada = new Set();
   const ordemDependente = [];
+  // O CUSTO de cada alvo (#308): a soma das corridas que ele pediu — prova do prefixo, mutantes e
+  // confirmacoes. Soma e nao relogio: com varios workers, o relogio de um alvo sobrepoe-se ao dos
+  // outros e nao diz o que ele custa. Por ENTRADA e nao pelo nome: o mesmo alvo pode vir duas vezes
+  // em `PARES` (o `check-test-surface.mjs`, com sinais diferentes), e pelo nome fundiam-se.
+  // E CONTA-as no mesmo passo: um tempo esquecido tira tambem uma corrida, e a contagem testa-se.
+  const custo = new Map(medidos.map((m) => [m, { ms: 0, corridas: 0 }]));
+  const soma = (m, r) => {
+    custo.get(m).ms += r.ms;
+    custo.get(m).corridas++;
+  };
   await emParalelo(comDono, workers, async (m, w) => {
     const r = await corre(w, join(copias[w], m.suite), { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo, [ENV_SO_DONO]: "1" }, limiteDe(m));
+    soma(m, r);
     if (r.ok && r.out.includes(MARCA_FIM_DO_DONO)) return void ligada.add(m.alvo);
     // Reprova (quem chama decide o exit): um dono que nao fica verde sozinho e um defeito de
     // isolamento real, e sem reprovar o ganho desaparecia em silencio, alvo a alvo. O veredicto
@@ -356,6 +368,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
     let r;
     if (ligada.has(m.alvo)) {
       r = await corre(w, suite, { ...FAIL_FAST_ENV, [ENV_ALVO]: m.alvo }, limite);
+      soma(m, r);
       // So conta SEM confirmacao um `FAIL` do DONO: o fail-fast sai no primeiro `FAIL`, antes de a
       // marca ser impressa, logo "FAIL e marca ausente" = apanhado dentro do dono, sobre um
       // prefixo provado verde. QUALQUER outra coisa (FAIL de fora, verde, rebentou, timeout)
@@ -363,6 +376,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
       const doDono = !r.ok && !r.timeout && PROVA_DE_FALHA.test(r.out) && !r.out.includes(MARCA_FIM_DO_DONO);
       if (!doDono) {
         const normal = await corre(w, suite, FAIL_FAST_ENV, limite);
+        soma(m, normal);
         confirmacoes[t]++;
         if (veredicto(normal) !== veredicto(r)) {
           console.log(`  ORDEM MUDOU O VEREDICTO  ${m.alvo}:${i + 1} — vale o da ordem normal (${veredicto(normal)}, nao ${veredicto(r)})`);
@@ -372,6 +386,7 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
       }
     } else {
       r = await corre(w, suite, FAIL_FAST_ENV, limite);
+      soma(m, r);
     }
     const ficouVermelha = !r.ok;
     // Repor ANTES de o worker pegar no item seguinte (e DEPOIS da confirmacao, que tem de ver a
@@ -406,10 +421,13 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
   return {
     baselinesVermelhas,
     ordemDependente,
+    msBaselines: suites.reduce((s, x) => s + baseline.get(x).ms, 0),
     resultados: medidos.map((m, t) => ({
       alvo: m.alvo,
       suite: m.suite,
       total: m.sitios.length,
+      ms: custo.get(m).ms,
+      corridas: custo.get(m).corridas,
       ordemLigada: ligada.has(m.alvo),
       confirmacoes: confirmacoes[t],
       divergencias: divergencias[t],
@@ -418,4 +436,34 @@ export async function medeCobertura({ medir, copias, pisoMs = PISO_TIMEOUT_MS })
       naoCobertos: naoCobertos[t].sort((a, b) => a.ln - b.ln),
     })),
   };
+}
+
+/**
+ * O resumo de tempos (#308): onde vai o custo da varredura, por alvo, do mais caro para o mais
+ * barato. Vai DEPOIS das linhas `OK`/`INCOMPLETA`, que ficam como estavam — sao lidas por outras
+ * pecas. O tempo de um alvo e CPU (a soma das corridas dele); a parede e a da MEDICAO (sem a criacao
+ * das copias). Um alvo com dois pares em `PARES` sai em duas linhas, marcadas "par i de n".
+ *
+ * @param {{resultados: Array<{alvo: string, total: number, ms: number, corridas: number}>, msBaselines: number,
+ *          paredeMs: number, workers: number}} o
+ * @returns {string} o bloco, ou `""` sem alvos medidos
+ */
+export function resumoDeTempos({ resultados, msBaselines, paredeMs, workers }) {
+  if (resultados.length === 0) return "";
+  const s = (ms) => `${(ms / 1000).toFixed(1)}s`;
+  const cpu = resultados.reduce((t, r) => t + r.ms, 0) + msBaselines;
+  const pct = (ms) => `${String(Math.round((100 * ms) / (cpu || 1))).padStart(3)}%`;
+  const pares = (r) => resultados.filter((x) => x.alvo === r.alvo);
+  const nome = (r) => (pares(r).length > 1 ? `${r.alvo} (par ${pares(r).indexOf(r) + 1} de ${pares(r).length})` : r.alvo);
+  const linhas = [...resultados]
+    .sort((a, b) => b.ms - a.ms || a.alvo.localeCompare(b.alvo))
+    .map((r) => `    ${pct(r.ms)}  ${s(r.ms).padStart(8)}  ${String(r.total).padStart(3)} sitios  ${String(r.corridas).padStart(4)} corrida(s)  ${s(r.ms / r.total)}/sitio  ${nome(r)}`);
+  // Os segundos arredondam-se ANTES de partir em minutos: `119.6 s` dava `1m60s`.
+  const seg = Math.round(paredeMs / 1000);
+  const parede = `${Math.floor(seg / 60)}m${String(seg % 60).padStart(2, "0")}s`;
+  return [
+    `\n  TEMPOS (CPU por alvo = soma das corridas dele; CPU total ${s(cpu)}, parede da medicao ${parede}, ${workers} worker(s))`,
+    ...linhas,
+    `    ${pct(msBaselines)}  ${s(msBaselines).padStart(8)}  baselines (1 corrida por suite)`,
+  ].join("\n");
 }

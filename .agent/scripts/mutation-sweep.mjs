@@ -95,7 +95,7 @@ import { PARES } from "./lib/pares.mjs";
 // exactamente 500 linhas contra um limite de 500 (ver o cabecalho dela).
 import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
-import { medeCobertura, quantosWorkers } from "./lib/varredura-paralela.mjs";
+import { medeCobertura, quantosWorkers, resumoDeTempos } from "./lib/varredura-paralela.mjs";
 
 
 const listarSo = process.argv.includes("--list");
@@ -342,7 +342,8 @@ const pisoMs = Number.isFinite(pisoPedido) && pisoPedido > 0 && pisoPedido <= 2 
  *  o que cada numero significa fica aqui, que e onde vive o exit code. */
 async function mede() {
   if (listarSo || medir.length === 0) return;
-  const { baselinesVermelhas, ordemDependente, resultados } = await medeCobertura({ medir, copias, pisoMs });
+  const t0 = Date.now();
+  const { baselinesVermelhas, ordemDependente, resultados, msBaselines } = await medeCobertura({ medir, copias, pisoMs });
   // A linha ORDEM DEPENDENTE ja saiu do motor no momento; aqui so se decide que reprova (#156).
   if (ordemDependente.length) falhou = true;
 
@@ -365,6 +366,7 @@ async function mede() {
     }
     sitiosMedidos += total;
   }
+  console.log(resumoDeTempos({ resultados, msBaselines, paredeMs: Date.now() - t0, workers: copias.length }));
 }
 
 try {
