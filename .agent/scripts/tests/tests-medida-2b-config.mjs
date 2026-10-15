@@ -101,6 +101,23 @@ export function registar() {
   test("a varredura nos DOIS jobs do projeto aparece (corre 2x) (#308)", () =>
     exige(contraProjeto({ hoje: TPL_SWEEP, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O, V], sweep: [V] }), ...OUTRO } }),
       { codigo: 0, inclui: [`${V} corre no job \`guard-tests\` e \`sweep\` deste projeto`] }));
+  // Os SHARDS (#308, leitor): o comando e o mesmo dos dois lados, logo so uma NOTE propria os leva a
+  // um derivado que ja tem o `sweep`. E nao se anuncia quando o projeto ja os tem, nem por um comentario.
+  {
+    const SHARDS = "    env:\n      SWEEP_SHARD: 1/2\n";
+    const TPL_SHARDS = { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }) + SHARDS, ...OUTRO };
+    test("o `sweep` em shards do template, sem shards no projeto, aparece (#308)", () =>
+      exige(contraProjeto({ hoje: TPL_SHARDS, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),
+        { codigo: 0, inclui: ["reparte a varredura completa em shards"] }));
+    test("o `sweep` em shards dos dois lados nao aparece; nem um SWEEP_SHARD comentado no template; nem sem `sweep` no projeto (#308)", () => [
+      ...exige(contraProjeto({ hoje: TPL_SHARDS, projeto: TPL_SHARDS }), { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
+      ...exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }) + "    # SWEEP_SHARD: 1/2\n", ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),
+        { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
+      // Sem `sweep` no projeto (a varredura desligada e decisao legitima): a NOTE nao lhe diz respeito.
+      ...exige(contraProjeto({ hoje: TPL_SHARDS, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO } }),
+        { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
+    ]);
+  }
   // O contra-caso: a mesma colocacao nao se anuncia.
   test("a varredura no `sweep` dos dois lados nao aparece (#308)", () =>
     exige(contraProjeto({ hoje: TPL_SWEEP, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),

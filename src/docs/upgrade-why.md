@@ -458,12 +458,16 @@ Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #
 `referee-exam-study`), com as suites e as duas varreduras **em serie** (os tempos de cada uma: o
 cabecalho do `mutation-sweep.mjs`).
 A margem era mais ou menos uma ronda do tamanho da 8, e um job morto pelo tecto le-se como defeito.
-O job `sweep` corre as duas varreduras como duas pernas de uma matriz, em paralelo, e partilha a
-mesma condicao ("o PR toca nos verificadores") — o tempo de parede passa a ser o da maior.
+O job `sweep` corre as duas varreduras numa matriz, em paralelo, e partilha a mesma condicao ("o PR
+toca nos verificadores") — o tempo de parede passa a ser o da maior. Desde a parte 2 do #308 a
+completa e ela propria repartida em **2 shards** (`SWEEP_SHARD`), e o `guard-gate` confere os
+relatorios de todos (`lib/varredura-shards.mjs`): cada shard so ve a sua fatia, e um em falta
+ficava verde.
 
 No #158 ela tinha ficado de proposito no `guard-tests`: move-la poria a correr DUAS vezes num
 derivado que ja a tem. O que torna o movimento seguro agora e que cada estado mau de um derivado
-tem quem o diga (todos medidos, com teste — duas leituras independentes do #308):
+tem quem o diga (medidos, com teste — duas leituras independentes do #308; as duas linhas marcadas
+"runtime" dependem do GitHub a correr, e estao por raciocinio, nao por suite):
 
 | Estado do derivado depois do `/upgrade` | Quem o diz |
 |---|---|
@@ -474,8 +478,13 @@ tem quem o diga (todos medidos, com teste — duas leituras independentes do #30
 | `guard-gate` trazido sem o `sweep` (`needs:` partido: o GitHub rejeita o workflow inteiro) | `check-test-surface` |
 | o `guard-tests` e o `guard-gate` com o mesmo nome (dois `Guard Tests`) | `check-test-surface` |
 | o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
+| `sweep` sem shards, com o template em shards | 2b: "reparte a varredura completa em shards ... trazer JUNTOS" |
+| a matriz em shards trazida SEM os passos do portao no `guard-gate` (um shard em falta passava verde) | `check-test-surface`: "nenhum job confere os relatorios deles" |
+| (runtime) o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
+| (runtime) o `ci.yml` novo com o `mutation-sweep.mjs` antigo (ignora o `SWEEP_SHARD`, nao escreve relatorio) | o upload reprova (`if-no-files-found: error`) — fechado; trazer os scripts com o workflow |
+| uma protecao que exija os checks das pernas pelo nome (`Mutation sweep (completa)`): com os shards passam a `(completa 1/2)`, `(completa 2/2)` e `(skips 1/1)`, e o antigo nunca aparece — os merges bloqueiam | ninguem automaticamente: o exigido e SO `Guard Tests` (o comentario do `guard-gate` di-lo desde a v0.58.0); quem tenha exigido as pernas troca-as por ele |
 
-Os defeitos de estrutura (as tres linhas do `check-test-surface` sem trailer) so se dizem quando o PR
+Os defeitos de estrutura (as linhas do `check-test-surface` sem trailer) so se dizem quando o PR
 os INTRODUZ: um defeito que ja existia deixava vermelho cada PR que tocasse no workflow — os do
 Dependabot incluidos, que nao escrevem trailer. E so contam nomes repetidos que envolvam a
 maquinaria: `name: Deploy` em staging e prod e idioma legitimo. Um derivado com um `name:` proprio
@@ -493,9 +502,11 @@ mergeado, sem nenhuma definicao mudada. Por isso `Guard Tests` passou a ser um j
 Nenhum repo precisa de mexer na protecao. O `always()` e excecao a marca do `if:` (so alarga onde o
 job corre; sem ele, um `needs` vermelho SALTAVA o gate, e um check saltado conta como passado).
 
-**O custo num privado free** (minutos faturados; cada job arredonda ao minuto): as duas pernas
-fazem checkout e setup em todo o PR, mesmo quando "nao aplicavel", e o gate corre sempre — ~+3 min
-por PR e +1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
+**O custo num privado free** (minutos faturados; cada job arredonda ao minuto): os tres jobs da
+matriz (dois shards e a `--skips`) fazem checkout e setup em todo o PR, mesmo quando "nao
+aplicavel", e o gate corre sempre; e cada shard repete as baselines e as provas do prefixo que a sua
+fatia pede — ~+4-6 min por PR que toca nos verificadores, contra metade do tempo de parede da
+completa, e ~+1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
 gasta ~40 min a medir um gate ja condenado. Num publico nao se paga. Os tempos medidos (o do derivado
 incluido) vivem so no cabecalho do `mutation-sweep.mjs` (`TP8`).
 

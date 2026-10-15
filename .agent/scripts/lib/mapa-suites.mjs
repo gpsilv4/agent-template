@@ -116,7 +116,9 @@ export const SUITES = [
   // suite dela e a unica que exercita o contra-caso (o processo vivo que nao se toca).
   { re: /^\.agent\/scripts\/(lib\/tmp-limpo|tests\/test-tmp-limpo)\.mjs$/, verifica: [S("test-tmp-limpo.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
-  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/(test-sweep-harness|fixture-ordem)\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
+  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/fixture-ordem\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // A fixture da varredura e tambem usada pelo `tests-varredura-shards.mjs`, do `test-guards` (#308).
+  { re: /^\.agent\/scripts\/tests\/harness\/test-sweep-harness\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
   { re: /^\.agent\/scripts\/(lib\/mapa-suites|tests\/test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },
@@ -134,6 +136,10 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
   // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/varredura-paralela\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  // Os shards da varredura (#308). A fatia vai na fixture do `test-mutation-sweep` (o varredor
+  // importa-a) e e testada no `tests-varredura-shards.mjs`; o portao so no segundo.
+  { re: /^\.agent\/scripts\/lib\/varredura-fatia\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/varredura-shards\.mjs$/, verifica: [S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/(lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os

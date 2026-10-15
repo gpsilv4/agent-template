@@ -321,7 +321,7 @@ jobs:
         # PR que nao tocou em testes ficava vermelho por causa de um merge feito noutro PR.
         run: node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD^1)"
 
-  # A VARREDURA DE MUTACAO num job proprio (#308, R7B-8), com DUAS pernas em paralelo: a completa
+  # A VARREDURA DE MUTACAO num job proprio (#308, R7B-8), com as pernas em paralelo: a completa
   # (cada `warn()`/`fatal()`) e a `--skips` (cada `skip()`/`note()`, #192). Corriam em SERIE no
   # `guard-tests`, depois das suites: num derivado privado (2 vCPU) o job chegou aos 51 dos 75 min
   # (os tempos vivem SO no cabecalho do `mutation-sweep.mjs`, `TP8`). Em paralelo, o tempo de parede
@@ -332,19 +332,27 @@ jobs:
   # reprova os estados maus de um derivado (a varredura em dois jobs, ou fora de um agregador; um
   # `needs:` partido; dois checks com o mesmo nome) — `src/docs/upgrade-why.md`, #308.
   #
-  # A MESMA condicao para as duas pernas, num passo so: uma matriz, e nao dois jobs com a condicao
+  # A MESMA condicao para todas as pernas, num passo so: uma matriz, e nao dois jobs com a condicao
   # copiada (`TP8`). `fail-fast: false`: uma perna vermelha nao cancela a outra a meio da medicao.
   #
-  # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as duas pernas fazem
+  # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as pernas fazem
   # checkout e setup em TODO o PR, mesmo quando a condicao diz "nao aplicavel", e o `guard-gate`
-  # corre sempre — ~+3 min por PR e +1 por push, contra o job unico de antes. Num publico nao se
+  # corre sempre — o custo por PR esta no paragrafo dos SHARDS, abaixo (um numero so, `TP8`). Num publico nao se
   # paga. O ganho e o tempo de parede de um PR que toca nos verificadores.
+  #
+  # A PERNA COMPLETA EM SHARDS (#308, o desenho do #159): `shard: [1, 2]` reparte os sitios por duas
+  # maquinas (`SWEEP_SHARD=k/n`, `lib/varredura-fatia.mjs`), em TODO o repo — num publico e gratis, e
+  # assim o template corre o mesmo caminho que um derivado privado. O `de` diz quantos shards ha; o
+  # `guard-gate` confere os relatorios de todos (`lib/varredura-shards.mjs`): um shard que saia da
+  # lista, ou um `de` que nao bata com ela, reprova ali, e nao fica verde com sitios por medir.
+  # Num privado: ~+4-6 min faturados por PR (baselines e provas repetidas por maquina), contra
+  # metade do tempo de parede da perna completa.
   sweep:
-    name: Mutation sweep (${{ matrix.modo }})
+    name: Mutation sweep (${{ matrix.modo }} ${{ matrix.shard }}/${{ matrix.de }})
     runs-on: ubuntu-latest
-    # Depois das SUITES: com elas vermelhas o gate ja esta condenado, e as duas pernas faturavam ~40
+    # Depois das SUITES: com elas vermelhas o gate ja esta condenado, e as pernas faturavam ~40
     # min num privado a medir para nada (antes, um passo vermelho saltava o da varredura). Custa ~3
-    # min de parede; o paralelismo das duas pernas, que e o ganho, fica.
+    # min de parede; o paralelismo das pernas, que e o ganho, fica.
     needs: guard-tests
     # Tambem ao nivel do JOB: num `push` o job arrancava, fazia o checkout e ficava VERDE sem ter
     # medido nada (`TP2`). Assim aparece como `skipped`.
@@ -352,7 +360,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        modo: [completa, skips]
+        modo: [completa]
+        shard: [1, 2]
+        include:
+          - modo: completa
+            de: 2
+          - modo: skips
+            shard: 1
+            de: 1
     # 75 (a perna completa; a `--skips` cabe folgada), e o numero vem de MEDICOES sucessivas e nao de um palpite. O historico e o que
     # interessa aqui, porque mostra uma TENDENCIA e nao um valor:
     #
@@ -394,8 +409,15 @@ jobs:
       - name: Mutation sweep — cada aviso tem de ficar vermelho
         env:
           MODO: ${{ matrix.modo }}
+          # O shard vai por ambiente e nao por `--shard`: o comando fica o de sempre (e o do `allow`).
+          SWEEP_SHARD: ${{ matrix.shard }}/${{ matrix.de }}
+          # A prova deste shard para o `guard-gate`: escrita em TODOS os ramos (mesmo "nao aplicavel"),
+          # porque um relatorio em falta e o que o portao reprova.
+          SWEEP_RELATORIO: ${{ runner.temp }}/varredura/${{ matrix.modo }}-${{ matrix.shard }}.json
         run: |
           set -euo pipefail
+          mkdir -p "$(dirname "$SWEEP_RELATORIO")"
+          nao_aplicavel() { printf '{"modo":"%s","k":%s,"n":%s,"aplicavel":false}\n' "$MODO" "${SWEEP_SHARD%/*}" "${SWEEP_SHARD#*/}" > "$SWEEP_RELATORIO"; }
           # Commit-RAIZ. AQUI, com o `if: pull_request` acima, este ramo nao corre (o merge ref
           # de um PR tem sempre pai) — e fica de proposito, nao por copia: um derivado que tire o
           # `if:` para varrer tambem em `push` corre-o no commit inicial do repo. Medido: o
@@ -404,6 +426,7 @@ jobs:
           # e "provei que nao ha intervalo", nao "nao consegui ler".
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
             echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
+            nao_aplicavel
             exit 0
           fi
           # SEM PIPE, e de proposito. Com `pipefail`, `git diff | grep -q` caia no `else` em
@@ -427,10 +450,23 @@ jobs:
             exit 1
           elif [ "$rc" -eq 1 ]; then
             echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
+            nao_aplicavel
           else
             echo "::error::grep saiu $rc a decidir se a varredura se aplica — nao consegui decidir."
             exit 1
           fi
+      # So num shard verde (o passo de cima falhou e este nao corre): vermelho, o portao ja reprova pelo
+      # `needs.sweep.result`. Sem `if: always()` de proposito — uma condicao num passo e marca no
+      # `check-test-surface`, e aqui nao compraria nada.
+      - name: Relatorio do shard para o portao
+        uses: actions/upload-artifact@v7
+        with:
+          name: varredura-${{ matrix.modo }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/varredura/${{ matrix.modo }}-${{ matrix.shard }}.json
+          if-no-files-found: error
+          # Um re-run do shard volta a carregar o mesmo nome; 7 dias deixam o portao ser re-corrido.
+          overwrite: true
+          retention-days: 7
 
   # O CHECK QUE A PROTECAO EXIGE (#308). Um ruleset ou uma branch protection exige checks pelo NOME,
   # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13). Com a varredura num job
@@ -440,7 +476,7 @@ jobs:
   # verificadores as pernas saem verdes sem medir). Assim nenhum repo — este, ou um derivado com a
   # protecao ligada — precisa de mudar as definicoes. Num privado de conta free a protecao nao e
   # imposta (`src/docs/github-security.md`): ai e so o semaforo. O required e SO este nome: os das
-  # pernas (`Mutation sweep (completa|skips)`) nao sao estaveis num `push` (saltadas, sem expandir).
+  # pernas (`Mutation sweep (completa 1/2)`, ...) nao sao estaveis num `push` (saltadas, sem expandir).
   #
   # NAO espera pelo `simulators`: o bootstrap remove esse job num derivado, e um `needs:` para um job
   # que nao existe invalida o workflow inteiro.
@@ -453,7 +489,24 @@ jobs:
     if: always()
     timeout-minutes: 5
     steps:
-      - name: Suites e varredura verdes
+      # Os SHARDS (#308): cada um so ve a sua fatia, logo "todos verdes" nao prova que TODOS correram —
+      # um tirado da matriz deixava sitios por medir com o resto verde. Os relatorios deles juntos
+      # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos.
+      # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
+      # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
+      # ficheiros e passa; e o passo de baixo que decide se os confere.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: varredura-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/varredura
+      - name: Suites e varredura verdes, e todos os shards mediram
         env:
           SUITES: ${{ needs.guard-tests.result }}
           VARREDURA: ${{ needs.sweep.result }}
@@ -468,7 +521,11 @@ jobs:
           # ou num `workflow_dispatch` que um derivado acrescente, salta). Num PR, saltada e "nao
           # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
           # Qualquer outro estado (`failure`, `cancelled`) reprova.
-          if [ "$VARREDURA" = success ] || { [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; }; then
+          if [ "$VARREDURA" = success ]; then
+            node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura"
+            exit $?
+          fi
+          if [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; then
             exit 0
           fi
           echo "::error::a varredura de mutacao nao passou ($EVENTO): $VARREDURA"
