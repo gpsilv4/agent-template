@@ -12,7 +12,7 @@
  */
 import { pathToFileURL } from "url";
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync, readFileSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, copyFileSync, cpSync, readFileSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
@@ -62,8 +62,25 @@ export const CHECKER_MODULOS = [...modulosImportadosPor(".agent/scripts/check-te
 const git = (dir, args) =>
   execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
 
-/** Repo com um teste "saudavel" commitado; devolve `{ dir, base }`. */
+/** O repo-modelo, montado UMA vez por processo e copiado para cada teste (#308). Montar de raiz
+ *  custava ~66 ms por teste (quatro processos git), copiar ~8 ms — e a varredura de mutacao corre
+ *  esta suite uma vez por mutante. O mesmo prefixo das fixtures: um modelo de uma corrida morta a
+ *  meio e apanhado pelo `limpaTmpsAntigos`, como elas. */
+let modelo = null;
+
+/** Repo com um teste "saudavel" commitado; devolve `{ dir, base }`. Uma COPIA do modelo, `.git`
+ *  incluido: o teste muta-a a vontade, e o modelo fica intacto para o seguinte. */
 function sandbox() {
+  if (!modelo) {
+    modelo = montaModelo();
+    process.on("exit", () => rmSync(modelo.dir, { recursive: true, force: true }));
+  }
+  const dir = mkdtempSync(join(tmpdir(), "surface-test-"));
+  cpSync(modelo.dir, dir, { recursive: true });
+  return { dir, base: modelo.base };
+}
+
+function montaModelo() {
   const dir = mkdtempSync(join(tmpdir(), "surface-test-"));
   mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
   // As suites vivem em `tests/`: a pasta cria-se AQUI, uma vez, e nao em cada fixture que la

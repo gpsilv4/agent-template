@@ -64,7 +64,11 @@ export const SUITES = [
   // E a razao pela qual o varredor NAO deriva este mapa do `PARES`: estes tres nao sao alvos
   // nem suites, logo uma derivacao a partir do `PARES` ficava cega a eles. Ja aconteceu uma vez.
   // A `config/superficie-de-teste.mjs` decide que globs contam como teste: muda o que ele mede (#188).
-  { re: /^\.agent\/scripts\/(check-test-surface|tests\/harness\/test-surface-harness|config\/superficie-de-teste)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(check-test-surface|config\/superficie-de-teste)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  // O harness leva TAMBEM o `test-guards`: e la que o contrato do fail-fast afirma que a suite sai
+  // sem deixar a sandbox (`tests-fail-fast.mjs`) — e desde o #308 a limpeza do repo-modelo depende
+  // do `exit` do processo, que so esse contrato mede (leitor do #308).
+  { re: /^\.agent\/scripts\/tests\/harness\/test-surface-harness\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs")] },
   // A baseline saiu do verificador quando ele chegou a 499 linhas, e traz a sua suite. Leva
   // TAMBEM a do ficheiro de origem: mexer aqui muda o que ele mede, e essa e a afirmacao
   // que so a suite dele faz.
