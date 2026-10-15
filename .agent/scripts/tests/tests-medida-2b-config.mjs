@@ -109,9 +109,12 @@ export function registar() {
     test("o `sweep` em shards do template, sem shards no projeto, aparece (#308)", () =>
       exige(contraProjeto({ hoje: TPL_SHARDS, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),
         { codigo: 0, inclui: ["reparte a varredura completa em shards"] }));
-    test("o `sweep` em shards dos dois lados nao aparece; nem um SWEEP_SHARD comentado no template (#308)", () => [
+    test("o `sweep` em shards dos dois lados nao aparece; nem um SWEEP_SHARD comentado no template; nem sem `sweep` no projeto (#308)", () => [
       ...exige(contraProjeto({ hoje: TPL_SHARDS, projeto: TPL_SHARDS }), { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
       ...exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }) + "    # SWEEP_SHARD: 1/2\n", ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),
+        { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
+      // Sem `sweep` no projeto (a varredura desligada e decisao legitima): a NOTE nao lhe diz respeito.
+      ...exige(contraProjeto({ hoje: TPL_SHARDS, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO } }),
         { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
     ]);
   }

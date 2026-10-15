@@ -151,6 +151,28 @@ export function registar() {
     registarResultado("shards: --shard sobre a fixture da varredura reparte, reprova a fatia e escreve o relatorio", problemas);
   }
 
+  // O caminho que o CI USA: o shard por ambiente (`SWEEP_SHARD`), sem `--shard` (auditoria do #308).
+  // Sem isto, partir o `?? process.env` deixava cada shard do CI a varrer tudo, e so o portao do PR
+  // seguinte o dizia.
+  {
+    const dir = sandbox();
+    try {
+      const r = run(dir, [], { SWEEP_SHARD: "2/2", SWEEP_RELATORIO: "relatorio.json" });
+      let relatorio = null;
+      try {
+        relatorio = JSON.parse(readFileSync(join(dir, "relatorio.json"), "utf8"));
+      } catch {
+        relatorio = null;
+      }
+      registarResultado(
+        "shards: SWEEP_SHARD no ambiente reparte como o --shard (o caminho do CI)",
+        relatorio?.k === 2 && relatorio?.n === 2 && relatorio?.medidos === 1 && r.out.includes("INCOMPLETA") ? [] : [`relatorio ${JSON.stringify(relatorio)}, exit ${r.code}`]
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   // As SUITES nao herdam o shard (leitor do #308): o job exporta `SWEEP_SHARD`/`SWEEP_RELATORIO`, e
   // herdados, a propria suite da varredura corria partida — baseline vermelha nos dois shards. A suite
   // falsa reprova se os vir; a varredura corre com eles no ambiente (a fatia 1/1 e tudo).

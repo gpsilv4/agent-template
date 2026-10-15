@@ -258,10 +258,12 @@ export function defeitosDeEstrutura(texto) {
   }
   // Os SHARDS (#308): cada shard so ve a sua fatia, e "todos verdes" nao prova que todos correram — quem
   // o prova e o portao (`lib/varredura-shards.mjs`). Um derivado que traga a matriz em shards SEM o
-  // portao ficava com um shard em falta verde: falha aberta (leitor do #308). O `ls` ja vem sem comentarios.
+  // portao ficava com um shard em falta verde: falha aberta (leitor do #308). E o portao tem de estar num
+  // AGREGADOR (auditoria do #308): num job a parte, que nenhuma protecao exige, nao decide nada. O `ls` ja
+  // vem sem comentarios.
   const ativa = (j, re) => j.ls.some((l) => re.test(l));
-  if (jobs.some((j) => ativa(j, /\bSWEEP_SHARD\b/)) && !jobs.some((j) => ativa(j, /\bvarredura-shards\.mjs\b/))) {
-    out.push("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
+  if (jobs.some((j) => ativa(j, /\bSWEEP_SHARD\b/)) && !jobs.some((j) => agregadores.has(j.id) && ativa(j, /\bvarredura-shards\.mjs\b/))) {
+    out.push("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job AGREGADOR confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
   }
   const nomes = new Map();
   for (const j of jobs) {

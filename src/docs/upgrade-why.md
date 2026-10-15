@@ -466,7 +466,8 @@ ficava verde.
 
 No #158 ela tinha ficado de proposito no `guard-tests`: move-la poria a correr DUAS vezes num
 derivado que ja a tem. O que torna o movimento seguro agora e que cada estado mau de um derivado
-tem quem o diga (todos medidos, com teste — duas leituras independentes do #308):
+tem quem o diga (medidos, com teste — duas leituras independentes do #308; as duas linhas marcadas
+"runtime" dependem do GitHub a correr, e estao por raciocinio, nao por suite):
 
 | Estado do derivado depois do `/upgrade` | Quem o diz |
 |---|---|
@@ -479,10 +480,11 @@ tem quem o diga (todos medidos, com teste — duas leituras independentes do #30
 | o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
 | `sweep` sem shards, com o template em shards | 2b: "reparte a varredura completa em shards ... trazer JUNTOS" |
 | a matriz em shards trazida SEM os passos do portao no `guard-gate` (um shard em falta passava verde) | `check-test-surface`: "nenhum job confere os relatorios deles" |
-| o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
-| o `ci.yml` novo com o `mutation-sweep.mjs` antigo (ignora o `SWEEP_SHARD`, nao escreve relatorio) | o upload reprova (`if-no-files-found: error`) — fechado; trazer os scripts com o workflow |
+| (runtime) o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
+| (runtime) o `ci.yml` novo com o `mutation-sweep.mjs` antigo (ignora o `SWEEP_SHARD`, nao escreve relatorio) | o upload reprova (`if-no-files-found: error`) — fechado; trazer os scripts com o workflow |
+| uma protecao que exija os checks das pernas pelo nome (`Mutation sweep (completa)`): com os shards passam a `(completa 1/2)`, `(completa 2/2)` e `(skips 1/1)`, e o antigo nunca aparece — os merges bloqueiam | ninguem automaticamente: o exigido e SO `Guard Tests` (o comentario do `guard-gate` di-lo desde a v0.58.0); quem tenha exigido as pernas troca-as por ele |
 
-Os defeitos de estrutura (as tres linhas do `check-test-surface` sem trailer) so se dizem quando o PR
+Os defeitos de estrutura (as linhas do `check-test-surface` sem trailer) so se dizem quando o PR
 os INTRODUZ: um defeito que ja existia deixava vermelho cada PR que tocasse no workflow — os do
 Dependabot incluidos, que nao escrevem trailer. E so contam nomes repetidos que envolvam a
 maquinaria: `name: Deploy` em staging e prod e idioma legitimo. Um derivado com um `name:` proprio

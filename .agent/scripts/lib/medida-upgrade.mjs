@@ -345,10 +345,10 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     }
   }
   // Os SHARDS (#308): o comando da varredura e o mesmo dos dois lados, e nada acima o ve — um derivado
-  // privado, para quem eles existem, ficava sem eles em silencio (leitor do #308).
+  // privado, para quem eles existem, ficava sem eles em silencio (leitor do #308). So a quem TEM o `sweep`.
   const reparte = (r) => /^[^#\n]*\bSWEEP_SHARD\b/m.test(leOuNull(join(r, ".github/workflows/ci.yml")) ?? "");
-  if (reparte(template) && !reparte(raiz)) {
-    note("o `sweep` do template reparte a varredura completa em shards (`SWEEP_SHARD`, #308) e o deste projeto nao — trazer JUNTOS a matriz, o passo do relatorio e os passos do portao no `guard-gate` (a matriz sem o portao, o `check-test-surface` reprova-a)");
+  if (reparte(template) && !reparte(raiz) && jobsAntes.sweep?.some((c) => c.endsWith("mutation-sweep.mjs"))) {
+    note("o `sweep` do template reparte a varredura completa em shards (`SWEEP_SHARD`, #308) e o deste projeto nao — trazer JUNTOS a matriz, o passo da varredura (o `env:` e o `nao_aplicavel`), o upload do relatorio e os passos do portao no `guard-gate` (a matriz sem o portao, o `check-test-surface` reprova-a)");
   }
 
   // O MESMO, para a fronteira de permissoes (#301, R7B-1). O motor nao toca no `settings.json` — e

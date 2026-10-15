@@ -319,11 +319,14 @@ export function registar() {
   // nada a dizer; e um `SWEEP_SHARD` so num comentario nao reparte nada.
   {
     const shards = "jobs:\n  sweep:\n    runs-on: y\n    steps:\n      - env:\n          SWEEP_SHARD: 1/2\n        run: node .agent/scripts/mutation-sweep.mjs\n";
-    const portao = "  gate:\n    runs-on: y\n    steps:\n      - run: node .agent/scripts/lib/varredura-shards.mjs x\n";
-    const diz = (t) => defeitosDeEstrutura(t).some((d) => d.includes("nenhum job confere os relatorios"));
-    registarResultado("gate: shards sem o portao que os confere sao um defeito; com ele, nao (#308)", [
+    const portao = "  gate:\n    runs-on: y\n    needs: [sweep]\n    steps:\n      - env:\n          V: ${{ needs.sweep.result }}\n        run: node .agent/scripts/lib/varredura-shards.mjs x\n";
+    // O portao num job que NAO agrega (nao le `needs.sweep.result`): nenhuma protecao o exige.
+    const aParte = "  conta:\n    runs-on: y\n    steps:\n      - run: node .agent/scripts/lib/varredura-shards.mjs x\n";
+    const diz = (t) => defeitosDeEstrutura(t).some((d) => d.includes("nenhum job AGREGADOR confere os relatorios"));
+    registarResultado("gate: shards sem o portao num agregador sao um defeito; com ele, nao (#308)", [
       ...(diz(shards) ? [] : ["a matriz em shards sem portao passou"]),
-      ...(!diz(shards + portao) ? [] : ["com o portao, continuou a reprovar"]),
+      ...(!diz(shards + portao) ? [] : ["com o portao num agregador, continuou a reprovar"]),
+      ...(diz(shards + aParte) ? [] : ["o portao num job a parte, que nao agrega, passou"]),
       ...(!diz(shards.replace("SWEEP_SHARD: 1/2", "# SWEEP_SHARD: 1/2")) ? [] : ["um SWEEP_SHARD comentado contou"]),
     ]);
   }

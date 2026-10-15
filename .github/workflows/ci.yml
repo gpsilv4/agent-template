@@ -337,7 +337,7 @@ jobs:
   #
   # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as pernas fazem
   # checkout e setup em TODO o PR, mesmo quando a condicao diz "nao aplicavel", e o `guard-gate`
-  # corre sempre — ~+3 min por PR e +1 por push, contra o job unico de antes. Num publico nao se
+  # corre sempre — o custo por PR esta no paragrafo dos SHARDS, abaixo (um numero so, `TP8`). Num publico nao se
   # paga. O ganho e o tempo de parede de um PR que toca nos verificadores.
   #
   # A PERNA COMPLETA EM SHARDS (#308, o desenho do #159): `shard: [1, 2]` reparte os sitios por duas
@@ -455,16 +455,18 @@ jobs:
             echo "::error::grep saiu $rc a decidir se a varredura se aplica — nao consegui decidir."
             exit 1
           fi
-      # `always()`: o relatorio sobe tambem quando a varredura reprova — o portao reprova na mesma
-      # (o job vermelho), mas quem le o run ve o que cada shard mediu.
+      # So num shard verde (o passo de cima falhou e este nao corre): vermelho, o portao ja reprova pelo
+      # `needs.sweep.result`. Sem `if: always()` de proposito — uma condicao num passo e marca no
+      # `check-test-surface`, e aqui nao compraria nada.
       - name: Relatorio do shard para o portao
-        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: varredura-${{ matrix.modo }}-${{ matrix.shard }}
           path: ${{ runner.temp }}/varredura/${{ matrix.modo }}-${{ matrix.shard }}.json
           if-no-files-found: error
-          retention-days: 1
+          # Um re-run do shard volta a carregar o mesmo nome; 7 dias deixam o portao ser re-corrido.
+          overwrite: true
+          retention-days: 7
 
   # O CHECK QUE A PROTECAO EXIGE (#308). Um ruleset ou uma branch protection exige checks pelo NOME,
   # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13). Com a varredura num job
@@ -487,7 +489,24 @@ jobs:
     if: always()
     timeout-minutes: 5
     steps:
-      - name: Suites e varredura verdes
+      # Os SHARDS (#308): cada um so ve a sua fatia, logo "todos verdes" nao prova que TODOS correram —
+      # um tirado da matriz deixava sitios por medir com o resto verde. Os relatorios deles juntos
+      # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos.
+      # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
+      # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
+      # ficheiros e passa; e o passo de baixo que decide se os confere.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: varredura-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/varredura
+      - name: Suites e varredura verdes, e todos os shards mediram
         env:
           SUITES: ${{ needs.guard-tests.result }}
           VARREDURA: ${{ needs.sweep.result }}
@@ -502,32 +521,15 @@ jobs:
           # ou num `workflow_dispatch` que um derivado acrescente, salta). Num PR, saltada e "nao
           # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
           # Qualquer outro estado (`failure`, `cancelled`) reprova.
-          if [ "$VARREDURA" = success ] || { [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; }; then
+          if [ "$VARREDURA" = success ]; then
+            node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura"
+            exit $?
+          fi
+          if [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; then
             exit 0
           fi
           echo "::error::a varredura de mutacao nao passou ($EVENTO): $VARREDURA"
           exit 1
-      # Os SHARDS (#308): cada um so ve a sua fatia, logo "todos verdes" nao prova que TODOS correram —
-      # um tirado da matriz deixava sitios por medir com o resto verde. Os relatorios deles juntos
-      # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos.
-      # So quando a varredura passou: vermelha ou saltada, o passo de cima ja decidiu.
-      - if: needs.sweep.result == 'success'
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-      - if: needs.sweep.result == 'success'
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-      - if: needs.sweep.result == 'success'
-        uses: actions/download-artifact@v8
-        with:
-          pattern: varredura-*
-          merge-multiple: true
-          path: ${{ runner.temp }}/varredura
-      - name: Todos os shards da varredura mediram
-        if: needs.sweep.result == 'success'
-        run: node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura"
 
   # Os dois SIMULADORES num job proprio (#158), em paralelo com o `guard-tests`: ~4 min que
   # corriam em serie ANTES da varredura, e nao dependem dela nem ela deles. Sao so do template —
