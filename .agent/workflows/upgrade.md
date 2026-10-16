@@ -107,19 +107,20 @@ node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
 ```
 
 Corre-se **do clone do template** (`$TPL`, o da secao 1) apontado a este projeto, e nao ao
-contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **passa** a reprovar aqui
-(subtraido, linha a linha, o que ja falhava), a **fronteira** (os comandos do utilizador), o que **saiu** do template com a marca migracao/limpeza,
-e o que sobra **depois** das adaptacoes mecanicas — essa ultima e a que precisa de decisao.
+contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **saiu** do template, o que **passa**
+a reprovar aqui (menos o que ja falhava), o que sobra **depois** das adaptacoes mecanicas (a decidir)
+e, por ultimo, a **fronteira**. Fachada `"EsteProjeto"`: editar no staging antes do `cp`.
 
 > Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela).
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
-Depois de aplicar — **e de o utilizador aplicar a fronteira** (2b) —, correr **nesta ordem** (com o `node .claude/hooks/tests/test-hooks.mjs`):
+Depois de aplicar — **e de o utilizador aplicar a fronteira** (2b) —, correr **nesta ordem**:
 
 ```bash
 node .agent/scripts/check-doc-versions.mjs     # paridade, orcamentos, placeholders
 node .agent/scripts/check-backlog.mjs          # contadores do backlog
+node .claude/hooks/tests/test-hooks.mjs        # so com a camada Claude
 node .agent/scripts/tests/test-guards.mjs            # e as outras suites test-*
 node .agent/scripts/mutation-sweep.mjs         # custa minutos; e o que interessa
 git add -A && node .agent/scripts/check-test-surface.mjs   # `git add` ANTES: ele le `git ls-files`
@@ -156,4 +157,4 @@ Sem isto, o proximo `/upgrade` cai no Modo B. So com a fronteira aplicada: senao
 
 O relatorio diz o que foi trazido **por categoria**, o que foi deliberadamente ignorado e
 porque, os conflitos que exigiram integracao a mao, e o resultado dos verificadores da secao
-3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou.
+3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou. Aplicada, **apagar o staging** (o caminho vem na 2b).

@@ -21,8 +21,7 @@
  */
 
 import { execFileSync } from "child_process";
-import { readFileSync, readdirSync, writeFileSync, rmSync, existsSync, mkdtempSync } from "fs";
-import { tmpdir } from "os";
+import { readFileSync, readdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { leOuNull } from "./ficheiros.mjs";
@@ -30,8 +29,7 @@ import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
 import { imprimeAntesDeAprovar } from "./saida-upgrade.mjs";
 import { agentesDesatualizados } from "./agentes.mjs";
 import { regrasEmFalta } from "./permissoes.mjs";
-import { fronteiraQueMuda, preparaStaging, comandosFronteira, hooksPorLigar, hooksPorDesligar, comFachada, PASTAS_FRONTEIRA } from "./fronteira-upgrade.mjs";
-import { resolve, relative, isAbsolute } from "path";
+import { fronteiraDa2b, validaFronteiraEm } from "./fronteira-upgrade.mjs";
 
 /** Os comandos que o consumidor corre, DERIVADOS dos jobs `guard-tests` e `sweep` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
@@ -265,6 +263,7 @@ export async function adapta2bGuard17({ dir, fatal }) {
  * @returns {number} o codigo de saida
  */
 export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fatal, fronteiraEm = null }) {
+  validaFronteiraEm(fronteiraEm, [raiz, template], fatal);
   const refs = versaoDeOrigem(raiz);
   if (refs.length === 0) {
     fatal(
@@ -392,72 +391,9 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // os intactos, que ele actualizou na copia, saem no bloco da FRONTEIRA abaixo (#304). Os removidos
   // pertencem a esta lista porque uma MIGRACAO adiada deixa as duas estruturas e poe o gate
   // vermelho — e a lista e lida ANTES de aplicar.
-  imprimeAntesDeAprovar({ medido, agentes: agentesDesatualizados(dir, template), desde: ref.slice(0, 12) }, ok);
-  // A FRONTEIRA e passo do UTILIZADOR (#304, R7B-2): o motor substitui `.claude/hooks/` e `.githooks/`
-  // na copia, mas no projeto real o agente nao os pode escrever — o hook de fronteira nega-o, e bem —, e o
-  // `upgrade.md` dizia "substituidos pelo motor" sem dizer por quem. Um derivado real decidiu sozinho,
-  // contra a letra do workflow. Daqui sai a lista, a versao PROCESSADA num staging que persiste (os
-  // placeholders e as constantes deste projeto — `lib/fronteira-upgrade.mjs`), e os comandos.
-  // O que o projeto tem COMMITADO e de onde a copia saiu; uma alteracao por commitar diz-se a parte.
-  // Os BYTES do commit, sem o `git()` desta medicao (que corta o fim): um `\n` final a menos fazia
-  // cada ficheiro intacto parecer mudado.
-  const commitado = (rel) => {
-    try {
-      return execFileSync("git", ["show", `HEAD:${rel}`], { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    } catch {
-      return null;
-    }
-  };
-  // A camada Claude: um projeto sem NENHUM ficheiro commitado em `.claude/` nao usa Claude Code — os hooks
-  // e os agentes nao se aplicam (auditoria do #304: a 2b mandava instalar 31 hooks a um projeto sem ela).
-  let temClaude = true;
-  try {
-    temClaude = execFileSync("git", ["ls-tree", "-r", "--name-only", "HEAD", "--", ".claude"], { cwd: raiz, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() !== "";
-  } catch {
-    temClaude = true; // na duvida, lista: um aviso a mais custa uma leitura
-  }
-  const fronteira = fronteiraQueMuda(raiz, dir, medido, { antes: commitado, temClaude });
-  let porCommitar = "";
-  try {
-    porCommitar = git(["status", "--porcelain", "--", ...PASTAS_FRONTEIRA], raiz).trim();
-  } catch {
-    porCommitar = "";
-  }
-  if (fronteira.length) {
-    // O staging NUNCA dentro do projeto nem do template (nem a conter um deles): com `--fronteira-em=.`
-    // ou `=$PWD` a propria 2b escrevia a fronteira do projeto, por um caminho que o hook nao ve.
-    const fora = (a, b) => { const r = relative(a, b); return r.startsWith("..") || isAbsolute(r); };
-    const staging = fronteiraEm === null ? mkdtempSync(join(tmpdir(), "agent-template-fronteira-")) : resolve(fronteiraEm);
-    if (fronteiraEm !== null && (!fronteiraEm.trim() || ![raiz, template].every((x) => fora(x, staging) && fora(staging, x)))) {
-      fatal(`--fronteira-em=${fronteiraEm}: o staging tem de ficar FORA do projeto e do template — senao a 2b escrevia a fronteira`);
-    }
-    preparaStaging(dir, fronteira, staging);
-    console.log("\n  --- A FRONTEIRA: passo do UTILIZADOR, fora do agente ---\n");
-    note(
-      `o upgrade muda ${fronteira.length} ficheiro(s) da fronteira; a versao dele (com os placeholders e as constantes ` +
-        `deste projeto) ficou em ${staging} (fica ate o apagares; o sistema pode limpar o tmpdir). Correr ANTES da ` +
-        `verificacao da secao 3 (ou aprovar cada \`Edit\`/\`Write\`):`
-    );
-    for (const l of comandosFronteira(raiz, staging, fronteira)) console.log(`        ${l}`);
-    const ligar = hooksPorLigar(fronteira);
-    if (ligar.length) note(`hook(s) novo(s) a ligar na chave \`hooks\` do .claude/settings.json (a mao): ${ligar.join(", ")}`);
-    const desligar = hooksPorDesligar(fronteira);
-    if (desligar.length) note(`hook(s) que saem, a DESLIGAR da chave \`hooks\` do .claude/settings.json (a mao): ${desligar.join(", ")}`);
-    const fachada = comFachada(staging, fronteira, "EsteProjeto");
-    if (fachada.length) note(`o nome do projeto nao se derivou: ${fachada.join(", ")} tem a fachada "EsteProjeto" — substituir pelo nome real antes do cp`);
-    if (porCommitar) note("este projeto tem alteracoes por commitar na fronteira: os cp/rm acima ESMAGAM-nas onde o template tambem mudou — guardar antes (commit ou stash) o que for do projeto; o que ja esta igual ao staging conta como aplicado");
-    let sujo = "";
-    try {
-      sujo = git(["status", "--porcelain", "--", ...PASTAS_FRONTEIRA], template).trim();
-    } catch {
-      sujo = "";
-    }
-    if (sujo) note("o template tem alteracoes por commitar na fronteira — o staging leva-as, e a marca da secao 4 grava so o commit");
-    console.log("");
-  } else {
-    ok("a fronteira (.claude/hooks/, .githooks/, .claude/agents/) nao muda neste upgrade — nada a pedir ao utilizador");
-  }
-  if (!temClaude) ok("este projeto nao tem a camada Claude (nada em .claude/): os hooks e os agentes nao se aplicam");
+  // A fronteira MEDE-SE aqui, sobre a copia como o motor a deixou; imprime-se no fim (`lib/fronteira-upgrade.mjs`).
+  const fronteira2b = fronteiraDa2b({ raiz, template, dir, medido, ref, fronteiraEm, git, ok, note, fatal });
+  imprimeAntesDeAprovar({ medido, agentes: agentesDesatualizados(dir, template), desde: ref.slice(0, 12), sai: fronteira2b.sai }, ok);
   if (medido.removidos.length) {
     // A copia e que fica sem eles — o projeto nao e tocado. Sem isto mediamos o MEIO da
     // migracao, um estado que ninguem deve ficar a ter, e a lista vinha cheia de ruido que
@@ -494,6 +430,8 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     console.log("\n  As adaptacoes mecanicas da 2b resolvem tudo o que passou a reprovar.\n");
   }
 
+  // A FRONTEIRA por ultimo (#317): so com a medicao inteira de pe se cria o staging e se dao os comandos.
+  fronteira2b.imprime();
   console.log("  Nada foi aplicado a este projeto: a medicao correu sobre uma copia.\n");
   return 0;
 }

@@ -93,8 +93,9 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/agentes\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
   // esta regra nao casava nada e mexer nele nao gerava obrigacao nenhuma — a mesma classe do
-  // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa.
-  { re: /^\.agent\/scripts\/tests\/harness\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")] },
+  // `pares.mjs` acima, e um harness DECIDE o veredicto de toda a suite que o usa. E o `test-guards`
+  // tambem (#317): o contrato do fail-fast dele ("sai sem deixar a sandbox") vive em `tests-fail-fast.mjs`.
+  { re: /^\.agent\/scripts\/tests\/harness\/test-upgrade-harness\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs")] },
   // O construtor de fixture do simulador de derivado, extraido pela mesma catraca (#198).
   { re: /^\.agent\/scripts\/tests\/harness\/test-derived-harness\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O harness do verificador de bundles, extraido pela mesma catraca. E a `config/` do

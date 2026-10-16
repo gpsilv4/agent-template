@@ -54,12 +54,19 @@ export const linhasDoProjeto = (doProjeto = []) =>
 
 /** Os ficheiros que sairam do template e o projeto ainda tem. Numa MIGRACAO (o mesmo nome noutra
  *  pasta) adiar a remocao deixa as duas estruturas, e e isso que poe o gate vermelho. */
-export const linhasRemovidos = (removidos, desde) => {
+export const linhasRemovidos = (removidos, desde, sai = new Set()) => {
   if (removidos.length === 0) return [];
   const migrados = removidos.filter((r) => r.migrado).length;
   return [
     `${removidos.length} ficheiro(s) sairam do template desde ${desde} e continuam no projeto:`,
-    ...removidos.map(({ caminho, migrado }) => `        ${caminho}${migrado ? "   (MIGRADO: o mesmo nome existe noutra pasta)" : ""}`),
+    // Os da FRONTEIRA tambem aparecem no bloco dela, com o `rm` que e do utilizador (#317): marcados, para a
+    // mesma remocao nao ser lida como duas — nem aprovada ao agente, que nao a pode fazer. `sai` e o que o
+    // bloco da 2b de facto lista: no modo template nao ha bloco, e nada se marca.
+    ...removidos.map(({ caminho, migrado }) => {
+      const marca = migrado ? "   (MIGRADO: o mesmo nome existe noutra pasta)" : "";
+      const daFronteira = sai.has(caminho);
+      return `        ${caminho}${marca}${daFronteira ? "   (FRONTEIRA: o rm e do utilizador, no bloco da fronteira)" : ""}`;
+    }),
     ...(migrados
       ? [
           `        ${migrados} sao MIGRACAO, nao limpeza — adiar a remocao deixa o projeto`,
@@ -74,14 +81,14 @@ export const linhasRemovidos = (removidos, desde) => {
  * o que e do projeto adotado e fica, o que nao foi copiado, os agentes, as constantes que mudaram de casa, e o que saiu do template.
  * @returns {string[][]} so os blocos nao vazios; o primeiro elemento de cada um e o titulo.
  */
-export const blocosAntesDeAprovar = ({ medido, agentes, desde }) =>
+export const blocosAntesDeAprovar = ({ medido, agentes, desde, sai }) =>
   [
     linhasSubstituidos(medido.substituidos),
     linhasDoProjeto(medido.doProjeto),
     linhasNaoCopiados(medido.naoCopiados),
     linhasAgentes(agentes),
     linhasMigracoes(medido.migracoes ?? []),
-    linhasRemovidos(medido.removidos, desde),
+    linhasRemovidos(medido.removidos, desde, sai),
   ].filter((b) => b.length);
 
 /** Imprime os blocos: o titulo por `ok` (o idioma do chamador), o detalhe tal como esta. */

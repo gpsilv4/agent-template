@@ -543,6 +543,15 @@ pelo mesmo `ask`, nunca por `cp` (que o contornava): o `tools:` deles e o que o 
 subagentes. A §3 corre depois da fronteira aplicada, e a marca da §4 so se grava com ela — senao o
 proximo `/upgrade` ja nao listava o que dela SAIU (os `muda`/`novo` voltavam, as remocoes nao).
 
+**A fronteira sai por ULTIMO na 2b (#317).** O bloco media-se e imprimia-se a meio, e a adaptacao do
+Guard 17 que vem depois pode acabar em `fatal`: ficavam no ecra comandos de uma medicao que falhou, e um
+staging orfao no tmpdir. Agora mede-se no mesmo sitio (sobre a copia como o motor a deixou, com os bytes
+lidos logo ali, antes da bateria correr sobre ela) e imprime-se no fim. No mesmo bloco: onde LIGAR cada
+hook novo (o evento e o matcher do `settings.json` do template, nao so o caminho), a ligacao que mudou num
+hook que o projeto ja tem, os ficheiros da fronteira marcados na lista do que saiu (o `rm` e do
+utilizador, nao do agente), e o staging, que persiste de proposito entre a 2b e o `cp` — e por isso so o
+utilizador o apaga (§5).
+
 ## As classes de "mudancas que reprovam" (taxonomia da 2b)
 
 Saiu do `upgrade.md` no #304, quando a fronteira precisou do espaco. Serve para **reconhecer** uma

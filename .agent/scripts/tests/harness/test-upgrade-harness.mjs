@@ -82,7 +82,7 @@ export function repo({ comTag = null, comMarca = false, semBootstrap = false } =
  *  caminho, logo tem de ser copiado para la — correr o daqui mediria ESTE repo.
  *  `sobrepoe` troca modulos de `lib/` DEPOIS da copia (`{ "upgrade-mecanico.mjs": src }`): e
  *  como se injecta um motor avariado, para medir o que o simulador apanha quando o motor erra. */
-export function corre(dir, args = [], sobrepoe = {}) {
+export function corre(dir, args = [], sobrepoe = {}, env = undefined) {
   mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, ".agent", "scripts", "guards"), { recursive: true });
   // A `lib/` INTEIRA, e nao os modulos nomeados um a um. A lista a mao era uma segunda copia
@@ -100,7 +100,8 @@ export function corre(dir, args = [], sobrepoe = {}) {
   }
   for (const [f, src] of Object.entries(sobrepoe)) writeFileSync(join(dir, ".agent/scripts/lib", f), src);
   try {
-    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], { cwd: dir, encoding: "utf8" }) };
+    const opts = { cwd: dir, encoding: "utf8", ...(env ? { env: { ...process.env, ...env } } : {}) };
+    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], opts) };
   } catch (err) {
     return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -119,7 +120,7 @@ export function corre(dir, args = [], sobrepoe = {}) {
  * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
  * @param {object} o.ontem   ficheiros do template JA na tag (o projeto herda-os intactos)
  */
-export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {} } = {}) {
+export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {}, tmp } = {}) {
   const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
   const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
@@ -172,10 +173,15 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
 
   // O staging da fronteira (#304) numa pasta da SUITE: o do simulador persiste de proposito, e a
   // varredura corre esta suite dezenas de vezes. `fronteiraEm: null` corre SEM a opcao (o staging por
-  // omissao, que o teste apaga); uma string e passada tal e qual (os casos de recusa).
-  const fronteira = fronteiraEm === undefined ? registaTmp(mkdtempSync(join(base, "sim-up-fronteira-"))) : fronteiraEm;
+  // omissao, que o teste apaga); uma string e passada tal e qual, e uma FUNCAO recebe `{ proj, tpl }` —
+  // os casos de recusa que apontam para dentro do projeto que so aqui existe (#317).
+  const fronteira =
+    fronteiraEm === undefined ? registaTmp(mkdtempSync(join(base, "sim-up-fronteira-"))) : typeof fronteiraEm === "function" ? fronteiraEm({ proj, tpl }) : fronteiraEm;
   const args = [`--projeto=${proj}`, ...(fronteira === null ? [] : [`--fronteira-em=${fronteira}`])];
-  return { tpl, proj, fronteira, ...corre(tpl, args) };
+  // `tmp`: o TMPDIR do simulador, para um teste do staging por omissao o apagar sem tocar no de mais ninguem.
+  // Uma FUNCAO recebe `{ proj }`: o TMPDIR dentro do projeto, que so existe a esta altura (#317).
+  const t = typeof tmp === "function" ? tmp({ proj }) : tmp;
+  return { tpl, proj, fronteira, ...corre(tpl, args, {}, t ? { TMPDIR: t } : undefined) };
 }
 
 export const exige = ({ code, out }, { codigo, inclui = [], exclui = [] }) => {

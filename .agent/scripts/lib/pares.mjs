@@ -156,6 +156,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O bloco da FRONTEIRA da 2b, que saiu do `medida-upgrade.mjs` (#317) e trouxe as recusas dele: o
+    // staging dentro do projeto ou do template, numa pasta cheia, e um caminho com caracteres de controlo.
+    // Cada `fatal()` que nao fica vermelho e uma escrita da fronteira que ninguem trava.
+    alvo: ".agent/scripts/lib/fronteira-upgrade.mjs",
+    suite: ".agent/scripts/tests/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A FIXTURE do modo template. Cada `fatal()` aqui apanha uma fixture que deixou de
     // representar um consumidor — e uma fixture que nao representa nada passa sempre.
     alvo: ".agent/scripts/lib/projeto-de-ontem.mjs",
