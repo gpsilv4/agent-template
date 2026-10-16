@@ -15,6 +15,7 @@ import { comFachada, fronteiraQueMuda } from "../lib/fronteira-upgrade.mjs";
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
+import { registar as registarFronteira317 } from "./tests-medida-2b-fronteira.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -224,11 +225,17 @@ export function registar() {
     ];
   });
   // Sem a opcao, o staging vai para uma pasta nova no tmpdir — que persiste, e por isso o teste a apaga.
+  // Num TMPDIR so deste teste, apagado inteiro (#317): a limpeza dependia da regex casar, e por prefixo no
+  // tmpdir do sistema apagava o staging de um `/upgrade` real corrido noutro terminal (leitura do #317).
   test("sem --fronteira-em o staging vai para o tmpdir (#304)", () => {
-    const r = contraProjeto({ hoje: { [H]: "// novo\n" }, fronteiraEm: null });
-    const m = /ficou em (\S*agent-template-fronteira-\S+) \(/.exec(r.out);
-    if (m) rmSync(m[1], { recursive: true, force: true });
-    return m ? [] : [`o staging por omissao nao apareceu: ${r.out.slice(0, 300)}`];
+    const meu = mkdtempSync(join(tmpdir(), "sim-up-tmp-"));
+    try {
+      const r = contraProjeto({ hoje: { [H]: "// novo\n" }, fronteiraEm: null, tmp: meu });
+      const m = /ficou em (\S*agent-template-fronteira-\S+) \(/.exec(r.out);
+      return m && m[1].startsWith(meu) ? [] : [`o staging por omissao nao apareceu no TMPDIR dado: ${r.out.slice(0, 300)}`];
+    } finally {
+      rmSync(meu, { recursive: true, force: true });
+    }
   });
   // Uma edicao POR COMMITAR num hook que o template nao mudou nao e "muda": a copia sai do commit.
   test("uma edicao por commitar no projeto nao vira um cp, e diz-se (#304)", () =>
@@ -306,4 +313,5 @@ export function registar() {
   test("um agente por commitar no TEMPLATE tambem e avisado (#304)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { [AG]: "---\nname: leitor\ntools: Read\n---\n" } }),
       { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
+  registarFronteira317({ H, P, cpDe, lido });
 }

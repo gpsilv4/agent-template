@@ -217,6 +217,18 @@ test("quem importa um modulo de lib/ ou tests/harness/ e obrigado a correr quand
   return [...p];
 });
 
+// O contrato do fail-fast ("sai sem deixar a sandbox") cita os harnesses numa STRING (`H("x.mjs")`), que o
+// teste de cima nao ve como import: mexer num deles tem de obrigar a correr a suite desse contrato (#317 —
+// o do `/upgrade` ficou de fora, e so uma leitura o apanhou).
+test("os harnesses do contrato de fail-fast obrigam a correr a suite dele", () => {
+  const f = ".agent/scripts/tests/tests-fail-fast.mjs";
+  const texto = readFileSync(f, "utf8");
+  const suite = `.agent/scripts/tests/${/export const entryPoint = "([^"]+)"/.exec(texto)?.[1]}`;
+  const citados = [...texto.matchAll(/\bH\("([\w-]+\.mjs)"\)/g)].map((m) => `.agent/scripts/tests/harness/${m[1]}`);
+  if (citados.length < 2) return [`so ${citados.length} harness(es) citados em ${f} — o teste mediria quase o vazio`];
+  return citados.filter((h) => !(regraDe(h)?.verifica ?? []).includes(suite)).map((h) => `mexer em ${h} nao obriga a correr ${suite}`);
+});
+
 test("todo o harness casa uma regra no mapa", () => {
   const dir = ".agent/scripts/tests/harness";
   const harnesses = readdirSync(dir).filter((n) => n.endsWith(".mjs"));
