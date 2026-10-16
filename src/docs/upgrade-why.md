@@ -282,6 +282,14 @@ novo; se estiver **customizado**, nao se toca. Um cabecalho customizado com pros
 silencio: um ID que ja nao existe e o Guard 15 que o aponta, um intervalo desactualizado e o
 G12g, ambos com ficheiro e linha. Quem integra a prosa nova e o consumidor.
 
+**E por isso a prosa que o consumidor guarda nao cita intervalos (#317).** O `anti-patterns.md` e o
+`review.md` diziam o intervalo dos anti-padroes do template por extenso, do primeiro ao ultimo. Um
+consumidor com o cabecalho customizado fica com essa prosa, e cada `TPn` novo do template punha o
+G12g a avisar nele — medido no derivado da ronda 8, depois da v0.58.0. Os dois passaram a dizer "os
+`TPn`", que nao envelhece. O titulo do `anti-patterns-template.md` e o `README` continuam com o
+intervalo: sao do template, e o G12g mantem-nos certos aqui. Quem ja tem o aviso corrige-o uma vez, na
+linha que ele aponta, para a mesma forma.
+
 ---
 
 ## Duas licoes da ronda 6 — a evidencia das instrucoes que o `upgrade.md` ja traz
@@ -480,6 +488,7 @@ tem quem o diga (medidos, com teste — duas leituras independentes do #308; as 
 | o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
 | `sweep` sem shards, com o template em shards | 2b: "reparte a varredura completa em shards ... trazer JUNTOS" |
 | a matriz em shards trazida SEM os passos do portao no `guard-gate` (um shard em falta passava verde) | `check-test-surface`: "nenhum job confere os relatorios deles" |
+| o portao trazido sem os MODOS, ou com modos que nao sao os da matriz (#317: um modo que deixasse de correr passava verde; um a mais punha todos os PRs vermelhos) | `check-test-surface`: "nao recebe o(s) modo(s)" / "exige o(s) modo(s) ... que a matriz nao tem"; em runtime, o portao: "nenhum relatorio" |
 | (runtime) o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
 | (runtime) o `ci.yml` novo com o `mutation-sweep.mjs` antigo (ignora o `SWEEP_SHARD`, nao escreve relatorio) | o upload reprova (`if-no-files-found: error`) — fechado; trazer os scripts com o workflow |
 | uma protecao que exija os checks das pernas pelo nome (`Mutation sweep (completa)`): com os shards passam a `(completa 1/2)`, `(completa 2/2)` e `(skips 1/1)`, e o antigo nunca aparece — os merges bloqueiam | ninguem automaticamente: o exigido e SO `Guard Tests` (o comentario do `guard-gate` di-lo desde a v0.58.0); quem tenha exigido as pernas troca-as por ele |

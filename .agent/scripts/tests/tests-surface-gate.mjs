@@ -17,6 +17,7 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { ehDerivado } from "../lib/derivado.mjs";
+import { modosDaMatriz, modosDoPortao } from "../lib/gate-modos.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { pathToFileURL } from "url";
 import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
@@ -328,6 +329,42 @@ export function registar() {
       ...(!diz(shards + portao) ? [] : ["com o portao num agregador, continuou a reprovar"]),
       ...(diz(shards + aParte) ? [] : ["o portao num job a parte, que nao agrega, passou"]),
       ...(!diz(shards.replace("SWEEP_SHARD: 1/2", "# SWEEP_SHARD: 1/2")) ? [] : ["um SWEEP_SHARD comentado contou"]),
+    ]);
+  }
+  // Os MODOS (#317): cada modo da matriz do `sweep` tem de chegar ao portao; os dois jeitos de os escrever.
+  {
+    const matriz = "jobs:\n  sweep:\n    runs-on: y\n    strategy:\n      matrix:\n        modo: [completa]\n        include:\n          - modo: skips\n    steps:\n      - env:\n          SWEEP_SHARD: 1/2\n        run: node .agent/scripts/mutation-sweep.mjs\n";
+    const portao = (args) => `  gate:\n    runs-on: y\n    needs: [sweep]\n    steps:\n      - env:\n          V: \${{ needs.sweep.result }}\n        run: node .agent/scripts/lib/varredura-shards.mjs x${args}\n`;
+    const faltam = (t) => defeitosDeEstrutura(t).find((d) => d.includes("nao recebe o(s) modo(s)")) ?? "";
+    registarResultado("gate: o portao recebe todos os modos da matriz (#317)", [
+      ...(faltam(matriz + portao("")).includes("completa, skips") ? [] : [`sem modos devia faltar completa e skips: "${faltam(matriz + portao(""))}"`]),
+      ...(faltam(matriz + portao(" completa")).includes("modo(s) skips da matriz") ? [] : ["o modo do `include` nao foi lido"]),
+      ...(faltam(matriz + portao(" completa skips")) === "" ? [] : ["com os dois modos, continuou a reprovar"]),
+    ]);
+  }
+  // O leitor (`lib/gate-modos.mjs`) directo: os nomes, sem duplicados, e `null` no que nao se le.
+  registarResultado("gate-modos: le a matriz e o portao, e devolve null no que nao se le (#317)", [
+    ...(JSON.stringify(modosDaMatriz(["modo: [completa]", "include:", "  - modo: skips", "  - modo: completa"])) === '["completa","skips"]' ? [] : ["a matriz nao deu completa e skips"]),
+    ...(modosDaMatriz(["modo: ${{ x }}"]) === null ? [] : ["um modo de uma expressao devia dar null"]),
+    ...(JSON.stringify(modosDoPortao(["run: node .agent/scripts/lib/varredura-shards.mjs x completa \\", "  skips"])) === '[["completa","skips"]]' ? [] : ["a continuacao nao foi lida"]),
+    ...(JSON.stringify(modosDoPortao(["run: node .agent/scripts/lib/varredura-shards.mjs x $M"])) === "[null]" ? [] : ["uma variavel devia dar null"]),
+  ]);
+  // As outras formas de YAML (leituras do #317): leem-se, e o que nao se le FALHA FECHADO.
+  {
+    const job = (m) => `jobs:\n  sweep:\n    runs-on: y\n    strategy:\n      matrix:\n${m}    steps:\n      - env:\n          SWEEP_SHARD: 1/2\n        run: node .agent/scripts/mutation-sweep.mjs\n`;
+    const gate = (args) => `  gate:\n    runs-on: y\n    needs: [sweep]\n    steps:\n      - env:\n          V: \${{ needs.sweep.result }}\n        run: node .agent/scripts/lib/varredura-shards.mjs x${args}\n`;
+    const defeitos = (t) => defeitosDeEstrutura(t).filter((d) => /modo|modos/.test(d));
+    const limpo = (nome, m, args) => (defeitos(job(m) + gate(args)).length === 0 ? [] : [`${nome}: ${defeitos(job(m) + gate(args)).join(" | ")}`]);
+    const diz = (nome, m, args, texto) => (defeitos(job(m) + gate(args)).some((d) => d.includes(texto)) ? [] : [`${nome}: esperava "${texto}"`]);
+    registarResultado("gate: os modos leem-se em todas as formas de YAML, e o que nao se le reprova (#317)", [
+      ...limpo("lista com aspas", '        modo: ["completa", "skips"]\n', " completa skips"),
+      ...limpo("escalar com aspas", "        include:\n          - modo: 'skips'\n          - modo: \"completa\"\n", " completa skips"),
+      ...limpo("mapa em linha", "        include:\n          - { modo: completa, shard: 1 }\n          - { modo: skips, shard: 1 }\n", " completa skips"),
+      ...limpo("lista em bloco", "        modo:\n          - completa\n          - skips\n", " completa skips"),
+      ...limpo("portao com aspas e continuacao", "        modo: [completa, skips]\n", ' \\\n          "completa" \'skips\''),
+      ...diz("matriz de uma expressao", "        matrix: ${{ fromJSON(x) }}\n", " completa", "nao consegui ler os modos da matriz"),
+      ...diz("portao com uma variavel", "        modo: [completa]\n", " $MODOS", "nao consegui ler os modos que o portao recebe"),
+      ...diz("um modo a mais no portao", "        modo: [completa]\n", " completa skips", "exige o(s) modo(s) skips, que a matriz nao tem"),
     ]);
   }
   // O que o bootstrap deixa: o `ci.yml` do TEMPLATE sem o job `simulators` (o §2.7 remove-o) nao tem

@@ -29,6 +29,7 @@
  * de shell sao o #295; um clone raso (`fetch-depth` curto) pode por em `base..HEAD` commits que nao
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */
+import { modosDaMatriz, modosDoPortao } from "./gate-modos.mjs";
 
 /** Uma linha de YAML sem o comentario e os espacos do fim. O `#` so comeca um comentario no
  *  inicio ou depois de um espaco — `${{ x }}#a` e `a#b` nao sao comentarios. */
@@ -264,6 +265,28 @@ export function defeitosDeEstrutura(texto) {
   const ativa = (j, re) => j.ls.some((l) => re.test(l));
   if (jobs.some((j) => ativa(j, /\bSWEEP_SHARD\b/)) && !jobs.some((j) => agregadores.has(j.id) && ativa(j, /\bvarredura-shards\.mjs\b/))) {
     out.push("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job AGREGADOR confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
+  }
+  // Os MODOS (#317): a matriz e a linha do portao sao duas listas, e tem de ser IGUAIS (`lib/gate-modos.mjs`).
+  // Um modo que nao chegue ao portao passava verde se deixasse de correr; um a mais punha todos os PRs
+  // vermelhos. O que nao se le FALHA FECHADO: um YAML desconhecido calava a regra (leituras do #317).
+  for (const j of jobs.filter((x) => ativa(x, /\bSWEEP_SHARD\b/))) {
+    const daMatriz = modosDaMatriz(j.ls);
+    if (daMatriz === null) {
+      out.push(`nao consegui ler os modos da matriz do job \`${j.id}\` (\`modo: [a, b]\` ou \`- modo: x\`) — sem eles, o portao nao sabe que modos exigir`);
+      continue;
+    }
+    for (const a of jobs.filter((x) => agregadores.has(x.id))) {
+      for (const recebe of modosDoPortao(a.ls)) {
+        if (recebe === null) {
+          out.push(`nao consegui ler os modos que o portao recebe no job \`${a.id}\` — escreve-os por extenso, sem variaveis`);
+          continue;
+        }
+        const faltam = daMatriz.filter((x) => !recebe.includes(x));
+        const sobram = recebe.filter((x) => !daMatriz.includes(x));
+        if (faltam.length) out.push(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) nao recebe o(s) modo(s) ${faltam.join(", ")} da matriz — um modo que nao corresse passava verde`);
+        if (sobram.length) out.push(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) exige o(s) modo(s) ${sobram.join(", ")}, que a matriz nao tem — todos os PRs ficavam vermelhos`);
+      }
+    }
   }
   const nomes = new Map();
   for (const j of jobs) {

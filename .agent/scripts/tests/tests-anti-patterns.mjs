@@ -14,6 +14,7 @@ import { pathToFileURL } from "url";
 import { test, file, readF, writeF, registarResultado, ROOT } from "./harness/test-harness.mjs";
 import { guardAntiPatternEvidence, guardAntiPatternRefs } from "../guards/anti-patterns.mjs";
 import { correDireto } from "./harness/guard-direto.mjs";
+import { ehDerivado } from "../lib/derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -55,6 +56,16 @@ export function registar() {
   const semEntradas = correDireto(guardAntiPatternEvidence, {
     read: (p) => (p.endsWith("anti-patterns-template.md") ? "# Template\n\nSem entradas.\n" : "# Porque\n"),
   });
+  // A prosa que um DERIVADO guarda (o cabecalho customizado, o `review.md` dele) nao cita o intervalo dos
+  // `TPn` (#317): cada `TPn` novo do template punha o G12g a avisar nele. O template tem o intervalo onde
+  // o G12g o mantem certo — o titulo do catalogo e o README —, e so la.
+  // So no TEMPLATE (leitura do #317): num derivado estes dois ficheiros sao DELE, e um cabecalho customizado
+  // com o intervalo e decisao do projeto — la quem fala e o G12g, com um aviso, so se o intervalo mentir.
+  const lerRaiz = (f) => { try { return readFileSync(join(ROOT, f), "utf8"); } catch { return null; } };
+  if (ehDerivado(lerRaiz)) console.log("  SKIP  os ficheiros que um derivado guarda nao citam o intervalo dos TPn (so no template)");
+  else registarResultado("os ficheiros que um derivado guarda nao citam o intervalo dos TPn (#317)",
+    [".agent/rules/anti-patterns.md", ".agent/workflows/review.md"].flatMap((f) =>
+      /`?TP\d+`?\s*(?:[-–]|\.\.)\s*`?TP\d+/.test(lerRaiz(f) ?? "") ? [`${f} cita um intervalo de TPn — dizer "os \`TPn\`"`] : []));
   registarResultado("G18: catalogo do template sem entradas da SKIP visivel",
     semEntradas.includes("SKIP  Guard 18 — o catalogo do template nao tem entradas") ? [] : [`saiu: ${semEntradas}`]);
 
