@@ -76,7 +76,6 @@
 
 import { readFileSync, rmSync, readdirSync, writeFileSync } from "fs";
 import { limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo.mjs";
-import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
@@ -96,6 +95,7 @@ import { PARES } from "./lib/pares.mjs";
 // exactamente 500 linhas contra um limite de 500 (ver o cabecalho dela).
 import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
+import { alvosDoDiff } from "./lib/varredura-diff.mjs";
 import { medeCobertura, quantosWorkers, resumoDeTempos, copiaDoRepo } from "./lib/varredura-paralela.mjs";
 import { qualShard, particao, totalDeSitios, ENV_SHARD, ENV_RELATORIO } from "./lib/varredura-fatia.mjs";
 
@@ -197,62 +197,10 @@ if (!only) {
   }
 }
 
-/** Os alvos que o trabalho deste branch toca, pelas DUAS vias que o mapa conhece.
- *
- *  1. O ficheiro alterado E um alvo -> varre-se.
- *  2. O ficheiro alterado e (ou leva a) uma SUITE -> varrem-se todos os alvos que a usam. E a
- *     via que apanha o indirecto: mexer no `test-harness.mjs` nao toca em alvo nenhum, mas
- *     muda o veredicto de ~260 testes. Sem esta via o filtro media menos do que diz medir, que
- *     seria o `TP2` dentro da ferramenta escrita para o apanhar.
- *
- *  A baseline vem de `git`: sem ela **reprova**, nunca cai para "varrer tudo" nem para "varrer
- *  nada". Uma medicao ausente nao e um OK — a mesma regra do `check-test-surface.mjs`. */
-function alvosDoDiff() {
-  const git = (args) => execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
-  let base;
-  try {
-    // O ramo principal deste repo, e nao um nome assumido: um projeto derivado pode usar outro.
-    const principal = ["origin/HEAD", "origin/main", "main", "origin/master", "master"].find((r) => {
-      try {
-        git(["rev-parse", "--verify", "--quiet", r]);
-        return true;
-      } catch {
-        return false;
-      }
-    });
-    if (!principal) return { erro: "nao encontrei o branch principal (origin/HEAD, main, master)" };
-    base = git(["merge-base", "HEAD", principal]);
-  } catch (err) {
-    return { erro: `nao consegui resolver a base do branch: ${err.message.split("\n")[0]}` };
-  }
-  // Sem `--cached`: compara a ARVORE DE TRABALHO contra a base, logo inclui o que ainda nao
-  // foi commitado. `-z` porque o git CITA caminhos com espacos ou bytes nao-ASCII, e um
-  // caminho citado nao casa regra nenhuma — a lacuna seria silenciosa (`TP5`).
-  let ficheiros;
-  try {
-    ficheiros = git(["diff", "--name-only", "-z", base]).split("\0").filter(Boolean);
-  } catch (err) {
-    return { erro: `nao consegui ler o diff contra ${base.slice(0, 7)}: ${err.message.split("\n")[0]}` };
-  }
-  // Os nao rastreados tambem contam: um verificador NOVO ainda por commitar e exactamente o
-  // caso em que ninguem quer descobrir a falta de cobertura so no CI.
-  try {
-    const novos = git(["ls-files", "--others", "--exclude-standard", "-z"]).split("\0").filter(Boolean);
-    ficheiros = [...new Set([...ficheiros, ...novos])];
-  } catch {
-    /* melhor esforco: o diff acima ja e a medicao */
-  }
-
-  const { porVerificador, semRegra } = verificadoresDe(ficheiros);
-  const suites = new Set(porVerificador.keys());
-  const alvos = PARES.filter((p) => ficheiros.includes(p.alvo) || suites.has(p.suite));
-  return { ficheiros, alvos, semRegra };
-}
-
 let selecionados = only ? PARES.filter((p) => p.alvo.includes(only)) : PARES;
 let diffSemAlvos = null;
 if (modoDiff) {
-  const r = alvosDoDiff();
+  const r = alvosDoDiff(ROOT, PARES, verificadoresDe);
   if (r.erro) {
     console.log(`  SEM BASELINE  ${r.erro}`);
     console.log("                sem baseline nao ha medicao, e uma medicao ausente nao e um OK.");
@@ -276,7 +224,8 @@ if (modoDiff) {
   }
   if (selecionados.length === 0) diffSemAlvos = r;
 }
-if (diffSemAlvos) {
+// Um `--shard` invalido reprova ANTES do "nada a varrer" (#317): `--diff --shard=mau` num branch sem alvos saia 0.
+if (diffSemAlvos && !shard?.erro) {
   const { ficheiros, semRegra } = diffSemAlvos;
   console.log(`  Nada a varrer: nenhum dos ${ficheiros.length} ficheiro(s) alterado(s) leva a um alvo.`);
   for (const f of semRegra) console.log(`    sem regra no mapa: ${f}`);
@@ -345,15 +294,17 @@ async function mede() {
 
   for (const { alvo, total, naoCobertos, ordemLigada, confirmacoes, divergencias } of resultados) {
     const ordem = ordemLigada ? ` [dono primeiro: ${confirmacoes} confirmacao(oes) na ordem normal, ${divergencias} divergencia(s)]` : "";
+    // Num shard, `total` e o da FATIA, nao o do alvo inteiro (#317): diz-se, para ninguem ler 3/3 como o alvo todo.
+    const fatia = shard?.n > 1 ? ` (fatia ${shard.k}/${shard.n})` : "";
     if (naoCobertos.length) {
-      console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos${ordem}`);
+      console.log(`  INCOMPLETA  ${alvo}: ${total - naoCobertos.length}/${total} sitios cobertos${fatia}${ordem}`);
       // O MOTIVO, quando o ha: um sitio em timeout nao e "sem teste", e "nao medido" — e quem le
       // so o relatorio final (e nao a linha impressa no momento) tem de o poder distinguir.
       const porque = { timeout: " (nao medido: timeout)", rebentou: " (rebentou: sem FAIL)" };
       for (const { ln, txt, motivo } of naoCobertos) console.log(`              L${ln}: ${txt}${porque[motivo] ?? ""}`);
       falhou = true;
     } else {
-      console.log(`  OK  ${alvo}: ${total}/${total} sitios — cada aviso fica vermelho${ordem}`);
+      console.log(`  OK  ${alvo}: ${total}/${total} sitios${fatia} — cada aviso fica vermelho${ordem}`);
     }
     sitiosMedidos += total;
   }
@@ -478,11 +429,15 @@ if (listarSo) process.exit(falhou ? 1 : 0);
 // A causa nao se afirma aqui: pode ser um aviso sem teste, um alvo ausente, um `sinal`
 // desatualizado, uma baseline vermelha ou uma linha ambigua. As linhas acima dizem qual.
 if (!falhou && sitiosMedidos === 0) {
-  // Nada correu mal E nada foi medido. Dizer "completa" seria afirmar o que nao se mediu.
+  // Nada correu mal E nada foi medido. Dizer "completa" seria afirmar o que nao se mediu. Com mais shards do
+  // que sitios a causa e a FATIA vazia, e nao o filtro nem o `sinal` (#317): diz-se qual.
+  const fatiaVazia = shard?.n && totalDaArvore > 0;
   console.log(
     `\n  NADA MEDIDO — nenhum sitio foi desligado${modoSkips ? " (modo --skips)" : ""}${only ? ` (--only=${only})` : ""}.` +
-      `\n  Isto NAO e cobertura completa: e uma varredura sem trabalho. Verificar o filtro,` +
-      `\n  ou o \`sinal\` do par, antes de ler este resultado como sucesso.\n`
+      (fatiaVazia
+        ? `\n  A fatia ${shard.k}/${shard.n} ficou vazia: ${totalDaArvore} sitio(s) para ${shard.n} shard(s). Menos shards, ou nenhum.\n`
+        : `\n  Isto NAO e cobertura completa: e uma varredura sem trabalho. Verificar o filtro,` +
+          `\n  ou o \`sinal\` do par, antes de ler este resultado como sucesso.\n`)
   );
   // `falhou = true` e nao um `process.exit(1)` proprio: assim este sitio de recusa e do mesmo
   // tipo que os outros deste ficheiro, e a varredura (que varre este ficheiro com o sinal

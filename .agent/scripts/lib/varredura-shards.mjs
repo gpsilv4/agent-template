@@ -10,7 +10,10 @@
  * `n` e no total, e a soma dos medidos e o total. O desenho original do #159 tinha esta defesa;
  * uma primeira versao do #308 deixou-a cair, e a revisao do proprio ticket repo-la.
  *
- * Uso no portao: `node .agent/scripts/lib/varredura-shards.mjs <pasta-com-os-relatorios>`.
+ * Uso no portao: `node .agent/scripts/lib/varredura-shards.mjs <pasta-com-os-relatorios> [modo...]`. Os
+ * MODOS esperados (#317): sem eles, tirar a `skips` da matriz deixava o portao verde sem ela — cada modo
+ * so era conferido se aparecesse. Sem modos na linha de comando, o comportamento e o de antes (um derivado
+ * com o `ci.yml` antigo nao parte); o `superficie-gate.mjs` exige que sejam exactamente os da matriz.
  *
  * A FATIA (`--shard=k/n`, a particao) vive em `./varredura-fatia.mjs`, e nao aqui: este modulo
  * tem sitios de recusa, e o varredor importa-la arrastava-o para a fixture do
@@ -26,11 +29,17 @@ import { pathToFileURL } from "url";
  * `{ modo, k, n, total, medidos, aplicavel }` (`aplicavel: false` = o PR nao tocou em verificador
  * nenhum, e a varredura nem correu).
  * @param {Array<{modo: string, k: number, n: number, total?: number, medidos?: number, aplicavel: boolean}>} relatorios
+ * @param {string[]} [modos] os modos que TEM de ter relatorios (a matriz do `sweep`)
  * @returns {string[]} os problemas; vazio = a varredura inteira foi medida
  */
-export function confere(relatorios) {
+export function confere(relatorios, modos = []) {
   const problemas = [];
   if (relatorios.length === 0) problemas.push("nenhum relatorio de shard — a varredura nao deixou prova de ter corrido");
+  for (const m of modos) if (!relatorios.some((r) => r.modo === m)) problemas.push(`${m}: nenhum relatorio — o modo saiu da matriz, ou nao correu`);
+  // A MESMA decisao para todos os modos pedidos (leitura do #317), como ja vale entre os shards de um: uma
+  // `completa` que correu com uma `skips` toda "nao aplicavel" e um modo que um `if:` proprio calou.
+  const decisoes = new Set(modos.flatMap((m) => relatorios.filter((r) => r.modo === m).map((r) => r.aplicavel)));
+  if (decisoes.size > 1) problemas.push(`os modos ${modos.join(", ")} nao concordam em correr: uns mediram, outros disseram "nao aplicavel"`);
   for (const modo of [...new Set(relatorios.map((r) => r.modo))].sort()) {
     const rs = relatorios.filter((r) => r.modo === modo);
     const ns = [...new Set(rs.map((r) => r.n))];
@@ -60,7 +69,7 @@ export function confere(relatorios) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const pasta = process.argv[2];
+  const [pasta, ...modos] = process.argv.slice(2);
   let relatorios = [];
   let ilegiveis = [];
   try {
@@ -76,7 +85,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } catch {
     ilegiveis = [`a pasta ${pasta ?? "(nenhuma)"}`];
   }
-  const erros = [...ilegiveis.map((f) => `nao consegui ler ${f}`), ...confere(relatorios)];
+  const erros = [...ilegiveis.map((f) => `nao consegui ler ${f}`), ...confere(relatorios, modos)];
   for (const e of erros) console.log(`  FALHA  varredura: ${e}`);
   if (erros.length === 0) {
     for (const r of relatorios.sort((a, b) => a.modo.localeCompare(b.modo) || a.k - b.k))

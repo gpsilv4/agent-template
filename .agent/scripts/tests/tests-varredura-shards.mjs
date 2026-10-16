@@ -121,6 +121,36 @@ export function registar() {
     }
   }
 
+  // Os MODOS esperados (#317): um modo da matriz sem relatorios reprova; sem modos pedidos, o de antes.
+  registarResultado("shards: um modo esperado sem relatorios reprova, e sem modos pedidos nao", [
+    ...(confere([rel()], ["completa", "skips"]).some((p) => p.startsWith("skips: nenhum relatorio")) ? [] : ["a skips em falta passou"]),
+    ...(confere([rel(), rel({ modo: "skips", total: 3, medidos: 3 })], ["completa", "skips"]).length === 0 ? [] : ["com os dois modos, reprovou"]),
+    ...(confere([rel()]).length === 0 ? [] : ["sem modos pedidos, reprovou o que antes passava"]),
+    // A mesma decisao entre os modos (leitura do #317): uma `skips` toda "nao aplicavel" com a `completa` medida.
+    ...(confere([rel(), rel({ modo: "skips", aplicavel: false })], ["completa", "skips"]).some((p) => p.includes("nao concordam em correr")) ? [] : ["modos com decisoes diferentes passaram"]),
+  ]);
+  {
+    const dir = mkdtempSync(join(tmpdir(), "shards-test-"));
+    try {
+      writeFileSync(join(dir, "completa-1.json"), JSON.stringify(rel()));
+      const cli = (modos) => {
+        try {
+          return { code: 0, out: execFileSync(process.execPath, [join(ROOT, ".agent/scripts/lib/varredura-shards.mjs"), dir, ...modos], { encoding: "utf8" }) };
+        } catch (err) {
+          return { code: err.status ?? -1, out: String(err.stdout ?? "") };
+        }
+      };
+      const semSkips = cli(["completa", "skips"]);
+      const soCompleta = cli(["completa"]);
+      registarResultado("shards: o portao pela linha de comando exige os modos que recebe", [
+        ...(semSkips.code === 1 && semSkips.out.includes("skips: nenhum relatorio") ? [] : [`sem a skips: exit ${semSkips.code}`]),
+        ...(soCompleta.code === 0 ? [] : [`so a completa: exit ${soCompleta.code}, ${soCompleta.out}`]),
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
   // --- Ponta a ponta: a fatia chega ao motor e o relatorio e escrito -------------------
   // A fixture da varredura tem dois sitios, um coberto e outro nao: o shard 1/2 mede so o coberto,
   // o 2/2 so o outro. Cada um reprova (ou nao) pela SUA fatia — e o relatorio diz o que mediu.
@@ -147,6 +177,9 @@ export function registar() {
     }
     if (!casos[0].out.includes("1 sitios medidos (shard 1/2, de 2)")) problemas.push(`shard 1/2: ${casos[0].out.slice(-300)}`);
     if (casos[1].code !== 1 || !casos[1].out.includes("INCOMPLETA")) problemas.push(`shard 2/2 devia reprovar o sitio por cobrir: exit ${casos[1].code}`);
+    // As linhas por alvo dizem que sao a FATIA (#317): 1/1 num shard nao e o alvo inteiro.
+    if (!/OK\s+\S+: 1\/1 sitios \(fatia 1\/2\)/.test(casos[0].out)) problemas.push(`shard 1/2 sem "(fatia 1/2)" na linha OK: ${casos[0].out.slice(-300)}`);
+    if (!/INCOMPLETA\s+\S+: 0\/1 sitios cobertos \(fatia 2\/2\)/.test(casos[1].out)) problemas.push(`shard 2/2 sem "(fatia 2/2)" na linha INCOMPLETA: ${casos[1].out.slice(-300)}`);
     if (confere(casos.map((c) => c.relatorio).filter(Boolean)).length) problemas.push("os dois relatorios reais nao passaram no portao");
     registarResultado("shards: --shard sobre a fixture da varredura reparte, reprova a fatia e escreve o relatorio", problemas);
   }
@@ -196,6 +229,35 @@ export function registar() {
     try {
       const r = run(dir, ["--list", "--shard=3/2"]);
       registarResultado("shards: --list com --shard mal escrito reprova", r.code === 1 && r.out.includes("SHARD INVALIDO") ? [] : [`exit ${r.code}`]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  // Mais shards do que sitios: a fatia vazia diz-se como tal, e nao como um filtro ou um `sinal` errado (#317).
+  {
+    const dir = sandbox({ segundoSitio: false });
+    try {
+      const r = run(dir, ["--shard=2/2"]);
+      registarResultado(
+        "shards: uma fatia vazia diz o shard, e nao manda verificar o filtro",
+        r.code === 1 && r.out.includes("A fatia 2/2 ficou vazia: 1 sitio(s) para 2 shard(s)") && !r.out.includes("Verificar o filtro")
+          ? []
+          : [`exit ${r.code}: ${r.out.slice(-300)}`]
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+  // `--diff` sem alvos e um `--shard` mal escrito: o shard reprova, em vez do "nada a varrer" sair 0 (#317).
+  // O `--diff` vive em `lib/varredura-diff.mjs`; este caso e o que o exercita no `test-guards`.
+  {
+    const dir = sandbox({ comGit: true, alterado: "README-x.md" });
+    try {
+      const r = run(dir, ["--diff", "--shard=3/2"]);
+      registarResultado(
+        "shards: --diff sem alvos com --shard mal escrito reprova",
+        r.code === 1 && r.out.includes("SHARD INVALIDO") && !r.out.includes("Nada a varrer") ? [] : [`exit ${r.code}: ${r.out.slice(-300)}`]
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

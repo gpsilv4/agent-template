@@ -491,7 +491,9 @@ jobs:
     steps:
       # Os SHARDS (#308): cada um so ve a sua fatia, logo "todos verdes" nao prova que TODOS correram —
       # um tirado da matriz deixava sitios por medir com o resto verde. Os relatorios deles juntos
-      # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos.
+      # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos. E os
+      # MODOS da matriz, passados ao portao (#317): sem eles, um modo tirado da matriz passava verde — o
+      # `superficie-gate.mjs` exige que sejam os mesmos, para nao serem duas listas a concordar a mao.
       # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
       # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
       # ficheiros e passa; e o passo de baixo que decide se os confere.
@@ -522,7 +524,7 @@ jobs:
           # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
           # Qualquer outro estado (`failure`, `cancelled`) reprova.
           if [ "$VARREDURA" = success ]; then
-            node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura"
+            node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura" completa skips
             exit $?
           fi
           if [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; then
