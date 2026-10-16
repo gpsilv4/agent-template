@@ -85,12 +85,13 @@ const CONDICOES = [
   // Uma por condicao de escrita dentro do bloco: com o rotulo escolhido por condicao, cada braco
   // sem caso era uma razao que podia mudar sem nada o denunciar.
   ["bloco que edita no sitio", "{ sed -i '' s/a/b/ .claude/settings.json; }", "edita-no-sitio"],
-  // O `git`/`find` que escreve so se ve num segmento SEU. Colado ao `{` o rotulo e o do bloco (ja
-  // era antes do #307, e nega na mesma) — e por isso leva a razao de OPACIDADE: uma escrita que o
-  // hook nao separa do bloco. Fixado abaixo; seguimento no #307.
+  // O `git`/`find` que escreve, num segmento seu OU colado a palavra-chave do bloco: desde o #317 o
+  // rotulo e o de escrita nos dois (antes, colado ao `{`, levava a razao de opacidade).
   ["bloco com git que escreve", "{ cat .claude/settings.json; git rm .claude/hooks/x; }", "git-que-escreve"],
   ["bloco com find que escreve", "{ cat .claude/settings.json; find .claude/hooks -delete; }", "find-que-escreve"],
-  ["git colado ao bloco", "{ git rm .claude/hooks/x; }", "verbo-nao-e-leitura:{"],
+  ["git colado ao bloco", "{ git rm .claude/hooks/x; }", "git-que-escreve"],
+  ["find colado ao bloco", "{ find .claude/hooks -delete; }", "find-que-escreve"],
+  ["git colado ao while", "while git rm .claude/hooks/x; do :; done", "git-que-escreve"],
   // A variavel de um `for` e o sujeito de um `case` sao TEXTO: um `rm` ali nao e um comando.
   ["rm como variavel do for", "for rm in .claude/hooks/*; do cat $rm; done", "verbo-nao-e-leitura:for"],
   ["rm no sujeito do case", "case rm in x) cat .claude/hooks/x;; esac", "verbo-nao-e-leitura:case"],

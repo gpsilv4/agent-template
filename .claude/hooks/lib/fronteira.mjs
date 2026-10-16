@@ -113,7 +113,26 @@ const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/
 const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|(?:\\|(?:builtin|command)\s+)?alias\s|[\w.:-]+\s*\(\s*\))/;
 
 /** Interpretadores a correr codigo INLINE. Correr um FICHEIRO e leitura; `-e` escreve. */
-const CODIGO_INLINE = /\b(?:node|deno|bun|python3?|ruby|perl|php)\b[^\n]*\s(?:-e|-p|--eval|--print|-c)\b/;
+// Uma so isencao, e ESTRITA (#317): quando o token IMEDIATAMENTE a seguir ao interpretador e um ficheiro
+// de script, o `-e`/`-c` que vier depois e do SCRIPT (`node eslint.js -c <config>` era negado). Qualquer
+// opcao antes do script mantem a regra antiga: uma primeira versao tentava saber que opcoes levam valor
+// (`-r x.js`, `--import`) e um leitor mostrou cinco formas de passar codigo inline por ela
+// (`--import=x.mjs -e`, `--title x.js -e`, dois espacos...). Na duvida, o lado fechado.
+// E o script so com caracteres que o shell entrega TAL COMO ESTAO — lista fechada, nao "tudo menos `-`":
+// `perl \-Ix.pl -e`, `node $X.js -e` e `node [-]-title?x.js -e` pareciam um script na regex e chegavam ao
+// interpretador como opcao (segunda leitura do #317).
+const INTERPRETADOR = String.raw`\b(?:node|deno|bun|python3?|ruby|perl|php)\b`;
+const FLAG_INLINE = String.raw`[^\n]*\s(?:-e|-p|--eval|--print|-c)\b`;
+const SCRIPT_A_SEGUIR = String.raw`\s+[\w./][\w./@+-]*\.(?:[cm]?js|ts|py|rb|pl|php)(?=\s|$)`;
+const CODIGO_INLINE = new RegExp(`${INTERPRETADOR}(?!${SCRIPT_A_SEGUIR})${FLAG_INLINE}`);
+// A mesma, SEM a isencao: o `alvo` ja passou pelo `normalizaCaminhos`, que troca `~/`, `$HOME/` e `$PWD/`
+// pelo caminho canonico — e `HOME=--title=; node ~/<raiz>/.claude/hooks/a.js -e` ficava com cara de script
+// (terceira leitura do #317). A isencao so vale se o texto TAL COMO FOI ESCRITO tambem a mostrar.
+const INLINE_SEM_ISENCAO = new RegExp(`${INTERPRETADOR}${FLAG_INLINE}`);
+// Os sub-verbos do `git` e as flags do `find` que escrevem: um sitio so, lidos pelo teste do segmento e
+// pelo do bloco (`{ git rm <f>; }`) — duas copias da lista divergiam ao primeiro sub-verbo novo.
+const GIT_QUE_ESCREVE = String.raw`\s(?:rm|mv|restore|checkout|clean|stash)\b`;
+const FIND_QUE_ESCREVE = /\s-(?:delete|fprint[f0]?|fls)\b/;
 
 /** Marca um sitio de RECUSA. Devolve o rotulo tal e qual — nao faz nada.
  *
@@ -194,7 +213,9 @@ function julga(texto, ctx, dentroDoGit = false) {
   }
   const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
   const opaco = OPACO.test(texto);
-  const inline = CODIGO_INLINE.test(texto);
+  // SEM a isencao do script: com a fronteira so citada nao ha leitura legitima a salvar (a do ESLint
+  // tem o caminho a vista), e cada isencao aqui era superficie nova sem proveito (quarta leitura do #317).
+  const inline = INLINE_SEM_ISENCAO.test(texto);
 
   // A fronteira so aparece DENTRO de aspas ou de um heredoc: e texto. Excepto quando o
   // comando executa esse texto (`eval`, `sh -c`) ou o passa a um interpretador (`node -e`),
@@ -266,7 +287,7 @@ function julga(texto, ctx, dentroDoGit = false) {
   // e o `xargs`, que nao tem o caminho escrito. Alinhar os dois passava esse comando a
   // PERMITIDO — apagava a pasta dos hooks inteira. Foi uma leitura independente a dar o
   // contra-exemplo, e os casos dele sao os primeiros do `tests-fronteira-alcance.mjs`.
-  const inlineNoAlvo = CODIGO_INLINE.test(alvo);
+  const inlineNoAlvo = CODIGO_INLINE.test(alvo) || (INLINE_SEM_ISENCAO.test(alvo) && CODIGO_INLINE.test(semCitacoes(texto)));
   // Uma allowlist por BINARIO e grossa quando o binario tem sub-verbos que apagam: `git rm`,
   // `git restore` e `git checkout --` passavam por `git` estar na lista. Medido ao remover um
   // hook obsoleto, minutos depois de escrever esta verificacao.
@@ -280,7 +301,7 @@ function julga(texto, ctx, dentroDoGit = false) {
   // --output=commit-msg` (sem extensao, o `normalizaCaminhos` nao a reescreve). Falha fechado.
   const cdNaFronteira = segmentos.some((s) => soMudaDeDirectorio(s) && FRONTEIRA.test(s));
   const gitQueEscreve =
-    /^git\b[^\n]*\s(?:rm|mv|restore|checkout|clean|stash)\b/m.test(restoTexto.trim()) ||
+    new RegExp(String.raw`^git\b[^\n]*${GIT_QUE_ESCREVE}`, "m").test(restoTexto.trim()) ||
     semCabeca.some((toks) => saidasDoGit(toks).some((s) => FRONTEIRA.test(` ${s}`) || (cdNaFronteira && !s.startsWith("/"))));
   // O `find` esta na LEITURA e destroi — e, ao contrario do `git`, nao tinha verificacao de
   // sub-verbo nenhuma. O espelho correcto NAO e "`-exec` nega": isso negava
@@ -300,7 +321,7 @@ function julga(texto, ctx, dentroDoGit = false) {
   // reintroduzi-lo "seria comico".
   const findQueEscreve =
     semCabeca.some((toks) => toks[0]?.replace(/^.*\//, "") === "find") &&
-    (/\s-(?:delete|fprint[f0]?|fls)\b/.test(visivel) ||
+    (FIND_QUE_ESCREVE.test(visivel) ||
       [...visivel.matchAll(/\s-(?:exec|execdir|ok|okdir)\s+(\S+)/g)].some((m) => {
         const sub = m[1].replace(/^.*\//, "");
         // O sub-verbo julga-se pela MESMA allowlist — mas `git` e `node` estao nela e escrevem
@@ -333,12 +354,20 @@ function julga(texto, ctx, dentroDoGit = false) {
   // nenhum, medido com a varredura (leitura do #307).
   if (PALAVRAS_DE_BLOCO.has(primeiro)) {
     const escrito = semCabeca.map(escritaDoBloco).find(Boolean);
+    // O `git`/`find` colado a palavra-chave (`{ git rm <f>; }`): os testes de cima ancoram no verbo do
+    // segmento, que aqui e o `{`. Sem as palavras-chave a frente, ve-se — so para o ROTULO (#317).
+    const semBloco = semCabeca.map((t) => {
+      const i = t.findIndex((x) => !PALAVRAS_DE_BLOCO.has(x));
+      return i < 0 ? [] : t.slice(i);
+    });
+    const gitNoBloco = semBloco.some((t) => new RegExp(String.raw`^git\b[^\n]*${GIT_QUE_ESCREVE}`).test(normaliza(t)));
+    const findNoBloco = semBloco.some((t) => verbo(t) === "find") && FIND_QUE_ESCREVE.test(visivel);
     return nega(
       escrito ? `verbo-nao-e-leitura:${escrito}`
       : editaNoSitio ? "edita-no-sitio"
       : redireciona ? "redireciona"
-      : gitQueEscreve ? "git-que-escreve"
-      : findQueEscreve ? "find-que-escreve"
+      : gitQueEscreve || gitNoBloco ? "git-que-escreve"
+      : findQueEscreve || findNoBloco ? "find-que-escreve"
       : `verbo-nao-e-leitura:${primeiro}`
     );
   }
@@ -358,47 +387,6 @@ function julga(texto, ctx, dentroDoGit = false) {
  */
 export const alteraFronteira = (texto, ctx) => porqueAltera(texto, ctx) !== null;
 
-/** A razao, escrita uma vez e usada pelo hook e pelos testes. */
-export const RAZAO_FRONTEIRA =
-  "A configuracao de fronteira (`.claude/settings.json`, `.claude/settings.local.json`, " +
-  "`.claude/hooks/`, `.githooks/`) nao " +
-  "se altera por `Bash`. O `deny` do settings so cobre `Edit`/`Write`, logo esta verificacao " +
-  "existe para fechar o resto — um agente que reescreva a propria fronteira deixa a sessao " +
-  "seguinte sem nenhuma. Editar com a ferramenta `Edit` (que pede aprovacao para os hooks e " +
-  "recusa o settings), ou a mao, fora do agente.";
-
-/** A razao quando o hook NAO PROVOU uma escrita: so nao conseguiu provar que o comando so le
- *  (#307). A mesma negacao com a razao de escrita, a um `for` que corria a suite dos hooks, dizia
- *  que o comando alterava a fronteira — e nao alterava nada. Uma razao errada empurra a desligar o
- *  hook; a certa diz o que fazer. */
-export const RAZAO_OPACA =
-  "O hook nao consegue provar que este comando so LE a configuracao de fronteira " +
-  "(`.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/`, `.githooks/`): " +
-  "e uma composicao opaca — um " +
-  "ciclo ou bloco de shell, codigo inline, `eval`/`sh -c`, execucao adiada, um caminho citado " +
-  "que o comando executa, ou um comando complexo demais para analisar. Na duvida nega, porque " +
-  "escrever ali por `Bash` deixava a sessao seguinte sem fronteira. Se so le: partir em comandos " +
-  "simples, um por chamada e com o caminho a vista (a suite dos hooks e " +
-  "`node .claude/hooks/tests/test-hooks.mjs`). Mover o comando para um script para o hook nao o " +
-  "ver e o que esta verificacao existe para travar. Se escreve: a ferramenta `Edit` (que pede " +
-  "aprovacao para os hooks e recusa o settings), ou a mao, fora do agente.";
-
-/** As condicoes em que a negacao vem de nao se conseguir ver, e nao de uma escrita vista.
- *  O `git-que-executa` fica de fora de proposito: o tecto e o executor aninhado tambem negam sem
- *  abrir, mas o rotulo nao separa esses ramos do que viu uma escrita — e na duvida a razao de
- *  escrita e a que nao aconselha a reescrever o comando. */
-const OPACAS = new Set([
-  "erro-ao-analisar", "citado-mas-executado", "execucao-adiada", "substituicoes-demais",
-  "codigo-inline", "wrapper-opaco",
-]);
-
-/**
- * A razao para a condicao que negou. So a MENSAGEM muda — o veredicto e o mesmo.
- * @param {string} condicao o rotulo de `porqueAltera()`
- * @returns {string} `RAZAO_OPACA` ou `RAZAO_FRONTEIRA`
- */
-export function razaoDe(condicao) {
-  const [rotulo, verbo] = condicao.split(/:(.*)/s);
-  const opaca = OPACAS.has(rotulo) || (rotulo === "verbo-nao-e-leitura" && PALAVRAS_DE_BLOCO.has(verbo));
-  return opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA;
-}
+// A MENSAGEM (as duas razoes e a escolha entre elas) vive em `./fronteira-dados.mjs` desde o #317;
+// reexporta-se daqui para quem ja a importava deste modulo.
+export { RAZAO_FRONTEIRA, RAZAO_OPACA, razaoDe } from "./fronteira-dados.mjs";

@@ -84,4 +84,46 @@ export function registar({ test, corre, repo, eq, contem }) {
   // Sem este, os tres de cima eram satisfeitos por desligar o `inline` por completo.
   test("alcance: `node -e` no segmento que TOCA a fronteira continua NEGADO", () =>
     decide(`cat /tmp/x; node -e "console.log(1)" ${H}`, "deny"));
+
+  // --- O `-c` de um SCRIPT nao e o do interpretador (#317) -------------------------
+  // `node eslint.js -c <config>` citando a fronteira era negado como codigo inline: o `-c` e do ESLint.
+  // O `-e`/`-c` so e inline ANTES do primeiro ficheiro de script.
+  test("alcance: `-c` de um script (`node x.js -c ...`) a ler a fronteira passa", () =>
+    decide(`node /tmp/eslint.js -c /tmp/eslint.config.mjs --no-warn-ignored ${H}`, "allow"));
+  // A isencao so vale com a fronteira A VISTA: so citada, nao ha leitura a salvar (quarta leitura do #317).
+  test("alcance: `node x.js -e` com a fronteira so no codigo citado continua NEGADO", () =>
+    decide(`node /tmp/x.js -e "require('fs').writeFileSync('${H}','{}')"`, "deny"));
+  // O lado que nao pode abrir: um ficheiro que e o VALOR de uma opcao nao e o script.
+  for (const [nome, comando] of [
+    ["`python3 -c` com a fronteira", `python3 -c "print(1)" ${H}`],
+    ["`node --flag -e` com a fronteira", `node --no-warnings -e "console.log(1)" ${H}`],
+    ["`node -r ./x.js -e` (o .js e do `-r`)", `node -r /tmp/x.js -e "console.log(1)" ${H}`],
+    ["`node --import ./y.mjs --eval`", `node --import /tmp/y.mjs --eval "console.log(1)" ${H}`],
+  ]) {
+    test(`alcance: ${nome} continua NEGADO`, () => decide(comando, "deny"));
+  }
+  // As formas que abriram a primeira versao, que adivinhava que opcoes levam valor (leituras do #317):
+  // qualquer opcao antes do script — colada por `=`, desconhecida, com dois espacos — mantem o `-e` inline.
+  // Cada uma duas vezes: com a fronteira VISIVEL (o `node` e leitura) e so DENTRO do codigo citado.
+  for (const [nome, antes] of [
+    ["`--import=x.mjs`", "node --import=/tmp/y.mjs -e"],
+    ["`--title x.js` (opcao fora da lista)", "node --title x.js -e"],
+    ["`--env-file a.js`", "node --env-file /tmp/a.js -e"],
+    ["`-r` com dois espacos", "node -r  /tmp/x.js -e"],
+    ["`-e` antes do script", "node -e"],
+    ["script entre aspas", `node "/tmp/x.js" -e`],
+    ["`python3 -X x.py -c`", "python3 -X x.py -c"],
+    ["`perl -Ix.pl -e`", "perl -Ix.pl -e"],
+    // O que o SHELL transforma em opcao antes de o interpretador a ver (segunda leitura do #317).
+    ["`perl \\-Ix.pl -e` (o shell tira o `\\`)", "perl \\-Ix.pl -e"],
+    ["`node $X.js -e` (variavel)", "X=--title=a; node $X.js -e"],
+    ["`node [-]-title?x.js -e` (glob)", "node [-]-title?x.js -e"],
+    // O `normalizaCaminhos` reescreve `$PWD/` antes do teste: o script so parece script DEPOIS (terceira leitura).
+    ["`PWD=--title=; node $PWD/<fronteira>.js -e`", "PWD=--title=; node $PWD/.claude/hooks/a.js -e"],
+  ]) {
+    test(`alcance: ${nome} com a fronteira visivel continua NEGADO`, () =>
+      decide(`${antes} "require('fs').writeFileSync(process.argv[1],'{}')" ${H}`, "deny"));
+    test(`alcance: ${nome} com a fronteira so no codigo citado continua NEGADO`, () =>
+      decide(`${antes} "require('fs').writeFileSync('${H}','{}')"`, "deny"));
+  }
 }

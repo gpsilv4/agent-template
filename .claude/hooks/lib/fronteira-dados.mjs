@@ -7,7 +7,9 @@
  * existir; o `tests-sem-ciclos.mjs` reprova se voltar.
  *
  * O que decide o que um comando faz a fronteira continua no `fronteira.mjs` (a `LEITURA`, o
- * `OPACO`, o `porqueAltera`). Aqui so os DADOS e a leitura do verbo, que nao dependem de nada.
+ * `OPACO`, o `porqueAltera`). Aqui so os DADOS e a leitura do verbo, que nao dependem de nada —
+ * e as razoes que se mostram ao negar (`razaoDe`), que vieram para aqui para o `fronteira.mjs`
+ * caber no limite do Guard 17 (#317); ele reexporta-as, e os importadores nao mudaram.
  */
 
 /** Os caminhos que constituem a fronteira, **em forma de dados**.
@@ -202,4 +204,53 @@ export function resto(segmento) {
     }
     return toks;
   }
+}
+
+// --- A MENSAGEM da negacao ---------------------------------------------------------
+// Saiu do `fronteira.mjs` quando ele passou as ~400 linhas (#317): sao dados e a escolha da
+// razao, sem nada da decisao — o `fronteira.mjs` reexporta-os, logo quem os importa nao mudou.
+
+/** A razao, escrita uma vez e usada pelo hook e pelos testes. */
+export const RAZAO_FRONTEIRA =
+  "A configuracao de fronteira (`.claude/settings.json`, `.claude/settings.local.json`, " +
+  "`.claude/hooks/`, `.githooks/`) nao " +
+  "se altera por `Bash`. O `deny` do settings so cobre `Edit`/`Write`, logo esta verificacao " +
+  "existe para fechar o resto — um agente que reescreva a propria fronteira deixa a sessao " +
+  "seguinte sem nenhuma. Editar com a ferramenta `Edit` (que pede aprovacao para os hooks e " +
+  "recusa o settings), ou a mao, fora do agente.";
+
+/** A razao quando o hook NAO PROVOU uma escrita: so nao conseguiu provar que o comando so le
+ *  (#307). A mesma negacao com a razao de escrita, a um `for` que corria a suite dos hooks, dizia
+ *  que o comando alterava a fronteira — e nao alterava nada. Uma razao errada empurra a desligar o
+ *  hook; a certa diz o que fazer. */
+export const RAZAO_OPACA =
+  "O hook nao consegue provar que este comando so LE a configuracao de fronteira " +
+  "(`.claude/settings.json`, `.claude/settings.local.json`, `.claude/hooks/`, `.githooks/`): " +
+  "e uma composicao opaca — um " +
+  "ciclo ou bloco de shell, codigo inline, `eval`/`sh -c`, execucao adiada, um caminho citado " +
+  "que o comando executa, ou um comando complexo demais para analisar. Na duvida nega, porque " +
+  "escrever ali por `Bash` deixava a sessao seguinte sem fronteira. Se so le: partir em comandos " +
+  "simples, um por chamada e com o caminho a vista (a suite dos hooks e " +
+  "`node .claude/hooks/tests/test-hooks.mjs`). Mover o comando para um script para o hook nao o " +
+  "ver e o que esta verificacao existe para travar. Se escreve: a ferramenta `Edit` (que pede " +
+  "aprovacao para os hooks e recusa o settings), ou a mao, fora do agente.";
+
+/** As condicoes em que a negacao vem de nao se conseguir ver, e nao de uma escrita vista.
+ *  O `git-que-executa` fica de fora de proposito: o tecto e o executor aninhado tambem negam sem
+ *  abrir, mas o rotulo nao separa esses ramos do que viu uma escrita — e na duvida a razao de
+ *  escrita e a que nao aconselha a reescrever o comando. */
+const OPACAS = new Set([
+  "erro-ao-analisar", "citado-mas-executado", "execucao-adiada", "substituicoes-demais",
+  "codigo-inline", "wrapper-opaco",
+]);
+
+/**
+ * A razao para a condicao que negou. So a MENSAGEM muda — o veredicto e o mesmo.
+ * @param {string} condicao o rotulo de `porqueAltera()`
+ * @returns {string} `RAZAO_OPACA` ou `RAZAO_FRONTEIRA`
+ */
+export function razaoDe(condicao) {
+  const [rotulo, verbo] = condicao.split(/:(.*)/s);
+  const opaca = OPACAS.has(rotulo) || (rotulo === "verbo-nao-e-leitura" && PALAVRAS_DE_BLOCO.has(verbo));
+  return opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA;
 }
