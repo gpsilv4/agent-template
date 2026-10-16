@@ -544,9 +544,10 @@ jobs:
     # completo e o setup, saltava os dois passos e ficava VERDE sem ter medido nada (`TP2`). Assim
     # aparece como `skipped`, que e o que aconteceu.
     if: github.event_name == 'pull_request'
-    # 15 da a mesma folga de ~3x que os outros jobs pequenos sobre o que os dois passos medem
-    # (o tempo de cada um esta no comentario dele, e nao repetido aqui — `TP8`).
-    timeout-minutes: 15
+    # 30 da ~2x sobre o que os passos medem num PR de maquinaria, que e o mais longo: com a `--skips`
+    # do derivado maduro (#308, parte 3) o job chega aos ~13-17 min, e os 15 de antes nao davam folga
+    # (o tempo de cada passo esta no comentario dele, e nao repetido aqui — `TP8`).
+    timeout-minutes: 30
     steps:
       # `fetch-depth: 0`: o `simulate-upgrade` monta um derivado da ULTIMA TAG, e um clone raso
       # nao as traz — ele reprova a dizer que nao mediu, em vez de passar em silencio.
@@ -561,9 +562,24 @@ jobs:
       # tudo. Custa cerca de um minuto (copia o repo e recorre as suites), logo fica so em `pull_request` —
       # e onde vale a pena e onde alguem le o resultado. Sem isto, a unica forma de saber que
       # o template funciona num derivado era alguem lembrar-se de o experimentar.
+      # E, num PR que toca na maquinaria, a `--skips` sobre o derivado MADURO (#308, parte 3): o R7B-7
+      # so apareceu no CI de um derivado, porque nenhum CI do template a corria sobre um derivado com
+      # historia. A MESMA condicao da varredura (sem o pipe, `TP11`); por `SIMULATE_SKIPS` e nao por
+      # flag, para o comando ser o do `allow`. ~+8 min neste job, em paralelo com o `Guard Tests`.
       - name: Projeto derivado — o template funciona depois do bootstrap
         if: github.event_name == 'pull_request'
-        run: node .agent/scripts/simulate-derived.mjs
+        run: |
+          set -euo pipefail
+          tocados="$(git diff --name-only "$(git rev-parse HEAD^1)..HEAD")"
+          rc=0
+          grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
+          if [ "$rc" -eq 0 ]; then
+            export SIMULATE_SKIPS=1
+          elif [ "$rc" -ne 1 ]; then
+            echo "::error::grep saiu $rc a decidir se a --skips do derivado se aplica — nao consegui decidir."
+            exit 1
+          fi
+          node .agent/scripts/simulate-derived.mjs
       # A OUTRA metade da promessa: o template tambem serve para ATUALIZAR projetos que ja
       # existem, e essa metade nao tinha rede nenhuma ate agora. Monta um derivado da ultima
       # tag, aplica o upgrade e mede — a FASE 1 dele imprime o que este PR faz reprovar num

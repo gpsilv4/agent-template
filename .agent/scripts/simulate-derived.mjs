@@ -32,6 +32,7 @@
  * Uso:
  *   node .agent/scripts/simulate-derived.mjs             # corre tudo
  *   node .agent/scripts/simulate-derived.mjs --keep      # nao apaga a copia (para inspeccionar)
+ *   node .agent/scripts/simulate-derived.mjs --skips     # e a varredura --skips no derivado maduro (#308; no CI, SIMULATE_SKIPS=1)
  *   node .agent/scripts/simulate-derived.mjs --only=check-doc-versions,test-guards
  */
 
@@ -112,7 +113,7 @@ process.on("SIGINT", () => {
 // media menos a cada suite nova). O leitor vive num sitio so, `lib/medida-upgrade.mjs`, com as
 // exclusoes e as razoes delas: havia uma segunda copia aqui, e ficou para tras nos tres defeitos
 // que a do `lib/` corrigiu — corria passos comentados, lia os jobs seguintes, e nao via os blocos
-// `run: |` (#198). A varredura de mutacao fica de fora: numa copia sem `.git` nem corria.
+// `run: |` (#198). A varredura de mutacao fica de fora da bateria; a `--skips` corre-se a parte, com `--skips`.
 const COMANDOS = comandosDoCI(ROOT)?.filter(correNaBateria) ?? null;
 if (COMANDOS === null || COMANDOS.length === 0) {
   // TP2: "nao consegui ler o ci.yml" != "nao ha comandos a correr". Uma lista vazia faria a
@@ -127,11 +128,20 @@ const manter = args.includes("--keep");
 const only = args.find((a) => a.startsWith("--only="))?.slice("--only=".length);
 const selecionados = only
   ? COMANDOS.filter((c) => only.split(",").some((o) => c.includes(o.trim())))
-  : COMANDOS;
+  : [...COMANDOS];
 
 if (selecionados.length === 0) {
   fatal(`--only=${only} nao seleccionou nenhum comando — nada a correr nao e sucesso`);
 }
+// `--skips` (no CI, `SIMULATE_SKIPS=1`: o comando fica o do `allow`), #308 parte 3: a varredura `--skips`
+// sobre o derivado MADURO, como mais um comando da bateria. O R7B-7 (assercoes SKIP/NOTE que passavam
+// por acidente) so apareceu no CI de um derivado: nenhum CI do template a corria sobre um derivado com
+// historia. Precisa de `.git` na copia, que o passo 4 cria so neste modo.
+const comSkips = args.includes("--skips") || process.env.SIMULATE_SKIPS === "1";
+// SAI do ambiente logo aqui (leitor do #308): herdada, a suite do simulador que a bateria corre lancava
+// simuladores de fixture tambem com a `--skips`, sem varredura nenhuma neles — o passo ficava vermelho.
+delete process.env.SIMULATE_SKIPS;
+if (comSkips) selecionados.push([".agent/scripts/mutation-sweep.mjs", "--skips"]);
 
 console.log("\n=== Simulacao de projeto derivado ===\n");
 
@@ -340,8 +350,15 @@ ok("BOOTSTRAP.md apagado (passo final da checklist) — o segundo sinal do ehDer
 
 // --- 4. correr -------------------------------------------------------------------
 console.log("");
+// A varredura le o repo (a copia nao traz o `.git`): um commit so, o estado montado acima.
+if (comSkips) {
+  for (const a of [["init", "-q"], ["add", "-A"], ["-c", "user.email=s@s", "-c", "user.name=s", "commit", "-q", "-m", "derivado maduro"]]) {
+    execFileSync("git", a, { cwd: dir, stdio: "ignore" });
+  }
+}
 let corridos = 0;
-for (const c of selecionados) {
+for (const item of selecionados) {
+  const [c, ...extra] = [].concat(item);
   if (!existsSync(join(dir, c))) {
     warn(`${c}: ausente na copia — nao consegui correr`);
     continue;
@@ -349,7 +366,7 @@ for (const c of selecionados) {
   let code = 0;
   let out = "";
   try {
-    out = execFileSync(process.execPath, [join(dir, c)], {
+    out = execFileSync(process.execPath, [join(dir, c), ...extra], {
       cwd: dir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
@@ -364,7 +381,9 @@ for (const c of selecionados) {
     ok(`${c}${resumo ? ` — ${resumo}` : ""}`);
   } else {
     warn(`${c}: exit ${code}${resumo ? ` — ${resumo}` : ""}`);
-    for (const l of out.split("\n").filter((l) => /^\s*(WARN|FAIL)/.test(l)).slice(0, 8)) {
+    // E as linhas da VARREDURA (#308, parte 3): o veredicto dela vem em `INCOMPLETA` e no sitio por
+    // cobrir (`L<n>:`), nao em WARN/FAIL — sem isto, um passo vermelho nao dizia qual sitio.
+    for (const l of out.split("\n").filter((l) => /^\s*(WARN|FAIL|INCOMPLETA|SEM PAR|SINAL ERRADO|SEM SUITE|ALVO AUSENTE|LINHA AMBIGUA|NADA MEDIDO|BASELINE VERMELHA|TIMEOUT|REBENTOU|VARREDURA NAO CONCLUSIVA|L\d+:)/.test(l)).slice(0, 8)) {
       console.log(`          ${l.trim()}`);
     }
   }
