@@ -131,7 +131,10 @@ export function queConfigurou({ dir, ok, fatal }) {
 // setup do consumidor com `ENOENT`, e foi assim que quatro testes ficaram vermelhos numa ronda.
 export async function comFicheirosGrandes({ dir, ok, fatal }) {
   const rel = ".agent/scripts/check-dominio.mjs";
-  writeFileSync(join(dir, rel), "#!/usr/bin/env node\n// Verificador proprio deste projeto.\n" + "// linha\n".repeat(540));
+  // Um sitio de recusa REAL (#308, parte 3): um verificador do projeto sem nenhum era um ficheiro grande
+  // a fingir de verificador, e a varredura do derivado nao tinha o que medir nele.
+  const corpo = 'const warn = (m) => { console.log(`  WARN  ${m}`); process.exitCode = 1; };\nif (process.argv.includes("--falha")) warn("dominio: falha pedida");\n';
+  writeFileSync(join(dir, rel), "#!/usr/bin/env node\n// Verificador proprio deste projeto.\n" + corpo + "// linha\n".repeat(540));
   const relGuard = ".agent/scripts/guards/sizes.mjs";
   const p = join(dir, relGuard);
   const c = leOuNull(p);
@@ -172,16 +175,42 @@ export function comoUmDerivadoReal({ dir, ok, fatal }) {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
     writeFileSync(join(dir, rel), txt);
   };
+  // Com uma recusa REAL alem do SKIP (#308, parte 3): um guard de projeto que so salta nao media nada.
   w(".agent/scripts/guards/do-projeto.mjs",
-    'export function guardDoProjeto({ skip }) {\n  skip("Guard do projeto (simulacao) — sem dados na copia");\n  return 0;\n}\n');
+    'export function guardDoProjeto({ read, skip, warn }) {\n  const dados = read("dados/projeto.json");\n  if (dados === null) {\n    skip("Guard do projeto (simulacao) — sem dados na copia");\n    return 0;\n  }\n  if (!dados.includes("ok")) warn("Guard do projeto (simulacao): os dados nao dizem ok");\n  return 1;\n}\n');
+  // A SUITE desses dois verificadores, como um derivado real a escreve: um modulo descoberto pelo
+  // `test-guards`, um caso por sitio de recusa. Sem ela, e sem os pares abaixo, a varredura do
+  // derivado dava `SEM PAR` aos dois (medido no #308, parte 3) e nao media nada nele.
+  w(".agent/scripts/tests/tests-do-projeto.mjs", [
+    'import { execFileSync } from "child_process";',
+    'import { join } from "path";',
+    'import { registarResultado, ROOT } from "./harness/test-harness.mjs";',
+    'import { guardDoProjeto } from "../guards/do-projeto.mjs";',
+    'export const entryPoint = "test-guards.mjs";',
+    'export function registar() {',
+    '  const ditos = { skip: [], warn: [] };',
+    '  const ctx = (dados) => ({ read: () => dados, skip: (m) => ditos.skip.push(m), warn: (m) => ditos.warn.push(m) });',
+    '  guardDoProjeto(ctx(null));',
+    '  registarResultado("do-projeto: sem dados, anuncia o SKIP", ditos.skip.length === 1 ? [] : ["o SKIP nao foi anunciado"]);',
+    '  guardDoProjeto(ctx("mau"));',
+    '  registarResultado("do-projeto: dados maus, avisa", ditos.warn.length === 1 ? [] : ["o WARN nao foi dado"]);',
+    '  let out = "";',
+    '  try { execFileSync("node", [join(ROOT, ".agent/scripts/check-dominio.mjs"), "--falha"], { encoding: "utf8", stdio: "pipe" }); } catch (e) { out = String(e.stdout); }',
+    '  registarResultado("check-dominio: a falha pedida avisa e sai != 0", out.includes("dominio: falha pedida") ? [] : ["o check-dominio nao avisou"]);',
+    '}',
+    '',
+  ].join("\n"));
   const relCfg = ".agent/scripts/config/guards-do-projeto.mjs";
   const cfg = leOuNull(join(dir, relCfg));
   if (cfg === null) fatal(`${relCfg} nao existe na copia — sem ela o derivado nao declara os seus guards`);
   const comGuard = aplica(cfg, "export const GUARDS = [", 'export const GUARDS = [{ modulo: "./guards/do-projeto.mjs", funcao: "guardDoProjeto" }, ');
   const comSkip = comGuard.estado === "sem-alvo" ? comGuard
     : aplica(comGuard.texto, "export const SKIPS_DO_PROJETO = [", 'export const SKIPS_DO_PROJETO = [{ chave: "Guard do projeto (simulacao) — sem dados", razao: "a copia nao tem dados" }, ');
-  if (comSkip.estado === "sem-alvo") fatal(`nao consegui declarar o guard do projeto em ${relCfg} — a lista mudou de forma`);
-  w(relCfg, comSkip.texto);
+  const par = (alvo) => `{ alvo: ".agent/scripts/${alvo}", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\\w.$])warn\\(/, neutro: "(() => {})(" }, `;
+  const comPares = comSkip.estado === "sem-alvo" ? comSkip
+    : aplica(comSkip.texto, "export const PARES_DO_PROJETO = [", `export const PARES_DO_PROJETO = [${par("guards/do-projeto.mjs")}${par("check-dominio.mjs")}`);
+  if (comPares.estado === "sem-alvo") fatal(`nao consegui declarar o guard do projeto em ${relCfg} — a lista mudou de forma`);
+  w(relCfg, comPares.texto);
   const relLog = "src/docs/CHANGELOG.md";
   w(relLog, `${leOuNull(join(dir, relLog)) ?? "# Changelog\n"}\n## [v0.1.0] - primeira release\n\n- Os anti-padroes do template eram os \`TP1\`-\`TP2\`.\n`);
   w(".agent/context/backlog-detail.md", "# Detalhe do backlog\n\nNotas do projeto.\n");
@@ -195,7 +224,7 @@ export function comoUmDerivadoReal({ dir, ok, fatal }) {
   if (rule === null) fatal(`${relRule} nao existe na copia — o bootstrap gera-a, e sem ela nao ha rule do projeto a crescer`);
   while (Buffer.byteLength(rule) < 11700) rule += "\n- Regra de dominio do projeto, escrita ao longo de cem dias de trabalho.";
   w(relRule, rule);
-  ok("derivado como os reais: guard proprio com SKIP declarado, CHANGELOG com historia, contexto e README do projeto, uma rule perto do tecto");
+  ok("derivado como os reais: guard proprio com SKIP declarado e par na varredura, CHANGELOG com historia, contexto e README do projeto, uma rule perto do tecto");
 }
 
 // --- 3g. o derivado que usa os OPT-OUTS ------------------------------------------

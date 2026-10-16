@@ -19,6 +19,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname } from "path";
+import { pathToFileURL } from "url";
 import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "../lib/derivado-maduro.mjs";
 
 let passed = 0;
@@ -175,7 +176,8 @@ await test("comFicheirosGrandes: congela o ficheiro do projeto nos TETOS", async
     const c = le(dir, ".agent/scripts/guards/sizes.mjs");
     const p = [];
     if (!/check-dominio\.mjs/.test(c)) p.push("nao congelou o ficheiro do projeto");
-    if (!/: 54[12]\b/.test(c)) p.push(`contagem inesperada em TETOS: ${c.match(/: (\d+)/)?.[1]}`);
+    // 544: as 540 linhas, o cabecalho e as duas da recusa real do #308 (parte 3).
+    if (!/: 54[34]\b/.test(c)) p.push(`contagem inesperada em TETOS: ${c.match(/: (\d+)/)?.[1]}`);
     // ACRESCENTA e nao substitui: os TETOS do template tem de sobreviver.
     if (!/export const TETOS = \{/.test(c)) p.push("destruiu o bloco TETOS em vez de lhe acrescentar");
     return p;
@@ -234,6 +236,18 @@ await test("comoUmDerivadoReal: declara o guard proprio E o seu SKIP na config",
     const p = [];
     if (!c.includes("guardDoProjeto")) p.push("o guard nao ficou declarado em GUARDS");
     if (!c.includes("Guard do projeto (simulacao)")) p.push("o SKIP nao ficou declarado em SKIPS_DO_PROJETO");
+    // Os PARES dos dois verificadores do projeto, e a suite deles (#308, parte 3): sem isto a varredura
+    // do derivado dava `SEM PAR` aos dois.
+    for (const alvo of ["guards/do-projeto.mjs", "check-dominio.mjs"]) {
+      if (!new RegExp(`PARES_DO_PROJETO = \\[[^\\n]*\\.agent/scripts/${alvo.replace(".", "\\.")}`).test(c)) p.push(`${alvo} sem par em PARES_DO_PROJETO`);
+    }
+    if (!(le(dir, ".agent/scripts/tests/tests-do-projeto.mjs") ?? "").includes('entryPoint = "test-guards.mjs"')) p.push("a suite do projeto nao ficou escrita");
+    // E o par e USAVEL (leitor do #308): importada, a config da um `sinal` que e uma RegExp e casa
+    // exactamente o sitio de recusa do guard gerado — um escape estragado no texto passava o teste acima.
+    const { PARES_DO_PROJETO } = await import(pathToFileURL(join(dir, ".agent/scripts/config/guards-do-projeto.mjs")).href + "?t=" + Date.now());
+    const doProjeto = PARES_DO_PROJETO.find((x) => x.alvo.endsWith("guards/do-projeto.mjs"));
+    const linhas = le(dir, ".agent/scripts/guards/do-projeto.mjs").split("\n").filter((l) => doProjeto?.sinal instanceof RegExp && doProjeto.sinal.test(l));
+    if (linhas.length !== 1) p.push(`o sinal do par do guard do projeto casou ${linhas.length} linha(s), esperado 1`);
     if (!le(dir, "src/docs/CHANGELOG.md").includes("`TP1`-`TP2`")) p.push("o CHANGELOG nao ganhou historia");
     // (f) entre a NOTE (11 500) e o tecto (12 000) das rules carregadas (#302).
     const bytes = Buffer.byteLength(le(dir, ".agent/rules/business-logic.md"));
@@ -263,6 +277,18 @@ await test("comoUmDerivadoReal: sem a rule do projeto, REPROVA", async () => {
     return ["devia ter reprovado sem a business-logic.md"];
   } catch (err) {
     return err instanceof Recusa && /business-logic\.md nao existe na copia/.test(err.message) ? [] : [`razao errada: ${err.message}`];
+  } finally {
+    limpa(dir);
+  }
+});
+// Sem a lista dos PARES (#308, parte 3): o guard ficava declarado e a varredura sem rede para ele.
+await test("comoUmDerivadoReal: sem PARES_DO_PROJETO, REPROVA", async () => {
+  const dir = comCfg("export const GUARDS = [];\nexport const SKIPS_DO_PROJETO = [];\n");
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    return ["devia ter reprovado sem a lista dos PARES"];
+  } catch (err) {
+    return err instanceof Recusa && /mudou de forma/.test(err.message) ? [] : [`razao errada: ${err.message}`];
   } finally {
     limpa(dir);
   }

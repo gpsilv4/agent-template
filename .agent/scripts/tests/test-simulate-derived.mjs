@@ -59,6 +59,7 @@ function test(nome, opcoes, expect) {
     try {
       out = execFileSync("node", [join(dir, ".agent/scripts/simulate-derived.mjs"), ...(expect.args ?? [])], {
         cwd: dir,
+        env: { ...process.env, ...(expect.env ?? {}) },
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -78,6 +79,10 @@ function test(nome, opcoes, expect) {
     }
     for (const s of expect.excludes ?? []) {
       if (out.includes(s)) problemas.push(`output NAO devia conter "${s}"`);
+    }
+    // O que tem de aparecer no output INTEIRO (as linhas de diagnostico nao sao linhas WARN).
+    for (const s of expect.mostra ?? []) {
+      if (!out.includes(s)) problemas.push(`output devia mostrar "${s}"`);
     }
     // Afirmacoes sobre a COPIA em si (nao sobre o que o simulador imprimiu). So faz sentido
     // com `--keep`, que e o que a deixa no disco para ser inspeccionada.
@@ -351,6 +356,24 @@ caso('patch: padrao com flag `g` nao alterna resultados entre chamadas', () => {
   const b = aplica('const X = false;', g, 'const X = false;');
   return a.estado === b.estado ? [] : [`duas chamadas iguais deram ${a.estado} e depois ${b.estado}`];
 });
+
+// --- A `--skips` sobre o derivado maduro (#308, parte 3) ---------------------------
+// Uma varredura FALSA na fixture: afirma receber `--skips` e encontrar o `.git` na copia (que o
+// simulador so cria neste modo).
+const SKIPS_COM_GIT = 'import { existsSync } from "fs";\nif (!process.argv.includes("--skips") || !existsSync(".git")) { console.log("  FAIL  sem --skips ou sem .git"); process.exit(1); }\nconsole.log("  Cobertura de mutacao completa — 1 sitios medidos.");\n';
+const VARREDURA = (corpo) => ({ ".agent/scripts/mutation-sweep.mjs": corpo });
+test("--skips: a varredura --skips corre na copia, com .git", { extra: VARREDURA(SKIPS_COM_GIT) }, { args: ["--skips"], code: 0, includes: ["mutation-sweep.mjs"] });
+test("sem --skips: a varredura nao corre", { extra: VARREDURA('console.log("  FAIL  correu"); process.exit(1);\n') }, { code: 0, excludes: ["mutation-sweep.mjs"] });
+// O caminho do CI: a variavel liga o modo e NAO passa aos comandos da bateria (leitor do #308) — herdada,
+// a suite do simulador lancava simuladores de fixture com a `--skips` e o passo ficava vermelho.
+test("SIMULATE_SKIPS=1 liga a --skips e nao passa aos comandos da bateria", {
+  extra: { ...VARREDURA(SKIPS_COM_GIT), [COMANDOS[0]]: 'if (process.env.SIMULATE_SKIPS) { console.log("  FAIL  herdou SIMULATE_SKIPS"); process.exit(1); }\nconsole.log("ok");\n' },
+}, { env: { SIMULATE_SKIPS: "1" }, code: 0, includes: ["mutation-sweep.mjs"] });
+// Vermelha, a varredura diz QUAL sitio: a linha tem de aparecer no output do simulador.
+test("--skips vermelha: o sitio por cobrir aparece", {
+  extra: VARREDURA('console.log("  INCOMPLETA  x.mjs: 0/1 sitios cobertos");\nconsole.log("              L12: skip(\\"x\\")");\nprocess.exit(1);\n'),
+}, { args: ["--skips"], code: 1, includes: ["mutation-sweep.mjs"], mostra: ["INCOMPLETA  x.mjs", "L12:"] });
+
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
