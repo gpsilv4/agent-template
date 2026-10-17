@@ -259,6 +259,7 @@ not to* line, so every agent sees it.
     │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
     │   ├── varredura-shards.mjs <- The gate's check that every sweep shard reported, and all sites were measured
     │   ├── varredura-diff.mjs <- The sweep's `--diff`: which targets the branch touches
+    │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved

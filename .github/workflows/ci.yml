@@ -216,40 +216,32 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      - name: Doc guards — negative tests
-        run: node .agent/scripts/tests/test-guards.mjs
-      - name: Bundle checker — negative tests
-        run: node .agent/scripts/tests/test-bundle-sizes.mjs
-      - name: Backlog checker — negative tests
-        run: node .agent/scripts/tests/test-backlog.mjs
-      - name: Mutation sweep — negative tests
-        run: node .agent/scripts/tests/test-mutation-sweep.mjs
-      - name: Test-surface checker — negative tests
-        run: node .agent/scripts/tests/test-test-surface.mjs
-      - name: Baseline e superficie — negative tests
-        run: node .agent/scripts/tests/test-baseline-superficie.mjs
-      - name: Registo de suites por descoberta — negative tests
-        run: node .agent/scripts/tests/test-registo.mjs
-      - name: Mapa "caminho tocado -> o que o verifica" — negative tests
-        run: node .agent/scripts/tests/test-mapa-suites.mjs
-      - name: Detector de codigo morto — negative tests
-        run: node .agent/scripts/tests/test-codigo-morto.mjs
-      - name: Adocao num projeto existente (adotar-template.mjs) — negative tests
-        run: node .agent/scripts/tests/test-adotar-template.mjs
-      - name: Criador de Releases (release-da-tag.sh) — negative tests
-        run: node .agent/scripts/tests/test-release-da-tag.mjs
-      - name: Limpeza de copias em tmpdir — negative tests
-        run: node .agent/scripts/tests/test-tmp-limpo.mjs
-      - name: Hooks — negative tests
-        run: node .claude/hooks/tests/test-hooks.mjs
-      - name: commit-msg hook — negative tests
-        run: node .agent/scripts/tests/test-commit-msg.mjs
-      - name: Simulador de projeto derivado — negative tests
-        run: node .agent/scripts/tests/test-simulate-derived.mjs
-      - name: Maturidade do derivado — negative tests
-        run: node .agent/scripts/tests/test-derivado-maduro.mjs
-      - name: Simulador de /upgrade — negative tests
-        run: node .agent/scripts/tests/test-simulate-upgrade.mjs
+      # As suites EM PARALELO (#337): as mesmas, todas, em todos os PRs — so mais depressa. Eram 17 passos em
+      # serie, ~97% dos ~3 min do job; o runner corre-as com tecto `min(4, cores)` (com 9 ao mesmo tempo ficava
+      # PIOR do que com 4, medido) e imprime a saida de cada uma inteira e pela ordem desta lista. Os comandos
+      # ficam por extenso, um por linha: a 2b do `/upgrade`, o Guard 11 e o `superficie-gate` leem-nos daqui.
+      # As MAIS LENTAS primeiro: arrancam logo, e nao ficam sozinhas no fim a fixar o tempo do passo. O `exec`
+      # faz do runner o processo do passo: o cancel/timeout sinaliza-o a ele (e nao ao `bash`), e ele diz qual pendurou.
+      - name: Suites — negative tests (em paralelo)
+        run: |
+          exec node .agent/scripts/lib/suites-em-paralelo.mjs -- \
+            node .agent/scripts/tests/test-test-surface.mjs \
+            node .agent/scripts/tests/test-guards.mjs \
+            node .agent/scripts/tests/test-simulate-upgrade.mjs \
+            node .claude/hooks/tests/test-hooks.mjs \
+            node .agent/scripts/tests/test-mutation-sweep.mjs \
+            node .agent/scripts/tests/test-simulate-derived.mjs \
+            node .agent/scripts/tests/test-commit-msg.mjs \
+            node .agent/scripts/tests/test-bundle-sizes.mjs \
+            node .agent/scripts/tests/test-backlog.mjs \
+            node .agent/scripts/tests/test-baseline-superficie.mjs \
+            node .agent/scripts/tests/test-registo.mjs \
+            node .agent/scripts/tests/test-mapa-suites.mjs \
+            node .agent/scripts/tests/test-codigo-morto.mjs \
+            node .agent/scripts/tests/test-adotar-template.mjs \
+            node .agent/scripts/tests/test-release-da-tag.mjs \
+            node .agent/scripts/tests/test-tmp-limpo.mjs \
+            node .agent/scripts/tests/test-derivado-maduro.mjs
       # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).

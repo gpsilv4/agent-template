@@ -58,6 +58,47 @@ export function registar() {
   test("bloco `run: |`: apagar o step do commit-msg (`.githooks/`) faz a contagem descer", (dir) =>
     muda(dir, ci(sweep, hook), ci(sweep)), { code: 1, includes: [`${MSG}: 2 -> 1`] });
 
+  // As SUITES EM PARALELO (#337): cada suite numa linha de continuacao conta 1, como quando era um passo.
+  const passo = (s) => `      - name: ${s}\n        run: node .agent/scripts/tests/${s}.mjs\n`;
+  const paralelo = (...ss) =>
+    bloco("suites", "node .agent/scripts/lib/suites-em-paralelo.mjs -- \\", ...ss.map((s, i) => `  node .agent/scripts/tests/${s}.mjs${i < ss.length - 1 ? " \\" : ""}`));
+  test("suites em paralelo: tirar uma suite da lista faz a contagem descer (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-c"))), { code: 1, includes: [`${MSG}: 3 -> 2`] });
+  // A CONTAGEM nao desce; o que avisa e o gate da maquinaria (os passos mudaram), que se resolve com o trailer.
+  test("suites em paralelo: juntar os passos num bloco nao faz a contagem descer (#337)", (dir) =>
+    muda(dir, ci(passo("test-a"), passo("test-b"), passo("test-c")), ci(paralelo("test-a", "test-b", "test-c"))), {
+      code: 1,
+      includes: ["passo da maquinaria mudou"],
+      excludes: [MSG],
+    });
+
+  // 2.a leitura do #337: as linhas de continuacao so contam se a cadeia nasce no proprio runner.
+  test("suites em paralelo: o `exec` antes do runner (o do ci.yml) nao parte a contagem (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("node .agent/scripts/lib/", "exec node .agent/scripts/lib/")),
+      "alteracao\n\nTest-Surface: .github/workflows/ci.yml — o exec passa o sinal ao runner"),
+    { code: 0, excludes: [`${MSG}:`] });
+  test("suites em paralelo: um `--max=N` no runner nao parte a contagem (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("suites-em-paralelo.mjs --", "suites-em-paralelo.mjs --max=2 --")),
+      "alteracao\n\nTest-Surface: .github/workflows/ci.yml — so fixa o tecto"),
+    { code: 0, excludes: [`${MSG}:`] });
+  test("suites em paralelo: trocar o `node` do runner por `echo` faz a contagem descer (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("node .agent/scripts/lib/", "echo .agent/scripts/lib/"))), {
+      code: 1,
+      includes: [`${MSG}: 3 -> 1`],
+    });
+  test("suites em paralelo: apagar a linha do runner faz a contagem descer (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("          node .agent/scripts/lib/suites-em-paralelo.mjs -- \\\n", ""))), {
+      code: 1,
+      includes: [`${MSG}: 3 -> 1`],
+    });
+  // A marca "falha engolida" le o bloco como a shell o executa (`comoORunnerExecuta` junta as continuacoes):
+  // um `|| true` numa linha propria, no fim da lista, e a mesma falha engolida.
+  test("suites em paralelo: um `|| true` numa linha de continuacao propria e marcado (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b")), ci(paralelo("test-a", "test-b").replace(/test-b\.mjs\n/, "test-b.mjs \\\n            || true\n"))), {
+      code: 1,
+      includes: ["falha engolida"],
+    });
+
   test("bloco `run: >` (folded) tambem conta", (dir) =>
     muda(dir,
       ci(sweep, "      - name: f\n        run: >\n          node a-check.mjs\n"),

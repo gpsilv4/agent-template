@@ -12,8 +12,9 @@
 import { readFileSync, rmSync, mkdtempSync, mkdirSync, writeFileSync, symlinkSync } from "fs";
 import { tmpdir } from "os";
 import { comFachada, fronteiraQueMuda } from "../lib/fronteira-upgrade.mjs";
-import { join } from "path";
-import { pathToFileURL } from "url";
+import { comandosDoCI, repetidosPorJob } from "../lib/medida-upgrade.mjs";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
 import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
 import { registar as registarFronteira317 } from "./tests-medida-2b-fronteira.mjs";
 
@@ -351,5 +352,46 @@ export function registar() {
   test("um agente por commitar no TEMPLATE tambem e avisado (#304)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { [AG]: "---\nname: leitor\ntools: Read\n---\n" } }),
       { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
+  // As suites em PARALELO (#337): o `ci.yml` corre-as atraves de um despachante, uma por linha. A 2b le cada
+  // suite, e NAO o despachante — sozinho, sem argumentos, so sabe reprovar, e a bateria ficava vermelha.
+  test("o despachante das suites em paralelo nao entra na bateria; as suites dele, sim (#337)", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "sim-up-ci-"));
+    try {
+      mkdirSync(join(raiz, ".github/workflows"), { recursive: true });
+      writeFileSync(
+        join(raiz, ".github/workflows/ci.yml"),
+        "jobs:\n  guard-tests:\n    steps:\n      - name: Suites\n        run: |\n          node .agent/scripts/lib/suites-em-paralelo.mjs -- \\\n            node .agent/scripts/tests/test-guards.mjs \\\n            node .agent/scripts/tests/test-backlog.mjs\n"
+      );
+      const c = comandosDoCI(raiz) ?? [];
+      return [
+        ...(c.some((x) => x.includes("suites-em-paralelo")) ? [`o despachante entrou: ${c.join(", ")}`] : []),
+        ...(["test-guards.mjs", "test-backlog.mjs"].every((n) => c.some((x) => x.endsWith(n))) ? [] : [`faltam suites: ${c.join(", ")}`]),
+      ];
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
+  // O passo que SUBSTITUI outros (#337), trazido SEM tirar os antigos: cada suite corre 2x, verde, e so
+  // a 2b o pode ver (o `comandosDe` tira os repetidos). E o `ci.yml` real do template nao repete nada.
+  test("a 2b ve uma suite que corre 2x no mesmo job, e o ci.yml do template nao tem nenhuma (#337)", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "sim-up-ci-"));
+    try {
+      mkdirSync(join(raiz, ".github/workflows"), { recursive: true });
+      const paralelo = "      - name: Suites\n        run: |\n          node .agent/scripts/lib/suites-em-paralelo.mjs -- \\\n            node .agent/scripts/tests/test-guards.mjs \\\n            node .agent/scripts/tests/test-backlog.mjs\n";
+      const ci = (passos) => writeFileSync(join(raiz, ".github/workflows/ci.yml"), "jobs:\n  guard-tests:\n    steps:\n" + passos);
+      ci(paralelo + "      - run: node .agent/scripts/tests/test-guards.mjs\n");
+      const com = repetidosPorJob(raiz);
+      ci(paralelo);
+      const sem = repetidosPorJob(raiz);
+      const tpl = repetidosPorJob(resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."));
+      return [
+        ...(JSON.stringify(com?.["guard-tests"]) === JSON.stringify([".agent/scripts/tests/test-guards.mjs"]) ? [] : [`o repetido nao foi visto: ${JSON.stringify(com)}`]),
+        ...(sem?.["guard-tests"]?.length === 0 ? [] : [`sem repetidos deu ${JSON.stringify(sem)}`]),
+        ...(tpl === null ? ["o ci.yml deste repo nao tem o job `guard-tests` (nao derivei nada)"] : Object.values(tpl).every((v) => v.length === 0) ? [] : [`o ci.yml deste repo repete: ${JSON.stringify(tpl)}`]),
+      ];
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
   registarFronteira317({ H, P, cpDe, lido });
 }

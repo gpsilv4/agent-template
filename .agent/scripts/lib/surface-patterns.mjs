@@ -73,6 +73,13 @@ const CONTAGENS = [
   // refactor legitimo. Achado do leitor independente; ha um teste que o prende.
   // O bloco conta UMA vez por step: o match vai do `run:` a primeira linha do corpo que invoca
   // um verificador e para ai.
+  // EXCEPTO as LINHAS DE CONTINUACAO (#337): a seguir a uma linha que acaba em `\`, uma linha que comeca
+  // por `node <verificador>` e mais uma suite do mesmo comando — a forma do `suites-em-paralelo.mjs`, que
+  // corre as 17 num passo. Sem esta 3.a alternativa o bloco contava 1, a contagem descia 17 -> 1, e apagar
+  // uma suite da lista deixava de fazer descer nada: a defesa sem saida passava a ter saida. Cada suite conta
+  // 1, como quando era um passo. So conta se a cadeia de `\` NASCE numa linha que e o proprio
+  // `node ...suites-em-paralelo.mjs --` (2.a leitura): trocar o `node` dela por `echo`, ou apaga-la, deixava
+  // as suites por correr e a contagem igual. O lookbehind so anda pelas linhas da cadeia (17), sem ambiguidade.
   //   `\1[ \t]+` — so linhas MAIS indentadas que o `run:` sao corpo (o `\1` captura a
   //                indentacao dele), logo o match nao atravessa para o step seguinte;
   //   `[^#\n]*` — o que vem antes do `node` nao pode ter um `#`: o `semComentarios` so tira
@@ -97,7 +104,7 @@ const CONTAGENS = [
   // Conta-se sobre o texto CRU (#295), mas nunca depois de uma aspa: `echo "skip node x-test.mjs"` no
   // lugar do passo nao conta (fazia a contagem nao descer). NAO conta (limitacao assumida): `node --flag x`. A forma de uma linha tem a mesma cegueira.
   {
-    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
+    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)|(?<=^[ \t]*(?:exec[ \t]+)?node[ \t]+\S*suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--[ \t]*\\[ \t]*\r?\n(?:[ \t]+node[ \t]+\S+[ \t]*\\[ \t]*\r?\n)*)[ \t]+(?![ \t])node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
     msg: "steps de verificacao no CI",
     // CRU (#295): com as strings tiradas, `run: 'node .../test-x.mjs'` ficava `run: ''` e passar um
     // passo a aspas fazia a contagem descer (alarme falso) — e voltar a tira-las escondia a descida.
