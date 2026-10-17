@@ -358,10 +358,13 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   const falta = regrasEmFalta(setAqui, setLa);
   // Os dois existem e nao se comparam (um nao e JSON valido): dize-lo — "nao comparei" nao e "nao falta
   // nada" (auditoria do #308). Sem o do projeto e um projeto sem Claude Code: nada a dizer.
-  if (falta === null && setAqui !== null && setLa !== null) note("nao consegui comparar o `deny`/`ask` com o do template: um dos settings.json nao e JSON valido");
-  for (const lista of ["deny", "ask"]) {
+  if (falta === null && setAqui !== null && setLa !== null) note("nao consegui comparar o `deny`/`ask`/`allow` com o do template: um dos settings.json nao e JSON valido");
+  for (const lista of ["deny", "ask", "allow"]) {
     if (falta?.[lista].length) {
-      note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s) que o deste projeto nao tem, literalmente: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
+      // O `allow` em falta nao tira protecao: sem ele, cada verificador da maquinaria pede aprovacao (#317).
+      const qual = lista === "allow" ? " da maquinaria" : "";
+      const como = lista === "allow" ? "nem cobre por um prefixo" : "literalmente";
+      note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s)${qual} que o deste projeto nao tem, ${como}: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
     }
   }
 

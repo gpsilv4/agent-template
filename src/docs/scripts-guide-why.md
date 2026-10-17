@@ -139,6 +139,18 @@ dela no repo. O cabecalho do `mutation-sweep.mjs`, o `ci.yml` e o `upgrade-why.m
 **Um portatil com `--workers=2` NAO e um runner de 2 vCPU**: cada core dele e mais rapido. Serve
 de proxy so depois de calibrado contra um tempo real do privado, e o factor escreve-se ao lado.
 
+**Medido com os shards (#328, v0.59.0), e a confirmacao que fechou o #308.** A espera de um PR que
+toca na maquinaria e a das suites mais a perna mais lenta da varredura:
+
+| Onde | Sitios | Suites | Shards da completa | `--skips` | Espera do PR |
+|---|---|---|---|---|---|
+| template, publico (4 vCPU), PR #333 | 366 | 3m19s | 13m25s / 11m36s | 7m23s | ~17 min |
+| `referee-exam-study`, privado (2 vCPU), PR #89 | 444 | 2m58s | 19m09s / 23m46s | 16m14s | **27m00s** (eram 51m12s) |
+
+n=1 em cada. A estimativa feita quando os shards entraram era ~27 min no privado, e bateu. Os dois
+shards nao demoram o mesmo porque a particao e por NUMERO de sitios, nao por custo — o resumo TEMPOS
+da o custo de cada alvo, e repartir por ele e a melhoria que fica por fazer.
+
 ### O numero do runner publico envelheceu, e a correccao foi um INTERVALO
 
 O `~22 min` da tabela era a primeira medicao, e ficou la. Oito corridas de CI depois, no mesmo

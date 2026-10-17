@@ -273,12 +273,16 @@ export function normalizaCaminhos(visivel, ctx = {}) {
  *  inteiro a ser lido como comando — e um apostrofo la dentro desemparelhava tudo o que vinha
  *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
 export const semCitacoes = (t) =>
-  desaspa(
-    // Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
-    // nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
-    t.replace(/(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
-      ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`)
-  ).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
+  desaspa(semCorposDeHeredoc(t)).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
+
+/** So os HEREDOCS do `semCitacoes`: cada um vira ` <<HEREDOC <resto da linha>` (e o que o shell executa no
+ *  corpo, se a etiqueta nao tem aspas); as aspas ficam. E o texto que as verificacoes sobre o comando CRU
+ *  leem (#317): o corpo de uma mensagem que cite `git -c core.pager=...` ou `eval` nao e um comando. */
+export const semCorposDeHeredoc = (t) =>
+  // Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
+  // nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
+  t.replace(/(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
+    ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`);
 
 /** O indice do `)` que fecha o `$(` em `s[k]`, a ler as aspas de DENTRO como o shell: dentro de um
  *  `$(...)` abre-se um contexto novo, e `"$(echo ")"; rm <f>)"` nao fecha no `)` citado. */

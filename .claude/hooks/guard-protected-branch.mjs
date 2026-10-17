@@ -455,7 +455,9 @@ try {
   // A fronteira nao se reescreve a si propria. A logica vive em `lib/fronteira.mjs`, que agora
   // diz QUAL das condicoes negou — reconstruir o comando depois nao chega (#101). E a razao
   // segue a condicao: escrita vista, ou leitura que nao se conseguiu provar (#307).
-  { const porque = porqueAltera(texto, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque)}\n\n(condicao: ${porque})`); }
+  // Com o comando CRU, e nao o `texto` de cima (auditoria do #317): esse corte e do git, e com ele
+  // `cat <<'EOF' > .claude/hooks/x.mjs` chegava aqui como `cat` — o `porqueAltera` trata os heredocs ele proprio.
+  { const porque = porqueAltera(cmd, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque)}\n\n(condicao: ${porque})`); }
 
   const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
   if (!invs.length) process.exit(0); // nada de git em posicao de comando
