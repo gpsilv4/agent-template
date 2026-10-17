@@ -126,4 +126,80 @@ export function registar({ test, corre, repo, eq, contem }) {
     test(`alcance: ${nome} com a fronteira so no codigo citado continua NEGADO`, () =>
       decide(`${antes} "require('fs').writeFileSync('${H}','{}')"`, "deny"));
   }
+
+  // --- Quem RECEBE codigo que nao esta num ficheiro (#317, item 24) ---------------------------
+  // Um interpretador ou uma shell com um heredoc, uma here-string ou na ponta de um pipe sem argumentos, com
+  // a fronteira so no codigo. O heredoc tinha DUAS falhas: o hook cortava-lhe o corpo antes de o julgar, e a
+  // lista de quem o corre era outra copia, que divergia (`python3.12`, `(node)`). As outras formas do item 24
+  // (flags agrupadas, `php -r`, `--import data:`...) ficam para o issue da posicao de comando.
+  for (const [nome, comando] of [
+    ["`node <<EOF`", `node <<'EOF'\nrequire('fs').writeFileSync('${H}','{}')\nEOF`],
+    ["`bash <<EOF`", `bash <<'EOF'\nrm -rf ${H}\nEOF`],
+    ["`python3.12 <<EOF`", `python3.12 <<'EOF'\nopen('${H}','w')\nEOF`],
+    ["`(node) <<EOF`", `(node) <<'EOF'\nrequire('fs').writeFileSync('${H}','{}')\nEOF`],
+    // Com argumentos (`-u`): sem eles, a regra do pipe no fim tambem o apanhava, e a do `<<... |` nao era exercida.
+    ["`cat <<EOF | python3 -u`", `cat <<'EOF' | python3 -u\nopen('${H}','w')\nEOF`],
+    ["`N=node; $N <<EOF`", `N=node; $N <<'EOF'\nrequire('fs').writeFileSync('${H}','{}')\nEOF`],
+    ["`$(which node) <<EOF`", `$(which node) <<'EOF'\nrequire('fs').writeFileSync('${H}','{}')\nEOF`],
+    ["here-string para a shell", `bash <<<'rm -rf ${H}'`],
+    ["`echo ... | bash`", `echo 'rm -rf ${H}' | bash`],
+    ["`echo ... | node`", `echo "require('fs').writeFileSync('${H}','{}')" | node`],
+  ]) {
+    test(`alcance: ${nome} com a fronteira so no codigo e NEGADO (#317)`, () =>
+      decide(comando, "deny", (r) => contem(r.razao, "citado-mas-executado")));
+  }
+  // A AUDITORIA do #317, pelo HOOK INTEIRO (o `decide` corre-o): os testes de unidade chamavam o
+  // `porqueAltera` com o comando cru e estavam verdes enquanto o hook, que lhe passava o comando sem os
+  // heredocs, deixava passar `cat <<'EOF' > <fronteira>` — no `main` desde o #223.
+  for (const [nome, comando] of [
+    ["`cat <<EOF > <fronteira>`", `cat <<'EOF' > ${H}\nx\nEOF`],
+    ["`$(rm ...)` num heredoc sem aspas", `cat <<EOF\n$(rm ${H})\nEOF`],
+    ["`cat <<<EOF` seguido de um `rm`", `cat <<<EOF\nrm -rf ${H}\nEOF`],
+    ["etiqueta `END-X` seguida de um `rm`", `cat <<END-X\nEND-X\nrm -rf ${H}\nEND`],
+    ["`node - <fronteira> <<EOF` a vista", `node - ${H} <<'EOF'\nrequire('fs').writeFileSync(process.argv.at(-1),'')\nEOF`],
+    ["`| bash -s`", `echo 'rm -rf ${H}' | bash -s`],
+    ["`|& bash`", `echo 'rm -rf ${H}' |& bash`],
+    ["`| bash 2>&1`", `echo 'rm -rf ${H}' | bash 2>&1`],
+    ["`node.exe -e`", `node.exe -e "require('fs').writeFileSync('${H}','')"`],
+    ["`python3-intel64 -c`", `python3-intel64 -c "open('${H}','w')"`],
+    // Da 2.a auditoria: o interpretador ENTRE ASPAS (o `main` negava; ler sem as citacoes apagava-lhe o nome),
+    // `| bash` com a fronteira a vista noutro segmento, e o `source`/a cabeca antes do comando-variavel.
+    ["`\"node\" -e` depois de um `cd`", `cd /tmp && "node" -e "require('fs').rmSync('${H}')"`],
+    ["`\"$(command -v node)\" -e`", `"$(command -v node)" -e "require('fs').writeFileSync('${H}','')"`],
+    ["`\"/usr/bin/python3\" -c` depois de outro comando", `true; "/usr/bin/python3" -c "open('${H}','w')"`],
+    ["`echo rm -rf <fronteira> | bash`, a vista", `echo rm -rf ${H} | bash`],
+    ["`source /dev/stdin <<\\EOF`", `source /dev/stdin <<\\EOF\neval "rm -rf ${H}"\nEOF`],
+    ["`sudo $SHELL <<EOF`", `sudo $SHELL <<'EOF'\nrm -rf ${H}\nEOF`],
+    // Da leitura final: quem corre o stdin numa shell sem se chamar shell. O `\EOF` com um `eval` o `main` negava.
+    ["`sudo -s <<\\EOF` com um `eval`", `sudo -s <<\\EOF\neval "rm -rf ${H}"\nEOF`],
+    ["`sudo -s <<'EOF'` com um `rm`", `sudo -s <<'EOF'\nrm -rf ${H}\nEOF`],
+    ["`su <<EOF`", `su <<'EOF'\nrm -rf ${H}\nEOF`],
+    ["`echo ... | sudo -i`", `echo 'rm -rf ${H}' | sudo -i`],
+    // DECIDIDO: um heredoc para um interpretador nega mesmo que o codigo so LEIA a fronteira — a politica do
+    // `node -e` que a cita; o hook nao distingue ler de escrever dentro do codigo (no `main` passava).
+    ["um script por heredoc que so LE a fronteira", `python3 - <<'EOF'\nprint(open('${H}').read())\nEOF`],
+  ]) {
+    test(`alcance: ${nome} e NEGADO pelo hook (auditoria do #317)`, () => decide(comando, "deny"));
+  }
+  // O que NAO pode mudar — os falsos positivos que as leituras do #317 mediram: um script a frente do
+  // interpretador continua leitura, e o que so MENCIONA um interpretador nao o corre.
+  for (const [nome, comando] of [
+    // Numa frase, e nao o caminho sozinho: entre aspas e sem espacos, o `desaspa` torna-o VISIVEL, e o caso
+    // ia ao outro ramo — o controlo negativo mostrou-o (a isencao do script nao era exercida).
+    ["`node <script>` com a fronteira citada num argumento", `node /tmp/ler.js "le ${H}"`],
+    // Um `echo`, e nao um `git commit`: na fixture o branch e o `main`, e o commit e negado por outra razao.
+    ["um texto que menciona o node e a fronteira", `echo "o node le ${H}"`],
+    ["uma mensagem por heredoc que cita `git -c core.pager=` e a fronteira", `cat <<'EOF' > /tmp/msg\ngit -c core.pager='rm ${H}' log passava\nEOF`],
+    ["um script por heredoc com `git push --force` em texto", `python3 - <<'EOF'\nprint("git push --force")\nEOF`],
+    // O `OPACO` le o comando SEM os corpos: uma mensagem que diga `xargs` ou `eval` e a fronteira nao corre nada.
+    ["uma mensagem por heredoc que cita `xargs`, `eval` e a fronteira", `cat <<'EOF' > /tmp/msg\nusa xargs e eval em ${H}\nEOF`],
+    ["`node <script> <<EOF` (dados para um ficheiro)", `node /tmp/x.mjs <<'EOF'\nler ${H}\nEOF`],
+    // So no texto citado: lido no texto cru, este "bash <<" contava como uma shell a receber codigo.
+    ["uma mensagem que cita `bash <<EOF` e a fronteira", `echo "corre bash <<EOF e escreve ${H}"`],
+    ["`node --test` filtrado por um padrao com a fronteira", `node --test /tmp/t.mjs 2>&1 | grep -E "not ok|${H}"`],
+    // O titulo menciona o node: o corpo do heredoc da mensagem continua a ser texto (o destinatario e o `cat`).
+    ["um corpo de PR por heredoc, com o node no titulo", `gh pr view 1 --json title -q "node" && cat <<'EOF' > /tmp/msg\nnode -e escrevia em ${H}\nEOF`],
+  ]) {
+    test(`alcance: ${nome} passa (#317)`, () => decide(comando, "allow"));
+  }
 }

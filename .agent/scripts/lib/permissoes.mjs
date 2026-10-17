@@ -135,13 +135,27 @@ export function emFalta(perms, existe = () => true) {
   ];
 }
 
+/** Se `regra` (`Bash(cmd)` ou `Bash(cmd:*)`) cai num prefixo `Bash(p:*)` de `regras`: o mesmo comando, ou ele
+ *  seguido de argumentos. */
+const cobertaPorPrefixo = (regra, regras) => {
+  const cmd = /^Bash\((.*?)(?::\*)?\)$/.exec(regra)?.[1];
+  if (cmd === undefined) return false;
+  return [...regras].some((p) => {
+    const pre = /^Bash\((.*):\*\)$/.exec(p)?.[1];
+    return pre !== undefined && (cmd === pre || cmd.startsWith(`${pre} `));
+  });
+};
+/** Uma regra do `allow` que corre um script da maquinaria do template (`node .agent/scripts/...`, os hooks). */
+const MAQUINARIA_NO_ALLOW = /\bnode\s+(?:\.\/)?\.(?:agent\/scripts|claude\/hooks)\//;
+
 /**
- * As regras do `deny`/`ask` do template que o projeto nao tem, LITERALMENTE. Literal de proposito:
+ * As regras do `deny`/`ask` do template que o projeto nao tem, LITERALMENTE (e as do `allow` da maquinaria que
+ * ele nao tem nem cobre por um prefixo `Bash(x:*)`). Literal de proposito no `deny`/`ask`:
  * e uma lista para copiar, e a equivalencia (um `Read(./**\/.env*)` que cobre quatro) e o Guard 11
  * que a julga. `null` quando um dos dois nao se le — "nao comparei" nao e "nao falta nada".
  * @param {string | null} projetoRaw
  * @param {string | null} templateRaw
- * @returns {{ deny: string[], ask: string[] } | null}
+ * @returns {{ deny: string[], ask: string[], allow: string[] } | null}
  */
 export function regrasEmFalta(projetoRaw, templateRaw) {
   const le = (raw) => {
@@ -157,10 +171,18 @@ export function regrasEmFalta(projetoRaw, templateRaw) {
   const lista = (v) => (Array.isArray(v) ? v.filter((r) => typeof r === "string") : []);
   const negadas = new Set(lista(p.deny));
   const tem = new Set([...lista(p.deny), ...lista(p.ask)]);
+  const permitidas = new Set(lista(p.allow));
   return {
     // So o `deny` do projeto conta: a mesma regra no `ask` e MAIS FRACA, e falta.
     deny: lista(t.deny).filter((r) => !negadas.has(r)),
     // Uma regra do `ask` do template que o projeto pos no `deny` e mais estrita: nao falta.
     ask: lista(t.ask).filter((r) => !tem.has(r)),
+    // Do `allow`, so o que corre a MAQUINARIA do template (#317, item 25): sem ela cada verificador pede
+    // aprovacao (o Guard 11 so o diz como NOTE), e no `/upgrade` da v0.59.0 a linha nova teve de ser
+    // acrescentada a mao. O resto do `allow` e escolha do projeto, e lista-lo era ruido. Uma que o projeto pos
+    // no `ask`/`deny` e decisao dele (leituras do #317): pedir aprovacao, de proposito, nao e falta.
+    // E COBERTA por um prefixo (`Bash(node x.mjs:*)` cobre `Bash(node x.mjs --list)`), que e como o Claude Code
+    // compara: medido no `referee-exam-study`, a comparacao literal pedia 6 regras que ele ja tinha assim.
+    allow: lista(t.allow).filter((r) => MAQUINARIA_NO_ALLOW.test(r) && !permitidas.has(r) && !tem.has(r) && !cobertaPorPrefixo(r, [...permitidas, ...tem])),
   };
 }

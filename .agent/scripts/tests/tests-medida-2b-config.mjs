@@ -56,11 +56,49 @@ export function registar() {
       { codigo: 0, exclui: ["do settings.json do template tem"] }
     ));
 
+  // O `allow` (#317, item 25): so as regras que correm a maquinaria do template; o resto e do projeto.
+  const comAllow = (allow) => `${JSON.stringify({ permissions: { deny: [], ask: [], allow } })}\n`;
+  test("uma regra do allow que corre a maquinaria do template, em falta, aparece na 2b; as outras nao (#317)", () =>
+    exige(
+      contraProjeto({
+        hoje: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/lib/varredura-shards.mjs:*)", "Bash(npm run dev:*)"]) },
+        projeto: { [SETTINGS]: comAllow([]) },
+      }),
+      { codigo: 0, inclui: ["o `allow` do settings.json do template tem 1 regra(s) da maquinaria", "Bash(node .agent/scripts/lib/varredura-shards.mjs:*)"], exclui: ["npm run dev"] }
+    ));
+  // Uma regra da maquinaria que o projeto pos no `ask` de proposito nao e "falta" (leituras do #317).
+  test("uma regra do allow que o projeto tem no ask nao aparece (#317)", () =>
+    exige(
+      contraProjeto({
+        hoje: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/lib/varredura-shards.mjs:*)"]) },
+        projeto: { [SETTINGS]: `${JSON.stringify({ permissions: { deny: [], ask: ["Bash(node .agent/scripts/lib/varredura-shards.mjs:*)"], allow: [] } })}\n` },
+      }),
+      { codigo: 0, exclui: ["o `allow` do settings.json do template"] }
+    ));
+  // Coberta por um prefixo do projeto (`Bash(x:*)`), como o Claude Code compara: medido no `referee-exam-study`,
+  // a comparacao literal pedia regras que ele ja tinha assim.
+  test("uma regra do allow coberta por um prefixo do projeto nao aparece; a que nao e coberta, sim (#317)", () =>
+    exige(
+      contraProjeto({
+        hoje: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/mutation-sweep.mjs --list)", "Bash(node .agent/scripts/simulate-upgrade.mjs)"]) },
+        projeto: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/mutation-sweep.mjs:*)", "Bash(node .agent/scripts/simulate:*)"]) },
+      }),
+      { codigo: 0, inclui: ["tem 1 regra(s) da maquinaria", "Bash(node .agent/scripts/simulate-upgrade.mjs)"], exclui: ["mutation-sweep.mjs --list"] }
+    ));
+  test("a mesma regra do allow dos dois lados nao aparece (#317)", () =>
+    exige(
+      contraProjeto({
+        hoje: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/lib/varredura-shards.mjs:*)"]) },
+        projeto: { [SETTINGS]: comAllow(["Bash(node .agent/scripts/lib/varredura-shards.mjs:*)"]) },
+      }),
+      { codigo: 0, exclui: ["o `allow` do settings.json do template"] }
+    ));
+
   // Os dois existem e um nao se le: "nao comparei" tem de se dizer (auditoria do #308).
   test("um settings.json invalido no projeto diz que nao comparou (#308)", () =>
     exige(
       contraProjeto({ hoje: { [SETTINGS]: perms(["Read(./.env)"], []) }, projeto: { [SETTINGS]: "{ nao e json" } }),
-      { codigo: 0, inclui: ["nao consegui comparar o `deny`/`ask` com o do template"] }
+      { codigo: 0, inclui: ["nao consegui comparar o `deny`/`ask`/`allow` com o do template"] }
     ));
   // ...e um projeto sem settings.json (sem Claude Code) nao tem nada a dizer.
   test("um projeto sem settings.json nao fala de deny/ask (#308)", () =>

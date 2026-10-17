@@ -29,7 +29,7 @@
  * `deny` e os hooks em `ask`, logo a alteracao legitima passa por uma aprovacao humana.
  */
 
-import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, semCitacoes, substituicoes } from "./caminhos.mjs";
+import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, semCitacoes, semCorposDeHeredoc, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
 export { contextoFronteira } from "./caminhos.mjs";
 // Os caminhos da fronteira (`CAMINHOS_FRONTEIRA`, `ehCaminhoFronteira`, `MAES`), o regex `FRONTEIRA`
@@ -121,7 +121,14 @@ const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|
 // E o script so com caracteres que o shell entrega TAL COMO ESTAO — lista fechada, nao "tudo menos `-`":
 // `perl \-Ix.pl -e`, `node $X.js -e` e `node [-]-title?x.js -e` pareciam um script na regex e chegavam ao
 // interpretador como opcao (segunda leitura do #317).
-const INTERPRETADOR = String.raw`\b(?:node|deno|bun|python3?|ruby|perl|php)\b`;
+// UMA lista de nomes, lida de duas formas (#317). Com uma FLAG inline a seguir (`node -e`), por `\b`, como sempre:
+// apanha `python3-intel64`, `node.exe`, `/usr/bin/node` (a auditoria mediu que o nome estrito afrouxava estes).
+// A RECEBER codigo (heredoc, pipe), pelo nome INTEIRO: ai `\b` casava o `node` de `/tmp/node-notes.md`.
+const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
+const INTERPRETADOR = String.raw`\b(?:${NOMES_INTERPRETADOR})\b`;
+const NOME = (n) => String.raw`(?<![\w.-])(?:${n})(?![\w.-])`;
+// As SHELLS tambem leem codigo de stdin e de heredoc (`bash <<EOF`, `echo ... | sh`) — e nenhuma regra as via.
+const SHELL = NOME(String.raw`sh|bash|zsh|dash|ksh|csh|tcsh|fish`);
 const FLAG_INLINE = String.raw`[^\n]*\s(?:-e|-p|--eval|--print|-c)\b`;
 const SCRIPT_A_SEGUIR = String.raw`\s+[\w./][\w./@+-]*\.(?:[cm]?js|ts|py|rb|pl|php)(?=\s|$)`;
 const CODIGO_INLINE = new RegExp(`${INTERPRETADOR}(?!${SCRIPT_A_SEGUIR})${FLAG_INLINE}`);
@@ -129,6 +136,34 @@ const CODIGO_INLINE = new RegExp(`${INTERPRETADOR}(?!${SCRIPT_A_SEGUIR})${FLAG_I
 // pelo caminho canonico — e `HOME=--title=; node ~/<raiz>/.claude/hooks/a.js -e` ficava com cara de script
 // (terceira leitura do #317). A isencao so vale se o texto TAL COMO FOI ESCRITO tambem a mostrar.
 const INLINE_SEM_ISENCAO = new RegExp(`${INTERPRETADOR}${FLAG_INLINE}`);
+// Quem RECEBE codigo que nao esta num ficheiro (#317, item 24): um interpretador ou uma shell com um heredoc ou
+// uma here-string (`node <<EOF`, `bash <<<'...'`), ou a ponta de um pipe sem argumentos (`echo ... | bash`,
+// `cat <<EOF | python3`). Le-se sobre o `semCitacoes` (o heredoc vira `<<HEREDOC`): o que so MENCIONA um
+// interpretador numa mensagem nao corre nada. Estreito de proposito — a regra geral ("interpretador sem
+// script") negava `node --test | grep "<fronteira>"`; essa, e o resto da familia, ficam para o desenho da
+// posicao de comando (o issue que segue o #317).
+const RECEBE = `(?:${NOME(NOMES_INTERPRETADOR)}|${SHELL})`;
+const SHELL_ELEVADA = String.raw`(?:(?:sudo|doas)(?:\s+-\S+)*\s+-[A-Za-z]*[si]\b|(?<![\w.-])(?:su|runuser)(?![\w.-]))`;
+// As quatro formas: (1) quem recebe um heredoc/here-string, salvo com um SCRIPT logo a seguir (`node x.mjs <<EOF`
+// passa dados a um ficheiro, e correr um ficheiro e leitura); (2) um heredoc que segue por um pipe para quem o
+// corre; (3) a ponta de um pipe (`|`, `|&`) sem mais do que flags e redireccoes (`| bash -s`, `| node --`); (4) um
+// COMANDO que e uma variavel ou uma substituicao a receber o heredoc (`$N <<EOF`): nao se sabe quem e.
+const RECEBE_CODIGO = new RegExp(
+  [
+    `${RECEBE}(?!${SCRIPT_A_SEGUIR})[^\\n|;&]*<<`,
+    `<<HEREDOC[^\\n]*\\|[^\\n]*${RECEBE}(?!${SCRIPT_A_SEGUIR})`,
+    `\\|&?\\s*${RECEBE}(?:\\s+-[\\w-]*)*\\s*(?:$|[;&|)#]|\\d*>)`,
+    // O comando-variavel tambem com uma CABECA (`sudo $SHELL <<EOF`, `env -i $X <<EOF`), e o `source`/`.` de um
+    // heredoc (`source /dev/stdin <<EOF`): correm o corpo na shell actual (2.a auditoria do #317).
+    `(?:^|[;&|(]\\s*)(?:(?:sudo|env|exec|nohup|command|time|nice)\\s+(?:-\\S+\\s+|\\w+=\\S*\\s+)*)?\\$[^\\s<]*\\)?\\s*<<`,
+    `(?:^|[;&|(]\\s*)(?:source|\\.)\\s[^\\n|;&]*<<`,
+    // Quem corre o stdin numa SHELL sem se chamar shell: `sudo -s`/`-i`, `doas -s`, `su`, `runuser` — com um
+    // heredoc ou na ponta de um pipe (leitura final do #317: `sudo -s <<\EOF` com um `eval` passava).
+    `(?:^|[;&|(]\\s*)${SHELL_ELEVADA}[^\\n|;&]*<<`,
+    `\\|&?\\s*${SHELL_ELEVADA}(?:\\s+-[\\w-]*)*\\s*(?:$|[;&|)#]|\\d*>)`,
+  ].join("|"),
+  "m"
+);
 // Os sub-verbos do `git` e as flags do `find` que escrevem: um sitio so, lidos pelo teste do segmento e
 // pelo do bloco (`{ git rm <f>; }`) — duas copias da lista divergiam ao primeiro sub-verbo novo.
 const GIT_QUE_ESCREVE = String.raw`\s(?:rm|mv|restore|checkout|clean|stash)\b`;
@@ -203,19 +238,27 @@ function julga(texto, ctx, dentroDoGit = false) {
   // `rebase -x 'git -c ... commit'` era negado com uma razao que fala da fronteira (3.a leitura).
   // Nomear e o NOME das pastas, e nao o regex estrito, que exige um separador antes:
   // `$PWD/.claude/hooks` nao o casava e a negacao aninhada desligava-se (4.a leitura).
+  // Sem os CORPOS de heredoc (#317): o hook passa o comando inteiro, e o corpo de uma mensagem que cite
+  // `git -c core.pager=...`, `eval` ou `xargs` nao e um comando. O que o heredoc faz fica a vista: o resto da
+  // linha (`> <fronteira>`) e o que o shell executa num corpo sem aspas.
+  const semCorpos = semCorposDeHeredoc(texto);
   if (!dentroDoGit) {
-    const executados = valoresQueExecutam(texto);
-    const nomeia = /\.claude|\.githooks/.test(texto);
+    const executados = valoresQueExecutam(semCorpos);
+    const nomeia = /\.claude|\.githooks/.test(semCorpos);
     if (nomeia && executados.length > MAX_EXECUTADOS) return nega("git-que-executa");
     for (const { comando } of executados) {
       if ((nomeia && valoresQueExecutam(comando).length) || julga(comando, ctx, true)) return nega("git-que-executa");
     }
   }
-  const visivel = normalizaCaminhos(semCitacoes(texto), ctx);
-  const opaco = OPACO.test(texto);
+  // Calculado UMA vez: cada chamada repete o regex dos heredocs, os `executados` e o `desaspa` (auditoria do #317).
+  const citado = semCitacoes(texto);
+  const visivel = normalizaCaminhos(citado, ctx);
+  const opaco = OPACO.test(semCorpos);
   // SEM a isencao do script: com a fronteira so citada nao ha leitura legitima a salvar (a do ESLint
   // tem o caminho a vista), e cada isencao aqui era superficie nova sem proveito (quarta leitura do #317).
-  const inline = INLINE_SEM_ISENCAO.test(texto);
+  // Sobre o texto COM as aspas e SEM os corpos de heredoc: sem as aspas, o `desaspa` apagava o NOME do
+  // interpretador citado (`"node" -e`, `"$(command -v node)" -e`), e o `main` negava-os (2.a auditoria do #317).
+  const inline = INLINE_SEM_ISENCAO.test(semCorpos);
 
   // A fronteira so aparece DENTRO de aspas ou de um heredoc: e texto. Excepto quando o
   // comando executa esse texto (`eval`, `sh -c`) ou o passa a um interpretador (`node -e`),
@@ -229,7 +272,10 @@ function julga(texto, ctx, dentroDoGit = false) {
       const dentro = c.slice(1, -1).trim();
       return FRONTEIRA.test(` ${dentro}`) && !/^[^\s;&|<>`$()]+$/.test(dentro);
     });
-    return opaco || inline || crases ? nega("citado-mas-executado") : null;
+    // Um heredoc para um interpretador nega mesmo que o codigo so LEIA a fronteira: e a politica do `node -e`
+    // (codigo inline que a cita), e o hook nao distingue ler de escrever dentro do codigo (#317, decidido).
+    const recebe = RECEBE_CODIGO.test(citado);
+    return opaco || inline || crases || recebe ? nega("citado-mas-executado") : null;
   }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
@@ -287,7 +333,7 @@ function julga(texto, ctx, dentroDoGit = false) {
   // e o `xargs`, que nao tem o caminho escrito. Alinhar os dois passava esse comando a
   // PERMITIDO — apagava a pasta dos hooks inteira. Foi uma leitura independente a dar o
   // contra-exemplo, e os casos dele sao os primeiros do `tests-fronteira-alcance.mjs`.
-  const inlineNoAlvo = CODIGO_INLINE.test(alvo) || (INLINE_SEM_ISENCAO.test(alvo) && CODIGO_INLINE.test(semCitacoes(texto)));
+  const inlineNoAlvo = CODIGO_INLINE.test(alvo) || (INLINE_SEM_ISENCAO.test(alvo) && CODIGO_INLINE.test(citado));
   // Uma allowlist por BINARIO e grossa quando o binario tem sub-verbos que apagam: `git rm`,
   // `git restore` e `git checkout --` passavam por `git` estar na lista. Medido ao remover um
   // hook obsoleto, minutos depois de escrever esta verificacao.
@@ -373,7 +419,10 @@ function julga(texto, ctx, dentroDoGit = false) {
   }
   if (!LEITURA.has(primeiro)) return nega(`verbo-nao-e-leitura:${primeiro}`);
   if (editaNoSitio) return nega("edita-no-sitio");
-  if (inlineNoAlvo) return nega("codigo-inline");
+  // Com a fronteira A VISTA, quem recebe codigo tambem e inline (auditoria do #317): `node - <fronteira> <<EOF`
+  // escrevia o `argv` com o `node` na LEITURA. Sobre o comando INTEIRO, e nao so os segmentos que tocam (2.a
+  // auditoria): o `|` parte segmentos, e `echo rm -rf <fronteira> | bash` tinha a fronteira so no `echo`.
+  if (inlineNoAlvo || RECEBE_CODIGO.test(visivel)) return nega("codigo-inline");
   if (opaco) return nega("wrapper-opaco");
   if (redireciona) return nega("redireciona");
   if (gitQueEscreve) return nega("git-que-escreve");

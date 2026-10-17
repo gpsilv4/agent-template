@@ -47,6 +47,9 @@
  *   publico (4/4), job com completa+`--skips` em serie: 24-29 min (n=3, PRs #310/#313/#314)
  *   derivado privado (2/2), PR #80: completa 29m14s + `--skips` 10m49s no 1.o CI; no verde, 48 min
  *     de varredura num job de 51m12s, suites ~3 min (n=2). Desde o #308: pernas paralelas (`sweep`).
+ *   EM SHARDS (#328, v0.59.0) — espera do PR, suites + a perna mais lenta:
+ *     publico (4/4), 366 sitios: ~17 min (shards 13m25s/11m36s, `--skips` 7m23s; n=1, PR #333)
+ *     derivado privado (2/2), 444 sitios: 27m00s (shards 19m09s/23m46s, `--skips` 16m14s; n=1, PR #89)
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
  * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.
