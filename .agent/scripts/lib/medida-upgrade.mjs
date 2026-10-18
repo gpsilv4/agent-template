@@ -382,6 +382,16 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
       );
     }
   }
+  // O PASSO EM PARALELO (#337), do lado de quem ainda nao o tem: os conjuntos de suites sao iguais (o despachante
+  // esta no EXCLUIR), logo nada acima o via — e o derivado ficava em serie sem saber que havia escolha.
+  // A linha do runner num `run: |` OU num `run:` de uma linha; nunca comentada.
+  const emParalelo = (r) => /^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs\b/m.test(textosDosJobs(r)?.["guard-tests"] ?? "");
+  if (emParalelo(template) && !emParalelo(raiz)) {
+    note(
+      "o `guard-tests` do template corre as suites num so passo, em paralelo (`suites-em-paralelo.mjs`, #337), e o deste projeto nao — " +
+        "OPCIONAL (so tempo: as mesmas suites); ao adotar, os passos de cada suite SAEM (senao correm 2x) e o commit leva o trailer `Test-Surface: .github/workflows/ci.yml — <porque>`"
+    );
+  }
   // Os SHARDS (#308): o comando da varredura e o mesmo dos dois lados, e nada acima o ve — um derivado
   // privado, para quem eles existem, ficava sem eles em silencio (leitor do #308). So a quem TEM o `sweep`.
   const reparte = (r) => /^[^#\n]*\bSWEEP_SHARD\b/m.test(leOuNull(join(r, ".github/workflows/ci.yml")) ?? "");

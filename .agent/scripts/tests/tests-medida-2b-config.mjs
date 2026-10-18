@@ -169,6 +169,25 @@ export function registar() {
     test("uma suite que corre uma vez nao aparece como repetida (#337)", () =>
       exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK } }),
         { codigo: 0, exclui: ["corre 2x no job"] }));
+    // O passo em paralelo no template e NAO no projeto: os conjuntos sao iguais, logo so esta NOTE o diz. E nao se
+    // diz a quem ja o tem, nem por uma linha comentada.
+    const PARALELO = "jobs:\n  guard-tests:\n    steps:\n      - run: node " + O + "\n      - name: Suites\n        run: |\n          exec node .agent/scripts/lib/suites-em-paralelo.mjs -- \\\n            node " + S + "\n";
+    const MSG_PARALELO = "corre as suites num so passo, em paralelo";
+    test("o passo em paralelo do template, que o projeto nao tem, aparece como opcional (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, inclui: [MSG_PARALELO, "OPCIONAL", "SAEM"] }));
+    test("o passo em paralelo que o projeto ja tem nao aparece (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, exclui: [MSG_PARALELO] }));
+    test("o passo em paralelo num `run:` de uma linha conta como presente (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": "jobs:\n  guard-tests:\n    steps:\n      - run: node " + O + "\n      - run: exec node .agent/scripts/lib/suites-em-paralelo.mjs -- node " + S + "\n", ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, exclui: [MSG_PARALELO] }));
+    test("um `suites-em-paralelo.mjs` noutro sitio do projeto nao e o passo (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": PARALELO.replace("node .agent/scripts/lib/", "node .github/"), ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, inclui: [MSG_PARALELO] }));
+    test("o passo em paralelo COMENTADO no projeto conta como ausente (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": PARALELO.replace("          exec node", "          # exec node") + "      - run: node " + S + "\n", ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, inclui: [MSG_PARALELO] }));
   }
   // O contra-caso: a mesma colocacao nao se anuncia.
   test("a varredura no `sweep` dos dois lados nao aparece (#308)", () =>
@@ -384,7 +403,8 @@ export function registar() {
     }
   });
   // O passo que SUBSTITUI outros (#337), trazido SEM tirar os antigos: cada suite corre 2x, verde, e so
-  // a 2b o pode ver (o `comandosDe` tira os repetidos). E o `ci.yml` real do template nao repete nada.
+  // a 2b o pode ver (o `comandosDe` tira os repetidos). E o `ci.yml` real DESTE repo nao repete nada — num derivado
+  // tambem: uma suite repetida de proposito no mesmo job e o defeito que a NOTE existe para mostrar.
   test("a 2b ve uma suite que corre 2x no mesmo job, e o ci.yml do template nao tem nenhuma (#337)", () => {
     const raiz = mkdtempSync(join(tmpdir(), "sim-up-ci-"));
     try {

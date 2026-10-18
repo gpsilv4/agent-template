@@ -86,6 +86,11 @@ export function registar() {
       code: 1,
       includes: [`${MSG}: 3 -> 1`],
     });
+  test("suites em paralelo: um `suites-em-paralelo.mjs` NOUTRO sitio nao e o runner, e a contagem desce (#337)", (dir) =>
+    muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("node .agent/scripts/lib/", "node .github/"))), {
+      code: 1,
+      includes: [`${MSG}: 3 -> 1`],
+    });
   test("suites em paralelo: apagar a linha do runner faz a contagem descer (#337)", (dir) =>
     muda(dir, ci(paralelo("test-a", "test-b", "test-c")), ci(paralelo("test-a", "test-b", "test-c").replace("          node .agent/scripts/lib/suites-em-paralelo.mjs -- \\\n", ""))), {
       code: 1,

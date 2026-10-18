@@ -104,7 +104,7 @@ const CONTAGENS = [
   // Conta-se sobre o texto CRU (#295), mas nunca depois de uma aspa: `echo "skip node x-test.mjs"` no
   // lugar do passo nao conta (fazia a contagem nao descer). NAO conta (limitacao assumida): `node --flag x`. A forma de uma linha tem a mesma cegueira.
   {
-    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)|(?<=^[ \t]*(?:exec[ \t]+)?node[ \t]+\S*suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--[ \t]*\\[ \t]*\r?\n(?:[ \t]+node[ \t]+\S+[ \t]*\\[ \t]*\r?\n)*)[ \t]+(?![ \t])node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
+    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)|(?<=^[ \t]*(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--[ \t]*\\[ \t]*\r?\n(?:[ \t]+node[ \t]+\S+[ \t]*\\[ \t]*\r?\n)*)[ \t]+(?![ \t])node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
     msg: "steps de verificacao no CI",
     // CRU (#295): com as strings tiradas, `run: 'node .../test-x.mjs'` ficava `run: ''` e passar um
     // passo a aspas fazia a contagem descer (alarme falso) — e voltar a tira-las escondia a descida.

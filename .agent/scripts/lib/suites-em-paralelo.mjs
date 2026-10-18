@@ -29,6 +29,11 @@
  *     node .agent/scripts/tests/test-backlog.mjs
  *
  * `--max=N`, antes do `--`, fixa o tecto (os testes usam-no); por omissao e `min(4, cores)`.
+ *
+ * LIMITACAO ASSUMIDA: uma suite acaba quando os pipes dela FECHAM (`close`), e nao quando o processo sai.
+ * Uma que saisse deixando um neto com o stdio herdado pendurava o passo ate ao timeout do job — vermelho,
+ * nunca verde. Nenhuma o faz hoje (as fixtures lancam com `stdio` proprio); decidir pelo `exit` mudava a
+ * forma de saber que uma suite acabou, e isso e risco novo sem um caso real (auditoria final do #337).
  */
 import { spawn } from "child_process";
 import { availableParallelism } from "os";
@@ -51,8 +56,11 @@ export function leArgs(args) {
   if (sep < 0) return { max: undefined, comandos: [], erros: ["falta o `--` antes das suites"] };
   let max;
   for (const a of args.slice(0, sep)) {
-    if (a.startsWith("--max=")) max = a.slice("--max=".length);
-    else erros.push(`opcao desconhecida antes do \`--\`: ${a}`);
+    if (a.startsWith("--max=")) {
+      max = a.slice("--max=".length);
+      // Um tecto que nao e um inteiro >= 1 nao cai em silencio no de omissao: e um erro como os outros.
+      if (!/^[1-9]\d*$/.test(max)) erros.push(`\`--max\` tem de ser um inteiro >= 1: ${a}`);
+    } else erros.push(`opcao desconhecida antes do \`--\`: ${a}`);
   }
   const resto = args.slice(sep + 1);
   const comandos = [];
@@ -60,6 +68,11 @@ export function leArgs(args) {
     const [bin, alvo] = [resto[i], resto[i + 1]];
     if (bin !== "node" || alvo === undefined || !SUITE.test(alvo)) {
       erros.push(`nao e uma suite: \`${resto.slice(i, i + 2).join(" ")}\` (so \`node .agent/scripts/tests/test-*.mjs\` ou \`node .claude/hooks/tests/test-*.mjs\`)`);
+      break;
+    }
+    // A mesma suite duas vezes: trocar uma linha por um duplicado mantinha a contagem e corria uma a menos.
+    if (comandos.some(([, c]) => c === alvo)) {
+      erros.push(`suite repetida: \`${alvo}\``);
       break;
     }
     comandos.push([bin, alvo]);
@@ -75,10 +88,10 @@ export function quantasDeCadaVez(max, cores = availableParallelism()) {
 }
 
 /** As suites a correr agora, e o que ja escreveram (o sinal de cancelamento nomeia-as, despeja-as e mata-as). */
-export const emCurso = new Map();
+const emCurso = new Map();
 
 /** Posto pelo sinal de cancelamento: a partir dai nenhuma suite arranca e nada mais se imprime. */
-export const runner = { cancelado: false };
+const runner = { cancelado: false };
 
 /** Mata a suite E o que ela lancou (`git`, `node` das fixtures): cada uma e lider do seu grupo (`detached`). */
 const mataGrupo = (p) => {
@@ -96,6 +109,9 @@ const corre = (cmd) =>
     const p = spawn(cmd[0], cmd.slice(1), { stdio: ["ignore", "pipe", "pipe"], detached: true });
     emCurso.set(p, { nome: cmd.at(-1), saida: () => saida });
     p.on("close", () => emCurso.delete(p));
+    // Texto, e nao Buffers somados: um caracter multibyte (o `—`) partido entre dois blocos saia como um caracter de substituicao.
+    p.stdout.setEncoding("utf8");
+    p.stderr.setEncoding("utf8");
     p.stdout.on("data", (d) => (saida += d));
     p.stderr.on("data", (d) => (saida += d));
     // Uma suite que nao arranca (binario em falta) e uma suite que REPROVA, e diz-se porque.
@@ -174,7 +190,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     // este (o `exec` no `ci.yml`). Diz-se QUAIS ainda corriam — e a resposta a "porque pendurou?" —, mata-as
     // com o que lancaram, e reprova. Os blocos das que ja reprovaram ja sairam (acima), e as linhas de estado
     // de todas as que acabaram tambem. Uma vez so (`once`, e a flag): um 2.o sinal nao despeja outra vez.
-    for (const sinal of ["SIGINT", "SIGTERM"]) {
+    // O SIGHUP e o terminal que fecha (local): as suites correm noutro grupo e nao o recebem.
+    for (const sinal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
       process.once(sinal, () => {
         if (runner.cancelado) return;
         runner.cancelado = true;
@@ -188,7 +205,16 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         process.stdout.write("", () => process.exit(1));
       });
     }
+    // Saida por outro caminho (uma excepcao, um EPIPE de `| head`): cada suite corre no seu grupo, e sem isto
+    // ficava orfa a correr. O `kill` e sincrono, logo funciona dentro do `exit`. Um sinal SEM handler (SIGKILL,
+    // SIGQUIT...) nao se apanha — ai so o fim do job as limpa.
+    process.on("exit", () => {
+      for (const p of emCurso.keys()) mataGrupo(p);
+    });
     const resultados = await correTodas(comandos, n);
+    // Cancelado: o handler do sinal ja disse tudo e sai quando a saida escoar. Sem isto, se as mortas fechassem
+    // antes, saiam aqui um resumo e um 2.o FAIL, com as mortas contadas como reprovadas (so ruido, mas falso).
+    if (runner.cancelado) await new Promise(() => {});
     const falharam = resultados.filter((r) => r.codigo !== 0);
     process.stdout.write(`\n  ${resultados.length} suite(s), ${n} de cada vez, ${((Date.now() - t0) / 1000).toFixed(1)}s de parede.\n`);
     // Na UI do GitHub, cada suite que reprovou fica a vista, e nao so dentro de um grupo fechado.

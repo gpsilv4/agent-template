@@ -10,7 +10,7 @@
  */
 import { pathToFileURL } from "url";
 import { execFileSync } from "child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from "fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
@@ -60,9 +60,9 @@ console.log(JSON.stringify({ code, out }));`;
  * Escreve `inicio`/`fim` num registo partilhado e, com `espera`, so acaba quando o registo ja tem `espera`
  * inicios — ou, com `esperaPor`, quando ja tem esse texto. Sao BARREIRAS, e nao tempos fixos: a ordem e a
  * sobreposicao provam-se sem depender da carga da maquina (as suites correm agora em paralelo com outras,
- * e num runner de 2 cores). O `tecto` so conta quando a barreira NAO pode chegar (o caso `--max=1`).
+ * e num runner de 2 cores). O `limiteMs` so conta quando a barreira NAO pode chegar (o caso `--max=1`).
  */
-const suite = (dir, nome, { codigo = 0, espera = 0, esperaPor = "", tecto = 15000, mata = false, pendura = false, neto = false, volume = 0 } = {}) => {
+const suite = (dir, nome, { codigo = 0, espera = 0, esperaPor = "", limiteMs = 15000, mata = false, pendura = false, neto = false, volume = 0, fronteira = false } = {}) => {
   const rel = `.agent/scripts/tests/test-${nome}.mjs`;
   mkdirSync(join(dir, ".agent/scripts/tests"), { recursive: true });
   const reg = JSON.stringify(join(dir, "registo"));
@@ -73,17 +73,142 @@ const suite = (dir, nome, { codigo = 0, espera = 0, esperaPor = "", tecto = 1500
       `appendFileSync(${reg}, "inicio ${nome}\\n");\n` +
       `console.log("saida de ${nome}");\n` +
       (volume ? `process.stdout.write("x".repeat(${volume}) + "\\n");\n` : "") +
-      `const ate = Date.now() + ${tecto};\n` +
+      // Um `—` (3 bytes) a cavalo dos 64 KB que um pipe entrega de cada vez.
+      // Espera pela escrita INTEIRA (o callback): o \`process.exit\` a seguir cortava-a, e um \`writeSync\` num pipe
+      // nao-bloqueante so escreve o que cabe (64 KB) e perde o resto — o teste reprovava pela fixture, nao pelo runner.
+      (fronteira ? `await new Promise((r) => process.stdout.write("x".repeat(65535) + "\\u2014fim-da-fronteira\\n", r));\n` : "") +
+      `const ate = Date.now() + ${limiteMs};\n` +
       `const pronta = () => { const r = readFileSync(${reg}, "utf8"); return ${JSON.stringify(esperaPor)} ? r.includes(${JSON.stringify(esperaPor)}) : (r.match(/inicio/g) || []).length >= ${espera}; };\n` +
       `while ((${espera} > 0 || ${JSON.stringify(esperaPor)}) && Date.now() < ate && !pronta()) await new Promise((r) => setTimeout(r, 20));\n` +
-      (pendura ? `await new Promise(() => setInterval(() => {}, 1000));\n` : "") +
+      // Pendurada, mas nao para sempre: morto o teste por um SIGKILL (que nao se apanha), ela sai sozinha.
+      (pendura ? `setTimeout(() => process.exit(9), 60000);\nawait new Promise(() => setInterval(() => {}, 1000));\n` : "") +
       `appendFileSync(${reg}, "fim ${nome}\\n");\n` +
       (mata ? `process.kill(process.pid, "SIGKILL");\n` : `process.exit(${codigo});\n`)
   );
   return ["node", rel];
 };
 
+/** Vivos por padrao (`pgrep -f`, regex POSIX). Um `pgrep` que nao existe NAO e "nenhum vivo": lanca,
+ *  e o teste reprova — senao a assercao "nao ficou nada vivo" passava sem medir. */
+function vivos(padrao) {
+  try {
+    return execFileSync("pgrep", ["-f", padrao], { encoding: "utf8" }).trim().split(/\s+/).filter(Boolean);
+  } catch (err) {
+    if (err.status === 1) return [];
+    throw new Error(`pgrep indisponivel: ${err.message}`);
+  }
+}
+
+/**
+ * Corre `corpo` (que devolve problemas) e, ACONTECA O QUE ACONTECER (uma excepcao, um timeout do controlador),
+ * procura os processos dos `padroes`, mata-os, e conta-os como problema: uma orfa e o defeito que estes testes
+ * prendem, e nao pode ficar a correr depois deles (auditoria final do #337).
+ */
+function comOrfasLimpas(padroes, corpo) {
+  let problemas;
+  try {
+    problemas = corpo();
+  } catch (err) {
+    problemas = [err instanceof Error ? err.message : String(err)];
+  }
+  try {
+    const orfas = padroes.flatMap((x) => vivos(x));
+    for (const o of orfas) try { process.kill(Number(o), "SIGKILL"); } catch { /* ja morreu */ }
+    if (orfas.length) problemas.push(`ficaram processos vivos (pids ${orfas.join(", ")})`);
+  } catch (err) {
+    problemas.push(err instanceof Error ? err.message : String(err));
+  }
+  return problemas;
+}
+
+/**
+ * Lanca o runner com `args` num controlador a parte, corre `passos` (codigo com `p`, `out`, `reg()`,
+ * `espera(ms)`, `ate`) e devolve `{ codigo, out }` quando o runner fecha. O `close` regista-se ANTES dos passos:
+ * um runner rapido fechava antes de alguem o ouvir, e a promessa nunca resolvia.
+ */
+function controla(dir, args, passos) {
+  const prog = `import { spawn, execFileSync } from "child_process"; import { readFileSync, appendFileSync } from "fs";
+const p = spawn(process.execPath, ${JSON.stringify([RUNNER, ...args])}, { cwd: ${JSON.stringify(dir)}, env: { ...process.env, GITHUB_ACTIONS: "" } });
+let out = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (out += d));
+p.stdout.on("error", () => {});
+const fechou = new Promise((r) => p.on("close", (c) => r(c)));
+const reg = () => readFileSync(${JSON.stringify(join(dir, "registo"))}, "utf8");
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+const vivo = (padrao) => { try { execFileSync("pgrep", ["-f", padrao]); return true; } catch (err) { if (err.status === 1) return false; throw err; } };
+const ate = Date.now() + 20000;
+${passos}
+const codigo = await fechou;
+console.log(JSON.stringify({ codigo, out: out.replace(/x{1000,}/g, "<volume>") }));`;
+  return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", prog], { encoding: "utf8", timeout: 45000 }));
+}
+
+/**
+ * As suites que o job `guard-tests` de um `ci.yml` CORRE, lido como o `bash` o executa. No passo do runner so
+ * contam as da CADEIA de `\` que nasce na linha dele: com o `exec`, uma linha depois de um `\` em falta nunca
+ * corre — e o passo ficava verde com uma suite a menos (auditoria final do #337). Fora dele, cada `node <suite>`.
+ */
+export function suitesQueOCICorre(ci) {
+  const job = (ci.split(/^  guard-tests:[ \t]*(?:#.*)?$/m)[1] ?? "").split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
+  const ls = job.split(/\r?\n/);
+  const corre = new Set();
+  for (let i = 0; i < ls.length; i++) {
+    if (/^[ \t]*#/.test(ls[i])) continue;
+    if (/^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs\b/.test(ls[i])) {
+      let j = i;
+      while (/\\[ \t]*$/.test(ls[j]) && j + 1 < ls.length) {
+        const m = ls[j + 1].match(/^[ \t]*node[ \t]+(\S+)[ \t]*(?:\\[ \t]*)?$/);
+        if (!m) break;
+        corre.add(m[1]);
+        j++;
+      }
+      // Depois do `exec`, o resto do passo nunca corre: salta ate ao passo seguinte.
+      i = j;
+      while (i + 1 < ls.length && !/^[ \t]*- /.test(ls[i + 1])) i++;
+      continue;
+    }
+    const m = ls[i].match(/(?:^|[\s;&|(])node[ \t]+(\S*tests\/test-[\w-]+\.mjs)\b/);
+    if (m) corre.add(m[1]);
+  }
+  return corre;
+}
+
+/** As suites EM DISCO (as duas pastas que o runner aceita). */
+const suitesEmDisco = (raiz) =>
+  [".agent/scripts/tests", ".claude/hooks/tests"].flatMap((d) => {
+    try {
+      return readdirSync(join(raiz, d)).filter((f) => /^test-[\w-]+\.mjs$/.test(f)).map((f) => `${d}/${f}`);
+    } catch {
+      return [];
+    }
+  });
+
 export function registar() {
+  // Cada suite em disco corre no `guard-tests` deste repo: uma suite que existe e nunca corre e um verde que mente.
+  registarResultado("suites em paralelo: cada suite em disco corre no guard-tests do ci.yml deste repo (#337)", (() => {
+    const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+    const corre = suitesQueOCICorre(ci);
+    const emDisco = suitesEmDisco(ROOT);
+    return [
+      ...(emDisco.length ? [] : ["nenhuma suite em disco: a medicao nao leu nada"]),
+      ...emDisco.filter((sx) => !corre.has(sx)).map((sx) => `${sx} existe e o guard-tests nao a corre`),
+    ];
+  })());
+  // E a leitura e a do `bash`: um `\` em falta corta a cadeia, um comentario tambem, e um passo proprio conta.
+  registarResultado("suites em paralelo: a leitura do ci.yml corta a cadeia num \\ em falta, e conta um passo proprio (#337)", (() => {
+    const passo = (...linhas) => "jobs:\n  guard-tests:\n    steps:\n      - name: Suites\n        run: |\n" + linhas.map((l) => `          ${l}\n`).join("");
+    const R = "exec node .agent/scripts/lib/suites-em-paralelo.mjs -- \\";
+    const [A, B, C] = ["a", "b", "c"].map((x) => `.agent/scripts/tests/test-${x}.mjs`);
+    const v = (ci) => [...suitesQueOCICorre(ci)].sort().join(",");
+    const casos = [
+      ["a cadeia inteira", passo(R, `  node ${A} \\`, `  node ${B}`), [A, B]],
+      ["um \\ em falta corta", passo(R, `  node ${A}`, `  node ${B}`), [A]],
+      ["um comentario a meio corta", passo(R, `  node ${A} \\`, "  # nada", `  node ${B}`), [A]],
+      ["um passo proprio conta", passo(R, `  node ${A}`) + `      - run: node ${C}\n`, [A, C]],
+      ["outro job nao conta", passo(R, `  node ${A}`) + `  outro:\n    steps:\n      - run: node ${C}\n`, [A]],
+    ];
+    return casos.flatMap(([nome, ci, esp]) => (v(ci) === [...esp].sort().join(",") ? [] : [`${nome}: deu ${v(ci)}`]));
+  })());
+
   registarResultado("suites em paralelo: le `--max` antes do `--` e pares `node <suite>` depois", [
     ...(JSON.stringify(leArgs(["--max=2", "--", "node", ".agent/scripts/tests/test-a.mjs", "node", ".claude/hooks/tests/test-hooks.mjs"])) ===
     JSON.stringify({ max: "2", comandos: [["node", ".agent/scripts/tests/test-a.mjs"], ["node", ".claude/hooks/tests/test-hooks.mjs"]], erros: [] })
@@ -100,6 +225,9 @@ export function registar() {
     ["um `node` sem suite no fim", ["--", "node", ".agent/scripts/tests/test-a.mjs", "node"]],
     ["um argumento a mais", ["--", "node", ".agent/scripts/tests/test-a.mjs", "--x"]],
     ["uma opcao desconhecida", ["--y", "--", "node", ".agent/scripts/tests/test-a.mjs"]],
+    ["um `--max=0`", ["--max=0", "--", "node", ".agent/scripts/tests/test-a.mjs"]],
+    ["um `--max` que nao e um numero", ["--max=dois", "--", "node", ".agent/scripts/tests/test-a.mjs"]],
+    ["a mesma suite duas vezes", ["--", "node", ".agent/scripts/tests/test-a.mjs", "node", ".agent/scripts/tests/test-a.mjs"]],
   ].flatMap(([nome, args]) => (leArgs(args).erros.length ? [] : [`${nome} passou: ${args.join(" ")}`])));
   registarResultado("suites em paralelo: o tecto e min(4, cores), `--max` valido manda, nunca menos de 1", [
     ...(quantasDeCadaVez(undefined, 10) === TECTO ? [] : [`10 cores deu ${quantasDeCadaVez(undefined, 10)}`]),
@@ -127,6 +255,12 @@ export function registar() {
         ...(r.out.includes("1 suite(s) reprovaram") && r.out.includes("test-b.mjs") ? [] : ["o resumo nao nomeia a que reprovou"]),
       ]);
     }
+    // Um caracter MULTIBYTE partido entre dois blocos do pipe sai inteiro (texto, e nao Buffers somados).
+    {
+      const r = corre(dir, ["--", ...suite(dir, "utf", { fronteira: true })]);
+      registarResultado("suites em paralelo: um caracter multibyte na fronteira de um bloco sai inteiro",
+        r.code === 0 && r.out.includes("x\u2014fim-da-fronteira") && !r.out.includes("\uFFFD") ? [] : [`exit ${r.code}; inteiro: ${r.out.includes("x\u2014fim-da-fronteira")}; saida: ${JSON.stringify(r.out.replace(/x{100,}/g, "<x>").slice(-300))}`]);
+    }
     // Morta por um SINAL (o OOM-kill): `code` e `null`, e tem de reprovar e dizer o sinal.
     {
       const r = corre(dir, ["--", ...suite(dir, "morta", { mata: true }), ...suite(dir, "viva")]);
@@ -150,11 +284,11 @@ export function registar() {
     }
     // O TECTO, por BARREIRA: com 2, as duas primeiras esperam uma pela outra e sobrepoem-se; com 1, nunca.
     {
-      // Com 1, a barreira nunca chega (e esse o ponto): o `tecto` curto e o que a deixa acabar.
+      // Com 1, a barreira nunca chega (e esse o ponto): o `limiteMs` curto e o que a deixa acabar.
       const ordem = (max) => {
         writeFileSync(join(dir, "registo"), "");
-        const tecto = max === 1 ? 1500 : 15000;
-        corre(dir, [`--max=${max}`, "--", ...suite(dir, "x", { espera: 2, tecto }), ...suite(dir, "y", { espera: 2, tecto }), ...suite(dir, "z")]);
+        const limiteMs = max === 1 ? 1500 : 15000;
+        corre(dir, [`--max=${max}`, "--", ...suite(dir, "x", { espera: 2, limiteMs }), ...suite(dir, "y", { espera: 2, limiteMs }), ...suite(dir, "z")]);
         return readFileSync(join(dir, "registo"), "utf8").trim().split("\n").map((l) => l.split(" ")[0]);
       };
       const sobrepoe = (seq) => seq.some((v, k) => v === "inicio" && seq[k + 1] === "inicio");
@@ -184,52 +318,66 @@ export function registar() {
       // Nomes UNICOS: o `pgrep` ve a linha de comando (caminho RELATIVO), e duas corridas em paralelo nao se confundem.
       const [a, b, fila] = ["a", "b", "fila"].map((x) => `${x}-${process.pid}`);
       const args = ["--max=2", "--", ...suite(dir, "acaba"), ...suite(dir, a, { pendura: true, neto: true, volume: 300000 }), ...suite(dir, b, { pendura: true }), ...suite(dir, fila)];
-      // Solta o SIGTERM so quando o runner ja anunciou a `acaba` E as duas penduradas ja arrancaram (barreiras, sem relogio).
-      const prog = `import { spawn } from "child_process"; import { readFileSync } from "fs";
-const p = spawn(process.execPath, ${JSON.stringify([RUNNER, ...args])}, { cwd: ${JSON.stringify(dir)}, env: { ...process.env, GITHUB_ACTIONS: "" } });
-let out = ""; p.stdout.on("data", (d) => (out += d)); p.stderr.on("data", (d) => (out += d));
-const reg = () => readFileSync(${JSON.stringify(join(dir, "registo"))}, "utf8");
-const ate = Date.now() + 20000;
-while (Date.now() < ate && !(out.includes("test-acaba.mjs passou") && reg().includes("inicio ${a}") && reg().includes("inicio ${b}"))) await new Promise((r) => setTimeout(r, 20));
-const fechou = new Promise((r) => p.on("close", (c) => r(c)));
+      registarResultado("suites em paralelo: cancelado, nomeia e despeja as penduradas, mata-as com os netos, nao arranca a fila, e reprova",
+        comOrfasLimpas([...[a, b, fila].map((x) => `test-${x}\\.mjs`), `neto-${a}$`], () => {
+          // Solta o SIGTERM so quando o runner ja anunciou a `acaba` E as duas penduradas ja arrancaram (barreiras, sem relogio).
+          // O despejo (300 KB) nao cabe no pipe: com a leitura PAUSADA, o runner so pode sair depois de as mortas
+          // fecharem — e a corrida em que, sem a flag runner.cancelado, a fila arrancava e as mortas saiam outra vez.
+          const { codigo, out } = controla(dir, args, `
+while (Date.now() < ate && !(out.includes("test-acaba.mjs passou") && reg().includes("inicio ${a}") && reg().includes("inicio ${b}"))) await espera(20);
+// O CONTROLO POSITIVO: o padrao tem de as ver VIVAS antes do sinal — senao "mortas" depois nao media nada.
+if (vivo("^node [^ ]*test-${a}\\\\.mjs$") && vivo("^node [^ ]*test-${b}\\\\.mjs$")) out += "\\n[vivas-antes-do-sinal]";
 p.kill("SIGTERM");
-// O despejo (300 KB) nao cabe no pipe: com a leitura PAUSADA, o runner so pode sair depois de as mortas
-// fecharem — e a corrida em que, sem a flag runner.cancelado, a fila arrancava e as mortas saiam outra vez.
 p.stdout.pause();
-await new Promise((r) => setTimeout(r, 1500));
-p.stdout.resume();
-const codigo = await fechou;
-console.log(JSON.stringify({ codigo, out: out.replace(/x{1000,}/g, "<volume>") }));`;
-      const { codigo, out } = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", prog], { encoding: "utf8", timeout: 45000 }));
-      // Vivos por padrao. Um `pgrep` que nao existe NAO e "nenhum vivo": reprova, senao a assercao passava sem medir.
-      const vivos = (padrao) => {
-        try {
-          return execFileSync("pgrep", ["-f", padrao], { encoding: "utf8" }).trim().split(/\s+/).filter(Boolean);
-        } catch (err) {
-          if (err.status === 1) return [];
-          throw new Error(`pgrep indisponivel: ${err.message}`);
-        }
-      };
-      let problemas = [];
-      try {
-        // Um padrao por nome: o `pgrep` le regex POSIX (sem `(?:`).
-        const orfas = [...[a, b, fila].map((x) => `test-${x}\\.mjs`), `neto-${a}`].flatMap((x) => vivos(x));
-        // Uma orfa (o defeito que isto prende) nao fica a correr para sempre depois do teste.
-        for (const o of orfas) try { process.kill(Number(o), "SIGKILL"); } catch { /* ja morreu */ }
-        problemas = [
-          ...(codigo === 1 ? [] : [`exit ${codigo}`]),
-          ...(out.includes("interrompido por SIGTERM com 2 suite(s)") && out.includes(`test-${a}.mjs`) && out.includes(`test-${b}.mjs`) ? [] : ["nao nomeou as duas penduradas"]),
-          ...(out.includes("INTERROMPIDA") && out.includes(`saida de ${a}`) ? [] : ["nao despejou o que a pendurada escreveu"]),
-          ...(out.split("INTERROMPIDA").length === 3 ? [] : ["o despejo nao saiu exactamente uma vez por pendurada"]),
-          ...(out.includes("test-acaba.mjs passou") ? [] : ["perdeu o estado da que ja tinha acabado"]),
-          ...(!readFileSync(join(dir, "registo"), "utf8").includes(`inicio ${fila}`) ? [] : ["a que estava em FILA arrancou depois do cancelamento"]),
-          ...(!/REPROVOU \(sinal SIGKILL\)/.test(out) ? [] : ["as mortas sairam outra vez como REPROVOU"]),
-          ...(orfas.length === 0 ? [] : [`ficaram processos vivos (pids ${orfas.join(", ")})`]),
-        ];
-      } catch (err) {
-        problemas = [err instanceof Error ? err.message : String(err)];
-      }
-      registarResultado("suites em paralelo: cancelado, nomeia e despeja as penduradas, mata-as com os netos, nao arranca a fila, e reprova", problemas);
+// Com a leitura PAUSADA o runner nao pode sair (o despejo nao cabe no pipe): as penduradas tem de morrer JA, no
+// handler do sinal — e nao so no \`exit\` do runner, que so as matava depois de a saida escoar.
+let mortasCedo = false;
+// Ancorado a linha de comando DA SUITE (node <caminho> e nada mais): a do runner tambem contem o nome dela.
+for (let k = 0; k < 100 && !mortasCedo; k++) { mortasCedo = !vivo("^node [^ ]*test-${a}\\\\.mjs$") && !vivo("^node [^ ]*test-${b}\\\\.mjs$"); if (!mortasCedo) await espera(20); }
+await espera(1500);
+out += mortasCedo ? "\\n[mortas-antes-de-sair]" : "";
+p.stdout.resume();`);
+          return [
+            ...(codigo === 1 ? [] : [`exit ${codigo}`]),
+            ...(out.includes("interrompido por SIGTERM com 2 suite(s)") && out.includes(`test-${a}.mjs`) && out.includes(`test-${b}.mjs`) ? [] : ["nao nomeou as duas penduradas"]),
+            ...(out.includes("INTERROMPIDA") && out.includes(`saida de ${a}`) ? [] : ["nao despejou o que a pendurada escreveu"]),
+            ...(out.split("INTERROMPIDA").length === 3 ? [] : ["o despejo nao saiu exactamente uma vez por pendurada"]),
+            ...(out.includes("test-acaba.mjs passou") ? [] : ["perdeu o estado da que ja tinha acabado"]),
+            ...(!readFileSync(join(dir, "registo"), "utf8").includes(`inicio ${fila}`) ? [] : ["a que estava em FILA arrancou depois do cancelamento"]),
+            ...(!/REPROVOU \(sinal SIGKILL\)/.test(out) ? [] : ["as mortas sairam outra vez como REPROVOU"]),
+            ...(!out.includes("reprovaram:") && !out.includes("de parede.") ? [] : ["depois do cancelamento ainda saiu o resumo final"]),
+            ...(out.includes("[vivas-antes-do-sinal]") ? [] : ["o padrao do pgrep nao encontrou as penduradas vivas: a verificacao seguinte nao mediria nada"]),
+            ...(out.includes("[mortas-antes-de-sair]") ? [] : ["as penduradas so morreram quando o runner saiu, e nao no sinal"]),
+          ];
+        }));
+    }
+    // O TERMINAL que fecha (SIGHUP, local): as suites correm noutro grupo e nao o recebem — o runner mata-as.
+    {
+      writeFileSync(join(dir, "registo"), "");
+      const h = `h-${process.pid}`;
+      const args = ["--max=2", "--", ...suite(dir, h, { pendura: true })];
+      registarResultado("suites em paralelo: SIGHUP (o terminal fecha) mata as suites e reprova",
+        comOrfasLimpas([`test-${h}\\.mjs`], () => {
+          const { codigo, out } = controla(dir, args, `
+while (Date.now() < ate && !reg().includes("inicio ${h}")) await espera(20);
+p.kill("SIGHUP");`);
+          return codigo === 1 && out.includes("interrompido por SIGHUP") ? [] : [`exit ${codigo}: ${out.slice(-200)}`];
+        }));
+    }
+    // Saida por uma EXCEPCAO (um EPIPE, como num `| head` local): quem le a saida fecha-a, e a escrita
+    // seguinte do runner rebenta. Sem o handler de `exit`, a pendurada ficava orfa a correr para sempre.
+    {
+      writeFileSync(join(dir, "registo"), "");
+      const [e1, e2] = ["e1", "e2"].map((x) => `${x}-${process.pid}`);
+      const args = ["--max=2", "--", ...suite(dir, e1, { pendura: true }), ...suite(dir, e2, { esperaPor: "solta" })];
+      registarResultado("suites em paralelo: o runner que morre por uma excepcao (EPIPE) nao deixa suites orfas",
+        comOrfasLimpas([`test-${e1}\\.mjs`], () => {
+          const { codigo } = controla(dir, args, `
+while (Date.now() < ate && !(reg().includes("inicio ${e1}") && reg().includes("inicio ${e2}"))) await espera(20);
+p.stdout.destroy();
+appendFileSync(${JSON.stringify(join(dir, "registo"))}, "solta\\n");`);
+          return codigo !== 0 ? [] : ["o runner saiu 0 depois de perder a saida"];
+        }));
     }
     // Um argumento que nao e uma suite REPROVA, e nada corre.
     {
