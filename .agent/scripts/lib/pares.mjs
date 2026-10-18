@@ -45,6 +45,9 @@ const PARES_DO_TEMPLATE = [
   // O PORTAO dos shards da varredura (#308): cada recusa e um shard em falta, repetido ou a
   // discordar — desligar uma deixava a perna completa passar com sitios por medir.
   { alvo: ".agent/scripts/lib/varredura-shards.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },
+  // As suites em paralelo (#337): o UNICO sitio de recusa e o `reprova()`. Desligado, o passo do CI ficava
+  // verde com uma suite vermelha — a falha aberta que correr em paralelo nao pode trazer.
+  { alvo: ".agent/scripts/lib/suites-em-paralelo.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$]|function )reprova\(/, neutro: "(() => {})(" },
   {
     // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
     // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel

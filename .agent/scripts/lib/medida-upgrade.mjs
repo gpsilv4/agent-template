@@ -48,21 +48,50 @@ export const JOBS_DA_2B = ["guard-tests", "sweep"];
  *  mesmo conjunto que o template com ela no `sweep` — e a 2b nao via que ela corre duas vezes, ou
  *  fora do check que a protecao exige (leitura independente do #308). */
 export function comandosPorJob(raiz) {
+  const jobs = textosDosJobs(raiz);
+  return jobs && Object.fromEntries(JOBS_DA_2B.map((n) => [n, comandosDe(jobs[n])]));
+}
+
+/** O texto de cada job da 2b, ou `null` sem `guard-tests`. */
+function textosDosJobs(raiz) {
   const ci = leOuNull(join(raiz, ".github/workflows/ci.yml"));
   // So ate ao job SEGUINTE: o `split` sozinho levava todos os jobs que vem depois.
   // Um comentario na linha do job (`  guard-tests:   # suites`) nao a desfaz — nem a do job seguinte,
   // senao os comandos dele eram atribuidos a este (leitura independente do #308).
   const doJob = (nome) => ci?.split(new RegExp(`^  ${nome}:[ \t]*(?:#.*)?$`, "m"))[1]?.split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
   if (!doJob("guard-tests")) return null;
-  return Object.fromEntries(JOBS_DA_2B.map((n) => [n, comandosDe(doJob(n) ?? "")]));
+  return Object.fromEntries(JOBS_DA_2B.map((n) => [n, doJob(n) ?? ""]));
 }
 
-/** Os `node X.mjs` dos `run:` de um job (o texto dele). */
+/** As SUITES (`tests/test-*.mjs`) que aparecem MAIS DE UMA VEZ no mesmo job: `{ "guard-tests": [...], sweep: [...] }`,
+ *  ou `null` sem `guard-tests` (#337). O passo das suites em paralelo SUBSTITUI um passo por suite: um
+ *  derivado que o traga e deixe os antigos corre cada suite duas vezes, verde — e nada mais o via (o
+ *  `comandosDe` tira os repetidos, e a contagem da superficie SOBE em vez de descer). So as suites: a varredura
+ *  aparece duas vezes no `sweep` do template DE PROPOSITO, em dois ramos de um `if` (completa / `--diff`). */
+export function repetidosPorJob(raiz) {
+  const jobs = textosDosJobs(raiz);
+  if (!jobs) return null;
+  return Object.fromEntries(
+    JOBS_DA_2B.map((n) => {
+      const todos = nodesDe(jobs[n]).filter((c) => /(?:^|\/)tests\/test-[\w-]+\.mjs$/.test(c));
+      return [n, [...new Set(todos.filter((c, i) => todos.indexOf(c) !== i))]];
+    })
+  );
+}
+
+/** Os `node X.mjs` dos `run:` de um job (o texto dele), sem repetidos e sem os EXCLUIDOS. */
 function comandosDe(job) {
   // EXCLUSOES, cada uma por uma razao concreta:
   //  - `check-test-surface`: precisa de um `.git` com historia, e um archive nao traz nenhum;
-  //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao.
-  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade"];
+  //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao;
+  //  - o `suites-em-paralelo` (#337): e um DESPACHANTE, e as suites que ele corre estao nas linhas seguintes
+  //    e leem-se uma a uma. Sozinho, sem argumentos, so sabe reprovar.
+  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade", "suites-em-paralelo"];
+  return [...new Set(nodesDe(job))].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
+}
+
+/** TODOS os `node X.mjs` dos `run:` de um job, pela ordem e com repetidos. */
+function nodesDe(job) {
   // LINHA A LINHA, e as COMENTADAS ficam de fora. Um passo comentado no `ci.yml` e uma
   // DECISAO do projeto — desligou-o —, e o regex corrido sobre o texto inteiro nao distinguia
   // `run:` de `#   run:`. Num projeto real isso poe a medicao a correr a varredura de mutacao
@@ -94,7 +123,7 @@ function comandosDe(job) {
     if (/^[|>][+-]?\s*$/.test(run[1])) bloco = ind;
     else for (const m of run[1].matchAll(NODE)) achados.push(m[1]);
   }
-  return [...new Set(achados)].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
+  return achados;
 }
 
 /** Os que a BATERIA nao corre, embora contem para a comparacao com o template. A varredura de
@@ -342,6 +371,26 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
           "um passo que o template moveu sai do job antigo (senao corre 2x); o `check-test-surface` reprova os estados que tiram a varredura do check exigido"
       );
     }
+  }
+  // OS REPETIDOS no mesmo job (#337): um passo que o template SUBSTITUIU (as suites em paralelo, no lugar de um
+  // passo por suite) trazido sem tirar os que substitui. Le-se DEPOIS de mexer no `ci.yml` (a 2b corre-se outra vez).
+  for (const [job, cs] of Object.entries(repetidosPorJob(raiz) ?? {})) {
+    for (const c of cs) {
+      note(
+        `${c} corre 2x no job \`${job}\` deste projeto — um passo que o template SUBSTITUIU sai com os que substitui ` +
+          "(#337: o `Suites — negative tests (em paralelo)` substitui um passo por suite; os antigos saem, e o commit leva o trailer `Test-Surface:`)"
+      );
+    }
+  }
+  // O PASSO EM PARALELO (#337), do lado de quem ainda nao o tem: os conjuntos de suites sao iguais (o despachante
+  // esta no EXCLUIR), logo nada acima o via — e o derivado ficava em serie sem saber que havia escolha.
+  // A linha do runner num `run: |` OU num `run:` de uma linha; nunca comentada.
+  const emParalelo = (r) => /^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs\b/m.test(textosDosJobs(r)?.["guard-tests"] ?? "");
+  if (emParalelo(template) && !emParalelo(raiz)) {
+    note(
+      "o `guard-tests` do template corre as suites num so passo, em paralelo (`suites-em-paralelo.mjs`, #337), e o deste projeto nao — " +
+        "OPCIONAL (so tempo: as mesmas suites); ao adotar, os passos de cada suite SAEM (senao correm 2x) e o commit leva o trailer `Test-Surface: .github/workflows/ci.yml — <porque>`"
+    );
   }
   // Os SHARDS (#308): o comando da varredura e o mesmo dos dois lados, e nada acima o ve — um derivado
   // privado, para quem eles existem, ficava sem eles em silencio (leitor do #308). So a quem TEM o `sweep`.

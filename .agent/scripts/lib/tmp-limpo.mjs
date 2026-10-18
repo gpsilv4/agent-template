@@ -94,6 +94,9 @@ export const PREFIXOS_DE_TESTE = [
   "commit-msg-test-",
   // Do `tests-varredura-shards.mjs` (#308): o portao pela linha de comando le relatorios de uma pasta.
   "shards-test-",
+  // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
+  // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
+  "paralelo-test-",
   // Da suite do `lib/derivado-maduro.mjs`, que saiu do simulador quando ele bateu nas 500
   // linhas. Entrou aqui porque o teste desta lista o exigiu — e foi a **simulacao de derivado**
   // a dize-lo primeiro, por correr todas as suites: eu tinha criado a fixture e nao corrido

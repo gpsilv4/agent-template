@@ -144,6 +144,8 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/varredura-diff\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/lib\/varredura-fatia\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/lib\/varredura-shards\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // As suites em paralelo do `Guard Suites` (#337): testadas no `tests-suites-em-paralelo.mjs`, do `test-guards`.
+  { re: /^\.agent\/scripts\/lib\/suites-em-paralelo\.mjs$/, verifica: [S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/(lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
