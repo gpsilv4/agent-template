@@ -158,6 +158,18 @@ export function registar() {
         { codigo: 0, exclui: ["reparte a varredura completa em shards"] }),
     ]);
   }
+  // A SUITE REPETIDA no mesmo job (#337): o passo em paralelo trazido sem tirar o antigo. A NOTE tem de SAIR
+  // na 2b (a varredura `--skips` desliga-a e exige vermelho) — e nao sai quando a suite corre uma vez.
+  {
+    const S = ".agent/scripts/tests/test-dup.mjs";
+    const SUITE_OK = { [S]: "// suite falsa: sai 0\n" };
+    test("uma suite que corre 2x no mesmo job do projeto aparece na 2b (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O, S, S] }), ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, inclui: [`${S} corre 2x no job \`guard-tests\` deste projeto`] }));
+    test("uma suite que corre uma vez nao aparece como repetida (#337)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O, S] }), ...OUTRO, ...SUITE_OK } }),
+        { codigo: 0, exclui: ["corre 2x no job"] }));
+  }
   // O contra-caso: a mesma colocacao nao se anuncia.
   test("a varredura no `sweep` dos dois lados nao aparece (#308)", () =>
     exige(contraProjeto({ hoje: TPL_SWEEP, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),
