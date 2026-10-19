@@ -71,7 +71,8 @@ const CONDICOES = [
   ["citado mas executado", 'sh -c "cat .claude/settings.json > /tmp/x"', "citado-mas-executado"],
   // Os dois medidos do #307: nenhum escrevia, e os dois levavam a razao de escrita.
   ["ciclo de shell", "for t in .claude/hooks/tests/test-*.mjs; do node $t; done", "verbo-nao-e-leitura:for"],
-  ["interpretador inline que so le", "python3 -c \"print(open('.claude/settings.json').read())\"", "citado-mas-executado"],
+  // O sufixo `:inline` (#336): a razao do codigo inline leva a nota do `jq`, e a dos outros opacos nao.
+  ["interpretador inline que so le", "python3 -c \"print(open('.claude/settings.json').read())\"", "citado-mas-executado:inline"],
   ["bloco que so le", "{ cat .claude/settings.json; }", "verbo-nao-e-leitura:{"],
   ["ciclo que le da fronteira", "while read f; do cat $f; done < .claude/hooks/x", "verbo-nao-e-leitura:done"],
   // E o contrario (leituras do #307): um bloco de shell com uma escrita A VISTA leva a razao de
@@ -116,6 +117,7 @@ const RAZAO_DO_ROTULO = {
   "git-que-escreve": ESCRITA,
   "find-que-escreve": ESCRITA,
   "citado-mas-executado": OPACA,
+  "citado-mas-executado:inline": OPACA,
   "verbo-nao-e-leitura:for": OPACA,
   "verbo-nao-e-leitura:rm": ESCRITA,
   "verbo-nao-e-leitura:{": OPACA,

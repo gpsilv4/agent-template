@@ -40,6 +40,14 @@
     **classe** que volta sempre com mais uma forma ganha **issue proprio**, e nao mais um caso
     (o texto citado que corre, #229). E a linha do `CLAUDE.md` — barreira contra o **descuido** —
     escrita em casos.
+  - **A posicao de comando** (#336). O "codigo inline" decidia-se por regex sobre o texto, e
+    `node -pe`, `perl -le`, `python3 -Ic`, `php -r` e `--import data:` passavam. O
+    `lib/posicao.mjs` le o comando como a shell (aspas, substituicoes e heredocs numa passagem) e
+    diz que palavra CORRE: a seguir as palavras-chave, as cabecas e a executores conhecidos
+    (`find -exec`, `npx`, `env -S`), e nao em qualquer palavra. A regra **so acrescenta**: as regex
+    de antes ficam como piso. Uma excepcao para o texto das mensagens (`-m "... node -e ..."`) foi
+    tentada e tirada — tres leituras acharam texto que a shell acaba a correr (`bash <(git log
+    -1 --format=%B)`) — e esse falso positivo fica negado de proposito (#344).
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio): corre no CI em cada PR que toque verificadores ou hooks (completa e `--skips`), e localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
 
 - **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/tests/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do modulo `.githooks/lib/commit-msg.mjs` — o `.githooks/commit-msg` e so um ponteiro que o importa (o git exige o nome sem extensao; o CodeQL escolhe pela extensao).

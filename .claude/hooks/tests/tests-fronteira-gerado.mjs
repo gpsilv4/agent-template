@@ -141,6 +141,44 @@ export function gerar() {
   return out;
 }
 
+/** A dimensao INTERPRETADOR INLINE (#336): o produto que os casos escritos a mao nao cobriam. A v1 do plano
+ *  do #336 afrouxava `node -r /tmp/x.js -e`, `do node -e` e `find -exec node -e` — e nenhum corpus as gerava.
+ *  [interpretador, letra de codigo, outra letra (para agrupar), uma opcao com valor do proprio interpretador] */
+export const INTERPRETADORES = [
+  ["node", "e", "i", "-r /tmp/x.js"], ["bun", "e", "i", "--cwd /tmp"], ["tsx", "e", "i", "-r /tmp/x.js"],
+  ["ts-node", "p", "i", "-r /tmp/x.js"], ["perl", "e", "l", "-I /tmp"], ["python3", "c", "I", "-W ignore"],
+  ["pypy3", "c", "I", "-W ignore"], ["ruby", "e", "n", "-I /tmp"], ["php", "r", "n", "-d x=y"],
+  ["lua", "e", "i", "-l mod"], ["Rscript", "e", "s", "--default-packages=x"], ["osascript", "e", "s", "-l JavaScript"],
+];
+/** A letra sozinha, agrupada DEPOIS de outra (`-le`) e ANTES de outra (`-el`). */
+const FORMAS_DA_LETRA = [(l) => `-${l}`, (l, o) => `-${o}${l}`, (l, o) => `-${l}${o}`];
+/** O que vem antes da letra: nada, uma opcao com valor (o desenho que adivinhava valores furou, #317), e
+ *  `--title x.js`, que parecia um script. */
+const ANTES_DA_LETRA = [() => "", (op) => `${op} `, () => "--title x.js "];
+/** A POSICAO do interpretador no comando: [antes, depois]. As palavras-chave, as cabecas, um executor. */
+export const POSICOES_INLINE = [
+  ["", ""], ["sudo ", ""], ["env -i ", ""], ["timeout 5 ", ""], ["for i in 1; do ", "; done"],
+  ["if true; then ", "; fi"], ["{ ", "; }"], ["exec ", ""], ["find /tmp -maxdepth 0 -exec ", " \\;"], ["npx ", ""],
+];
+/** A fronteira a VISTA (argumento) ou so DENTRO do codigo citado. */
+const FRONTEIRA_INLINE = [
+  (h) => [`"print(1)"`, ` ${h}`],
+  (h) => [`"unlink('${h}')"`, ""],
+];
+
+export function gerarInline() {
+  const out = [];
+  for (const [bin, letra, outra, op] of INTERPRETADORES)
+    for (const forma of FORMAS_DA_LETRA)
+      for (const antes of ANTES_DA_LETRA)
+        for (const [pre, pos] of POSICOES_INLINE)
+          for (const fr of FRONTEIRA_INLINE) {
+            const [codigo, alvo] = fr(".claude/hooks/x.mjs");
+            out.push(`${pre}${bin} ${antes(op)}${forma(letra, outra)} ${codigo}${alvo}${pos}`);
+          }
+  return out;
+}
+
 /**
  * Formas de ESCRITA que passam **hoje**, e que a invariante nao conta como falha porque estao
  * DECLARADAS. Nao sao desculpas: cada uma passa TAMBEM com a cabeca vazia — sao buracos
@@ -157,8 +195,8 @@ const DECLARADO = [
   // O `(?:\S*\/)?` tolera o caminho: `/usr/bin/git config` e a mesma forma que `git config`,
   // e a primeira versao deste predicado nao o via — o corpus apanhou-o de imediato.
   (k) => /(?:^|\s)(?:\S*\/)?git\s+(?:config|apply|reset|am|cherry-pick|revert|filter-branch)\b/.test(k.cmd),
-  // `node -r` / `--require`: carrega codigo antes do ficheiro. O `CODIGO_INLINE` cobre `-e`/`-p`
-  // e nao esta forma. Mesma familia do `NODE_OPTIONS=--require` que o inventario ja regista.
+  // `node -r` / `--require`: carrega codigo antes do ficheiro. O codigo INLINE (o `CODIGO_INLINE`, e a
+  // posicao do #336, com as letras agrupadas e o `data:`) nao e esta forma: aqui o codigo esta num ficheiro. Mesma familia do `NODE_OPTIONS=--require` que o inventario ja regista.
   (k) => /\bnode\b[^\n]*\s(?:-r|--require)\b/.test(k.cmd),
   // `awk -i inplace`: o `editaNoSitio` cobre `sed|perl|ruby|python` e nao o `awk`.
   (k) => /\bawk\b[^\n]*\s-i\s+inplace\b/.test(k.cmd),
@@ -281,6 +319,15 @@ export function registar({ test, eq }) {
       `o produto das dimensoes da ${esperado} e o gerador produziu ${casos.length} — uma ` +
         `dimensao esvaziou-se, e um corpus vazio nao reprova nada (TP2)`
     );
+  });
+
+  // --- O interpretador inline, em cada posicao (#336) -------------------------------------------
+  const inline = gerarInline();
+  test("gerado/inline: o corpus tem o tamanho do produto", () =>
+    eq(inline.length, INTERPRETADORES.length * FORMAS_DA_LETRA.length * ANTES_DA_LETRA.length * POSICOES_INLINE.length * FRONTEIRA_INLINE.length, "uma dimensao esvaziou-se (TP2)"));
+  test("gerado/inline: todo o interpretador a correr codigo inline com a fronteira e negado", () => {
+    const escapam = inline.filter((c) => porqueAltera(c) === null);
+    eq(escapam.length, 0, `${escapam.length} de ${inline.length} passam. Primeiros: ${escapam.slice(0, 5).join(" | ")}`);
   });
 
   // --- As classes que FECHARAM --------------------------------------------------------------

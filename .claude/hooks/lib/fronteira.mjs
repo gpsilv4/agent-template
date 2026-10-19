@@ -36,7 +36,8 @@ export { contextoFronteira } from "./caminhos.mjs";
 // e a `resto()` vivem no modulo-FOLHA (#243): este ficheiro e o `caminhos.mjs` importavam-se um ao
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
 // importe deste ficheiro); `MAES` e `resto` importam-se da folha.
-import { escritaDoBloco, FRONTEIRA, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
+import { escritaDoBloco, FRONTEIRA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
+import { comandos, inlineDe } from "./posicao.mjs";
 import { valoresQueExecutam } from "./verbos-git.mjs";
 export { CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
 
@@ -102,7 +103,8 @@ const LEITURA = new Set([
 
 /** Wrappers que executam o que lhes chega em texto: ai o conteudo citado **e** comando. */
 //  O `trap` tambem: `trap "rm <fronteira>" EXIT` corre o texto citado a saida (leitura do 024753a).
-const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b/;
+//  E o `env -S`/`--split-string` (leitura 1 do #336): corre o valor como um comando, e `env -S 'rm <f>'` passava.
+const OPACO = /\b(?:eval|xargs|trap)\b|\b(?:sh|bash|zsh|dash|ksh)\b[^\n]*\s-c\b|\benv\b[^\n]*\s(?:-[A-Za-z]*S|--split-string)/;
 
 /** Execucao ADIADA: uma funcao definida, ou um `trap`, corre o corpo noutro sitio — depois de um
  *  `cd` para a fronteira, ou com o nome de um verbo isento (`true(){ rm -rf *; }; cd <f> && true`).
@@ -124,7 +126,7 @@ const ADIADA = /(?:^|[;&|({\n]|\b(?:then|do|else)\s)\s*(?:function\s+\S+|trap\s|
 // UMA lista de nomes, lida de duas formas (#317). Com uma FLAG inline a seguir (`node -e`), por `\b`, como sempre:
 // apanha `python3-intel64`, `node.exe`, `/usr/bin/node` (a auditoria mediu que o nome estrito afrouxava estes).
 // A RECEBER codigo (heredoc, pipe), pelo nome INTEIRO: ai `\b` casava o `node` de `/tmp/node-notes.md`.
-const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
+// Os NOMES vivem na folha desde o #336: o `posicao.mjs` le-os tambem, e duas copias divergiam (`TP8`).
 const INTERPRETADOR = String.raw`\b(?:${NOMES_INTERPRETADOR})\b`;
 const NOME = (n) => String.raw`(?<![\w.-])(?:${n})(?![\w.-])`;
 // As SHELLS tambem leem codigo de stdin e de heredoc (`bash <<EOF`, `echo ... | sh`) — e nenhuma regra as via.
@@ -140,8 +142,8 @@ const INLINE_SEM_ISENCAO = new RegExp(`${INTERPRETADOR}${FLAG_INLINE}`);
 // uma here-string (`node <<EOF`, `bash <<<'...'`), ou a ponta de um pipe sem argumentos (`echo ... | bash`,
 // `cat <<EOF | python3`). Le-se sobre o `semCitacoes` (o heredoc vira `<<HEREDOC`): o que so MENCIONA um
 // interpretador numa mensagem nao corre nada. Estreito de proposito — a regra geral ("interpretador sem
-// script") negava `node --test | grep "<fronteira>"`; essa, e o resto da familia, ficam para o desenho da
-// posicao de comando (o issue que segue o #317).
+// script") negava `node --test | grep "<fronteira>"`. As letras agrupadas, o `php -r` e o `data:` decidem-se
+// por posicao (`posicao.mjs`, #336); o heredoc lido como texto e o PR (c) do #336.
 const RECEBE = `(?:${NOME(NOMES_INTERPRETADOR)}|${SHELL})`;
 const SHELL_ELEVADA = String.raw`(?:(?:sudo|doas)(?:\s+-\S+)*\s+-[A-Za-z]*[si]\b|(?<![\w.-])(?:su|runuser)(?![\w.-]))`;
 // As quatro formas: (1) quem recebe um heredoc/here-string, salvo com um SCRIPT logo a seguir (`node x.mjs <<EOF`
@@ -185,6 +187,17 @@ const FIND_QUE_ESCREVE = /\s-(?:delete|fprint[f0]?|fls)\b/;
  *  pura **precisamente** para a varredura a poder cobrir, depois de medir 0/9 nesse ficheiro.
  *  O cabecalho dela di-lo. Esta e a mesma troca: uma linha de producao por uma rede. */
 const nega = (rotulo) => rotulo;
+
+/** O primeiro comando que corre codigo inline, por posicao (`posicao.mjs`, #336). Um `nega(` POR SINAL, e
+ *  nao um so: a varredura muta cada chamada, e cada sinal tem o seu caso no `tests-fronteira-posicao.mjs`. */
+function negaInline(cmds, rotulo) {
+  const tipo = cmds.map(inlineDe).find(Boolean);
+  return tipo === "letra" ? nega(rotulo)
+    : tipo === "data" ? nega(rotulo)
+    : tipo === "deno" ? nega(rotulo)
+    : tipo === "variavel" ? nega(rotulo)
+    : null;
+}
 
 /**
  * PORQUE e que este comando seria negado — o mesmo veredicto de `alteraFronteira()`, com o
@@ -275,7 +288,12 @@ function julga(texto, ctx, dentroDoGit = false) {
     // Um heredoc para um interpretador nega mesmo que o codigo so LEIA a fronteira: e a politica do `node -e`
     // (codigo inline que a cita), e o hook nao distingue ler de escrever dentro do codigo (#317, decidido).
     const recebe = RECEBE_CODIGO.test(citado);
-    return opaco || inline || crases || recebe ? nega("citado-mas-executado") : null;
+    // O inline primeiro, pelo rotulo: a razao dele leva a nota do `jq`. O piso (a regex) e a posicao (#336), que
+    // so ACRESCENTA: aqui a fronteira so esta citada, e um inline em QUALQUER comando nega, como sempre negou.
+    if (inline) return nega("citado-mas-executado:inline");
+    const pos = negaInline(comandos(texto), "citado-mas-executado:inline");
+    if (pos) return pos;
+    return opaco || crases || recebe ? nega("citado-mas-executado") : null;
   }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
@@ -423,6 +441,16 @@ function julga(texto, ctx, dentroDoGit = false) {
   // escrevia o `argv` com o `node` na LEITURA. Sobre o comando INTEIRO, e nao so os segmentos que tocam (2.a
   // auditoria): o `|` parte segmentos, e `echo rm -rf <fronteira> | bash` tinha a fronteira so no `echo`.
   if (inlineNoAlvo || RECEBE_CODIGO.test(visivel)) return nega("codigo-inline");
+  // Pela posicao (#336), nos comandos dos segmentos que tocam — e em qualquer um cujo PROPRIO argv cite a
+  // fronteira: `cat <f> | node -e "...<f>..."` tem o `node` num segmento que nao toca.
+  // E a JUSANTE, por pipe, de um que a cita: `find <f> | python3 -c '...os.remove(l)...'` recebe o caminho pelo
+  // stdin, e o codigo nao o cita (a leitura adversarial do #336). O cru E o texto (`.cl''aude`), e as redireccoes.
+  const NOMEIA = /\.claude|\.githooks/;
+  const cita = (c) => c.argv.some((w) => NOMEIA.test(w.cru) || NOMEIA.test(w.texto)) || c.redir.some((r) => NOMEIA.test(r.alvo));
+  let corrente = false;
+  const citam = comandos(texto).filter((c) => (corrente = cita(c) || (c.pipeDe && corrente)));
+  const pos = negaInline([...tocam.flatMap((s) => comandos(s)), ...citam], "codigo-inline");
+  if (pos) return pos;
   if (opaco) return nega("wrapper-opaco");
   if (redireciona) return nega("redireciona");
   if (gitQueEscreve) return nega("git-que-escreve");

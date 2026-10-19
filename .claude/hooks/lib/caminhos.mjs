@@ -304,7 +304,7 @@ export function fimSubst(s, k) {
 
 /** O indice da `"` que fecha a que esta em `s[k]` — saltando os `$(...)` e as crases de dentro, que
  *  tem aspas proprias: `"$(echo "x"; rm <f>)"` fechava no `"` de `"x"` e o `rm` ficava escondido. */
-function fimAspasDuplas(s, k) {
+export function fimAspasDuplas(s, k) {
   for (let j = k + 1; j < s.length; j++) {
     if (s[j] === "\\") j++;
     else if (s[j] === '"') return j;

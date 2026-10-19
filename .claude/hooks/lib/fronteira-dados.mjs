@@ -75,6 +75,10 @@ export const montaFronteira = (caminhos, maes) =>
   );
 export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
 
+/** Os interpretadores que correm codigo, como alternativas de uma regex. Lidos pelo `fronteira.mjs` (as regex
+ *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
+export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
+
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *
  *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do `guard-protected-branch.mjs`, e digo-o em
@@ -252,5 +256,14 @@ const OPACAS = new Set([
 export function razaoDe(condicao) {
   const [rotulo, verbo] = condicao.split(/:(.*)/s);
   const opaca = OPACAS.has(rotulo) || (rotulo === "verbo-nao-e-leitura" && PALAVRAS_DE_BLOCO.has(verbo));
-  return opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA;
+  const inline = rotulo === "codigo-inline" || (rotulo === "citado-mas-executado" && verbo === "inline");
+  return (opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA) + (inline ? NOTA_INLINE : "");
 }
+
+/** So nas negacoes de CODIGO INLINE (#336): o que so le tambem e negado, e de proposito — distinguir ler de
+ *  escrever dentro do codigo era analisar JS com regex (decisao 3 do `/grill`). Dizer o caminho que funciona
+ *  poupa a tentativa seguinte; num ciclo ou num `eval` a nota nao se aplica, e nao aparece. */
+const NOTA_INLINE =
+  " Um interpretador a correr codigo inline (`node -e`, `perl -e`, `python3 -c`...) que cite a fronteira e " +
+  "negado mesmo que so LEIA: o hook nao distingue ler de escrever dentro do codigo. Para validar o JSON, " +
+  "`jq empty <ficheiro>`.";

@@ -131,7 +131,7 @@ export function registar({ test, corre, repo, eq, contem }) {
   // Um interpretador ou uma shell com um heredoc, uma here-string ou na ponta de um pipe sem argumentos, com
   // a fronteira so no codigo. O heredoc tinha DUAS falhas: o hook cortava-lhe o corpo antes de o julgar, e a
   // lista de quem o corre era outra copia, que divergia (`python3.12`, `(node)`). As outras formas do item 24
-  // (flags agrupadas, `php -r`, `--import data:`...) ficam para o issue da posicao de comando.
+  // (flags agrupadas, `php -r`, `--import data:`...) fecharam por posicao no #336: `tests-fronteira-posicao.mjs`.
   for (const [nome, comando] of [
     ["`node <<EOF`", `node <<'EOF'\nrequire('fs').writeFileSync('${H}','{}')\nEOF`],
     ["`bash <<EOF`", `bash <<'EOF'\nrm -rf ${H}\nEOF`],
