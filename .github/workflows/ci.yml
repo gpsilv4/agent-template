@@ -46,6 +46,8 @@ jobs:
       # Era o job `detect`. Corre DEPOIS do checkout: o `hashFiles` ao nivel do job corre antes dele e falha.
       # Os passos da app leem a resposta e saltam NO SHELL, a falhar fechado: um valor que nao seja `true` nem
       # `false` reprova (o `if:` de job que havia em cada um dos tres saiu, e nenhum `if:` entrou).
+      # A linha `case "$TEM_APP"` e o `env: TEM_APP` repetem-se, iguais, nos cinco passos da app: o YAML nao os
+      # partilha sem um `if:` (que o medidor da superficie conta como salto) ou um script a parte. Mudar um = mudar os cinco.
       - name: Projeto
         id: check
         run: |

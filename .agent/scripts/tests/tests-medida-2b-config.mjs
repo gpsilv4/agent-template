@@ -202,6 +202,10 @@ export function registar() {
     test("com os jobs separados nos dois lados nao aparece (#347)", () =>
       exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": SEPARADOS, ...OUTRO }, projeto: { ".github/workflows/ci.yml": SEPARADOS, ...OUTRO } }),
         { codigo: 0, exclui: ["como passos de UM job"] }));
+    // Sem o `detect` (um derivado que ja o tirou): os outros dois chegam (leitura do PR A — so `detect` + `unit-tests` eram testados).
+    test("os testes unitarios e o audit separados, sem `detect`, aparecem (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  unit-tests:\n    steps: []\n  security-audit:\n    steps: []\n"), ...OUTRO } }),
+        { codigo: 0, inclui: ["como passos de UM job, `Code Quality`"] }));
     // Um `detect:` SOZINHO pode ser outra coisa (um `paths-filter`): exige-se pelo menos dois dos tres ids.
     test("um job `detect` sozinho nao aparece (#347)", () =>
       exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  detect:\n    steps: []\n"), ...OUTRO } }),
