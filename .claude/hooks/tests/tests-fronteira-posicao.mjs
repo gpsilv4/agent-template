@@ -14,6 +14,7 @@
  */
 import { pathToFileURL } from "url";
 import { rmSync } from "fs";
+import { MAX_POSICOES as MAX } from "../lib/posicao.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -80,6 +81,100 @@ const NEGA = [
   ["`node -$'\\x70e'`", `node -$'\\x70e' "require('fs').rmSync('${H}')"`],
   ["`perl -l$E`", `perl -l$E 'unlink "${H}"'`],
   ["`.cl''aude` no argv do interpretador", `cat ${H} | node -e "require('fs').rmSync(process.argv[1])" .cl''aude/hooks/x.mjs`],
+  // Da auditoria antes do PR (a): a jusante de um pipe por um BLOCO, e uma subshell a seguir ao pipe.
+  ["`find <f> | while read l; do python3 -c ...; done`", `find .claude/hooks -name '*.bak' | while read l; do python3 -c "import os,sys; os.remove(sys.argv[1])" "$l"; done`],
+  ["`ls <f> | (perl -lne unlink)`", "ls -d .claude/hooks/* | (perl -lne unlink)"],
+  // Um heredoc sem etiqueta de fecho: a shell corre-o na mesma, e a ultima linha contava.
+  ["heredoc sem fecho com `$(node -pe ...)`", `cat <<EOF\n$(node -pe "require('fs').rmSync('${H}')")`],
+  // O lexer contra a shell real: `\`+newline dentro de aspas duplas, `$((...)...)` que NAO e aritmetica,
+  // chavetas e variaveis fora da posicao do verbo.
+  ["`\"no\\<nl>de\" -pe`", `"no\\\nde" -pe "require('fs').rmSync('${H}')"`],
+  ["`$((node -pe ...); true)`", `echo $((node -pe "require('fs').rmSync('${H}')"); true)`],
+  ["`{node,-pe,CODE}`", `{node,-pe,"require('fs').rmSync('${H}')"}`],
+  ["`npx {node,-pe,CODE}`", `npx {node,-pe,"require('fs').rmSync('${H}')"}`],
+  ["`find -exec $N$M -pe`", `N=no; M=de; find /tmp -maxdepth 0 -exec $N$M -pe "require('fs').rmSync('${H}')" \\;`],
+  ["`npx -p x $N -pe`", `npx -p x $N -pe "require('fs').rmSync('${H}')"`],
+  // Da leitura da 2.a passagem: o que ela tinha AFROUXADO face ao b5eb0fb. Uma letra que nao consome o resto
+  // do grupo (`perl -d`, `ruby -W`/`-K`) nao pode parar a leitura das letras; uma janela de cabecas nao pode
+  // esconder o verbo; e o nome do interpretador nao pode estreitar (`ts-node-esm`, `python3-dbg`).
+  ["`perl -de`", `PERLDB_OPTS=NonStop=1 perl -de 'unlink "${H}"'`],
+  ["`ruby -We`", `ruby -We 'File.delete("${H}")'`],
+  ["`ruby -Kue`", `ruby -Kue 'File.delete("${H}")'`],
+  ["`env -i` x35 antes do `node -pe`", `cat ${H} | env ${"-i ".repeat(35)}node -pe "require('fs').rmSync('${H}')"`],
+  ["`ts-node-esm -pe`", `ts-node-esm -pe "require('fs').rmSync('${H}')"`],
+  ["`python3-dbg -Ic`", `python3-dbg -Ic "import os; os.remove('${H}')"`],
+  // ...e as formas da classe que ela achou ainda abertas.
+  ["`echo done` dentro do ciclo nao fecha o bloco", `find .claude/hooks -name '*.bak' | while read l; do :; echo done; python3 -c "import os,sys; os.remove(sys.argv[1])" "$l"; done`],
+  ["`| (:; perl -lne unlink)` (o 2.o comando da subshell)", "ls -d .claude/hooks/* | (:; perl -lne unlink)"],
+  ["chavetas com `{}` no codigo", `{node,-pe,"if(1){require('fs').rmSync('${H}')}"}`],
+  ["`$(( $(node -pe ...) ))` (a substituicao dentro da aritmetica)", `echo $(( $(node -pe "require('fs').rmSync('${H}')") ))`],
+  ["`env A=1` x70 antes do `node -pe` (o tecto de voltas)", `${"env A=1 ".repeat(70)}node -pe "require('fs').rmSync('${H}')"`],
+  // Um wrapper FORA da lista: so o modo `qualquer` do ramo citado o ve (sem ele, estes passavam).
+  ["`ltrace node -pe` (fora dos EXECUTORES)", `ltrace node -pe "require('fs').rmSync('${H}')"`],
+  ["`unshare -r node -pe` (fora dos EXECUTORES)", `unshare -r node -pe "require('fs').rmSync('${H}')"`],
+  // Wrappers nos EXECUTORES: conta a primeira palavra com nome de interpretador depois deles.
+  ["`rlwrap node -pe`", `rlwrap node -pe "require('fs').rmSync('${H}')"`],
+  ["`xcrun node -pe`", `xcrun node -pe "require('fs').rmSync('${H}')"`],
+  ["`script -q /dev/null node -pe`", `script -q /dev/null node -pe "require('fs').rmSync('${H}')"`],
+  ["`/opt/homebrew/bin/env node -pe`", `/opt/homebrew/bin/env node -pe "require('fs').rmSync('${H}')"`],
+];
+
+/** Da leitura da 3.a passagem. O valor colado de uma opcao conta como letras (`perl -MTime::HiRes` nega, como no
+ *  b5eb0fb): a versao que parava o grupo numa letra de valor afrouxou quatro vezes, e o `-M` do perl e codigo. */
+const NEGA_3 = [
+  ["`python3 \"-c<NL>...\"` (uma flag com quebra de linha)", `python3 "-c\nimport os; os.remove('${S}')"`],
+  ["`perl '-MFile::Temp;unlink(...)'` (o valor do `-M` e codigo)", `perl '-MFile::Temp;unlink(".claude/settings.json")' /dev/null`],
+  ["`$P/node -E` (um nome que expande, no verbo)", `P='perl -I'; $P/node -E 'unlink(".claude/settings.json")'`],
+  ["`perl '-w -E' ...` (duas flags numa palavra)", `perl '-w -E' 'unlink(".claude/settings.json")'`],
+  ["`perl -l0e` (a letra depois de um digito)", `perl -l0e 'unlink(".claude/settings.json")'`],
+  ["`''{perl,-e,...}` (chavetas que nao comecam a palavra)", `''{perl,-e,'unlink(".claude/settings.json")'}`],
+  ["`ls <f> | echo \"$(perl -lne unlink)\"` (o interior le o pipe)", `ls -d .claude/hooks/* | echo "$(perl -lne unlink)"`],
+  ["`ls <f> | tee >(perl -lne unlink)`", "ls -d .claude/hooks/* | tee >(perl -lne unlink) >/dev/null"],
+];
+
+/** Da leitura da 4.a passagem: as shells com `-c` escritas de outra maneira (passavam no `main` e no b5eb0fb). O
+ *  rotulo e o OPACO do ramo, e nao o do inline: uma shell corre um comando, e a nota do `jq` nao lhe serve. */
+const SHELLS = [
+  ["`{bash,-c} '<escrita>'`", "{bash,-c} 'rm -rf .claude/hooks'"],
+  ["`b''ash -c '<escrita>'`", "b''ash -c 'rm -rf .claude/hooks'"],
+];
+
+/** Os casos de POSICAO no ramo VISIVEL (a fronteira a vista no `cat`), onde o modo `qualquer` nao corre: no ramo
+ *  citado ele apanha qualquer `node`, e os mesmos casos ficavam verdes sem a posicao (leitura da 3.a passagem). */
+const VISIVEL = [
+  ["`do`", `for i in 1; do node -pe "require('fs').rmSync('${H}')"; done`],
+  ["`then`", `if true; then node -pe "require('fs').rmSync('${H}')"; fi`],
+  // (O `function f {` fica de fora: no ramo visivel o `ADIADA` nega-o primeiro, com o rotulo dele.)
+  ["`exec -a`", `exec -a nome node -pe "require('fs').rmSync('${H}')"`],
+  ["`time -p`", `time -p node -pe "require('fs').rmSync('${H}')"`],
+  ["`env X=1`", `env NODE_NO_WARNINGS=1 node -pe "require('fs').rmSync('${H}')"`],
+  ["`find -exec`", `find /tmp -maxdepth 0 -exec node -pe "require('fs').rmSync('${H}')" \\;`],
+  ["`npx -p x`", `npx -p node@20 node@20 -pe "require('fs').rmSync('${H}')"`],
+  ["`npm exec --`", `npm exec -- node -pe "require('fs').rmSync('${H}')"`],
+  ["`uv run --with`", `uv run --with x python -Ic "import os; os.remove('${H}')"`],
+  ["`rlwrap`", `rlwrap node -pe "require('fs').rmSync('${H}')"`],
+  ["`xcrun`", `xcrun node -pe "require('fs').rmSync('${H}')"`],
+  ["`script -q /dev/null`", `script -q /dev/null node -pe "require('fs').rmSync('${H}')"`],
+  ["`/opt/homebrew/bin/env`", `/opt/homebrew/bin/env node -pe "require('fs').rmSync('${H}')"`],
+  ["`env -i` x35", `env ${"-i ".repeat(35)}node -pe "require('fs').rmSync('${H}')"`],
+  ["`perl5.34 -e`", `perl5.34 -e 'unlink "${H}"'`],
+  ["`ts-node-esm -pe`", `ts-node-esm -pe "require('fs').rmSync('${H}')"`],
+  ["`perl -0777ne`", `perl -0777ne 'unlink "${H}"' /dev/null`],
+  ["`perl -de`", `perl -de 'unlink "${H}"'`],
+  ["`ruby -We`", `ruby -We 'File.delete("${H}")'`],
+  // Da leitura da 4.a passagem: o que o b5eb0fb negava e uma versao intermedia deixou passar.
+  ["`cross-env A=$HOME NODE_OPTIONS=...data:... node x.js`", `cross-env A=$HOME NODE_OPTIONS='--import=data:text/javascript,import fs from "fs";fs.rmSync("${H}")' node x.js`],
+  ["`{node,x.js} -e` (um pedaco de chavetas nao e um script escrito)", `{node,x.js} -e 'require("fs").rmSync("${H}")'`],
+  // O `.sh` so isenta uma SHELL: para o perl, `x.sh` nao e o script dele, e o `-le` continua a ser codigo.
+  ["`perl x.sh -le` (o `.sh` nao isenta o perl)", `perl x.sh -le 'unlink "${H}"'`],
+  // Da leitura da 5.a passagem: um nome de SHELL entre o executor e o interpretador nao lhe rouba a posicao.
+  ["`flock /tmp/sh.lock node -e`", `flock /tmp/sh.lock node -e "require('fs').rmSync('${H}')"`],
+  ["`npx -p sh node -pe`", `npx -p sh node -pe "require('fs').rmSync('${H}')"`],
+  ["`strace -o /tmp/bash.trace node -pe`", `strace -o /tmp/bash.trace node -pe "require('fs').rmSync('${H}')"`],
+  // Da leitura da 6.a passagem: as chavetas no verbo com um pedaco vazio, ou com um wrapper fora das listas.
+  ["`{,node} -pe`", `{,node} -pe "require('fs').rmSync('${H}')"`],
+  ["`{env,} node -e`", `{env,} node -e "require('fs').rmSync('${H}')"`],
+  ["`{taskset,-c,0} node -pe`", `{taskset,-c,0} node -pe "require('fs').rmSync('${H}')"`],
 ];
 
 /** Pares de UM eixo: o mesmo argumento, so a letra muda. O `echo` com espacos poe o comando no ramo
@@ -137,6 +232,45 @@ export function registar({ test, corre, repo, eq, contem }) {
   // (`bash <(git log -1 --format=%B)`). E o unico caso que so o piso apanha: mata a mutacao dele.
   test("posicao: uma mensagem que cita `node -e` e a fronteira continua NEGADA (de proposito)", () =>
     decide(`git commit -m "fix: o node -e escrevia em ${H}"`, "deny", peloInline));
+
+  for (const [nome, comando] of NEGA_3) {
+    test(`posicao: ${nome} NEGA`, () => decide(comando, "deny", peloInline));
+  }
+  for (const [nome, comando] of SHELLS) {
+    test(`posicao: ${nome} NEGA, com o rotulo opaco`, () =>
+      decide(comando, "deny", (r) => {
+        contem(r.razao, "(condicao: citado-mas-executado)");
+        if (r.razao.includes("jq")) throw new Error("a razao de uma shell fala do jq");
+      }));
+  }
+  // E no ramo visivel, a jusante: o rotulo e o `wrapper-opaco`, o mesmo que o `OPACO` da quando ve `bash -c`.
+  test("posicao: `cat <f> | {bash,-c} '<escrita>'` nega com `wrapper-opaco`", () =>
+    decide(`cat ${H} | {bash,-c} 'rm -rf .claude/hooks'`, "deny", (r) => contem(r.razao, "(condicao: wrapper-opaco)")));
+  for (const [nome, comando] of VISIVEL) {
+    test(`posicao/visivel: ${nome} nega a jusante de \`cat <f> |\``, () => decide(`cat ${H} | ${comando}`, "deny", peloInline));
+  }
+
+  // O CUSTO (auditoria antes do PR a): o `verboEm` por cada `{`/`-exec` era cubico — 11 s por comando a 4000
+  // caracteres, no processo do hook. A folga e larga de proposito (o `main` faz isto em ~5 ms): o teste so tem
+  // de ver a classe de crescimento, e nao o numero de uma maquina.
+  // Passado o tecto de posicoes ou de voltas, NEGA (nao se sabe quem corre) — e depressa. Cada forma e uma das
+  // que a auditoria mediu em segundos; o tempo inclui o spawn do hook.
+  for (const [nome, cmd] of [
+    ["`{ `x661 + `exec `x529", `cat ${H} echo ${"{ ".repeat(661)}${"exec ".repeat(529)}`],
+    ["`{ `x661 + `env A=1 `x331", `cat ${H} echo ${"{ ".repeat(661)}${"env A=1 ".repeat(331)}`],
+    ["`npx ` + `{ env `x500", `cat ${H} | npx ${"{ env ".repeat(500)}`],
+    ["`{ x time -p `x300", `cat ${H} echo ${"{ x time -p ".repeat(300)}`],
+  ]) {
+    test(`posicao: ${nome} (~4000 caracteres) nega em menos de 1 s`, () => {
+      const t = performance.now();
+      decide(cmd, "deny");
+      const ms = performance.now() - t;
+      if (ms > 1000) throw new Error(`${ms.toFixed(0)} ms para ${cmd.length} caracteres`);
+    });
+  }
+  // Abaixo do tecto o veredicto nao muda: 32 `{` num `cat` continuam a ser uma leitura.
+  test("posicao: abaixo do tecto de posicoes, um `cat` com `{` continua a deixar", () =>
+    decide(`cat ${H} echo ${"{ ".repeat(MAX)}`, "allow"));
 
   for (const [nome, deixa, nega] of PARES) {
     test(`posicao: ${nome} sem letra de codigo DEIXA (controlo)`, () => decide(ANTES + deixa, "allow"));

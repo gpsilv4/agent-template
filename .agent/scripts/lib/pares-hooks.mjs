@@ -59,8 +59,9 @@ export const PARES_DOS_HOOKS = [
     // devolve o FIM do texto — a mutacao engole o resto do comando numa palavra (ou num corpo de heredoc), e
     // os casos de estrutura do `tests-posicao.mjs` tem de ficar vermelhos. Auto-contido de proposito: um nome
     // que nao existisse no ambito lancava, caia no `erro-ao-analisar`, e contava como morto pela razao errada.
-    // As DEFINICOES (`const fechaSubst =`, `function fechaHeredoc(`) nao casam. O seguimento das aspas
-    // SIMPLES (o `indexOf` do ciclo) fica de fora — e dito, para nao se ler "o lexer coberto" a mais.
+    // As DEFINICOES (`const fechaSubst =`, `function fechaHeredoc(`) nao casam. Ficam de fora os ciclos que
+    // seguem as aspas SIMPLES (o `indexOf`), as CRASES (dentro e fora de aspas duplas) e o `$'...'` — e dito,
+    // para nao se ler "o lexer coberto" a mais. O `aritmetica()` usa o `fechaSubst(`, e entra.
     alvo: ".claude/hooks/lib/posicao.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /(?<![\w.$])(?<!function\s)(?:fechaSubst|fechaAspas|fechaHeredoc)\(/,

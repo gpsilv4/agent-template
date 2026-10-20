@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, resto } from "./fronteira-dados.mjs";
+import { CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, NOMEIA, resto } from "./fronteira-dados.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
@@ -391,7 +391,7 @@ function desaspa(t) {
     // directorio, escritos por um comando (pre-existente, apanhado pela leitura do 193a9a9).
     const raiz = dentro.match(/^\$\((pwd|git rev-parse --show-toplevel)\)(\/[^\s"'$`\\;&|<>()]*)$/);
     const alvo = "<>".includes(ultimo) || ("&|!".includes(ultimo) && "<>".includes(penultimo));
-    const fronteira = (x) => alvo || /\.claude|\.githooks/.test(x);
+    const fronteira = (x) => alvo || NOMEIA.test(x);
     // Entre aspas DUPLAS, o que o shell executa sai a parte (#229); as simples nao expandem.
     const fica =
       simples && fronteira(dentro) ? dentro

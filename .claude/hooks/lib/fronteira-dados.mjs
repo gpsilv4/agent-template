@@ -59,6 +59,10 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
  *  E o mesmo escape do `check-codigo-morto.mjs` e do `test-bundle-sizes.mjs`, COPIADO de proposito:
  *  este modulo e a folha da fronteira e nao importa de `.agent/scripts/` (camadas separadas). */
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** O texto NOMEIA a fronteira: so o nome das pastas de topo (`.claude`, `.githooks`), em qualquer sitio. Mais
+ *  largo do que o `FRONTEIRA` de proposito — e o "isto fala da fronteira?" de quem decide o alcance, e nao "isto
+ *  e um caminho dela". Derivado da lista: eram quatro copias escritas a mao em dois ficheiros (`TP8`). */
+export const NOMEIA = new RegExp([...new Set(CAMINHOS_FRONTEIRA.map((f) => f.split("/")[0]))].map(literalEmRegex).join("|"));
 /** A regex da fronteira para uma lista de caminhos e de pastas-mae. Uma FUNCAO para o teste a poder
  *  montar com um caminho que tenha caracteres especiais: os de hoje so tem `.`, e com eles um escape
  *  que so tratasse o `.` dava a mesma regex — nenhum teste o via. */
@@ -94,7 +98,7 @@ export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|p
  *     `OPACO`, e consumi-las faria julgar o verbo errado: em `ls <fronteira> | xargs rm`, quem
  *     apaga e o `xargs`, que nao tem o caminho escrito.
  *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`. */
-const CABECAS = new Set([
+export const CABECAS = new Set([
   "sudo", "doas", "env", "command", "builtin", "time", "timeout", "nohup", "setsid", "stdbuf",
   "nice", "ionice", "unbuffer",
 ]);
@@ -245,7 +249,7 @@ export const RAZAO_OPACA =
  *  escrita e a que nao aconselha a reescrever o comando. */
 const OPACAS = new Set([
   "erro-ao-analisar", "citado-mas-executado", "execucao-adiada", "substituicoes-demais",
-  "codigo-inline", "wrapper-opaco",
+  "codigo-inline", "wrapper-opaco", "recebe-codigo",
 ]);
 
 /**

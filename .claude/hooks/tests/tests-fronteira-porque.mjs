@@ -72,7 +72,9 @@ const CONDICOES = [
   // Os dois medidos do #307: nenhum escrevia, e os dois levavam a razao de escrita.
   ["ciclo de shell", "for t in .claude/hooks/tests/test-*.mjs; do node $t; done", "verbo-nao-e-leitura:for"],
   // O sufixo `:inline` (#336): a razao do codigo inline leva a nota do `jq`, e a dos outros opacos nao.
-  ["interpretador inline que so le", "python3 -c \"print(open('.claude/settings.json').read())\"", "citado-mas-executado:inline"],
+  // Quem RECEBE codigo no ramo visivel tem rotulo seu (auditoria do PR a do #336): a razao e opaca, sem a nota do `jq`.
+  ["recebe codigo pelo pipe", "cat .claude/hooks/x.mjs | bash", "recebe-codigo"],
+  ["interpretador inline que so le","python3 -c \"print(open('.claude/settings.json').read())\"", "citado-mas-executado:inline"],
   ["bloco que so le", "{ cat .claude/settings.json; }", "verbo-nao-e-leitura:{"],
   ["ciclo que le da fronteira", "while read f; do cat $f; done < .claude/hooks/x", "verbo-nao-e-leitura:done"],
   // E o contrario (leituras do #307): um bloco de shell com uma escrita A VISTA leva a razao de
@@ -118,6 +120,7 @@ const RAZAO_DO_ROTULO = {
   "find-que-escreve": ESCRITA,
   "citado-mas-executado": OPACA,
   "citado-mas-executado:inline": OPACA,
+  "recebe-codigo": OPACA,
   "verbo-nao-e-leitura:for": OPACA,
   "verbo-nao-e-leitura:rm": ESCRITA,
   "verbo-nao-e-leitura:{": OPACA,

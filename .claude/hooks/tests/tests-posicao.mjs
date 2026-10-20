@@ -9,7 +9,8 @@
  * fica vermelho quando a varredura muta o fim de uma substituicao, de umas aspas ou de um heredoc.
  */
 import { pathToFileURL } from "url";
-import { comandos, inlineDe } from "../lib/posicao.mjs";
+import { comandos, familiaDe, inlineDe } from "../lib/posicao.mjs";
+import { NOMES_INTERPRETADOR } from "../lib/fronteira-dados.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -42,6 +43,9 @@ const ESTRUTURA = [
   ["dois heredocs na mesma linha", "a <<X <<Y\nnode -pe 1\nX\nnode -pe 2\nY\nb", [["a"], ["b"]]],
   ["um heredoc sem aspas: o texto do corpo nao e comando", "a <<X\nnode -pe 1\nX\nb", [["a"], ["b"]]],
   ["`$((...))` aritmetico nao e substituicao nem heredoc", "echo $((1<<2)) x", [["echo", "$((1<<2))", "x"]]],
+  // O `(1+2)` daria um comando `1+2` se fosse lido como substituicao: e o caso que mata a mutacao do `aritmetica()`.
+  ["`$((1+2))` aritmetico nao corre nada", `echo $((1+2)) "$((3+4))" x`, [["echo", "$((1+2))", "$((3+4))", "x"]]],
+  ["`$((a); b)` e uma substituicao com subshell", "echo $((rm x); true)", [["echo", "$((rm x); true)"], ["rm", "x"], ["true"]]],
   ["`$(...)` corre: o interior vem depois", "echo $(rm x) y", [["echo", "$(rm x)", "y"], ["rm", "x"]]],
   ["`$(...)` dentro de aspas duplas corre", `echo "a $(rm x) b"`, [["echo", "a $(rm x) b"], ["rm", "x"]]],
   ["a crase corre", "echo `rm x`", [["echo", "`rm x`"], ["rm", "x"]]],
@@ -77,9 +81,22 @@ export function registar({ test, eq }) {
     eq(um("node -e x").argv[2].citada, false, "nao citada");
   });
 
+  // A tabela de familias do lexer e os NOMES da folha sao duas listas: prendem-se aqui (`TP8`). Um nome novo
+  // nos `NOMES_INTERPRETADOR` sem familia no `posicao.mjs` ficava sem cobertura nenhuma, sem sinal.
+  test("posicao/lexer: cada interpretador dos NOMES da folha tem familia no lexer", () => {
+    const nomes = NOMES_INTERPRETADOR.split("|").map((a) => a.replace(/\(\?:[^)]*\)\??|\?/g, ""));
+    eq(nomes.length > 10, true, "os NOMES nao se partiram (TP2)");
+    eq(nomes.filter((n) => !familiaDe(n)).join(", "), "", "sem familia");
+  });
+
   // --- Quem corre codigo inline, por posicao ---------------------------------------------------
   /** [texto, sinal esperado] — o primeiro comando do texto (o `inlineDe` de cada um, o primeiro que da). */
-  const sinal = (t) => comandos(t).map(inlineDe).find(Boolean) ?? null;
+  // `(c) => inlineDe(c)`, e nao `.map(inlineDe)`: o `map` passava o INDICE como `qualquer`, e do 2.o comando em
+  // diante os casos de posicao ficavam verdes sem a posicao (leitura da 3.a passagem).
+  const sinal = (t) => comandos(t).map((c) => inlineDe(c)).find(Boolean) ?? null;
+  // O tecto de voltas, que so se ve pelo SINAL: sem ele o `verboEm` acabava no `node` e dava `letra`.
+  test("posicao/inline: `env A=1` x70 antes do interpretador passa o tecto de voltas -> variavel", () =>
+    eq(sinal(`${"env A=1 ".repeat(70)}node -pe 1`), "variavel", "tecto"));
   for (const [texto, esperado] of [
     ["node -pe 1", "letra"],
     ["perl -le 1", "letra"],

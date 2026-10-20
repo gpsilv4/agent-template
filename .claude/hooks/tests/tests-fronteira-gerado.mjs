@@ -329,6 +329,14 @@ export function registar({ test, eq }) {
     const escapam = inline.filter((c) => porqueAltera(c) === null);
     eq(escapam.length, 0, `${escapam.length} de ${inline.length} passam. Primeiros: ${escapam.slice(0, 5).join(" | ")}`);
   });
+  // A metade com a fronteira VISIVEL nega quase toda pelo verbo (so o `node` esta na LEITURA): nao prova a regra
+  // do inline. A metade CITADA sim, e e por isso que afirma QUE regra negou (auditoria do PR a).
+  test("gerado/inline: com a fronteira so citada, e a regra do inline que nega", () => {
+    const citados = inline.filter((c) => !c.includes(`" .claude/`));
+    eq(citados.length, inline.length / FRONTEIRA_INLINE.length, "a metade citada");
+    const outra = citados.filter((c) => porqueAltera(c) !== "citado-mas-executado:inline");
+    eq(outra.length, 0, `${outra.length} negados por outra regra. Primeiros: ${outra.slice(0, 3).map((c) => `${c} -> ${porqueAltera(c)}`).join(" | ")}`);
+  });
 
   // --- As classes que FECHARAM --------------------------------------------------------------
   for (const classe of FECHADO_CLASSE) {
