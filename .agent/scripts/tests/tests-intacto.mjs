@@ -23,10 +23,10 @@ const PH = "{" + "{" + "PROJECT_NAME" + "}" + "}";
 export function registar() {
   // O caso que motivou o modulo: o derivado tem o nome REAL onde a tag tinha o placeholder.
   registarResultado("intacto: o valor de um placeholder nao conta como alteracao",
-    intacto("# Guia (Referee Exam Study)\ncorpo\n", `# Guia (${PH})\ncorpo\n`) ? [] : ["deu alterado so pelo nome do projeto"]);
+    intacto("# Guia (Derivado B)\ncorpo\n", `# Guia (${PH})\ncorpo\n`) ? [] : ["deu alterado so pelo nome do projeto"]);
   // O CONTRA-CASO, sem o qual o de cima passava com um `return true`.
   registarResultado("intacto: uma alteracao fora do placeholder conta",
-    intacto("# Guia (Referee Exam Study)\nimport './guards/meu.mjs';\n", `# Guia (${PH})\ncorpo\n`) ? ["uma alteracao real passou por intacta"] : []);
+    intacto("# Guia (Derivado B)\nimport './guards/meu.mjs';\n", `# Guia (${PH})\ncorpo\n`) ? ["uma alteracao real passou por intacta"] : []);
   // O placeholder so aceita UMA linha: aceitar mais escondia linhas acrescentadas ao lado dele.
   registarResultado("intacto: o placeholder nao engole linhas acrescentadas",
     intacto("# Guia (X\nlinha nova)\ncorpo\n", `# Guia (${PH})\ncorpo\n`) ? ["um placeholder engoliu uma linha nova"] : []);

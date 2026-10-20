@@ -463,7 +463,7 @@ dela nao corre a varredura (minutos).
 ## Porque a varredura saiu do `guard-tests` para um job seu (#308)
 
 Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #80 do
-`referee-exam-study`), com as suites e as duas varreduras **em serie** (os tempos de cada uma: o
+o derivado privado B), com as suites e as duas varreduras **em serie** (os tempos de cada uma: o
 cabecalho do `mutation-sweep.mjs`).
 A margem era mais ou menos uma ronda do tamanho da 8, e um job morto pelo tecto le-se como defeito.
 O job `sweep` corre as duas varreduras numa matriz, em paralelo, e partilha a mesma condicao ("o PR

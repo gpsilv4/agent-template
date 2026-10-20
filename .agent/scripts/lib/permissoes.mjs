@@ -182,7 +182,7 @@ export function regrasEmFalta(projetoRaw, templateRaw) {
     // acrescentada a mao. O resto do `allow` e escolha do projeto, e lista-lo era ruido. Uma que o projeto pos
     // no `ask`/`deny` e decisao dele (leituras do #317): pedir aprovacao, de proposito, nao e falta.
     // E COBERTA por um prefixo (`Bash(node x.mjs:*)` cobre `Bash(node x.mjs --list)`), que e como o Claude Code
-    // compara: medido no `referee-exam-study`, a comparacao literal pedia 6 regras que ele ja tinha assim.
+    // compara: medido no derivado privado B, a comparacao literal pedia 6 regras que ele ja tinha assim.
     allow: lista(t.allow).filter((r) => MAQUINARIA_NO_ALLOW.test(r) && !permitidas.has(r) && !tem.has(r) && !cobertaPorPrefixo(r, [...permitidas, ...tem])),
   };
 }

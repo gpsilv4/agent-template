@@ -413,7 +413,7 @@ jobs:
           # Commit-RAIZ. AQUI, com o `if: pull_request` acima, este ramo nao corre (o merge ref
           # de um PR tem sempre pai) — e fica de proposito, nao por copia: um derivado que tire o
           # `if:` para varrer tambem em `push` corre-o no commit inicial do repo. Medido: o
-          # `referee-exam-study` fez exatamente isso. Sem o ramo, `git rev-parse HEAD^1` sai 128,
+          # o derivado privado B fez exatamente isso. Sem o ramo, `git rev-parse HEAD^1` sai 128,
           # o `set -e` mata o step e o PRIMEIRO CI desse derivado nasce vermelho. Nao e o `TP2`:
           # e "provei que nao ha intervalo", nao "nao consegui ler".
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
