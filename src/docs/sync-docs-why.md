@@ -6,8 +6,10 @@
 
 ## Script novo: porque **nunca** no job `quality`
 
-O job `quality` tem `if: has_pkg == 'true'` e salta por inteiro num template sem app. Um guard
-la ficava **testado** (pelas suites) e **nunca aplicado**. Foi o padrao que o `check-test-surface`
+O job `quality` salta a app num template sem app (era um `if: has_pkg == 'true'` no job; desde o #347 e
+um salto no shell de cada passo da app). Um guard la ficava **testado** (pelas suites) e **nunca aplicado**.
+E o `quality` e o job da APP: codigo de maquinaria ao lado do `postinstall` das dependencias perde-se a
+confianca que a separacao dos jobs compra (#347). Foi o padrao que o `check-test-surface`
 teve durante meses: documentado em todo o lado e corrido por nada.
 
 O `check-test-surface` vive no `guard-tests` mas com `if: github.event_name == 'pull_request'`,

@@ -80,6 +80,13 @@ export function registar() {
     muda(dir, workflow(), workflow().replace("'^\\.agent/scripts/'", "'^nada/'")),
   { code: 1, includes: ["passo da maquinaria mudou ou saiu: if git diff --name-only | grep -qE"] });
 
+  // O controlo POSITIVO do #347 (PR A): a app juntou-se num job `quality` e a maquinaria ficou no seu. Mover um
+  // passo da maquinaria (as suites) para o job da app tem de AVISAR — sem isto, o "OK sem marcas" do PR A
+  // podia ser cegueira e nao medicao.
+  test("gate: MOVER o passo das suites para o job da app (`quality`) avisa (#347)", (dir) =>
+    muda(dir, workflow(), workflow().replace("      - run: node .agent/scripts/tests/test-guards.mjs\n", "") +
+      "  quality:\n    runs-on: ubuntu-latest\n    steps:\n      - run: node .agent/scripts/tests/test-guards.mjs\n"),
+  { code: 1, includes: ["passo da maquinaria mudou ou saiu: node .agent/scripts/tests/test-guards.mjs"] });
   // Da leitura independente: o gate desligava-se sem mudar a LINHA dele.
   test("gate: MOVER a linha do gate para o passo Audit (continue-on-error) avisa", (dir) =>
     muda(dir, workflow(), workflow({ gate: "echo sem gate", audit: '        run: |\n          npm audit\n          node .agent/scripts/check-test-surface.mjs "$BASE"\n' })),

@@ -394,13 +394,15 @@ src/docs/
 
 ### `ci.yml` — Runs automatically on every PR and push to main
 
+The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality`: in a private repo every job is billed rounded up to the minute, and four short jobs cost four minutes (#347). It stays apart from the machinery job (`guard-tests`) and from `Secret Scan`, on purpose.
+
 | Step | What it does |
 |------|--------------|
 | TypeScript | `npx tsc --noEmit` — 0 errors (skipped if there is no `tsconfig.json`) |
 | Lint | `npm run lint` — no warnings (skipped if there is no `lint` script) |
 | Build | `npm run build` — verify bundle (skipped if there is no `build` script) |
 | Unit Tests | `npm run test:unit` (skipped if there is no `test:unit` script) |
-| Security Audit | `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
+| Security Audit | the `Audit` step: `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
 | Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every push/PR** in the `guard-tests` job |
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every push/PR** in the `guard-tests` job |
@@ -414,7 +416,7 @@ src/docs/
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
-> **Why the steps are guarded:** the `detect` job only proves a `package.json` exists. Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
+> **Why the steps are guarded:** the `Projeto` step only proves a `package.json` exists (without one, every app step skips in its own shell, and an unknown answer fails). Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
 
 > CI runs on `pull_request` + `push` with a least-privilege `permissions: contents: read` block. Dependabot PRs ride the normal `pull_request` path (GitHub's safe default: read-only token, no secrets) — no `pull_request_target` needed, since no CI step requires secrets. A separate `secret-scan` (gitleaks) job runs on every push, even on the bare template.
 
@@ -464,7 +466,11 @@ Each version (vX.Y.Z) has an annotated git tag. Tags are created after each spri
 
 Branch protection rules (require status checks, block force push) require **GitHub Pro** for private repos. The CI works as an **informational semaphore** — shows green/red on PRs and the developer decides. If Pro becomes available, enable in GitHub Settings > Branches.
 
-> **Note**: CI jobs depend on a `detect` job that checks for `package.json` **after checkout**, and skip on the bare template. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
+> **Note**: the `Code Quality` job checks for `package.json` **after checkout** (its `Projeto` step), and its app steps skip on the bare template.
+>
+> **Two consequences of one job (#347), written down:**
+> - **A red step stops the next ones.** A `tsc` error means the unit tests and the audit do not run in that run. They used to run in jobs of their own. The PR is red either way; the signal per run is smaller.
+> - **On the bare template the `Audit` step shows a tolerated X on every run.** `npm audit` fails without a lockfile, and `continue-on-error` keeps the job green. Guarding it would take a new `if:`, which the surface checker counts. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
 
 ## Placeholders
 

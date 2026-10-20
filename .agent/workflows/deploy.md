@@ -64,7 +64,7 @@ gh pr checks --watch
 ```
   Um agente em terminal nao consegue "ver no GitHub"; sem este comando o gate e so prosa.
 - Se algum check falhou, corrigir antes de continuar o deploy
-- **Security Audit**: por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
+- **Security Audit** (o passo `Audit` do job `Code Quality`, #347): por defeito e informativo (`continue-on-error`) — fica verde mesmo com advisories. **Abrir o log e ler o relatorio**; nao assumir que verde = limpo
 - Se E2E tests estao configurados no CI, devem estar verdes tambem
 - Para inspecao humana: GitHub > repo > branch > checks
 
