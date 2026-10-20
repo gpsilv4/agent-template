@@ -406,6 +406,41 @@ export function registar() {
       muda(dir, agregador(null), agregador(cond)),
     { code: 1, includes: [IF] });
   }
+  // O push de um merge num privado (#347, PR B): a forma exacta, so como `if:` de JOB, e so nos tres jobs do
+  // `ci.yml` que o PR tambem corre. Cada forma excluida tem o par que CONTA: uma cauda, um `)`, as aspas
+  // trocadas, uma continuacao, cada operador, o passo, outro job, outro workflow.
+  const MP = "github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'";
+  const comJob = (cond, id = "quality") => `${base}  ${id}:\n    runs-on: y\n${cond === null ? "" : `    if: ${cond}\n`}    steps:\n      - run: node b-test.mjs\n`;
+  for (const [rotulo, cond] of [["nua", MP], ["em ${{ }}", `\${{ ${MP} }}`], ["entre aspas", `"${MP}"`], ["com comentario", `${MP}  # so o merge num privado`]]) {
+    test(`gate: \`if:\` do merge num privado como if de job nao conta (#347) — ${rotulo}`, (dir) =>
+      muda(dir, comJob(null), comJob(cond)),
+    { code: 0, excludes: [IF] });
+  }
+  for (const [rotulo, cond] of [
+    ["uma cauda `&& false`", `${MP} && false`], ["`(a || b) && false`", `(${MP}) && false`], ["um `)` a mais", `${MP})`],
+    ["aspas trocadas", `"${MP}'`], ["uma continuacao", `${MP}\n      && false`], ["outro committer", MP.replace("'web-flow'", "'outro'")],
+    ["sem o `!private`", MP.replace(" || !github.event.repository.private", "")], ["o `==` trocado por `!=`", MP.replace("==", "!=")],
+    // O `!` e o terceiro operador (segunda leitura): sem eles, um repo PUBLICO passava a saltar os merges.
+    ["sem o `!` do private", MP.replace("!github", "github")], ["o `!=` do committer trocado por `==`", MP.replace("!= 'web-flow'", "== 'web-flow'")],
+  ]) {
+    test(`gate: \`if:\` do merge num privado alterado continua a contar (#347) — ${rotulo}`, (dir) =>
+      muda(dir, comJob(null), comJob(cond)),
+    { code: 1, includes: [IF] });
+  }
+  test("gate: a forma do merge num privado num PASSO conta (#347)", (dir) =>
+    muda(dir, comJob(null), `${base}  quality:\n    runs-on: y\n    steps:\n      - if: ${MP}\n        run: node b-test.mjs\n`),
+  { code: 1, includes: [IF] });
+  // A chave `if:` como ULTIMA do ultimo passo do job (segunda leitura): sem o guarda da indentacao, era isenta.
+  test("gate: a forma do merge num privado no fim do ultimo passo conta (#347)", (dir) =>
+    muda(dir, comJob(null), `${base}  quality:\n    runs-on: y\n    steps:\n      - name: t\n        run: node b-test.mjs\n        if: ${MP}\n`),
+  { code: 1, includes: [IF] });
+  // Outro job (um `deploy` a jusante) e outro workflow (so de `push`): o "o PR ja correu isto" e falso (as duas leituras).
+  test("gate: a forma do merge num privado noutro job do ci.yml conta (#347)", (dir) =>
+    muda(dir, comJob(null, "deploy"), comJob(MP, "deploy")),
+  { code: 1, includes: [IF] });
+  test("gate: a forma do merge num privado noutro workflow conta (#347)", (dir) =>
+    muda(dir, comJob(null), comJob(MP), { ficheiro: ".github/workflows/deploy.yml" }),
+  { code: 1, includes: [IF] });
   // A auditoria do #308: um job a jusante dos testes que NAO le resultados (um `deploy`) com `always()`
   // corre com os testes vermelhos — conta. A primeira versao da excecao vivia no regex e deixava-o passar.
   test("gate: `if: always()` num job que nao le resultados (um deploy) conta (#308)", (dir) =>

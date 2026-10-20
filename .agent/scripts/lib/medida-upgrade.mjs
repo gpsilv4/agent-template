@@ -402,6 +402,10 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // Os jobs CURTOS da app (#347): num privado cada job e cobrado ao minuto, e o template juntou-os no `quality`.
   // Pelo menos DOIS dos tres ids: um `detect:` sozinho pode ser outra coisa (um `paths-filter`, leitura do PR A).
   const curtos = (r) => (leOuNull(join(r, ".github/workflows/ci.yml")) ?? "").match(/^  (?:detect|unit-tests|security-audit):/gm)?.length ?? 0;
+  // E o push de um merge num privado (#347, PR B): so o portao corre. "Ja tem" = o `if:` E o shell do portao (a meias, nota).
+  const saltaMerge = (r) => ((t) => /^[ \t]+if:.*committer\.username != 'web-flow'/m.test(t) && /"\$COMMITTER" = web-flow/.test(t))(leOuNull(join(r, ".github/workflows/ci.yml")) ?? "");
+  if (saltaMerge(template) && !saltaMerge(raiz))
+    note("o template salta o `Code Quality`, o `Guard Suites` e o `Secret Scan` no push de um merge num repo privado (#347) — OPCIONAL (so minutos); trazer JUNTOS os tres `if:` de job e o shell do portao `Guard Tests` que recalcula o salto e corre o `commit-msg` (os `if:` sem esse shell poem o push vermelho)");
   if (curtos(raiz) >= 2 && curtos(template) === 0)
     note("o template corre a app (detect, testes unitarios, audit) como passos de UM job, `Code Quality` (#347), e o deste projeto em jobs separados — OPCIONAL (so minutos: num repo privado cada job e cobrado arredondado ao minuto); ao juntar, a maquinaria fica FORA desse job, e os checks `Detect Project`/`Unit Tests`/`Security Audit` saem dos obrigatorios");
 

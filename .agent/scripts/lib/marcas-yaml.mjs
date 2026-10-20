@@ -25,22 +25,33 @@ export const SO_DO_TEMPLATE = new Set([".github/workflows/codeql.yml"]);
 export const paraMarcas = (f, t) =>
   /\.ya?ml$/i.test(f)
     ? comoORunnerExecuta(
-        tolerantes(agregadoresSempre(t))
+        tolerantes(isencoesDeJob(t, f))
           .replace(/^([ \t]*)-(?=[ \t]+\S)/gm, "$1 ")
           .replace(/^([ \t]*)(?:(["'])(if|continue-on-error|shell|run)\2|(if|continue-on-error|shell|run))[ \t]*:/gm, "$1$3$4:")
       )
     : t;
 
 /**
- * O `if: always()` de um job AGREGADOR sai da marca do `if:` (#308): sem ele, uma dependencia
- * vermelha SALTAVA o agregador — e um check saltado conta como passado para a protecao. So num job
- * que LE o resultado de outro (`needs.<X>.result`), e so a forma exacta (a do `pull_request`, com as
- * mesmas ancoras: aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma continuacao na linha
- * seguinte). Num job a jusante que nao le resultados — um `deploy` com `needs: [test]` —, o
- * `always()` faz correr com os testes vermelhos, e CONTA: a primeira versao desta excecao vivia no
- * regex da marca, sem saber de que job era, e deixava-o passar (auditoria do #308).
+ * As DUAS isencoes da marca do `if:` que so valem como `if:` de PRIMEIRO NIVEL de um job — a mesma forma num
+ * passo continua a contar. Cada uma so na forma EXACTA (aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma
+ * continuacao na linha seguinte). O `if:` passa a `@@if-...@@:`, que a marca nao le.
+ *  - O `if: always()` de um AGREGADOR (#308): sem ele, uma dependencia vermelha SALTAVA o agregador — e um
+ *    check saltado conta como passado para a protecao. So num job que LE o resultado de outro
+ *    (`needs.<X>.result`). Num job a jusante que nao le resultados — um `deploy` com `needs: [test]` —, o
+ *    `always()` faz correr com os testes vermelhos, e CONTA: a primeira versao desta excecao vivia no regex
+ *    da marca, sem saber de que job era, e deixava-o passar (auditoria do #308).
+ *  - O push de um MERGE num repo privado (#347, PR B): `pull_request || publico || committer != web-flow`.
+ *    E verdadeiro em TODO o PR e em todo o repo publico — so salta, num privado, o push que o GitHub fez ao
+ *    mergear (o PR ja correu tudo; num privado free cada job e cobrado ao minuto). So nos tres jobs do
+ *    `ci.yml` que o PR tambem corre (`JOBS_DO_MERGE`): noutro workflow — um so de `push`, como um `deploy` —
+ *    ou noutro job, o "o PR ja correu isto" nao e verdade, e a mesma forma CONTA (as duas leituras do PR B).
+ *    O portao (`Guard Tests`) recalcula o salto no SEU shell e reprova qualquer outro `skipped`.
  */
-function agregadoresSempre(t) {
+const JOBS_DO_MERGE = new Set(["quality", "guard-tests", "secret-scan"]);
+const CI_DO_MERGE = /(^|\/)\.github\/workflows\/ci\.ya?ml$/;
+const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+const MERGE_PRIVADO = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*\|\|[ \t]*!github\.event\.repository\.private[ \t]*\|\|[ \t]*github\.event\.head_commit\.committer\.username[ \t]*!=[ \t]*'web-flow'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+function isencoesDeJob(t, ficheiro) {
   const ls = t.split(/\r?\n/);
   const iJobs = ls.findIndex((l) => /^["']?jobs["']?[ \t]*:/.test(l));
   if (iJobs < 0) return t;
@@ -50,19 +61,22 @@ function agregadoresSempre(t) {
   const ne = ls.slice(iJobs + 1, fim).filter((l) => l.trim() && !/^[ \t]*#/.test(l));
   if (ne.length === 0) return t;
   const jInd = Math.min(...ne.map(ind));
-  const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
   for (let i = iJobs + 1; i < fim; i++) {
     if (!ls[i].trim() || ind(ls[i]) !== jInd || /^[ \t]*#/.test(ls[i])) continue;
     let f = i + 1;
     while (f < fim && (!ls[f].trim() || /^[ \t]*#/.test(ls[f]) || ind(ls[f]) > jInd)) f++;
     const bloco = ls.slice(i + 1, f);
-    if (!bloco.some((l) => !/^[ \t]*#/.test(l) && /\bneeds\.[\w-]+\.result\b/.test(l))) continue;
-    const kInd = Math.min(...bloco.filter((l) => l.trim() && !/^[ \t]*#/.test(l)).map(ind));
+    const agrega = bloco.some((l) => !/^[ \t]*#/.test(l) && /\bneeds\.[\w-]+\.result\b/.test(l));
+    const doMerge = CI_DO_MERGE.test(ficheiro) && JOBS_DO_MERGE.has(/^[ \t]*["']?([\w-]+)["']?[ \t]*:/.exec(ls[i])?.[1]);
+    const naoVazias = bloco.filter((l) => l.trim() && !/^[ \t]*#/.test(l));
+    const kInd = naoVazias.length ? Math.min(...naoVazias.map(ind)) : -1;
     for (let k = i + 1; k < f; k++) {
-      if (ind(ls[k]) !== kInd || !SEMPRE.test(ls[k])) continue;
+      if (ind(ls[k]) !== kInd) continue;
+      const re = agrega && SEMPRE.test(ls[k]) ? SEMPRE : doMerge && MERGE_PRIVADO.test(ls[k]) ? MERGE_PRIVADO : null;
+      if (!re) continue;
       const prox = ls.slice(k + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));
       if (prox !== undefined && ind(prox) > kInd) continue; // uma continuacao muda a condicao
-      ls[k] = ls[k].replace(SEMPRE, "$1@@if-agregador@@$2always()");
+      ls[k] = re === SEMPRE ? ls[k].replace(SEMPRE, "$1@@if-agregador@@$2always()") : ls[k].replace(MERGE_PRIVADO, "$1@@if-merge-privado@@$2");
     }
     i = f - 1;
   }

@@ -211,6 +211,26 @@ export function registar() {
       exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  detect:\n    steps: []\n"), ...OUTRO } }),
         { codigo: 0, exclui: ["como passos de UM job"] }));
   }
+  // O push de um merge num privado (#347, PR B): a NOTE sai a quem nao tem o salto, e nao a quem ja o tem.
+  {
+    const SO_IF = ciDe({ guard: [O] }).replace("  guard-tests:\n", "  guard-tests:\n    if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'\n");
+    const COM_SALTO = `${SO_IF}  guard-gate:\n    steps:\n      - run: |\n          [ "$COMMITTER" = web-flow ]\n`;
+    const MSG = "no push de um merge num repo privado";
+    // Os `if:` sem o shell do portao (a meias, segunda leitura): o push fica vermelho, e a nota tem de sair.
+    test("so os `if:` do salto, sem o shell do portao, aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": COM_SALTO, ...OUTRO }, projeto: { ".github/workflows/ci.yml": SO_IF, ...OUTRO } }),
+        { codigo: 0, inclui: [MSG] }));
+    test("o salto do push de um merge que o projeto nao tem aparece como opcional (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": COM_SALTO, ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO } }),
+        { codigo: 0, inclui: [MSG, "OPCIONAL", "JUNTOS"] }));
+    test("o salto do push de um merge nos dois lados nao aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": COM_SALTO, ...OUTRO }, projeto: { ".github/workflows/ci.yml": COM_SALTO, ...OUTRO } }),
+        { codigo: 0, exclui: [MSG] }));
+    // Um template antigo (sem o salto) nao tem nada a trazer, nem a um projeto que o tenha posto por si.
+    test("sem o salto no template nao aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": COM_SALTO, ...OUTRO } }),
+        { codigo: 0, exclui: [MSG] }));
+  }
   // O contra-caso: a mesma colocacao nao se anuncia.
   test("a varredura no `sweep` dos dois lados nao aparece (#308)", () =>
     exige(contraProjeto({ hoje: TPL_SWEEP, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),

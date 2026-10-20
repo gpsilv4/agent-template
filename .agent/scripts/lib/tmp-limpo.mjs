@@ -94,6 +94,8 @@ export const PREFIXOS_DE_TESTE = [
   "commit-msg-test-",
   // Do `tests-varredura-shards.mjs` (#308): o portao pela linha de comando le relatorios de uma pasta.
   "shards-test-",
+  // Do `tests-portao-ci.mjs` (#347, PR B): o shell do portao `Guard Tests` corre num repo git descartavel.
+  "portao-ci-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
   // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
   "paralelo-test-",
