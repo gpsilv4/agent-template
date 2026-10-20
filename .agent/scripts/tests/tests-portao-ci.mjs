@@ -105,6 +105,20 @@ function corre(corpo, env, mensagem) {
 }
 
 export function registar() {
+  // O extractor sobre YAML sintetico: corre em qualquer projeto (um derivado sem o salto da SKIP abaixo, e um
+  // modulo sem nenhum teste reprova no registo). Nao pode ler o `run:` de OUTRO passo, nem cortar o corpo.
+  {
+    const p = (corpo, entre = "        env:\n          A: b\n") => `jobs:\n  g:\n    steps:\n${PASSO}\n${entre}        run: |\n${corpo}\n      - run: depois\n`;
+    const lido = passoDoPortao(p("          linha 1\n\n          linha 3"));
+    registarResultado("portao: o extractor le o env: e o corpo inteiro do passo, ate ao passo seguinte (#347)", [
+      ...(lido?.corpo === "linha 1\n\nlinha 3" ? [] : [`corpo lido: ${JSON.stringify(lido?.corpo)}`]),
+      ...(JSON.stringify(lido?.env) === JSON.stringify(["env:", "A: b"]) ? [] : [`env lido: ${JSON.stringify(lido?.env)}`]),
+    ]);
+    registarResultado("portao: o extractor nao le o `run: |` de outro passo, nem um passo que nao existe (#347)", [
+      ...(passoDoPortao(p("          x", "        uses: a/b@v1\n      - name: outro\n")) === null ? [] : ["leu o `run:` do passo seguinte"]),
+      ...(passoDoPortao("jobs:\n  g:\n    steps:\n      - run: x\n") === null ? [] : ["inventou um passo"]),
+    ]);
+  }
   const lerRaiz = (rel) => leOuNull(join(ROOT, rel));
   const ci = lerRaiz(".github/workflows/ci.yml");
   const passo = ci === null ? null : passoDoPortao(ci);
