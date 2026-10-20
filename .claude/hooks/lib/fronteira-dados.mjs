@@ -59,6 +59,10 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
  *  E o mesmo escape do `check-codigo-morto.mjs` e do `test-bundle-sizes.mjs`, COPIADO de proposito:
  *  este modulo e a folha da fronteira e nao importa de `.agent/scripts/` (camadas separadas). */
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** O texto NOMEIA a fronteira: so o nome das pastas de topo (`.claude`, `.githooks`), em qualquer sitio. Mais
+ *  largo do que o `FRONTEIRA` de proposito — e o "isto fala da fronteira?" de quem decide o alcance, e nao "isto
+ *  e um caminho dela". Derivado da lista: eram quatro copias escritas a mao em dois ficheiros (`TP8`). */
+export const NOMEIA = new RegExp([...new Set(CAMINHOS_FRONTEIRA.map((f) => f.split("/")[0]))].map(literalEmRegex).join("|"));
 /** A regex da fronteira para uma lista de caminhos e de pastas-mae. Uma FUNCAO para o teste a poder
  *  montar com um caminho que tenha caracteres especiais: os de hoje so tem `.`, e com eles um escape
  *  que so tratasse o `.` dava a mesma regex — nenhum teste o via. */
@@ -75,6 +79,10 @@ export const montaFronteira = (caminhos, maes) =>
   );
 export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
 
+/** Os interpretadores que correm codigo, como alternativas de uma regex. Lidos pelo `fronteira.mjs` (as regex
+ *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
+export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
+
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *
  *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do `guard-protected-branch.mjs`, e digo-o em
@@ -90,7 +98,7 @@ export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
  *     `OPACO`, e consumi-las faria julgar o verbo errado: em `ls <fronteira> | xargs rm`, quem
  *     apaga e o `xargs`, que nao tem o caminho escrito.
  *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`. */
-const CABECAS = new Set([
+export const CABECAS = new Set([
   "sudo", "doas", "env", "command", "builtin", "time", "timeout", "nohup", "setsid", "stdbuf",
   "nice", "ionice", "unbuffer",
 ]);
@@ -241,7 +249,7 @@ export const RAZAO_OPACA =
  *  escrita e a que nao aconselha a reescrever o comando. */
 const OPACAS = new Set([
   "erro-ao-analisar", "citado-mas-executado", "execucao-adiada", "substituicoes-demais",
-  "codigo-inline", "wrapper-opaco",
+  "codigo-inline", "wrapper-opaco", "recebe-codigo",
 ]);
 
 /**
@@ -252,5 +260,14 @@ const OPACAS = new Set([
 export function razaoDe(condicao) {
   const [rotulo, verbo] = condicao.split(/:(.*)/s);
   const opaca = OPACAS.has(rotulo) || (rotulo === "verbo-nao-e-leitura" && PALAVRAS_DE_BLOCO.has(verbo));
-  return opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA;
+  const inline = rotulo === "codigo-inline" || (rotulo === "citado-mas-executado" && verbo === "inline");
+  return (opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA) + (inline ? NOTA_INLINE : "");
 }
+
+/** So nas negacoes de CODIGO INLINE (#336): o que so le tambem e negado, e de proposito — distinguir ler de
+ *  escrever dentro do codigo era analisar JS com regex (decisao 3 do `/grill`). Dizer o caminho que funciona
+ *  poupa a tentativa seguinte; num ciclo ou num `eval` a nota nao se aplica, e nao aparece. */
+const NOTA_INLINE =
+  " Um interpretador a correr codigo inline (`node -e`, `perl -e`, `python3 -c`...) que cite a fronteira e " +
+  "negado mesmo que so LEIA: o hook nao distingue ler de escrever dentro do codigo. Para validar o JSON, " +
+  "`jq empty <ficheiro>`.";

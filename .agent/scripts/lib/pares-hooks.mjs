@@ -55,6 +55,19 @@ export const PARES_DOS_HOOKS = [
     neutro: "((x) => null)(",
   },
   {
+    // O LEXER de posicao (#336). Nao nega: diz onde acaba uma substituicao, umas aspas ou um heredoc. O neutro
+    // devolve o FIM do texto — a mutacao engole o resto do comando numa palavra (ou num corpo de heredoc), e
+    // os casos de estrutura do `tests-posicao.mjs` tem de ficar vermelhos. Auto-contido de proposito: um nome
+    // que nao existisse no ambito lancava, caia no `erro-ao-analisar`, e contava como morto pela razao errada.
+    // As DEFINICOES (`const fechaSubst =`, `function fechaHeredoc(`) nao casam. Ficam de fora os ciclos que
+    // seguem as aspas SIMPLES (o `indexOf`), as CRASES (dentro e fora de aspas duplas) e o `$'...'` — e dito,
+    // para nao se ler "o lexer coberto" a mais. O `aritmetica()` usa o `fechaSubst(`, e entra.
+    alvo: ".claude/hooks/lib/posicao.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])(?<!function\s)(?:fechaSubst|fechaAspas|fechaHeredoc)\(/,
+    neutro: "((t) => t.length)(",
+  },
+  {
     // A entrada, a saida e o PRAZO do guard (#227). Os sitios de chamada de `negar(` sao dois: o
     // prazo esgotado, e a negacao que o worker passa ao processo principal. Mutado um, o guard
     // permite o que devia negar. A definicao (`export function negar(`) nao conta.

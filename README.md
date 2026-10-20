@@ -329,7 +329,8 @@ not to* line, so every agent sees it.
 │   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
 │   │                                  block AFTER compaction dropped the imported rules
 │   ├── lib/                        <- What the hooks share: the frontier rule (`fronteira`,
-│   │                                  `caminhos`, and their import-free leaf `fronteira-dados`),
+│   │                                  `caminhos`, the command-position lexer `posicao`, and
+│   │                                  their import-free leaf `fronteira-dados`),
 │   │                                  git verbs, the guard's deadline (`resposta`),
 │   │                                  porcelain parsing, a subagent's scope (`ambito-agente`),
 │   │                                  the protected-branch list (`protegidos`)

@@ -40,6 +40,11 @@
     **classe** que volta sempre com mais uma forma ganha **issue proprio**, e nao mais um caso
     (o texto citado que corre, #229). E a linha do `CLAUDE.md` — barreira contra o **descuido** —
     escrita em casos.
+  - **A posicao de comando** (#336). `node -pe`, `perl -le`, `python3 -Ic` e `php -r` passavam
+    pela regex. O `lib/posicao.mjs` le o comando como a shell e diz que palavra CORRE (palavras-
+    chave, cabecas, executores, o que fica a jusante por pipe; com a fronteira so citada, qualquer
+    inline). **So acrescenta**: as regex ficam como piso. Uma mensagem que cite `node -e` e a
+    fronteira fica negada de proposito (#344). O detalhe e o que fica de fora: o cabecalho do modulo.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio): corre no CI em cada PR que toque verificadores ou hooks (completa e `--skips`), e localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
 
 - **Hook do git** (`.githooks/commit-msg` + `.agent/scripts/tests/test-commit-msg.mjs`): recusa mensagens de commit que atribuam o trabalho a uma IA (`Co-Authored-By` de ferramenta, "Generated with", emoji de robo); um co-autor humano passa. E do **git** e nao do Claude Code porque um `PreToolUse` ve `git commit -m` e nao ve `-F ficheiro` — e foi por `-F` que a regra foi violada. Ligar por clone: `git config core.hooksPath .githooks`; quem nao ligar fica sem a rede local, e por isso o `ci.yml` repete a verificacao sobre as mensagens do PR. Detalhe e a razao do blocklist no cabecalho do modulo `.githooks/lib/commit-msg.mjs` — o `.githooks/commit-msg` e so um ponteiro que o importa (o git exige o nome sem extensao; o CodeQL escolhe pela extensao).
