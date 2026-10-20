@@ -23,19 +23,33 @@ permissions:
   contents: read
 
 jobs:
-  # Detects package.json AFTER checkout (job-level hashFiles runs before checkout and
-  # is unreliable). Other jobs skip on the bare template and run on real projects.
-  detect:
-    name: Detect Project
+  # A APP num so job (#347): o `detect`, o `quality`, o `unit-tests` e o `security-audit` eram 4 jobs, e num repo
+  # privado cada job e cobrado ARREDONDADO ao minuto — medido em outubro, 5 dos 8 jobs de um PR duravam menos de
+  # 1 min e pagavam 1. Ficam os mesmos passos, pela mesma ordem, num job so. O preco, dito: um passo vermelho
+  # para os seguintes (um erro do `tsc` ja nao deixa correr os testes unitarios nem o audit, que antes tinham
+  # jobs proprios), e os testes correm sobre a arvore depois do `build`. O PR fica vermelho na mesma; perde-se
+  # sinal por corrida, nao cobertura.
+  #
+  # SEPARADO da maquinaria (`guard-tests`) de proposito: as suites sao codigo do PR, e no mesmo job podiam
+  # escrever em `$GITHUB_PATH` um `tsc` falso e a app ficava verde sem correr (2.a auditoria da Fase 0 do #347).
+  # E SEM segredos: o `secret-scan` fica no seu job, longe do `postinstall` das dependencias.
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      has_pkg: ${{ steps.check.outputs.has_pkg }}
+    # Os tres jobs da app tinham 15 + 15 + 10 min; em serie, o tecto soma-os.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - id: check
+
+      # Era o job `detect`. Corre DEPOIS do checkout: o `hashFiles` ao nivel do job corre antes dele e falha.
+      # Os passos da app leem a resposta e saltam NO SHELL, a falhar fechado: um valor que nao seja `true` nem
+      # `false` reprova (o `if:` de job que havia em cada um dos tres saiu, e nenhum `if:` entrou).
+      # A linha `case "$TEM_APP"` e o `env: TEM_APP` repetem-se, iguais, nos cinco passos da app: o YAML nao os
+      # partilha sem um `if:` (que o medidor da superficie conta como salto) ou um script a parte. Mudar um = mudar os cinco.
+      - name: Projeto
+        id: check
         run: |
           # `-f package.json` so olhava para a RAIZ. Num monorepo (apps/web, packages/*,
           # frontend/) — o caso por omissao em Turborepo, pnpm workspaces e Nx — a resposta era
@@ -52,7 +66,7 @@ jobs:
           if [ -n "$outro" ]; then
             echo "::error::Ha package.json fora da raiz e o CI so olha para a raiz:"
             echo "$outro" | sed 's/^/::error::  /'
-            echo "::error::Apontar os jobs para essa pasta (working-directory) ou mover o package.json."
+            echo "::error::Apontar os passos para essa pasta (working-directory) ou mover o package.json."
             exit 1
           fi
           # Nem na raiz nem em lado nenhum. Depois do bootstrap isso e "nao consegui medir",
@@ -63,17 +77,6 @@ jobs:
           fi
           echo "has_pkg=false" >> "$GITHUB_OUTPUT"
 
-  quality:
-    name: Code Quality
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: detect
-    if: needs.detect.outputs.has_pkg == 'true'
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
@@ -83,10 +86,13 @@ jobs:
 
       # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
       # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
-      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
-      # que nao aponta para a causa. A mensagem de erro aqui aponta.
+      # `package-lock.json` — o caso por defeito — levava os passos da app vermelhos com uma
+      # mensagem que nao aponta para a causa. A mensagem de erro aqui aponta.
       - name: Install
+        env:
+          TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
+          case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
             npm ci
           else
@@ -95,104 +101,55 @@ jobs:
           fi
 
       # Each step is guarded so a project WITHOUT that tool/script does not red-fail.
-      # `detect` only proves package.json exists; these guards prove the specific
+      # `Projeto` only proves package.json exists; these guards prove the specific
       # toolchain exists before running it. Remove a guard once your stack is fixed.
       - name: TypeScript
+        env:
+          TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
+          case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if [ -f tsconfig.json ]; then npx tsc --noEmit; else echo "No tsconfig.json — skipping typecheck"; fi
 
       - name: Lint
+        env:
+          TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
+          case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.lint?0:1)"; then npm run lint; else echo "No 'lint' script — skipping"; fi
 
       - name: Build
+        env:
+          TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
+          case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.build?0:1)"; then npm run build; else echo "No 'build' script — skipping"; fi
 
       # Uncomment after configuring bundle targets in .agent/scripts/check-bundle-sizes.mjs
       # - name: Bundle Sizes
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
-      # NAO por os doc guards nem o backlog aqui: este job tem
-      # `if: has_pkg == 'true'` e salta num template sem app, logo eles nunca correriam.
-      # Vivem no job `guard-tests`, que corre sempre.
-
-
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: detect
-    if: needs.detect.outputs.has_pkg == 'true'
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile. Descomentar depois
-          # de commitar o `package-lock.json`, ou trocar por `cache: pnpm`/`yarn`.
-          # cache: npm
-
-      # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
-      # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
-      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
-      # que nao aponta para a causa. A mensagem de erro aqui aponta.
-      - name: Install
-        run: |
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci
-          else
-            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
-            exit 1
-          fi
+      # NAO por os doc guards nem o backlog aqui: este job salta a app num template sem
+      # app, e eles sao maquinaria. Vivem no job `guard-tests`, que corre sempre.
 
       - name: Unit Tests
+        env:
+          TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
+          case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.['test:unit']?0:1)"; then npm run test:unit; else echo "No 'test:unit' script — skipping"; fi
-
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: detect
-    if: needs.detect.outputs.has_pkg == 'true'
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          # `cache: npm` ERRA (nao avisa — erra) quando nao ha lockfile. Descomentar depois
-          # de commitar o `package-lock.json`, ou trocar por `cache: pnpm`/`yarn`.
-          # cache: npm
-
-      # O unico passo do pipeline que NAO estava guardado, e o primeiro a falhar: `npm ci`
-      # exige lockfile por definicao. Um projeto que fez scaffold a mao e nao commitou o
-      # `package-lock.json` — o caso por defeito — levava 3 jobs vermelhos com uma mensagem
-      # que nao aponta para a causa. A mensagem de erro aqui aponta.
-      - name: Install
-        run: |
-          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
-            npm ci
-          else
-            echo "::error::package.json sem package-lock.json — corre 'npm install' e commita o lock (o CI usa 'npm ci'). Noutro gestor de pacotes, ajusta este passo e o 'cache:' acima."
-            exit 1
-          fi
 
       # Informative, NOT a hard gate: transitive high-sev advisories are common and
       # often unfixable without a breaking bump — blocking every merge on them is a
       # footgun. Review the report; escalate to a gate (remove continue-on-error) once
       # your dependency tree is clean, or narrow with --audit-level / an allowlist.
+      # Na forma EXACTA de antes (so o `npm audit`, sem guarda): o medidor da superficie so tolera o
+      # `continue-on-error` num passo que so audita (`marcas-yaml.mjs`, `AUDIT`). Sem app, o `npm audit` falha
+      # sem lockfile e o erro e tolerado — uma anotacao no passo, e o job verde.
       - name: Audit
         continue-on-error: true
         run: npm audit --audit-level=high
 
-  # Negative tests for the guard scripts themselves. Deliberately NOT behind `detect`:
+  # Negative tests for the guard scripts themselves. Deliberately NOT behind the app's `Projeto` step:
   # they need no package.json and no dependencies, and the bare template is exactly the
   # case they cover — gating them behind a package.json would mean they never run here.
   guard-tests:
@@ -245,8 +202,8 @@ jobs:
       # A autoridade que o agente nao alcanca (TP4): se a superficie de teste encolher face a
       # base do PR, isto reprova. So em `pull_request` — e onde a base esta definida sem
       # ambiguidade (`github.event.before` vem a zeros no primeiro push de um branch).
-      # Os doc guards e o backlog correm **aqui** e nao no job `quality`: aquele tem
-      # `if: has_pkg == 'true'` e salta por inteiro num template sem app, logo os guards
+      # Os doc guards e o backlog correm **aqui** e nao no job `quality`: aquele salta os seus
+      # passos num template sem app (e era, ate ao #347, um job inteiro saltado), logo os guards
       # ficavam testados (pelas suites acima) e nunca **aplicados**. E o mesmo padrao que o
       # `check-test-surface` tinha: documentado em todo o lado e corrido por nada. Nenhum dos
       # dois precisa de `package.json` nem de configuracao.
@@ -461,7 +418,8 @@ jobs:
           retention-days: 7
 
   # O CHECK QUE A PROTECAO EXIGE (#308). Um ruleset ou uma branch protection exige checks pelo NOME,
-  # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13). Com a varredura num job
+  # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13; a lista inteira em
+  # `src/docs/upgrade-why.md`). Com a varredura num job
   # seu, `Guard Tests` deixava de a incluir — um PR com a varredura vermelha passava a poder ser
   # mergeado, sem nenhuma definicao mudada. Este job tem o nome antigo e so fica verde com as suites
   # verdes E a varredura verde (ou saltada: so corre em `pull_request`, e num PR que nao toca nos
@@ -609,8 +567,8 @@ jobs:
           persist-credentials: false
       # A `gitleaks-action` exige `GITLEAKS_LICENSE` em contas de ORGANIZACAO (gratis, mas por
       # formulario externo); so contas pessoais estao isentas. Sem isso, quem clonar este
-      # template para um repo de org fica com o UNICO job que corre sempre — e o unico que nao
-      # depende do `detect` — vermelho no dia 1, por um motivo que nao e do codigo dele.
+      # template para um repo de org fica com um job que corre sempre vermelho no dia 1, por um
+      # motivo que nao e do codigo dele.
       #
       # Este passo transforma isso num aviso accionavel em vez de uma falha opaca. Nao salta a
       # varredura: se a licenca existir, corre na mesma.

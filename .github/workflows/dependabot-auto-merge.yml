@@ -21,7 +21,7 @@
 #      GITHUB_TOKEN nao aprova PRs; usa required *status checks*, nao reviews.)
 #
 # ⚠️ O AUDIT NAO TRAVA NADA: em `ci.yml` o `npm audit` corre com `continue-on-error`
-# (informativo por defeito), logo o check fica SEMPRE verde. Com este auto-merge
+# (informativo por defeito), logo o passo nunca poe o check `Code Quality` vermelho. Com este auto-merge
 # ligado, um PR patch/minor do Dependabot com advisory de severidade alta entra sem
 # ninguem ler o relatorio. Se ligares o auto-merge, remove o `continue-on-error` do
 # passo Audit em `ci.yml` para o tornar um gate real (e atualiza `SECURITY.md`).

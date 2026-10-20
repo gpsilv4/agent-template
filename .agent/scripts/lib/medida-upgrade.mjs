@@ -399,6 +399,12 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     note("o `sweep` do template reparte a varredura completa em shards (`SWEEP_SHARD`, #308) e o deste projeto nao — trazer JUNTOS a matriz, o passo da varredura (o `env:` e o `nao_aplicavel`), o upload do relatorio e os passos do portao no `guard-gate` (a matriz sem o portao, o `check-test-surface` reprova-a)");
   }
 
+  // Os jobs CURTOS da app (#347): num privado cada job e cobrado ao minuto, e o template juntou-os no `quality`.
+  // Pelo menos DOIS dos tres ids: um `detect:` sozinho pode ser outra coisa (um `paths-filter`, leitura do PR A).
+  const curtos = (r) => (leOuNull(join(r, ".github/workflows/ci.yml")) ?? "").match(/^  (?:detect|unit-tests|security-audit):/gm)?.length ?? 0;
+  if (curtos(raiz) >= 2 && curtos(template) === 0)
+    note("o template corre a app (detect, testes unitarios, audit) como passos de UM job, `Code Quality` (#347), e o deste projeto em jobs separados — OPCIONAL (so minutos: num repo privado cada job e cobrado arredondado ao minuto); ao juntar, a maquinaria fica FORA desse job, e os checks `Detect Project`/`Unit Tests`/`Security Audit` saem dos obrigatorios");
+
   // O MESMO, para a fronteira de permissoes (#301, R7B-1). O motor nao toca no `settings.json` — e
   // do projeto —, e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
   // passou varias rondas sem o `ask` dos hooks. Lista LITERAL, para copiar; o que deixa a

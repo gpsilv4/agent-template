@@ -17,7 +17,7 @@
  *   node .agent/scripts/tests/test-guards.mjs
  *
  * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml
- * (sem `package.json` e sem gate do `detect` — o template puro e exatamente o caso coberto).
+ * (sem `package.json` e sem depender do passo `Projeto` do `Code Quality` — o template puro e exatamente o caso coberto).
  */
 
 import { cpSync, mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync, writeFileSync, existsSync } from "fs";

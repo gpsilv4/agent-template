@@ -133,6 +133,31 @@ dela no repo. O cabecalho do `mutation-sweep.mjs`, o `ci.yml` e o `upgrade-why.m
 | Disco | 14 GB | 14 GB | Nada: igual, e as fixtures limpam-se (`lib/tmp-limpo.mjs`) |
 | Minutos | gratis, ilimitados | quota da conta, depois ao minuto | **O custo, nao a espera.** Cada job arredonda ao minuto: paralelizar ou partir em shards baixa a parede e nao a fatura |
 
+### O custo num privado free, medido (#347)
+
+**O plano gratis da 2000 min/mes, partilhados por TODOS os repos privados da conta**, e cada job e cobrado
+**arredondado ao minuto para cima**. Os repos publicos nao contam: o template e gratis.
+
+**Medido em outubro de 2026, job a job pela API**, com a quota esgotada a dia 20:
+
+| Repo | Cobrados | Reais | Onde |
+|---|---|---|---|
+| derivado privado A (CI proprio, 5 jobs) | 1423 | 654 | 740 nos PRs e 564 no push do merge; o `Secret Scan` 222 cobrados por 34 reais, e o `Commit Messages` 218 por 23 |
+| derivado privado B (o CI do template) | 630 | 467 | 5 dos 8 jobs de um PR duravam menos de 1 min e pagavam 1; os 3 shards da varredura pagam pelo menos 3 mesmo "nao aplicavel" |
+
+**O custo e o NUMERO de jobs, e nao o trabalho.** Daqui saem as decisoes do #347, por PR:
+- **A:** a app (o projeto, os testes unitarios e o audit) e passos de UM job, `Code Quality`.
+- **B:** o push de um merge de PR num privado salta, e o portao so verifica a mensagem.
+- **C:** os shards so arrancam quando a varredura se aplica.
+- **D:** um PR so de docs salta o pesado.
+
+**O que NAO se juntou, e porque.** Sao tres jobs de verificacao, separados por CONFIANCA:
+- **a app** (`quality`);
+- **a maquinaria** (`guard-tests`): as suites sao codigo do PR, e no mesmo job da app podiam por um `tsc` falso no `$GITHUB_PATH`;
+- **os segredos** (`secret-scan`): o token e a licenca do gitleaks nao ficam ao lado do `postinstall` das dependencias.
+
+Juntar tudo poupava mais 2 min por corrida, e abria isso. A Fase 0 (tres passagens do `plan-auditor`) esta no #347.
+
 **O "deploy" nao e o que isto atrasa.** No metodo do template, o deploy de producao e do alojamento
 (depois do merge); o runner atrasa o **portao** antes do merge — o CI do PR.
 

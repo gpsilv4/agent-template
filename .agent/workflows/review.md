@@ -48,7 +48,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
   `n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0); [ "${n:-0}" -gt 0 ] && gh pr checks --watch || echo "sem PR/checks ainda"`
   Antes de haver PR, os equivalentes locais sao o `tsc`/`lint`/testes desta checklist
 - Se CI falhou, corrigir antes de pedir review/merge
-- **Security Audit**: corre com `continue-on-error` por defeito, logo fica **sempre verde**.
+- **Security Audit** (o passo `Audit` do `Code Quality`): corre com `continue-on-error` por defeito, logo fica **sempre verde**.
   Abrir o log e ler o relatorio — verde nao significa limpo
 - Mensagens de commit seguem Conventional Commits (`feat:`, `fix:`, `docs:`, etc.) — ver `CONTRIBUTING.md`
 

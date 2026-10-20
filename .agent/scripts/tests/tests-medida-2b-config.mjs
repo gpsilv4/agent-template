@@ -189,6 +189,28 @@ export function registar() {
       exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": PARALELO, ...OUTRO, ...SUITE_OK }, projeto: { ".github/workflows/ci.yml": PARALELO.replace("          exec node", "          # exec node") + "      - run: node " + S + "\n", ...OUTRO, ...SUITE_OK } }),
         { codigo: 0, inclui: [MSG_PARALELO] }));
   }
+  // Os jobs curtos da app (#347): a NOTE sai a quem os tem separados, e nao a quem ja os juntou.
+  {
+    const SEPARADOS = ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  detect:\n    steps: []\n  unit-tests:\n    steps: []\n");
+    test("os jobs curtos da app separados aparecem como opcionais (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": SEPARADOS, ...OUTRO } }),
+        { codigo: 0, inclui: ["como passos de UM job, `Code Quality`", "OPCIONAL", "FORA desse job"] }));
+    test("a app ja num job so nao aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO } }),
+        { codigo: 0, exclui: ["como passos de UM job"] }));
+    // O template TAMBEM com os jobs separados (uma tag antiga): nao ha nada a trazer.
+    test("com os jobs separados nos dois lados nao aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": SEPARADOS, ...OUTRO }, projeto: { ".github/workflows/ci.yml": SEPARADOS, ...OUTRO } }),
+        { codigo: 0, exclui: ["como passos de UM job"] }));
+    // Sem o `detect` (um derivado que ja o tirou): os outros dois chegam (leitura do PR A — so `detect` + `unit-tests` eram testados).
+    test("os testes unitarios e o audit separados, sem `detect`, aparecem (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  unit-tests:\n    steps: []\n  security-audit:\n    steps: []\n"), ...OUTRO } }),
+        { codigo: 0, inclui: ["como passos de UM job, `Code Quality`"] }));
+    // Um `detect:` SOZINHO pode ser outra coisa (um `paths-filter`): exige-se pelo menos dois dos tres ids.
+    test("um job `detect` sozinho nao aparece (#347)", () =>
+      exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": ciDe({ guard: [O] }), ...OUTRO }, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O] }).replace("jobs:\n", "jobs:\n  detect:\n    steps: []\n"), ...OUTRO } }),
+        { codigo: 0, exclui: ["como passos de UM job"] }));
+  }
   // O contra-caso: a mesma colocacao nao se anuncia.
   test("a varredura no `sweep` dos dois lados nao aparece (#308)", () =>
     exige(contraProjeto({ hoje: TPL_SWEEP, projeto: { ".github/workflows/ci.yml": ciDe({ guard: [O], sweep: [V] }), ...OUTRO } }),

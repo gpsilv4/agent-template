@@ -375,8 +375,9 @@ nem menos coberto, porque eles ja davam `SKIP` la.
 
 **E num repo com branch protection**: se o `Guard Tests` for required check, os simuladores deixam de
 bloquear o merge ate o `Simuladores` passar tambem a required. Este template tem um ruleset no `main`
-desde 2026-10-09 (exige `Guard Tests`, `Secret Scan`, `Detect Project` e os dois `Analyze`) — e o
-`Simuladores` nao esta nele (medido a 2026-10-13, #308).
+desde 2026-10-09 (exige `Guard Tests`, `Secret Scan`, `Code Quality` e os dois `Analyze`; ate ao #347
+era `Detect Project` em vez do `Code Quality`) — e o `Simuladores` nao esta nele (medido a 2026-10-13,
+#308; a lista, a 2026-10-20).
 
 ## Porque o que o git do template IGNORA nao se copia (R7-D)
 
