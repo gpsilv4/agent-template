@@ -76,7 +76,7 @@ export function registar() {
       }),
       { codigo: 0, exclui: ["o `allow` do settings.json do template"] }
     ));
-  // Coberta por um prefixo do projeto (`Bash(x:*)`), como o Claude Code compara: medido no `referee-exam-study`,
+  // Coberta por um prefixo do projeto (`Bash(x:*)`), como o Claude Code compara: medido no derivado privado B,
   // a comparacao literal pedia regras que ele ja tinha assim.
   test("uma regra do allow coberta por um prefixo do projeto nao aparece; a que nao e coberta, sim (#317)", () =>
     exige(

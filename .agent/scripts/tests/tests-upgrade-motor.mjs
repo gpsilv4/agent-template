@@ -412,7 +412,7 @@ export function registar() {
   // --- Placeholders usados como EXEMPLO em prosa --------------------------------
   // O sweep do bootstrap substitui `{{ MAIUSCULAS }}` (sem os espacos) em todo o lado e **nao
   // marcador de um exemplo**. Um comentario que cite o placeholder por extenso fica, num
-  // derivado, a dizer «um `Referee Exam Study` la sobrevivia ao bootstrap» — sem sentido, em
+  // derivado, a dizer «um `Derivado B` la sobrevivia ao bootstrap» — sem sentido, em
   // todos os projetos, para sempre.
   //
   // A solucao ja estava escrita no `sync-docs.md` (escrever com espacos) e **nao tinha sido

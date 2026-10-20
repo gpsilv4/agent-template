@@ -104,7 +104,7 @@ nesta maquina"*. Faltava o outro lado, e um consumidor real forneceu-o.
 
 > **Atualizado em 2026-10-01 (#160)**, depois do fail-fast (#140): no runner publico, **12-20 min**
 > (n=10, 724-1183 s, 2026-09-29..10-01); no portatil, **13m37s** (n=1, 235 sitios). O privado so
-> tem medicoes **anteriores** ao fail-fast: **51m28s** duas vezes (`referee-exam-study`,
+> tem medicoes **anteriores** ao fail-fast: **51m28s** duas vezes (o derivado privado B,
 > 2026-09-18, 208 sitios), por medir de novo. A tabela acima fica como historico.
 
 **O GitHub da runners de 4 cores a repos publicos e 2 a privados** nos planos Free/Pro, e
@@ -145,7 +145,7 @@ toca na maquinaria e a das suites mais a perna mais lenta da varredura:
 | Onde | Sitios | Suites | Shards da completa | `--skips` | Espera do PR |
 |---|---|---|---|---|---|
 | template, publico (4 vCPU), PR #333 | 366 | 3m19s | 13m25s / 11m36s | 7m23s | ~17 min |
-| `referee-exam-study`, privado (2 vCPU), PR #89 | 444 | 2m58s | 19m09s / 23m46s | 16m14s | **27m00s** (eram 51m12s) |
+| derivado privado B (2 vCPU) | 444 | 2m58s | 19m09s / 23m46s | 16m14s | **27m00s** (eram 51m12s) |
 
 n=1 em cada. A estimativa feita quando os shards entraram era ~27 min no privado, e bateu. Os dois
 shards nao demoram o mesmo porque a particao e por NUMERO de sitios, nao por custo — o resumo TEMPOS
