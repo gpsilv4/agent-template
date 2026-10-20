@@ -42,3 +42,10 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    # As sub-actions do CodeQL (`init`, `analyze`) tem de ter a MESMA versao: sozinho, um PR que so subia uma
+    # delas reprovava o `Analyze` ("Loaded a configuration file for version 4.39.0, but running version
+    # 4.38.3") — medido nos PRs #345 e #346 do template. Num grupo, sobem juntas.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
