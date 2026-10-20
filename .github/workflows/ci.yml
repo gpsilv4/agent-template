@@ -35,6 +35,11 @@ jobs:
   # E SEM segredos: o `secret-scan` fica no seu job, longe do `postinstall` das dependencias.
   quality:
     name: Code Quality
+    # O push de um MERGE num repo PRIVADO salta (#347, PR B): o PR ja correu isto sobre o mesmo codigo, e num
+    # privado free cada job e cobrado ao minuto. Verdadeiro em todo o PR e em todo o repo publico. O portao
+    # (`Guard Tests`) recalcula o salto no shell dele e verifica a mensagem do merge. Limites: um PR mergeado
+    # vermelho, um commit pela UI web no `main` e um committer forjado tambem saltam (`scripts-guide-why.md`).
+    if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
     runs-on: ubuntu-latest
     # Os tres jobs da app tinham 15 + 15 + 10 min; em serie, o tecto soma-os.
     timeout-minutes: 30
@@ -156,6 +161,8 @@ jobs:
     # `Guard Suites`, e nao `Guard Tests`: esse nome e o do job `guard-gate`, abaixo — o check que a
     # protecao exige (#308).
     name: Guard Suites
+    # O mesmo salto do `quality` (#347, PR B).
+    if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
     runs-on: ubuntu-latest
     # Sem a varredura (#308): as suites e os verificadores, ~3 min no template e num derivado. A
     # varredura de mutacao vive no job `sweep`, em paralelo — o tecto dela e o historico dele estao la.
@@ -463,8 +470,23 @@ jobs:
           SUITES: ${{ needs.guard-tests.result }}
           VARREDURA: ${{ needs.sweep.result }}
           EVENTO: ${{ github.event_name }}
+          PRIVADO: ${{ github.event.repository.private }}
+          COMMITTER: ${{ github.event.head_commit.committer.username }}
         run: |
           echo "  suites: $SUITES · varredura: $VARREDURA"
+          # As suites SALTADAS (#347, PR B) so no push de um merge num privado — recalculado AQUI, e nao
+          # confiado ao `if:` do `guard-tests`: um `if:` alargado num PR futuro (que avisa uma vez e sai pelo
+          # trailer) deixava de verificar os pushes em silencio. Qualquer outro `skipped` reprova. E a
+          # mensagem do merge passa pelo `commit-msg` (a atribuicao a IA), que de outro modo ninguem lia.
+          if [ "$SUITES" = skipped ]; then
+            if [ "$EVENTO" != pull_request ] && [ "$PRIVADO" = true ] && [ "$COMMITTER" = web-flow ] && [ "$VARREDURA" = skipped ]; then
+              git log -1 --format=%B HEAD > "$RUNNER_TEMP/mensagem"
+              node .githooks/commit-msg "$RUNNER_TEMP/mensagem"
+              exit $?
+            fi
+            echo "::error::as suites (Guard Suites) saltaram fora do push de um merge num privado ($EVENTO, privado=$PRIVADO, committer=$COMMITTER, varredura=$VARREDURA)"
+            exit 1
+          fi
           if [ "$SUITES" != success ]; then
             echo "::error::as suites (Guard Suites) nao passaram: $SUITES"
             exit 1
@@ -548,10 +570,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node .agent/scripts/simulate-upgrade.mjs
 
-  # Runs on every push/PR, including the bare template (no package.json guard):
-  # scans the full history for committed secrets/keys.
+  # Runs on every PR and push, including the bare template (no package.json guard) — except the push of a
+  # PR merge in a PRIVATE repo (#347, the `if:` below): the PR already scanned it. Scans the full history.
   secret-scan:
     name: Secret Scan
+    # O mesmo salto do `quality` (#347, PR B).
+    if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # gitleaks-action v3 lista os commits do PR (evento pull_request) via API -> precisa

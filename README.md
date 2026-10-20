@@ -470,6 +470,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 >
 > **Two consequences of one job (#347), written down:**
 > - **A red step stops the next ones.** A `tsc` error means the unit tests and the audit do not run in that run. They used to run in jobs of their own. The PR is red either way; the signal per run is smaller.
+> - **In a PRIVATE repo, the push of a PR merge skips `Code Quality`, `Guard Suites` and `Secret Scan`** (#347): the PR already ran them on the same code. `Guard Tests` still runs, re-checks that it really is a merge push (`web-flow`, private, not a PR) and checks the merge message with `.githooks/commit-msg`. Limits: a PR merged red, a web-UI commit straight to `main`, or a forged committer also skip — see `src/docs/scripts-guide-why.md`. Public repos run everything on push, as before.
 > - **On the bare template the `Audit` step shows a tolerated X on every run.** `npm audit` fails without a lockfile, and `continue-on-error` keeps the job green. Guarding it would take a new `if:`, which the surface checker counts. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
 
 ## Placeholders

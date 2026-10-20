@@ -158,6 +158,37 @@ dela no repo. O cabecalho do `mutation-sweep.mjs`, o `ci.yml` e o `upgrade-why.m
 
 Juntar tudo poupava mais 2 min por corrida, e abria isso. A Fase 0 (tres passagens do `plan-auditor`) esta no #347.
 
+#### O push de um merge num privado (PR B)
+
+O `quality`, o `guard-tests` e o `secret-scan` tem o mesmo `if:` de job:
+`github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'`.
+E verdadeiro em todo o PR e em todo o repo publico: so salta, num privado, o push que o GitHub faz ao mergear
+(committer `web-flow`, num merge commit ou num squash). Esse push corria o mesmo codigo que o PR acabou de
+verificar, e custava ~5 min cobrados por PR.
+
+**O portao (`Guard Tests`) nao confia no `if:`.** Corre sempre (`always()`), e no seu shell aceita as suites
+`skipped` so com as tres condicoes recalculadas (nao e um PR, `private == true`, committer `web-flow`) e a
+varredura tambem saltada. Ai corre o `.githooks/commit-msg` sobre a mensagem do merge — e a atribuicao a IA
+continua a ser apanhada no `main`, que de outro modo ninguem lia. Qualquer outro `skipped` reprova: um `if:`
+alargado num PR futuro avisa uma vez no `check-test-surface` (sai pelo trailer) e, depois disso, o portao
+reprova cada push que ele deixasse de verificar. O shell real e testado em `tests-portao-ci.mjs`.
+
+**O medidor da superficie** isenta esta forma so EXACTA, so como `if:` de job e so nesses tres jobs do
+`ci.yml` (`marcas-yaml.mjs`, `isencoesDeJob`). Num passo, com uma cauda, noutro job ou noutro workflow, conta:
+num workflow so de `push` (um `deploy`, o `release.yml`) o "o PR ja correu isto" e falso, e a primeira versao,
+que isentava em qualquer job, deixava-o desligar sem marca (as duas leituras do PR B).
+
+**Limites, aceites e escritos:**
+- um PR mergeado com o CI vermelho ou desatualizado deixa o `main` por verificar ate ao PR seguinte (num
+  privado free a protecao nao e imposta, logo o merge vermelho ja era possivel);
+- um commit pela UI web directamente no `main` tambem tem o committer `web-flow`, e salta;
+- um committer forjado salta (o campo vem do commit);
+- o `commit-msg` ignora as linhas que comecam por `#` (os comentarios do git, tambem fora do editor): uma
+  atribuicao escrita num cabecalho markdown do corpo de um squash passa — o mesmo limite que ja tinha no
+  commit local.
+
+Num repo publico nada muda: o template corre tudo no push, como antes.
+
 **O "deploy" nao e o que isto atrasa.** No metodo do template, o deploy de producao e do alojamento
 (depois do merge); o runner atrasa o **portao** antes do merge — o CI do PR.
 
