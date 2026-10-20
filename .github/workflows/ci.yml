@@ -416,7 +416,8 @@ jobs:
           retention-days: 7
 
   # O CHECK QUE A PROTECAO EXIGE (#308). Um ruleset ou uma branch protection exige checks pelo NOME,
-  # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13). Com a varredura num job
+  # e o deste repo exige `Guard Tests` (medido: ruleset `main`, 2026-10-13; a lista inteira em
+  # `src/docs/upgrade-why.md`). Com a varredura num job
   # seu, `Guard Tests` deixava de a incluir — um PR com a varredura vermelha passava a poder ser
   # mergeado, sem nenhuma definicao mudada. Este job tem o nome antigo e so fica verde com as suites
   # verdes E a varredura verde (ou saltada: so corre em `pull_request`, e num PR que nao toca nos
