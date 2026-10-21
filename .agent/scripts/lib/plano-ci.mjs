@@ -1,0 +1,58 @@
+/**
+ * O PLANO do CI: a varredura de mutacao aplica-se a este PR? — {{PROJECT_NAME}}
+ *
+ * PORQUE EXISTE (#347): num PR que nao toca na maquinaria, os shards da varredura arrancam e concluem "nao
+ * aplicavel" em segundos — num repo privado, cada um custa um minuto cobrado. Para os shards so arrancarem
+ * quando a varredura se aplica (o C2), a decisao tem de ser tomada ANTES do codigo do PR, e por isso este
+ * ficheiro e lido do commit BASE: o portao (`Guard Tests`) copia-o SOZINHO para `$RUNNER_TEMP` e corre-o. Um
+ * PR que mudasse a regra mudava a decisao que o julga. E por ser copiado sozinho que nao importa NADA do repo
+ * (um teste em `tests-plano-ci.mjs` exige so `node:*`).
+ *
+ * NO C1 (sombra): o portao calcula o plano da base e exige que CONCORDE com o que os shards decidiram pelo
+ * `grep` do passo do `sweep`. Nada deixa de correr; um falso vermelho mostra o defeito antes de o C2 desligar
+ * shards. Os prefixos sao os mesmos do `grep` do `sweep` e do dos `Simuladores` — o mesmo teste compara os tres
+ * pelo comportamento, e a descoberta da varredura (`alvos-no-disco.mjs`, `PARES`) contra eles.
+ *
+ * Uso: `node plano-ci.mjs <ficheiro com um caminho por linha>` — imprime `true` ou `false` e sai 0; um
+ * ficheiro vazio (um PR sem diff) e `false`. Sem argumento, ilegivel, ou com uma linha vazia no meio: sai 2.
+ * "Nao consegui ler" nunca e "false" (`TP2`).
+ */
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+/** O que conta como maquinaria: as pastas que a varredura mede. */
+export const PREFIXOS_MAQUINARIA = /^(\.agent\/scripts\/|\.claude\/hooks\/|\.githooks\/)/;
+
+/** @param {string[]} caminhos @returns {boolean} a varredura aplica-se se algum caminho e maquinaria */
+export const aplicaVarredura = (caminhos) => caminhos.some((c) => PREFIXOS_MAQUINARIA.test(c));
+
+/**
+ * Os caminhos de um ficheiro do `git diff --name-only`, um por linha. Devolve `{ caminhos }` ou `{ erro }`.
+ * Uma linha vazia so pode ser a ultima (o `\n` final): no meio, o ficheiro nao e o que o `git diff` escreve.
+ */
+export function caminhosDe(texto) {
+  const ls = texto.split("\n");
+  if (ls.at(-1) === "") ls.pop();
+  if (ls.some((l) => l === "")) return { erro: "uma linha vazia no meio — nao e a saida de um `git diff --name-only`" };
+  return { caminhos: ls };
+}
+
+/** Recusa com a razao, e sai 2: o shell do portao trata qualquer saida que nao seja `true`/`false` como vermelho. */
+function recusa(msg) {
+  console.error(`plano-ci: ${msg}`);
+  process.exit(2);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const ficheiro = process.argv[2];
+  if (!ficheiro) recusa("falta o ficheiro com os caminhos tocados");
+  let texto;
+  try {
+    texto = readFileSync(ficheiro, "utf8");
+  } catch (err) {
+    recusa(`nao consegui ler ${ficheiro}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const { caminhos, erro } = caminhosDe(texto);
+  if (erro) recusa(`${ficheiro}: ${erro}`);
+  console.log(String(aplicaVarredura(caminhos)));
+}

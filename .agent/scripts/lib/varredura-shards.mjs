@@ -30,10 +30,16 @@ import { pathToFileURL } from "url";
  * nenhum, e a varredura nem correu).
  * @param {Array<{modo: string, k: number, n: number, total?: number, medidos?: number, aplicavel: boolean}>} relatorios
  * @param {string[]} [modos] os modos que TEM de ter relatorios (a matriz do `sweep`)
+ * @param {{plano?: boolean}} [o] o PLANO da base (#347, C1, em sombra): com ele, cada relatorio tem de
+ *   ter `aplicavel === plano` — o plano e o `grep` do `sweep` tem de decidir o mesmo. Sem ele, como antes.
  * @returns {string[]} os problemas; vazio = a varredura inteira foi medida
  */
-export function confere(relatorios, modos = []) {
+export function confere(relatorios, modos = [], { plano } = {}) {
   const problemas = [];
+  if (typeof plano === "boolean") {
+    const contra = relatorios.filter((r) => r.aplicavel !== plano).map((r) => `${r.modo} ${r.k}/${r.n}`);
+    if (contra.length) problemas.push(`o plano da base diz que a varredura ${plano ? "se aplica" : "nao se aplica"}, e ${contra.join(", ")} decidiu o contrario — o plano e o \`grep\` do \`sweep\` discordam`);
+  }
   if (relatorios.length === 0) problemas.push("nenhum relatorio de shard — a varredura nao deixou prova de ter corrido");
   for (const m of modos) if (!relatorios.some((r) => r.modo === m)) problemas.push(`${m}: nenhum relatorio — o modo saiu da matriz, ou nao correu`);
   // A MESMA decisao para todos os modos pedidos (leitura do #317), como ja vale entre os shards de um: uma
@@ -68,6 +74,19 @@ export function confere(relatorios, modos = []) {
   return problemas;
 }
 
+/**
+ * O `VARREDURA_PLANO` que o portao exporta (#347, C1). `"true"`/`"false"` -> o booleano; AUSENTE -> `undefined`
+ * (o portao antigo, ou a base sem o plano: o `confere` como antes). Qualquer outro valor, `""` incluido, e um
+ * problema — nunca "como antes" por um valor mal escrito (`TP2`).
+ * @param {string | undefined} valor @param {string[]} problemas
+ */
+export function planoDe(valor, problemas) {
+  if (valor === undefined) return undefined;
+  if (valor === "true" || valor === "false") return valor === "true";
+  problemas.push(`VARREDURA_PLANO=${JSON.stringify(valor)} — so "true" ou "false" (ou ausente)`);
+  return undefined;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [pasta, ...modos] = process.argv.slice(2);
   let relatorios = [];
@@ -85,7 +104,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   } catch {
     ilegiveis = [`a pasta ${pasta ?? "(nenhuma)"}`];
   }
-  const erros = [...ilegiveis.map((f) => `nao consegui ler ${f}`), ...confere(relatorios, modos)];
+  const doPlano = [];
+  const plano = planoDe(process.env.VARREDURA_PLANO, doPlano);
+  const erros = [...ilegiveis.map((f) => `nao consegui ler ${f}`), ...doPlano, ...confere(relatorios, modos, { plano })];
   for (const e of erros) console.log(`  FALHA  varredura: ${e}`);
   if (erros.length === 0) {
     for (const r of relatorios.sort((a, b) => a.modo.localeCompare(b.modo) || a.k - b.k))

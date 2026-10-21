@@ -454,8 +454,10 @@ jobs:
       # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
       # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
       # ficheiros e passa; e o passo de baixo que decide se os confere.
+      # `fetch-depth: 2`: a sombra do plano le a BASE (`HEAD^1`, o pai do merge ref de um PR) e o diff contra ela.
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@v7
         with:
@@ -496,8 +498,31 @@ jobs:
           # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
           # Qualquer outro estado (`failure`, `cancelled`) reprova.
           if [ "$VARREDURA" = success ]; then
+            # A SOMBRA DO PLANO (#347, C1): num PR, o plano da varredura (`lib/plano-ci.mjs`) tem de CONCORDAR com o
+            # que os shards decidiram pelo `grep` do `sweep`. Nada deixa de correr; discordar e vermelho. O que a BASE
+            # protege e o CONTEUDO do plano (um PR nao muda a regra que o julga); este shell e o `grep` sao do PR, e
+            # o que os prende sao os testes cruzados (`tests-plano-ci.mjs`) e o medidor da superficie (o portao e um
+            # agregador: mudar isto avisa e so passa com o trailer). O MESMO diff do `sweep` (`$base..HEAD`, com
+            # renomeacoes). So atribuicoes soltas: um `export x=$(...)` ou um `local` mascaravam o erro ao `set -e`.
+            # Um `VARREDURA_PLANO` herdado (um `env:` de cima) imprimia "concorda" sem plano: limpa-se antes.
+            unset VARREDURA_PLANO
+            if [ "$EVENTO" = pull_request ]; then
+              base="$(git rev-parse --verify HEAD^1)"
+              lista="$(git ls-tree "$base" -- .agent/scripts/lib/plano-ci.mjs)"
+              if [ -z "$lista" ]; then
+                echo "sombra: desligada (a base nao tem o plano)"
+              else
+                mkdir -p "$RUNNER_TEMP/plano"
+                git show "$base:.agent/scripts/lib/plano-ci.mjs" > "$RUNNER_TEMP/plano/plano-ci.mjs"
+                git diff --name-only "$base..HEAD" > "$RUNNER_TEMP/plano/tocados.txt"
+                plano="$(node "$RUNNER_TEMP/plano/plano-ci.mjs" "$RUNNER_TEMP/plano/tocados.txt")"
+                case "$plano" in true|false) ;; *) echo "::error::o plano da base respondeu '$plano', e nao true/false"; exit 1;; esac
+                export VARREDURA_PLANO="$plano"
+              fi
+            fi
             node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura" completa skips
-            exit $?
+            if [ -n "${VARREDURA_PLANO:-}" ]; then echo "sombra: concorda (plano=$VARREDURA_PLANO)"; fi
+            exit 0
           fi
           if [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; then
             exit 0

@@ -42,6 +42,9 @@ const { PARES_DO_PROJETO } = await import(CFG.href);
 const PARES_DO_TEMPLATE = [
   // ESTE ficheiro: o `throw` da config em falta e um sitio de recusa, e o `tests-pares.mjs` mede-o.
   { alvo: ".agent/scripts/lib/pares.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])throw new Error\(/, neutro: "(() => {})(" },
+  // O PLANO do CI (#347, C1): as tres recusas da CLI. Uma que nao fica vermelha e um "false" por nao ter lido — a
+  // varredura deixava de correr num PR que a pedia (no C2). O dono e o `tests-plano-ci.mjs`.
+  { alvo: ".agent/scripts/lib/plano-ci.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$]|function )recusa\(/, neutro: "(() => {})(" },
   // O PORTAO dos shards da varredura (#308): cada recusa e um shard em falta, repetido ou a
   // discordar — desligar uma deixava a perna completa passar com sitios por medir.
   { alvo: ".agent/scripts/lib/varredura-shards.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },

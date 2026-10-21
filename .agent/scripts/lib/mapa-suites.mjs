@@ -48,6 +48,8 @@ export const SUITES = [
   // As sondas do Guard 11 e a comparacao do `deny`/`ask` com o template (#301): o guard as usa (e o
   // anti-`TP8` vive no `tests-settings.mjs`), e a 2b imprime a lista.
   { re: /^\.agent\/scripts\/lib\/permissoes\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // O plano do CI (#347, C1): o dono no `test-guards` (a CLI, o desvio face a descoberta, as regex do `ci.yml`).
+  { re: /^\.agent\/scripts\/lib\/plano-ci\.mjs$/, verifica: [S("test-guards.mjs")] },
   // As notas da forma do `ci.yml` na 2b (#347, C0): o dono no `test-guards` (unitarios, rapidos), e a 2b de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/medida-upgrade-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
@@ -148,7 +150,9 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/varredura-shards\.mjs$/, verifica: [S("test-guards.mjs")] },
   // As suites em paralelo do `Guard Suites` (#337): testadas no `tests-suites-em-paralelo.mjs`, do `test-guards`.
   { re: /^\.agent\/scripts\/lib\/suites-em-paralelo\.mjs$/, verifica: [S("test-guards.mjs")] },
-  { re: /^\.agent\/scripts\/(lib\/alvos-no-disco|tests\/test-mutation-sweep)\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // A descoberta tambem e lida pelo teste cruzado do plano do CI (`tests-plano-ci.mjs`, #347 C1): mexer nela corre os dois.
+  { re: /^\.agent\/scripts\/lib\/alvos-no-disco\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/test-mutation-sweep\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },
   // Os modulos `tests-*.mjs` nao casavam regra NENHUMA: edita-los nao gerava obrigacao de
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point

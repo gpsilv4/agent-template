@@ -18,7 +18,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
 import { qualShard, particao, totalDeSitios } from "../lib/varredura-fatia.mjs";
-import { confere } from "../lib/varredura-shards.mjs";
+import { confere, planoDe } from "../lib/varredura-shards.mjs";
 import { sandbox, run } from "./harness/test-sweep-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -92,6 +92,26 @@ export function registar() {
   conferido("a soma abaixo do total reprova", [rel({ k: 1, n: 2, medidos: 5 }), rel({ k: 2, n: 2, medidos: 4 })], "9 de 10 sitios");
   // Os modos conferem-se em separado: a `--skips` de um shard nao completa a completa.
   conferido("cada modo confere-se sozinho", [rel({ k: 1, n: 2, medidos: 6 }), rel({ modo: "skips", k: 1, n: 1, total: 3, medidos: 3 })], "completa: shards 1 de 2");
+
+  // --- A SOMBRA do plano (#347, C1): o plano da base e o `grep` do `sweep` tem de decidir o mesmo -----------
+  {
+    const aplica = [rel({ k: 1, n: 2, medidos: 6 }), rel({ k: 2, n: 2, medidos: 4 })];
+    const nao = [rel({ k: 1, n: 2, aplicavel: false }), rel({ k: 2, n: 2, aplicavel: false })];
+    const com = (rs, plano, trecho) => {
+      const p = confere(rs, [], { plano });
+      return trecho === null ? p.map((x) => `nao devia haver problemas: ${x}`) : p.some((x) => x.includes(trecho)) ? [] : [`esperava "${trecho}", veio ${JSON.stringify(p)}`];
+    };
+    registarResultado("shards: o plano `true` e um shard que disse \"nao aplicavel\" discordam (#347)", com(nao, true, "o plano da base diz que a varredura se aplica"));
+    registarResultado("shards: o plano `false` e um shard que mediu discordam (#347)", com(aplica, false, "nao se aplica"));
+    registarResultado("shards: o plano e os shards a concordar passam, nos dois sentidos (#347)", [...com(aplica, true, null), ...com(nao, false, null)]);
+    registarResultado("shards: sem plano, como antes (#347)", [...com(aplica, undefined, null), ...com(nao, undefined, null)]);
+    const lido = (v) => { const ps = []; return { plano: planoDe(v, ps), ps }; };
+    registarResultado("shards: o VARREDURA_PLANO le `true`/`false`, e ausente e `undefined` (#347)", [
+      ...(lido("true").plano === true && lido("false").plano === false && lido(undefined).plano === undefined ? [] : ["os tres valores validos nao foram lidos"]),
+      ...(lido("true").ps.length + lido("false").ps.length + lido(undefined).ps.length === 0 ? [] : ["um valor valido deu problema"]),
+    ]);
+    registarResultado("shards: um VARREDURA_PLANO invalido, VAZIO incluido, e um problema e nunca \"como antes\" (#347)", ["talvez", "", "TRUE", " true"].filter((v) => lido(v).ps.length !== 1).map((v) => `${JSON.stringify(v)} nao deu problema`));
+  }
 
   // --- O portao pela linha de comando, como o CI o chama --------------------------------
   {

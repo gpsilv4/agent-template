@@ -96,6 +96,10 @@ export const PREFIXOS_DE_TESTE = [
   "shards-test-",
   // Do `tests-portao-ci.mjs` (#347, PR B): o shell do portao `Guard Tests` corre num repo git descartavel.
   "portao-ci-test-",
+  // Do `tests-plano-ci.mjs` (#347, C1): a CLI do plano sobre um ficheiro de caminhos.
+  "plano-ci-test-",
+  // Do `tests-portao-sombra.mjs` (#347, C1): o shell do portao num repo de fixture com base e HEAD.
+  "portao-sombra-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
   // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
   "paralelo-test-",
