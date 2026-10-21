@@ -48,6 +48,8 @@ export const SUITES = [
   // As sondas do Guard 11 e a comparacao do `deny`/`ask` com o template (#301): o guard as usa (e o
   // anti-`TP8` vive no `tests-settings.mjs`), e a 2b imprime a lista.
   { re: /^\.agent\/scripts\/lib\/permissoes\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // As notas da forma do `ci.yml` na 2b (#347, C0): o dono no `test-guards` (unitarios, rapidos), e a 2b de ponta a ponta.
+  { re: /^\.agent\/scripts\/lib\/medida-upgrade-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   // O que os dois modos do `/upgrade` imprimem: a ordem e a promessa tem casos puros no
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
@@ -156,6 +158,9 @@ export const SUITES = [
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da
   // erro nenhum, so deixa de gerar a obrigacao certa.
+  // O dono das notas da forma do CI (#347, C0) corre no `test-guards`: o nome segue o alvo (`tests-<alvo>.mjs`, a
+  // convencao do dono na varredura), e por isso casava a regra de baixo — a primeira que casa vence.
+  { re: /^\.agent\/scripts\/tests\/tests-medida-upgrade-ci\.mjs$/, verifica: [S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/tests\/tests-(upgrade|medida)-[\w-]+\.mjs$/, verifica: [S("test-simulate-upgrade.mjs")], only: "upgrade" },
   { re: /^\.agent\/scripts\/tests\/tests-[\w-]+\.mjs$/, verifica: [S("test-guards.mjs")] },
 

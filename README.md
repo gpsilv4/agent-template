@@ -267,6 +267,7 @@ not to* line, so every agent sees it.
     │   ├── intacto.mjs         <- "The project did not touch this file", placeholders aside
     │   ├── saida-upgrade.mjs   <- The lists /upgrade shows before approval, one formatter for both modes
     │   ├── medida-upgrade.mjs  <- Section 2b measured from BOTH sides (template and consumer)
+    │   ├── medida-upgrade-ci.mjs  <- ...and its notes on the SHAPE of ci.yml (each optional CI change, #347)
     │   ├── fronteira-upgrade.mjs  <- The boundary an upgrade changes, staged for the USER to copy (#304)
     │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
     │   ├── tmp-limpo.mjs      <- tmpdir copies don't outlive their owner (swept at startup)

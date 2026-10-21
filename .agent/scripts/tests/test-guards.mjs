@@ -24,7 +24,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // `lib/pares-hooks.mjs` que ele junta (#243). O `tests-settings-sondas.mjs` exercita o `lib/permissoes.mjs`
 // (as sondas do Guard 11, #301). O `tests-varredura-shards.mjs` exercita o `lib/varredura-fatia.mjs` e o
 // `lib/varredura-shards.mjs` (os shards da varredura, #308), e o `--diff` do `lib/varredura-diff.mjs` (#317). O `tests-suites-em-paralelo.mjs` exercita o
-// `lib/suites-em-paralelo.mjs` (as suites do `Guard Suites` em paralelo, #337). Fica escrito porque o mapa de suites exige que a suite
+// `lib/suites-em-paralelo.mjs` (as suites do `Guard Suites` em paralelo, #337). O `tests-medida-upgrade-ci.mjs` exercita o
+// `lib/medida-upgrade-ci.mjs` (as notas da 2b sobre a forma do `ci.yml`, #347). Fica escrito porque o mapa de suites exige que a suite
 // **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 import { fileURLToPath } from "url";
 import { dirname } from "path";
