@@ -261,6 +261,7 @@ not to* line, so every agent sees it.
     │   ├── plano-ci.mjs       <- Does the sweep apply to this PR? Read from the BASE commit by the gate (#347)
     │   ├── varredura-diff.mjs <- The sweep's `--diff`: which targets the branch touches
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
+    │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved

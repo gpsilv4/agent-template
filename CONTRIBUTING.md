@@ -47,7 +47,8 @@ and every person, agents included. A human co-author is fine.
 `defaults:`, or changing or removing a STEP that mentions `.agent/scripts/`, `.claude/hooks/` or
 `.githooks/` (or the job it runs in: its `if:`, `needs:`, `env:`...), fails the
 `check-test-surface` step — it changes the gate without touching a test (#285). Adding a new
-step does not. When the change is deliberate, add a trailer to the LAST commit of the PR that
+step does not, and neither does adding a suite line to the parallel suites step, inside the
+chain that starts at the runner (#341); removing one, or touching the runner, does. When the change is deliberate, add a trailer to the LAST commit of the PR that
 touches that file, with the file and the reason (`—`, `--` or ` - ` as the separator):
 
 ```
