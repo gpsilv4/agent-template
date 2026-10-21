@@ -161,7 +161,10 @@ gh pr merge --squash         # (ou merge pela UI do GitHub)
 # 2. Aplicar migracoes em prod (se houver)
 # (adaptar ao backend do projeto)
 
-# 3. Criar tag da versao — no commit de merge em main, NAO no branch de feature
+# 3. SO NO ULTIMO PR DO SPRINT (ou da release): criar a tag da versao. UMA por sprint, NUNCA uma por
+#    PR — os PRs de um sprint entram sem tag. Num repo privado cada tag e um job cobrado (o
+#    `release.yml`; o custo medido esta em `src/docs/scripts-guide-why.md`, #347).
+#    No commit de merge em main, NAO no branch de feature
 #    (apos squash merge o main local esta desatualizado: sincronizar primeiro)
 #    SO NO TEMPLATE DE ORIGEM: o `.agent/TEMPLATE_VERSION` tem de dizer `vX.Y.Z` ANTES da tag —
 #    sobe-se no PR da release. E o que um projeto criado com "Use this template" grava como a sua
@@ -191,6 +194,7 @@ git push origin vX.Y.Z
 | Desculpa | Porque nao |
 |---|---|
 | "O CI esta verde." | Com zero checks, o `gh pr checks --watch` sai 0: o gate conta os checks antes de esperar (secao 2). |
+| "Cada PR merece a sua tag." | A tag e do sprint, nao do PR: num privado cada tag e um job do `release.yml` cobrado ao minuto (#347, secao 7). |
 | "A tag chega, o Release faz-se depois." | O Release cria-se sozinho da tag; sem o `release.yml` ficaram 50 de 55 tags sem ele (#277). Confirmar que apareceu (secao 7). |
 | **No template:** "Subo a versao depois da tag." | O `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
 | **No template:** "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
