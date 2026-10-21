@@ -267,7 +267,10 @@ export function registar() {
     const lidas = [...suitesQueOCICorre(real)].sort();
     // Um DERIVADO que ainda corre as suites passo a passo (adotar o runner e opcional, a 2b di-lo) nao tem cadeia:
     // SKIP, com o teste registado na mesma. No template, sem cadeia reprova (o `simulate-upgrade` apanhou-o).
-    const semRunner = lidas.length === 0 && daCadeia.length === 0;
+    // "Sem runner" = nenhuma unidade FIXA do runner no job. Nao pelas listas: o `suitesQueOCICorre` tambem le os passos
+    // `run: node <suite>` um a um, e num derivado passo a passo nunca vem vazio (a 3.a volta do `simulate-upgrade`).
+    const fixasDoRunner = us.filter((u) => RUNNER.test(u.rotulo.replace(/[ \t]+\\$/, ""))).length;
+    const semRunner = fixasDoRunner === 0;
     if (semRunner && ehDerivado((rel) => leOuNull(join(ROOT, rel)))) {
       console.log("  SKIP  paralelo como conjunto: o ci.yml deste projeto nao corre as suites pelo runner em paralelo (#341)");
       registarResultado("paralelo como conjunto: sem o runner num derivado, nada a medir no ci.yml real (#341)", [], "");
