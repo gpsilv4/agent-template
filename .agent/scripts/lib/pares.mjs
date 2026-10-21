@@ -356,6 +356,31 @@ const PARES_DO_TEMPLATE = [
   // cada uma deixava 17 de 47 com a suite verde, e uma entrada nova nascia sem teste. O sinal tem
   // comprimento ZERO e fica logo antes do regex; o neutro insere `/(?!)/ || `, que deixa a entrada
   // a nunca casar e o JavaScript valido (`{ re: /(?!)/ || /x/ }`, `/(?!)/ || /x/i,`).
+  // O passo das SUITES EM PARALELO como um conjunto (#341): os dois regexes do modulo, desligados como os do
+  // `surface-patterns.mjs` (o neutro `/(?!)/ || `). Sem o do runner, o passo volta a uma unidade; sem o da suite,
+  // tudo vai para a fixa — e os casos "nao avisa" do `tests-surface-blocos.mjs` ficam vermelhos. LIMITE: um regex
+  // que aceita TUDO (uma fixa vazia) nao se exprime aqui; e o controlo 2 da Fase 0, medido a mao.
+  {
+    alvo: ".agent/scripts/lib/passo-paralelo.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<=^export const (?:RUNNER|SUITE) = )(?=\/)/,
+    neutro: "/(?!)/ || ",
+  },
+  // ...e a LOGICA da cadeia (leitura adversarial do #341): as partes da fixa (o `...antes`/`...depois`, cada uma
+  // numa linha) e o `continua` da cadeia. Sem estes, tirar o `...antes` da fixa deixava um `exit 0` antes do runner
+  // passar calado, e nenhuma varredura o via.
+  {
+    alvo: ".agent/scripts/lib/passo-paralelo.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<=^\s+\.\.\.)(?=(?:antes|depois),$)/,
+    neutro: "[] || ",
+  },
+  {
+    alvo: ".agent/scripts/lib/passo-paralelo.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<=&& )(?=continua\(corpo\[k - 1\]\))/,
+    neutro: "true || ",
+  },
   {
     alvo: ".agent/scripts/lib/surface-patterns.mjs",
     suite: ".agent/scripts/tests/test-test-surface.mjs",

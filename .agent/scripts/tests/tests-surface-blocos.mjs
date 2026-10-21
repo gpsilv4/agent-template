@@ -11,11 +11,14 @@
  * NAO e um entry point: o `test-test-surface.mjs` descobre-o e chama `registar()`.
  */
 import { execFileSync } from "child_process";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git, registarResultado } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
 import { CONTAGENS } from "../lib/surface-patterns.mjs";
+import { unidadesDaMaquinaria } from "../lib/superficie-gate.mjs";
+import { partePasso, RUNNER, SUITE } from "../lib/passo-paralelo.mjs";
+import { suitesQueOCICorre } from "./tests-suites-em-paralelo.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -205,5 +208,75 @@ export function registar() {
       }
       registarResultado(nome, problemas, "");
     }
+  }
+
+  // --- O passo das suites em paralelo como um CONJUNTO (#341) ---------------------------------------------
+  // So contam as suites da CADEIA estrita que nasce no runner; o resto fica na unidade fixa, por ordem.
+  const MUDOU = "passo da maquinaria mudou ou saiu";
+  const P = (...ss) => paralelo(...ss).replace("node .agent/scripts/lib/", "exec node .agent/scripts/lib/");
+  const T = (s) => `node .agent/scripts/tests/${s}.mjs`;
+  const TRAILER = "alteracao\n\nTest-Surface: .github/workflows/ci.yml — o caso do teste";
+  const calado = { code: 0, excludes: [MUDOU, "fora da cadeia"] };
+  const avisa = (...inc) => ({ code: 1, includes: [MUDOU, ...inc] });
+  for (const [nome, antes, depois, espera] of [
+    ["uma suite nova no FIM da cadeia nao avisa", P("test-a", "test-b"), P("test-a", "test-b", "test-c"), calado],
+    ["uma suite nova a MEIO da cadeia nao avisa", P("test-a", "test-b"), P("test-a", "test-c", "test-b"), calado],
+    ["reordenar as suites nao avisa", P("test-a", "test-b", "test-c"), P("test-c", "test-a", "test-b"), calado],
+    ["o runner com `--max=2` e uma suite nova nao avisa", P("test-a").replace("mjs --", "mjs --max=2 --"), P("test-a", "test-b").replace("mjs --", "mjs --max=2 --"), calado],
+    ["tirar uma suite avisa, com o nome dela", P("test-a", "test-b", "test-c"), P("test-a", "test-c"), avisa(`${MUDOU}: ${T("test-b")}`)],
+    ["uma suite repetida, e tirar uma das duas, avisa", P("test-a", "test-b", "test-b"), P("test-a", "test-b"), avisa(`${MUDOU}: ${T("test-b")}`)],
+    ["uma suite nova ANTES do `exec` avisa, e diz que fica antes do runner", P("test-a", "test-b"), P("test-a", "test-b").replace("exec node", `${T("test-c")} \\\n          exec node`), avisa("ANTES do runner")],
+    ["uma suite movida para antes do `exec` avisa", P("test-a", "test-b", "test-c"), P("test-a", "test-b").replace("exec node", `${T("test-c")} \\\n          exec node`), avisa("ANTES do runner")],
+    ["uma linha vazia a meio da cadeia avisa", P("test-a", "test-b"), P("test-a", "test-b").replace(`${T("test-a")} \\\n`, `${T("test-a")} \\\n\n`), avisa()],
+    ["um comentario a meio da cadeia avisa", P("test-a", "test-b"), P("test-a", "test-b").replace(`${T("test-a")} \\\n`, `${T("test-a")} \\\n          # x\n`), avisa()],
+    ["um comentario no fim de uma linha da cadeia (`\\ # c`) avisa", P("test-a", "test-b", "test-c"), P("test-a", "test-b", "test-c").replace(`${T("test-b")} \\`, `${T("test-b")} \\ # c`), avisa()],
+    ["um comentario antes do `\\` (`# \\`) avisa", P("test-a", "test-b", "test-c"), P("test-a", "test-b", "test-c").replace(`${T("test-b")} \\`, `${T("test-b")} # \\`), avisa()],
+    ["um `\\` seguido de espacos avisa", P("test-a", "test-b", "test-c"), P("test-a", "test-b", "test-c").replace(`${T("test-b")} \\`, `${T("test-b")} \\  `), avisa()],
+    ["tirar o `exec` avisa", P("test-a", "test-b"), paralelo("test-a", "test-b"), avisa()],
+    ["mudar o caminho do runner avisa", P("test-a", "test-b"), P("test-a", "test-b").replace("lib/suites-em-paralelo.mjs", "lib/outro.mjs"), avisa()],
+    ["um `exit 0` antes do `exec` avisa", P("test-a", "test-b"), P("test-a", "test-b").replace("exec node", "exit 0\n          exec node"), avisa()],
+    ["um `node <suite> || true` na cadeia avisa", P("test-a", "test-b"), P("test-a", "test-b").replace(`${T("test-a")} \\`, `${T("test-a")} \\\n            ${T("test-x")} || true \\`), avisa()],
+    ["mudar o `name:` do passo avisa", P("test-a", "test-b"), P("test-a", "test-b").replace("name: suites", "name: outras"), avisa()],
+    ["`run: |` trocado por `run: >` avisa", P("test-a", "test-b"), P("test-a", "test-b").replace("run: |", "run: >"), avisa()],
+    ["uma linha nova DEPOIS da cadeia avisa (a fixa mudou)", P("test-a", "test-b"), P("test-a", "test-b").replace(`${T("test-b")}\n`, `${T("test-b")}\n          echo fim\n`), avisa()],
+    ["uma suite movida para um passo-GEMEO (o mesmo `name:`) com `exit 0` antes do runner avisa", P("test-a", "test-b"), P("test-a") + P("test-b").replace("exec node", "exit 0\n          exec node"), avisa()],
+    ["tabs entre o `node` e o caminho contam como suite (nao avisa)", P("test-a", "test-b"), P("test-a", "test-b", "test-c").replace(`node .agent/scripts/tests/test-c.mjs`, "node\t.agent/scripts/tests/test-c.mjs"), calado],
+  ]) test(`paralelo como conjunto: ${nome} (#341)`, (dir) => muda(dir, ci(antes), ci(depois)), espera);
+  // Mudar o cabecalho do JOB: um aviso so, pelo job (a deduplicacao do `verificaGate`), e nao um por suite.
+  test("paralelo como conjunto: mudar o cabecalho do job avisa UMA vez, pelo job (#341)", (dir) =>
+    muda(dir, ci(P("test-a", "test-b")), ci(P("test-a", "test-b")).replace("  t:\n", "  t:\n    env:\n      X: y\n")), { code: 1, includes: ["o cabecalho do job `t` mudou"], excludes: [MUDOU] });
+  // Um `\` em falta a meio (o `test-c` deixa de correr): o portao avisa e nomeia-o; com o trailer, a CONTAGEM
+  // continua a reprovar (`3 -> 2`), e essa nao tem saida — e a defesa que fica (R12; sem o `\` no `test-a` seria 3 -> 1).
+  const semBarra = P("test-a", "test-b", "test-c").replace(`${T("test-b")} \\`, T("test-b"));
+  test("paralelo como conjunto: um `\\` em falta a meio avisa, e nomeia a suite que ficou fora (#341)", (dir) =>
+    muda(dir, ci(P("test-a", "test-b", "test-c")), ci(semBarra)), avisa(`${T("test-c")} fora da cadeia`));
+  test("paralelo como conjunto: com o trailer, um `\\` em falta continua a reprovar pela contagem (#341)", (dir) =>
+    muda(dir, ci(P("test-a", "test-b", "test-c")), ci(semBarra), TRAILER), { code: 1, includes: [`${MSG}: 3 -> 2`] });
+  test("paralelo como conjunto: o ci.yml com CRLF parte-se como o LF (#341)", (dir) =>
+    muda(dir, ci(P("test-a", "test-b")).replace(/\n/g, "\r\n"), ci(P("test-a", "test-b", "test-c")).replace(/\n/g, "\r\n")), calado);
+  // O `ci.yml` REAL: a particao corre onde importa. As suites da cadeia sao as que o `suitesQueOCICorre` le, e ha
+  // uma so fixa — sem um numero escrito a mao (era o atrito que o #341 tira, levado para o teste).
+  {
+    const real = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+    const us = unidadesDaMaquinaria(real).filter((u) => u.job === "guard-tests:");
+    const daCadeia = [...new Set(us.filter((u) => SUITE.test(u.rotulo)).map((u) => u.rotulo.replace(/^node[ \t]+/, "")))].sort();
+    const lidas = [...suitesQueOCICorre(real)].sort();
+    registarResultado("paralelo como conjunto: no ci.yml real, as suites da cadeia sao as que o runner corre, e ha uma fixa (#341)", [
+      ...(daCadeia.length > 0 && JSON.stringify(daCadeia) === JSON.stringify(lidas) ? [] : [`a cadeia deu ${JSON.stringify(daCadeia)}, o suitesQueOCICorre ${JSON.stringify(lidas)}`]),
+      ...(us.filter((u) => RUNNER.test(u.rotulo.replace(/[ \t]+\\$/, ""))).length === 1 ? [] : ["nao ha exactamente uma unidade fixa do runner"]),
+    ], "");
+  }
+  // O regex do runner contra o da CONTAGEM (R14): as mesmas variantes, o mesmo veredicto. Fica de fora o `\` seguido
+  // de espacos, onde divergem de proposito (aqui fecha a cadeia, como no `bash`).
+  {
+    const conta = CONTAGENS.find((c) => c.msg === MSG).re;
+    const contados = (t) => (t.match(new RegExp(conta.source, conta.flags.includes("g") ? conta.flags : `${conta.flags}g`)) ?? []).length;
+    const variantes = ["exec node .agent/scripts/lib/suites-em-paralelo.mjs --", "node .agent/scripts/lib/suites-em-paralelo.mjs --", "node ./.agent/scripts/lib/suites-em-paralelo.mjs --", "exec node .agent/scripts/lib/suites-em-paralelo.mjs --max=2 --", "echo .agent/scripts/lib/suites-em-paralelo.mjs --"];
+    registarResultado("paralelo como conjunto: o runner reconhece-se como a contagem o reconhece (#341)", variantes.flatMap((v) => {
+      const texto = ci(bloco("suites", `${v} \\`, `  ${T("test-a")} \\`, `  ${T("test-b")} \\`, `  ${T("test-c")}`));
+      const ls = texto.split("\n").slice(3, -1);
+      const parte = partePasso(ls, ls, (x) => x.join("\n"));
+      return (parte !== null) === (contados(texto) === 3) ? [] : [`"${v}": a particao ${parte ? "reconhece" : "nao reconhece"}, a contagem deu ${contados(texto)}`];
+    }), "");
   }
 }

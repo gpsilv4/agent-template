@@ -546,3 +546,18 @@ para nao ser descoberto:
   recomenda, e um derivado que o escalou para gate tem de poder voltar atras. Por isso MOVER a chave do
   passo de audit para outro passo passa a contar como acrescenta-la a esse (antes a contagem ficava
   igual, e mover para um `make test` passava calado). Um passo so com `uses:` nao prova que audita: conta.
+- **O passo das suites em paralelo** (#341): parte-se numa unidade FIXA e numa por suite
+  (`lib/passo-paralelo.mjs`), e acrescentar ou reordenar uma suite deixa de pedir o trailer. So conta como
+  suite uma linha da CADEIA estrita que nasce no runner (`node <suite> \`, seguidas): uma suite posta ANTES do
+  `exec` juntava-se a ele num so comando, corria sozinha e desligava o runner — e a primeira versao do desenho
+  deixava-a passar calada (tres passagens do `plan-auditor`). Um ` \` em falta, uma linha vazia ou um
+  comentario a meio cortam a cadeia, e o aviso nomeia a suite que ficou fora. O comprimento da cadeia NAO entra
+  na fixa: com ele, acrescentar uma suite voltava a avisar. A fixa entra na chave de CADA suite: so com o
+  cabecalho do passo, mover uma suite para um passo-gemeo (o mesmo `name:`, com um `exit 0` antes do runner)
+  passava calado (leitura adversarial). As redes que nao tem saida pelo trailer: num corte a MEIO, a contagem
+  "steps de verificacao no CI" (desce); num corte no FIM (acrescentar a ultima suite e esquecer o ` \` na linha
+  antiga, o caso mais provavel), a contagem NAO desce, e quem o apanha e o teste "cada suite em disco corre"
+  (`tests-suites-em-paralelo.mjs`). Limites: o par em `PARES` desliga os dois regexes e a logica da cadeia
+  (as partes da fixa e o `continua`), mas nao exprime um regex que aceite tudo (uma fixa vazia), que se mede a
+  mao; e o `check-test-surface` corre o codigo do HEAD do PR, logo um PR que relaxe o modulo E use o relaxamento
+  so e travado por quem le o diff (o vao que o `TP4` ja assume).

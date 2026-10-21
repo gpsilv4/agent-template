@@ -13,7 +13,9 @@
  *    mude ou desapareca avisa — o PASSO inteiro com o cabecalho do JOB, e nao so a linha. A linha
  *    sozinha deixava passar mover o gate para o passo `Audit` (que tem `continue-on-error: true`),
  *    um `exit 0` acrescentado antes dele, ou o `if:`/`env:` do job mudado (leitura independente
- *    do #285, medido no codigo). Um passo NOVO nao avisa: so alarga a rede.
+ *    do #285, medido no codigo). Um passo NOVO nao avisa: so alarga a rede. O passo das SUITES EM
+ *    PARALELO parte-se numa unidade fixa e numa por suite (#341, `lib/passo-paralelo.mjs`): uma suite
+ *    nova DENTRO da cadeia do runner e uma unidade nova, e nao avisa.
  * Reconhecer so as formas que estreitam era o jogo que o issue diz nao funcionar (`TP8`).
  *
  * Como o `Guard Tests` e obrigatorio, um aviso destes tem SAIDA, e so esta: o trailer
@@ -30,6 +32,7 @@
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */
 import { modosDaMatriz, modosDoPortao } from "./gate-modos.mjs";
+import { partePasso, unidadesDoParalelo } from "./passo-paralelo.mjs";
 
 /** Uma linha de YAML sem o comentario e os espacos do fim. O `#` so comeca um comentario no
  *  inicio ou depois de um espaco — `${{ x }}#a` e `a#b` nao sao comentarios. */
@@ -111,13 +114,14 @@ function cabecalhoQueConta(ls) {
   return limpas(fica).join("\n");
 }
 
-/** Parte `ls` em grupos que comecam numa linha com a indentacao `ind` (e que case `abre`). */
+/** Parte `ls` em grupos que comecam numa linha com a indentacao `ind` (e que case `abre`). Cada grupo guarda em
+ *  `.inicio` o indice da sua primeira linha em `ls`: e o que alinha as linhas limpas com as cruas (#341). */
 function agrupa(ls, ind, abre = () => true) {
   const grupos = [];
-  for (const l of ls) {
-    if (l.trim() && indent(l) === ind && abre(l)) grupos.push([l]);
+  ls.forEach((l, i) => {
+    if (l.trim() && indent(l) === ind && abre(l)) grupos.push(Object.assign([l], { inicio: i }));
     else if (grupos.length) grupos.at(-1).push(l);
-  }
+  });
   return grupos;
 }
 
@@ -316,11 +320,12 @@ export const defeitosNovos = (antes, depois) => {
  * se compara; `rotulo` e o que se mostra (a primeira linha da maquinaria). As linhas que a citem
  * fora de um passo (um `if:` de job, uma linha solta) sao unidades so delas.
  * @param {string | null} texto
- * @returns {{chave: string, rotulo: string, job: string, passo: string}[]}
+ * @returns {{chave: string, rotulo: string, job: string, passo: string, aviso?: string | null}[]}
  */
 export function unidadesDaMaquinaria(texto) {
   if (!texto) return [];
   const ls = linhasDe(texto);
+  const cru = texto.split(/\r\n|\r|\n/);
   const rotuloDe = (grupo) => limpas(grupo).find((l) => MAQUINARIA.test(l)).replace(/^(?:-[ \t]+)?(?:run[ \t]*:[ \t]*)?/, "");
   const soltas = (grupo) => limpas(grupo).filter((l) => MAQUINARIA.test(l)).map((l) => ({ chave: l, rotulo: l, job: "", passo: l }));
   const iJobs = ls.findIndex((l) => /^jobs[ \t]*:/.test(l));
@@ -361,8 +366,16 @@ export function unidadesDaMaquinaria(texto) {
     const ne = passos.filter((l) => l.trim());
     if (ne.length === 0) continue;
     for (const p of agrupa(passos, Math.min(...ne.map(indent)), (l) => /^[ \t]*-/.test(l))) {
+      if (!p.some((l) => MAQUINARIA.test(l))) continue;
+      // O passo das suites em paralelo (#341): uma unidade fixa e uma por suite (`lib/passo-paralelo.mjs`).
+      const ini = iJobs + 1 + job.inicio + iSteps + 1 + p.inicio;
+      const parte = partePasso(p, cru.slice(ini, ini + p.length), normalizaPasso);
+      if (parte) {
+        unidades.push(...unidadesDoParalelo(parte, cab, id));
+        continue;
+      }
       const passo = normalizaPasso(p);
-      if (p.some((l) => MAQUINARIA.test(l))) unidades.push({ chave: `${cab}\n--\n${passo}`, rotulo: rotuloDe(p), job: id, passo });
+      unidades.push({ chave: `${cab}\n--\n${passo}`, rotulo: rotuloDe(p), job: id, passo });
     }
   }
   return unidades;
@@ -447,10 +460,17 @@ export function verificaGate({ f, antes, agora, para, contavel, base, git, ler, 
   const cabecalhos = new Set();
   for (const i of perdidas(ua.map((u) => u.chave), ud.map((u) => u.chave))) {
     const u = ua[i];
-    if (u.job && ud.some((v) => v.job === u.job && v.passo === u.passo)) cabecalhos.add(u.job);
+    // So e "o cabecalho mudou" se o MESMO passo continua la tantas vezes como antes (#341: uma suite repetida, e
+    // tirar uma das duas, deixava a outra a fazer de prova e dizia "cabecalho" em vez do nome da suite).
+    const n = (us) => us.filter((v) => v.job === u.job && v.passo === u.passo).length;
+    if (u.job && n(ud) > 0 && n(ud) >= n(ua)) cabecalhos.add(u.job);
     else sinais.push(`passo da maquinaria mudou ou saiu: ${u.rotulo}`);
   }
   for (const job of cabecalhos) sinais.push(`o cabecalho do job \`${job.replace(/:$/, "")}\` mudou (if:/needs:/env:/continue-on-error:...)`);
+  // Uma suite que ficou FORA da cadeia do runner (#341): o aviso acima diz "o passo mudou"; este diz porque.
+  // Pelo `passo` e nao pela `chave`: senao uma suite ja fora da cadeia na base voltava a cada mudanca de cabecalho.
+  for (const v of ud) if (v.aviso && !ua.some((u) => u.passo === v.passo)) sinais.push(v.aviso);
+  sinais.splice(0, sinais.length, ...new Set(sinais)); // dois passos iguais perdidos davam a mesma linha duas vezes
   if (sinais.length === 0) return estrutura.length > 0;
   let motivo = null;
   try {
