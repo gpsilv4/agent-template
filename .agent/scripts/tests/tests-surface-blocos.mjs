@@ -19,6 +19,8 @@ import { CONTAGENS } from "../lib/surface-patterns.mjs";
 import { unidadesDaMaquinaria } from "../lib/superficie-gate.mjs";
 import { partePasso, RUNNER, SUITE } from "../lib/passo-paralelo.mjs";
 import { suitesQueOCICorre } from "./tests-suites-em-paralelo.mjs";
+import { ehDerivado } from "../lib/derivado.mjs";
+import { leOuNull } from "../lib/ficheiros.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -261,7 +263,13 @@ export function registar() {
     const us = unidadesDaMaquinaria(real).filter((u) => u.job === "guard-tests:");
     const daCadeia = [...new Set(us.filter((u) => SUITE.test(u.rotulo)).map((u) => u.rotulo.replace(/^node[ \t]+/, "")))].sort();
     const lidas = [...suitesQueOCICorre(real)].sort();
-    registarResultado("paralelo como conjunto: no ci.yml real, as suites da cadeia sao as que o runner corre, e ha uma fixa (#341)", [
+    // Um DERIVADO que ainda corre as suites passo a passo (adotar o runner e opcional, a 2b di-lo) nao tem cadeia:
+    // SKIP, com o teste registado na mesma. No template, sem cadeia reprova (o `simulate-upgrade` apanhou-o).
+    const semRunner = lidas.length === 0 && daCadeia.length === 0;
+    if (semRunner && ehDerivado((rel) => leOuNull(join(ROOT, rel)))) {
+      console.log("  SKIP  paralelo como conjunto: o ci.yml deste projeto nao corre as suites pelo runner em paralelo (#341)");
+      registarResultado("paralelo como conjunto: sem o runner num derivado, nada a medir no ci.yml real (#341)", [], "");
+    } else registarResultado("paralelo como conjunto: no ci.yml real, as suites da cadeia sao as que o runner corre, e ha uma fixa (#341)", [
       ...(daCadeia.length > 0 && JSON.stringify(daCadeia) === JSON.stringify(lidas) ? [] : [`a cadeia deu ${JSON.stringify(daCadeia)}, o suitesQueOCICorre ${JSON.stringify(lidas)}`]),
       ...(us.filter((u) => RUNNER.test(u.rotulo.replace(/[ \t]+\\$/, ""))).length === 1 ? [] : ["nao ha exactamente uma unidade fixa do runner"]),
     ], "");
