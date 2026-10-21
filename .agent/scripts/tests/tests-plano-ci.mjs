@@ -23,6 +23,8 @@ import { PREFIXOS_MAQUINARIA, aplicaVarredura, caminhosDe } from "../lib/plano-c
 import { alvosNoDisco } from "../lib/alvos-no-disco.mjs";
 import { PARES } from "../lib/pares.mjs";
 import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
+import { ehDerivado } from "../lib/derivado.mjs";
+import { leOuNull } from "../lib/ficheiros.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -54,7 +56,10 @@ const PROVA = [".agent/scripts/a.mjs", ".claude/hooks/a.mjs", ".githooks/a", ".a
  *  problema: sem nenhuma, a comparacao passava sem comparar nada (`TP2`). */
 export function regexQueDivergem(ci) {
   const rs = regexDoCi(ci);
-  if (rs.length < 2) return [`o ci.yml tem ${rs.length} regex de \`grep -qE ... <<<"$tocados"\`, e esperava pelo menos 2 (o \`sweep\` e os \`Simuladores\`)`];
+  // Quantas se esperam vem do ci.yml, e nao de um 2 fixo (TP15): o BOOTSTRAP remove o job `simulators` num
+  // derivado, e la ha so a do `sweep`. Com o job, as duas; sem nenhuma, reprova na mesma (zero nao compara nada).
+  const esperadas = 1 + (/^  simulators:[ \t]*(?:#.*)?$/m.test(ci) ? 1 : 0);
+  if (rs.length < esperadas) return [`o ci.yml tem ${rs.length} regex de \`grep -qE ... <<<"$tocados"\`, e esperava pelo menos ${esperadas} (o \`sweep\`${esperadas > 1 ? " e os `Simuladores`" : ""})`];
   return rs.flatMap((r) => PROVA.filter((c) => new RegExp(r).test(c) !== PREFIXOS_MAQUINARIA.test(c)).map((c) => `a regex '${r}' do ci.yml e o plano decidem diferente em ${c}`));
 }
 
@@ -109,6 +114,24 @@ export function registar() {
   // --- A sombra contra si propria: o `ci.yml` real ----------------------------------------------------
   const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
   registarResultado("plano: as regex do `sweep` e dos `Simuladores` decidem igual ao plano (#347)", regexQueDivergem(ci));
+  // Um DERIVADO (o BOOTSTRAP remove o job `simulators`) tem so a regex do `sweep`, e passa (TP15). Os dois casos
+  // correm nos DOIS mundos (a TP15 outra vez, na leitura deste PR): com o job, tira-se; sem ele, o `ci` ja e o
+  // derivado, e o controlo ACRESCENTA um job `simulators` sem a regex.
+  {
+    const temSimuladores = /^  simulators:[ \t]*(?:#.*)?$/m.test(ci);
+    const semSimuladores = temSimuladores ? ci.replace(/^  simulators:[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$)/m, "") : ci;
+    const simuladoresSemRegex = temSimuladores
+      ? ci.replace(/(^  simulators:[\s\S]*?)grep -qE '[^']+' <<<"\$tocados"/m, "$1true")
+      : ci.replace(/^jobs:[ \t]*\n/m, "jobs:\n  simulators:\n    steps:\n      - run: true\n");
+    registarResultado("plano: num derivado sem o job `simulators`, a regex do `sweep` chega (TP15, #347)", [
+      ...(/^  simulators:[ \t]*(?:#.*)?$/m.test(semSimuladores) ? ["nao consegui tirar o job `simulators`"] : []),
+      ...regexQueDivergem(semSimuladores),
+    ]);
+    registarResultado("plano: com o job `simulators` e sem a regex dele, reprova (controlo, TP15)", simuladoresSemRegex !== ci && regexQueDivergem(simuladoresSemRegex).length > 0 ? [] : ["o job `simulators` sem a regex passou"]);
+    // No TEMPLATE o job tem de la estar (leitura do PR): renomea-lo baixava a exigencia para 1 regex em silencio.
+    if (!ehDerivado((rel) => leOuNull(join(ROOT, rel))))
+      registarResultado("plano: no template, o job `simulators` existe e a sua regex e exigida (TP15)", temSimuladores ? [] : ["o ci.yml do template nao tem o job `simulators`"]);
+  }
   registarResultado("plano: um prefixo mudado so num sitio do ci.yml reprova (controlo, #347)", regexQueDivergem(ci.replace("|\\.githooks/)'", "|\\.githook/)'")).length > 0 ? [] : ["a regex mudada passou"]);
   registarResultado("plano: um `grep` alargado a `.github/` no ci.yml reprova (controlo, #347)", regexQueDivergem(ci.replace("|\\.githooks/)'", "|\\.githooks/|\\.github/)'")).length > 0 ? [] : ["o grep alargado passou"]);
   registarResultado("plano: um ci.yml sem as regex reprova, e nao passa sem comparar (#347)", regexQueDivergem("jobs: {}\n").length > 0 ? [] : ["zero regex passou"]);

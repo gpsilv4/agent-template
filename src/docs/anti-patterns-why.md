@@ -572,3 +572,37 @@ aviso sem a razao, e a razao so existia num commit que o squash apagou.
 **O que se faz em vez disso.** O corpo do squash e construido a partir do branch, nao de memoria:
 as linhas `Test-Surface:` vao todas, ao lado do `Closes #N` — o mesmo cuidado que ja se tem com o
 `Closes`, que tambem so fecha o issue se estiver no corpo final.
+
+## TP15 — Um teste sobre o `ci.yml` REAL que assume a forma nova do template
+
+**Origem.** A mesma classe apareceu cinco vezes em dois dias (#347 e #341):
+- o PR #356 (#347 B): o `tests-portao-ci.mjs` lia o portao do `ci.yml` real e exigia o ramo novo do salto do
+  merge. Num derivado atualizado da v0.60 o portao era o antigo, o modulo ficava sem testes, e o `registo.mjs`
+  reprova um modulo com zero;
+- o PR #363 (#341), tres vezes antes do push: a assercao sobre o `ci.yml` real do passo das suites em paralelo.
+  Primeiro faltava o SKIP; depois a contagem confundia um passo `run: node <suite>` inteiro (o CI antigo, passo a
+  passo) com uma suite da cadeia; por fim o criterio "sem runner" olhava para o `suitesQueOCICorre`, que tambem le
+  esses passos um a um e nunca vem vazio;
+- o `tests-plano-ci.mjs` do #347 C1, ja no `main`: exigia duas regex (a do `sweep` e a dos `Simuladores`), e o
+  BOOTSTRAP remove o job `simulators` de um derivado. Apanhado ao listar os testes desta classe, numa `worktree`
+  com o `simulators` tirado — os simuladores do template nao o viam, porque o bootstrap que simulam o mantem.
+
+**Porque escapa.** O teste e verde no template, porque o template TEM a peca nova. Num derivado, o `/upgrade` nao
+substitui o `ci.yml` (a categoria `.github/workflows/*` so traz os jobs em falta, e adotar uma forma nova e
+OPCIONAL, a 2b di-lo), e o BOOTSTRAP tira-lhe pecas (o `simulators`). O teste viaja, o `ci.yml` nao.
+
+**O que se faz em vez disso.**
+- Derivar do proprio `ci.yml` o que se exige: quantas regex (uma por job que as tem), se ha runner (uma unidade
+  fixa dele no job), se o portao tem o ramo novo.
+- Num derivado sem a peca (`ehDerivado`), SKIP com o motivo e um teste REGISTADO na mesma (`registo.mjs`).
+- No template, sem a peca, reprova: e a mesma assercao, so que no sitio onde a peca tem de existir.
+- Reproduzir a falha num derivado a mao (uma `worktree` com o `ci.yml` da tag e a marca `.agent/.template-version`)
+  ANTES de voltar ao simulador. Corrigir contra o simulador as cegas custou duas voltas no #363.
+
+**Detecao.** `git grep -nE '(lerRaiz\(|join\(ROOT, )"\.github/workflows/ci\.yml"' -- .agent/scripts/tests` lista so
+os testes que leem o `ci.yml` REAL (o `'workflows/ci.yml'` solto apanha tambem as fixtures que escrevem o seu). Cada
+um tem de ter um `ehDerivado`, ou derivar do ficheiro o que exige. O `tests-suites-em-paralelo.mjs` reprova de
+proposito num derivado com suites novas por correr — e uma verificacao em falta, que a 2b manda acrescentar, e nao
+esta classe. E a propria correccao do `tests-plano-ci.mjs` trouxe a classe outra vez: os dois testes novos
+exigiam encontrar o job `simulators` para o tirar ou mutar, e reprovavam num derivado sem ele. A leitura apanhou-o;
+correm agora nos dois mundos, e foram confirmados numa `worktree` sem o job.
