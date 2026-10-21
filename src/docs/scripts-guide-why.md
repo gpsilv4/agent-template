@@ -143,13 +143,34 @@ dela no repo. O cabecalho do `mutation-sweep.mjs`, o `ci.yml` e o `upgrade-why.m
 | Repo | Cobrados | Reais | Onde |
 |---|---|---|---|
 | derivado privado A (CI proprio, 5 jobs) | 1423 | 654 | 740 nos PRs e 564 no push do merge; o `Secret Scan` 222 cobrados por 34 reais, e o `Commit Messages` 218 por 23 |
-| derivado privado B (o CI do template) | 630 | 467 | 5 dos 8 jobs de um PR duravam menos de 1 min e pagavam 1; os 3 shards da varredura pagam pelo menos 3 mesmo "nao aplicavel" |
+| derivado privado B (o CI do template) | 630 | 467 | 8 dos 10 jobs de um PR duravam menos de 1 min e pagavam 1 (medido de novo a 2026-10-21; a primeira contagem dizia "5 dos 8"); os 3 shards da varredura pagam pelo menos 3 mesmo "nao aplicavel" |
+
+**Antes e depois, por PR (2026-10-21).** O "antes" e MEDIDO no CI do derivado privado B (o CI do template na
+v0.60, 2 vCPU). O "depois" e ESTIMADO pela mesma regra (cada job arredondado ao minuto) sobre essas duracoes; a
+medicao real faz-se no CI dos derivados depois do `/upgrade`, e fica no #347.
+
+| Evento (privado, com app) | Antes | Depois de A, B e C1 | Com o C2 |
+|---|---|---|---|
+| PR de codigo, sem maquinaria | 13-14 (10 jobs) | ~10-11 (a app num job) | ~7-8 (sem os 3 shards) |
+| push do merge para o `main` | 10-11 (7 jobs) | 1 (so o `Guard Tests`) | 1 |
+| PR de codigo completo (PR + push) | ~24 | ~11-12 | ~8-9 |
+| PR de maquinaria (um `/upgrade`) + push | ~84 (62 nos shards) | ~71-72 (84 - ~3 da app - ~9,5 do push) | ~71-72: a varredura aplica-se; quem ajuda e o #357 (num derivado, varrer so o que difere da tag) |
+
+O tempo de RELOGIO de um PR nao muda (~4 min num privado, dominado pelo `Guard Suites`); o push do merge passa de
+~4 min a segundos. Num repo publico nada muda: os minutos nao contam. O D (saltar o pesado num PR so de docs) foi
+largado: as suites leem os documentos do repo REAL (pelo `git grep` de 2026-10-21, 13 ficheiros de teste citam
+`src/docs/`, 13 citam `.agent/context/` e 11 os `.md` da raiz; contam-se por pasta, e um ficheiro pode estar em mais
+de uma), e saltar as suites num PR so de docs trocava minutos por regressoes.
 
 **O custo e o NUMERO de jobs, e nao o trabalho.** Daqui saem as decisoes do #347, por PR:
 - **A:** a app (o projeto, os testes unitarios e o audit) e passos de UM job, `Code Quality`.
 - **B:** o push de um merge de PR num privado salta, e o portao so verifica a mensagem.
-- **C:** os shards so arrancam quando a varredura se aplica.
-- **D:** um PR so de docs salta o pesado.
+- **C:** os shards so arrancam quando a varredura se aplica. Em tres: C0 (as notas da 2b num modulo), C1 (o plano
+  em SOMBRA no portao: nao muda a fatura) e C2 (a troca: desliga os shards, depois da medicao da sombra).
+- **D:** um PR so de docs saltava o pesado — LARGADO (as suites leem os documentos do repo real; ver acima).
+- **E:** uma tag por sprint, e nunca por PR (`deploy.md`, `process-rules.md`): num privado cada tag e um job do
+  `release.yml`. Medido em outubro no derivado privado A: 69 tags num mes, uma por PR, e o `release.yml` custou 70
+  min da quota.
 
 **O que NAO se juntou, e porque.** Sao tres jobs de verificacao, separados por CONFIANCA:
 - **a app** (`quality`);
@@ -164,7 +185,8 @@ O `quality`, o `guard-tests` e o `secret-scan` tem o mesmo `if:` de job:
 `github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'`.
 E verdadeiro em todo o PR e em todo o repo publico: so salta, num privado, o push que o GitHub faz ao mergear
 (committer `web-flow`, num merge commit ou num squash). Esse push corria o mesmo codigo que o PR acabou de
-verificar, e custava ~5 min cobrados por PR.
+verificar, e custava 10-11 min cobrados por PR num derivado com app (7 jobs no CI da v0.60; ~5 no template, sem
+app). Passa a 1 (so o portao), como na tabela acima.
 
 **O portao (`Guard Tests`) nao confia no `if:`.** Corre sempre (`always()`), e no seu shell aceita as suites
 `skipped` so com as tres condicoes recalculadas (nao e um PR, `private == true`, committer `web-flow`) e a

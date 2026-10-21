@@ -138,7 +138,7 @@ e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, 
   juntos; cada reprovacao de CI custa ~25.
 - **CI Gate**: Antes de mergear para main, confirmar que **todos os CI checks passaram** (TypeScript, lint, build, tests, audit). Nunca mergear com checks vermelhos.
 - **PRs**: Usar o template de PR (`.github/pull_request_template.md`) que impoe checklist alinhada com o workflow `/review`.
-- **Tags**: Apos cada release/sprint concluido e mergeado para main, no `main` sincronizado (`git pull --ff-only origin main` — depois de um squash o local esta atras), criar tag anotada: `git tag -a vX.Y.Z -F <ficheiro-fora-do-repo>` (1.a linha = titulo; nunca `-m "..."`, `TP10`) + `git push origin vX.Y.Z`. O GitHub Release cria-se sozinho (`release.yml`).
+- **Tags**: Apos cada release/sprint (nunca por PR: num privado cada tag e um job cobrado, #347) concluido e mergeado para main, no `main` sincronizado (`git pull --ff-only origin main` — depois de um squash o local esta atras), criar tag anotada: `git tag -a vX.Y.Z -F <ficheiro-fora-do-repo>` (1.a linha = titulo; nunca `-m "..."`, `TP10`) + `git push origin vX.Y.Z`. O GitHub Release cria-se sozinho (`release.yml`).
 
 ### Regra de Branch (Agente de IA)
 
