@@ -258,6 +258,7 @@ not to* line, so every agent sees it.
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
     │   ├── varredura-shards.mjs <- The gate's check that every sweep shard reported, and all sites were measured
+    │   ├── plano-ci.mjs       <- Does the sweep apply to this PR? Read from the BASE commit by the gate (#347)
     │   ├── varredura-diff.mjs <- The sweep's `--diff`: which targets the branch touches
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command

@@ -189,6 +189,34 @@ que isentava em qualquer job, deixava-o desligar sem marca (as duas leituras do 
 
 Num repo publico nada muda: o template corre tudo no push, como antes.
 
+#### O plano da varredura, em sombra (C1)
+
+Os shards da varredura arrancam em todos os PRs e, num PR sem maquinaria, concluem "nao aplicavel" em segundos —
+num privado, cada um custa um minuto cobrado. Antes de os desligar (o C2), o C1 prova a decisao nova em PRs reais:
+- **o plano** (`lib/plano-ci.mjs`) decide se a varredura se aplica, com os mesmos prefixos do `grep` do `sweep`;
+- **o portao** le-o do commit BASE (`git show "$base:..."`, copiado sozinho, antes de qualquer codigo do PR) e
+  exige que CONCORDE com o que os shards decidiram. Nada deixa de correr; discordar e vermelho. Imprime
+  `sombra: concorda (plano=...)` ou, com a base sem o plano, `sombra: desligada`.
+- **o mesmo diff do `sweep`** (`$base..HEAD`, com a deteccao de renomeacoes). Com `--no-renames` a sombra
+  discordava num PR que move um ficheiro para fora da maquinaria — que hoje escapa a varredura; corrigi-lo e uma
+  mudanca de comportamento, e fica para o C2.
+
+**O que a sombra prova, e o que NAO (as duas leituras do C1).** O plano e o `grep` usam os mesmos prefixos e o mesmo
+diff, logo concordam POR CONSTRUCAO: os PRs com `sombra: concorda` provam o encanamento (a copia da base, o `git
+show`, o `node`, a concordancia no portao), nao que a decisao esteja certa. O que prende a decisao sao os testes
+cruzados. Fica para o C2, onde a decisao passa a desligar shards:
+- os caminhos que o git CITA (`core.quotePath`: acentos, aspas, `\`) nao casam nem no `grep` nem no plano — o C2
+  usa `git -c core.quotePath=false diff --name-only --no-renames -z`, partido por `\0`;
+- uma renomeacao para fora da maquinaria (o `--no-renames`);
+- o ramo `sombra: desligada` passa a vermelho (so e legitimo enquanto a base nao tem o plano).
+Na medicao nao conta um PR que toque no `lib/varredura-shards.mjs`: e a comparacao, e corre do HEAD.
+Os casos da sombra registam-se com `registarResultado`, que o `check-test-surface` nao conta: apagar um passava
+calado. E uma classe que ja existia (#359).
+
+**O C2 so entra** depois de 3 PRs que toquem em maquinaria e 3 que nao toquem com `sombra: concorda`. Os testes
+cruzados (`tests-plano-ci.mjs`) prendem o plano a descoberta da varredura e aos `PARES` do template; um alvo do
+PROJETO fora dos prefixos e uma nota, e nao um vermelho (o derivado nao tem onde estender os prefixos).
+
 **O "deploy" nao e o que isto atrasa.** No metodo do template, o deploy de producao e do alojamento
 (depois do merge); o runner atrasa o **portao** antes do merge — o CI do PR.
 
