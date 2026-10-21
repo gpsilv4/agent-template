@@ -17,7 +17,7 @@ import { pathToFileURL } from "url";
 import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
 import { CONTAGENS } from "../lib/surface-patterns.mjs";
 import { unidadesDaMaquinaria } from "../lib/superficie-gate.mjs";
-import { partePasso, RUNNER, SUITE } from "../lib/passo-paralelo.mjs";
+import { partePasso, RUNNER } from "../lib/passo-paralelo.mjs";
 import { suitesQueOCICorre } from "./tests-suites-em-paralelo.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
@@ -261,7 +261,9 @@ export function registar() {
   {
     const real = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
     const us = unidadesDaMaquinaria(real).filter((u) => u.job === "guard-tests:");
-    const daCadeia = [...new Set(us.filter((u) => SUITE.test(u.rotulo)).map((u) => u.rotulo.replace(/^node[ \t]+/, "")))].sort();
+    // So as unidades que a PARTICAO criou (o `<suite>` na chave): um passo `run: node <suite>` inteiro (o CI antigo,
+    // passo a passo) tem o mesmo rotulo, e contava-se como cadeia num derivado na v0.60 (o `simulate-upgrade`).
+    const daCadeia = [...new Set(us.filter((u) => u.passo.includes("\n<suite>\n")).map((u) => u.rotulo.replace(/^node[ \t]+/, "")))].sort();
     const lidas = [...suitesQueOCICorre(real)].sort();
     // Um DERIVADO que ainda corre as suites passo a passo (adotar o runner e opcional, a 2b di-lo) nao tem cadeia:
     // SKIP, com o teste registado na mesma. No template, sem cadeia reprova (o `simulate-upgrade` apanhou-o).
