@@ -159,6 +159,16 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // As notas da FORMA do `ci.yml` na 2b, que sairam do `medida-upgrade.mjs` (#347, C0). Nao tem `fatal()`:
+    // os sitios sao as `note()` — cada uma e uma diferenca de CI que um derivado deixava de ver. A suite e o
+    // `test-guards`, e o dono (`tests-medida-upgrade-ci.mjs`) corre primeiro: a funcao e pura, logo cada
+    // sitio custa milissegundos, e nao uma corrida da suite do upgrade.
+    alvo: ".agent/scripts/lib/medida-upgrade-ci.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])note\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O bloco da FRONTEIRA da 2b, que saiu do `medida-upgrade.mjs` (#317) e trouxe as recusas dele: o
     // staging dentro do projeto ou do template, numa pasta cheia, e um caminho com caracteres de controlo.
     // Cada `fatal()` que nao fica vermelho e uma escrita da fronteira que ninguem trava.
