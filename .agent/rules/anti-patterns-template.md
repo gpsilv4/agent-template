@@ -1,4 +1,4 @@
-# Anti-Padroes do TEMPLATE (TP1-TP14) — {{PROJECT_NAME}}
+# Anti-Padroes do TEMPLATE (TP1-TP15) — {{PROJECT_NAME}}
 
 > **NAO carregado** no contexto do agente. Lido on-demand: pelo Guard 15
 > (`.agent/scripts/guards/anti-patterns.mjs`), que resolve as citacoes, e por quem for ler
@@ -18,8 +18,7 @@
 - **Anti-padrao**: afirmar `includes("<texto>")` sobre o output INTEIRO de um verificador, com
   uma mutacao que quebra mais do que o alvo do teste. Fica verde porque OUTRA verificacao
   falhou. Variante: o `includes` nao distingue niveis, logo despromover um erro a aviso mantem
-  o teste verde e desliga o gate. **Forma mais teimosa**: contagens escritas em prosa ou em
-  mensagens de commit — o mesmo numero saiu errado quatro vezes numa sessao.
+  o teste verde e desliga o gate. **Forma mais teimosa**: contagens escritas em prosa (o `-why`).
 - **Correto**: afirmar contra as linhas do **nivel certo**, e mutar so o input do alvo. Nao
   escrever contagens que nao se derivaram no momento: correr o comando e colar, ou escrever **o
   comando** em vez do numero.
@@ -30,9 +29,7 @@
 
 - **Origem**: o `check-backlog.mjs` deste template.
 - **Anti-padrao**: um verificador que nao encontra dados concluir que **nao ha nada a
-  verificar**. Um backlog populado, com o titulo de uma seccao renomeado, lia zero linhas e
-  anunciava `Backlog vazio` com exit `0` — o gate passava **a afirmar** que estava vazio.
-  Variantes: caminhos relativos ao `cwd`, esperar por checks de CI que ainda nao arrancaram,
+  verificar** (o caso medido, um `Backlog vazio` com exit `0`, esta no `-why`). Variantes: caminhos relativos ao `cwd`, esperar por checks de CI que ainda nao arrancaram,
   clone com CRLF.
 - **Correto**: separar **"nao ha nada"** de **"nao consegui ler"**. Verificar primeiro que a
   estrutura de que dependes existe (cabecalhos, ficheiros, contagem > 0) e reprovar se nao
@@ -70,23 +67,20 @@
 ## TP5 — `.trim()` no output de um comando cujas colunas significam algo
 
 - **Origem**: o hook `stop-verify` sub-reportava a divida **em silencio**, com a suite verde.
-- **Anti-padrao**: `.trim()` ao output **inteiro** de um comando de colunas fixas. No
-  `git status --porcelain` a coluna de um ficheiro nao-staged e um **espaco** (` M path`):
-  trimar come-o so na primeira linha, o `slice(3)` leva um caractere do caminho, e o ficheiro
-  desaparece da analise sem erro nenhum.
+- **Anti-padrao**: `.trim()` ao output **inteiro** de um comando de colunas fixas: no
+  `git status --porcelain` come o espaco de ` M path` na primeira linha, e o ficheiro
+  desaparece sem erro (o mecanismo esta no `-why`).
 - **Correto**: cortar **so** o que sobra no fim — `.replace(/\n+$/, "")` — e trimar por linha,
   nunca em bloco. Nao normalizar espacos de um formato onde o espaco e dado.
 - **Detecao em review**: o instrumento fiavel e o **teste com as duas formas** de linha
-  (`?? path` sem espaco **e** ` M path` com espaco) — era so a primeira que os testes montavam.
-  Grep secundario: `grep -rn 'execFileSync(.*)\.trim()\|}).trim()' .agent .claude`, e o revisor
-  confirma se aquele output tem espaco significativo.
+  (`?? path` sem espaco e ` M path` com ele). Grep:
+  `grep -rn 'execFileSync(.*)\.trim()\|}).trim()' .agent .claude`.
 
 ## TP6 — Blocklist de formas perigosas onde era preciso um allowlist
 
 - **Origem**: o hook `guard-protected-branch` deste template — **32 defeitos** na primeira leitura.
 - **Anti-padrao**: enumerar o que e **perigoso**. As formas de escrever a mesma coisa numa
-  shell nao tem fim (`eval`, `sh -c`, backticks, `$(...)`, caminho absoluto, `xargs`, `sudo`,
-  `env`, `{ }`, aspas pelo meio), logo a lista **falha aberta**. Pior: cada correcao cria
+  shell nao tem fim (o `-why` lista-as), logo a lista **falha aberta**. Pior: cada correcao cria
   formas novas.
 - **Correto**: enumerar o que e **seguro** e negar o resto (falha **fechada**). A lista de
   verbos inofensivos e finita; a de comandos ofuscados nao e. Onde falhar fechado bloquearia
@@ -109,8 +103,7 @@
 
 - **Origem**: cinco ocorrencias numa so sessao, todas diferentes a olho e iguais por dentro.
 - **Anti-padrao**: re-escrever uma regra que ja existe noutro ficheiro e contar com que as duas
-  se mantenham iguais. A copia falha onde ninguem sabe que e copia: numa **fronteira**, meses
-  depois, com a mensagem a apontar para o sintoma.
+  se mantenham iguais. A copia falha onde ninguem sabe que e copia (o `-why`).
 - **Correto**: **derivar, nao duplicar.** Quem define exporta, quem precisa importa; em testes,
   a lista deriva-se do disco ou da mesma fonte que o codigo usa.
 - **Detecao em review**: a varredura nao o ve (as duas copias estao cobertas). Ao rever um diff:
@@ -177,3 +170,13 @@
 - **Correto**: `git log main..HEAD --format=%B | grep '^Test-Surface:'` vai para o `--body`,
   ao lado do `Closes #N`.
 - **Detecao em review**: `git log -1 --format=%B <squash>` contra a lista acima.
+
+## TP15 — Um teste sobre o `ci.yml` REAL que assume a forma nova do template
+
+- **Origem**: #356, #363.
+- **Anti-padrao**: exigir no `ci.yml` real uma peca nova; um derivado (o `/upgrade` nao o
+  troca, o BOOTSTRAP tira pecas) reprova.
+- **Correto**: derivar do `ci.yml` o que se exige; num derivado sem a peca, SKIP e um teste
+  registado.
+- **Detecao em review**: `git grep -nE '(lerRaiz\(|join\(ROOT, )"\.github/workflows/ci\.yml"' --
+  .agent/scripts/tests`: cada um com `ehDerivado`, ou deriva o que exige.
