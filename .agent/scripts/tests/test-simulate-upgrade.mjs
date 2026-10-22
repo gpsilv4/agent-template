@@ -18,7 +18,7 @@
  * `lib/upgrade-categorias.mjs` (em `tests-upgrade-motor.mjs`), a
  * fixture `lib/projeto-de-ontem.mjs`, o instrumento da seccao 2b em `lib/medida-upgrade.mjs` e `lib/medida-upgrade-ci.mjs`
  * e a fronteira em `lib/fronteira-upgrade.mjs` (em `tests-medida-2b*.mjs`), o filtro em `lib/fora-do-template.mjs`
- * (em `tests-upgrade-fora-do-template.mjs`), o projeto ADOTADO (em `tests-upgrade-adotado.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`
+ * (em `tests-upgrade-fora-do-template.mjs`), o ADOTADO (`tests-upgrade-adotado.mjs`), os wrappers do Gemini (`tests-upgrade-wrappers.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`
  * e a comparacao de `lib/intacto.mjs`, que tem tambem os seus casos puros no `tests-intacto.mjs`.
  * O `lib/mapa-suites.mjs` manda verificar estes modulos com esta suite.
  *
@@ -37,6 +37,7 @@ import { registar as registarForaDoTemplate } from "./tests-upgrade-fora-do-temp
 import { registar as registarAdotado } from "./tests-upgrade-adotado.mjs";
 import { registar as registarPlaceholders } from "./tests-upgrade-placeholders.mjs";
 import { registar as registarConstantes } from "./tests-upgrade-constantes.mjs";
+import { registar as registarWrappers } from "./tests-upgrade-wrappers.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
@@ -52,6 +53,7 @@ registarForaDoTemplate();
 registarAdotado();
 registarPlaceholders();
 registarConstantes();
+registarWrappers();
 
 // --- Os guardas que saem ANTES de medir -----------------------------------------
 
@@ -153,8 +155,6 @@ test("sem BOOTSTRAP.md (o outro sinal de derivado), tambem da SKIP", () => {
 // o simulador correr ate ao fim — e e so assim que os seus proprios caminhos de recusa (a
 // customizacao da fixture, a derivacao dos comandos, a adaptacao do Guard 17) ficam medidos.
 // A varredura de mutacao apontou-os um a um como nao cobertos; nenhum apareceu numa leitura.
-
-
 
 // O archive vazio: a tag aponta para um commit sem ficheiros nenhuns, e o template so aparece
 // depois dela. E a unica forma de chegar a esse caminho sem partir o git de proposito.
