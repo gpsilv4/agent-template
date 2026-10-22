@@ -25,6 +25,7 @@ Follow the workflows in `.agent/workflows/`:
 | Full sprint | implement all -> `/review` -> `/deploy` |
 | Milestone (end of sprint, pre-release) | `/audit` -> backlog proposals, approved first |
 | Product strategy | `/market-scan` -> backlog proposals, approved first |
+| Opening a sprint, or after a release | `/backlog-review` -> backlog proposals, approved first |
 
 ## Dependencies and the lockfile
 

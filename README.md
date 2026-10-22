@@ -134,7 +134,7 @@ gh pr create --fill     # then merge once CI is green
 # -> tell the AI: "run /review"
 ```
 
-### The 13 workflows
+### The 14 workflows
 
 Each one is a file in `.agent/workflows/` — the single source of truth every agent reads.
 
@@ -152,6 +152,7 @@ Each one is a file in `.agent/workflows/` — the single source of truth every a
 | `/deploy` | Release checklist with a real CI gate | when the sprint is complete |
 | `/audit` | Multi-lens health check of the whole project | at a milestone (end of sprint, pre-release) |
 | `/market-scan` | Market research and feature ideation | for product strategy |
+| `/backlog-review` | Review the existing backlog against the code: done, stale, duplicate, missing, order | when opening a sprint, or after a release |
 | `/upgrade` | Bring template improvements into a derived project | in a derived project, to pull a newer template |
 
 **How to invoke them:** in **Claude Code** and **Gemini CLI** they are real slash commands
@@ -206,6 +207,7 @@ not to* line, so every agent sees it.
 │   ├── security-tests.md       <- /security-tests — Security tests
 │   ├── audit.md                <- /audit — Full project/app health audit (multi-lens)
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
+│   ├── backlog-review.md       <- /backlog-review — Review the existing backlog against the code
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
 └── scripts/                    <- 9 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
@@ -545,7 +547,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 `.claude/` (slash commands, subagents, `settings.json`) is read **only by Claude Code** — other tools ignore it. But **no logic lives there**: each command is a thin wrapper that says *"read and follow `.agent/workflows/<name>.md`"*. The workflows, rules, and context all live in `.agent/`, which **every agent reads**.
 
 - **Claude Code**: `/plan`, `/review`, etc. are typed slash commands; the permission boundary and subagents apply.
-- **Gemini CLI**: the same 13 commands ship as `.gemini/commands/*.toml`.
+- **Gemini CLI**: the same 14 commands ship as `.gemini/commands/*.toml`.
 - **Any other agent**: ask *"run /plan"* or *"follow `.agent/workflows/plan.md`"* — the identical file.
 
 **What you do lose outside Claude Code**, stated plainly rather than waved away:

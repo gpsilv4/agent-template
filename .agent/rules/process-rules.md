@@ -79,6 +79,7 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 | Sprint completo | implementar todos -> `/review` -> `/deploy` |
 | Milestone (fim de sprint, pre-release) | `/audit` -> propostas de backlog, com aprovacao |
 | Estrategia de produto | `/market-scan` -> propostas de backlog, com aprovacao |
+| Abrir um sprint, ou depois de uma release | `/backlog-review` -> propostas de backlog, com aprovacao |
 
 - O `/deploy` so corre quando o sprint esta completo — tickets individuais fazem commit no branch mas nao deploy
 

@@ -58,6 +58,7 @@ o caso que o `/debug` e o `/refactor` mandam registar):
 4. Atualizar a linha **Proximo:** com o item seguinte do sprint
 
 **Ao iniciar um sprint:**
+- Se existir o `/backlog-review` (`.agent/workflows/backlog-review.md`; o Modo minimo remove-o), propo-lo primeiro: rever o backlog contra o codigo antes de explicar os items
 - O agente deve ler o sprint ativo no `backlog.md` e **avaliar o tamanho**:
   - Se o sprint tem **mais de 9 items**, sugerir divisao em sprints menores (7-9 items cada) e aguardar aprovacao
   - Verificar se novos tickets foram adicionados ao sprint desde o planeamento original
