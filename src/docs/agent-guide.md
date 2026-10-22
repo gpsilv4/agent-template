@@ -102,6 +102,7 @@ Os workflows sao sequencias de passos que o Agente executa para tarefas especifi
 | **`/deploy`**         | Deploy Producao    | Passos finais para enviar para producao.                |
 | **`/audit`**          | Auditoria Completa | Estado holistico do projeto/app (milestone; multi-lente).|
 | **`/market-scan`**    | Analise de Mercado | Concorrencia + gaps + ideacao de features (web).        |
+| **`/backlog-review`** | Rever o backlog | O backlog que ja existe contra o codigo: feito, obsoleto, duplicado, em falta, ordem. |
 | **`/upgrade`**        | Atualizar do template | Trazer melhorias do template de origem sem perder o que e do projeto. |
 | **`/grill`**          | Interrogar antes do plano | Extrair as decisoes que ainda nao foram tomadas, uma pergunta de cada vez. Corre antes da Fase 0, so em `L` e `M` ambiguo. |
 

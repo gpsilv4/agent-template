@@ -64,6 +64,7 @@ Stack: {{STACK}}.
 | Deploy para producao      | `.agent/workflows/deploy.md`           | com o sprint completo |
 | Auditoria completa        | `.agent/workflows/audit.md`            | num milestone (fim de sprint, pre-release) |
 | Analise de mercado        | `.agent/workflows/market-scan.md`      | na estrategia de produto |
+| Rever o backlog           | `.agent/workflows/backlog-review.md`   | ao abrir um sprint, ou depois de uma release |
 | Atualizar do template     | `.agent/workflows/upgrade.md`          | num derivado, para trazer o template novo |
 
 ---
