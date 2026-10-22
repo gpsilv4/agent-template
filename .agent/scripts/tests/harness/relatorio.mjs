@@ -113,7 +113,9 @@ export function resumo() {
     for (const f of failures) {
       console.log(`\n[${f.name}]`);
       for (const p of f.problems) console.log(`  ${p}`);
-      console.log(f.out.split("\n").map((l) => `    | ${l}`).join("\n"));
+      // Sem `out` e o caso comum (o `registarResultado(name, problems)`): rebentar aqui escondia o detalhe de
+      // TODAS as falhas da corrida, e nao so desta (#366).
+      if (f.out) console.log(f.out.split("\n").map((l) => `    | ${l}`).join("\n"));
     }
     console.log("");
     process.exit(1);

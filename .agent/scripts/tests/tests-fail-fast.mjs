@@ -248,4 +248,27 @@ export function registar() {
     if ((r.out.match(/^\s*FAIL\s/gm) || []).length !== 1) p.push("tem de parar no PRIMEIRO FAIL — houve zero ou mais do que um");
     caso("fail-fast (#157): test-hooks sai ao primeiro FAIL", p);
   }
+
+  // --- O resumo com falhas SEM `out` (#366) ---------------------------------------------------
+  // O `registarResultado(name, problems)` sem `out` e o caso comum; o resumo fazia `f.out.split` e
+  // rebentava, escondendo o detalhe de TODAS as falhas. Os marcadores `[nome]` so o DETALHE os imprime
+  // (os problemas ja saem na linha `FAIL`, antes do resumo): o segundo, depois do primeiro, prova que o
+  // detalhe nao parou nele.
+  {
+    const dir = mkdtempSync(join(tmpdir(), "fail-fast-test-"));
+    let r;
+    try {
+      const f = join(dir, "suite-sem-out.mjs");
+      writeFileSync(f, `import { registarResultado, resumo } from ${JSON.stringify(pathToFileURL(RELATORIO).href)};\nregistarResultado("sem-out-1", ["problema-um"]);\nregistarResultado("sem-out-2", ["problema-dois"]);\nresumo();\n`);
+      r = executa(f, false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const p = [];
+    if (r.code !== 1) p.push(`tem de sair 1, saiu ${r.code}`);
+    if (/TypeError/.test(r.out)) p.push("o resumo rebentou com uma falha sem `out`");
+    const [i1, i2] = ["[sem-out-1]", "[sem-out-2]"].map((t) => r.out.indexOf(t));
+    if (i1 < 0 || i2 < i1) p.push(`o detalhe tem de mostrar [sem-out-1] e depois [sem-out-2] (posicoes ${i1}, ${i2})`);
+    caso("relatorio (#366): falhas sem `out` mostram o detalhe, sem rebentar", p);
+  }
 }

@@ -17,8 +17,8 @@
  * ficheiro vazio (um PR sem diff) e `false`. Sem argumento, ilegivel, ou com uma linha vazia no meio: sai 2.
  * "Nao consegui ler" nunca e "false" (`TP2`).
  */
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 /** O que conta como maquinaria: as pastas que a varredura mede. */
 export const PREFIXOS_MAQUINARIA = /^(\.agent\/scripts\/|\.claude\/hooks\/|\.githooks\/)/;
@@ -43,7 +43,18 @@ function recusa(msg) {
   process.exit(2);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Os DOIS lados pelo caminho real (#366): o Node resolve os symlinks no `import.meta.url` e nao no
+// `argv[1]`, logo, copiado para uma pasta atras de um symlink (o `tmpdir()` do macOS e `/var`, que
+// aponta para `/private/var`), o plano nao corria e nao imprimia nada. Resolver so o `argv[1]` partia
+// com `--preserve-symlinks-main`. O `try`: importado com um `argv[1]` que nao existe, nao e o main.
+const ehMain = (() => {
+  try {
+    return Boolean(process.argv[1]) && realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
+if (ehMain) {
   const ficheiro = process.argv[2];
   if (!ficheiro) recusa("falta o ficheiro com os caminhos tocados");
   let texto;
