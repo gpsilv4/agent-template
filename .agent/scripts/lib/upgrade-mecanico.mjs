@@ -382,6 +382,11 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
   const atualizados = [];
   {
     const JA_TRATADO = new Set([".agent/rules/anti-patterns.md", ".agent/rules/anti-patterns-template.md"]);
+    // Os wrappers do Gemini sao a metade da linha "workflows + os dois wrappers" do `upgrade.md`
+    // que nunca chegava (#365): um workflow novo reprovava a FASE 2 so pelo `.toml` em falta.
+    // So num projeto que JA tem a pasta — sem ela, e um opt-out (o Guard 6 le-o assim), e cria-la
+    // por um wrapper novo punha-o a reprovar em todos os outros workflows.
+    const temGemini = existsSync(join(dir, ".gemini/commands"));
     andaFicheiros(root, (sub, nome) => {
       // Os da RAIZ entram: `README.md`, `CLAUDE.md`, `CONTRIBUTING.md` sao documentos do
       // template como os outros, e citam anti-padroes na mesma. Ficaram de fora na primeira
@@ -389,7 +394,9 @@ export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, const
       // morta. Num consumidor real estes costumam estar customizados, e ai a regra deixa-os em
       // paz sozinha; nao e preciso excepcao nenhuma.
       const naRaiz = !sub.includes("/");
-      if (!naRaiz && !sub.startsWith(".agent/") && !sub.startsWith("src/docs/") && !sub.startsWith(".claude/")) return;
+      const doGemini = sub.startsWith(".gemini/commands/");
+      if (doGemini && !temGemini) return;
+      if (!naRaiz && !doGemini && !sub.startsWith(".agent/") && !sub.startsWith("src/docs/") && !sub.startsWith(".claude/")) return;
       if (sub.startsWith(".agent/context/") || sub.startsWith(".agent/scripts/") || sub.startsWith(".claude/hooks/")) return;
       if (JA_TRATADO.has(sub) || !substituivel(sub, nome)) return;
       if (!podeCopiar(sub)) return;
