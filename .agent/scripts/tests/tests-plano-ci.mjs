@@ -15,7 +15,7 @@
  */
 import { pathToFileURL } from "url";
 import { execFileSync } from "child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
@@ -82,6 +82,26 @@ function cli(conteudo, { semArgumento = false, ilegivel = false } = {}) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+/** O plano copiado SOZINHO para uma pasta e corrido ATRAVES de um symlink para ela, como o portao o corre de
+ *  `$RUNNER_TEMP` e o teste da sombra do `tmpdir()` do macOS (`/var` aponta para `/private/var`, #366). O
+ *  symlink e do proprio teste: sem a correcao reprova em qualquer sistema, e nao so no macOS. */
+function cliPorSymlink(conteudo) {
+  const dir = mkdtempSync(join(tmpdir(), "plano-ci-test-link-"));
+  try {
+    const real = join(dir, "real");
+    mkdirSync(real);
+    copyFileSync(PLANO, join(real, "plano-ci.mjs"));
+    symlinkSync(real, join(dir, "link"), "dir");
+    writeFileSync(join(dir, "tocados.txt"), conteudo);
+    try {
+      return { code: 0, out: execFileSync("node", [join(dir, "link", "plano-ci.mjs"), join(dir, "tocados.txt")], { stdio: "pipe" }).toString().trim() };
+    } catch (err) {
+      return { code: err.status, out: `${err.stdout ?? ""}${err.stderr ?? ""}` };
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 const espera = (r, code, out) => (r.code === code && (out === null || r.out === out) ? [] : [`esperava exit ${code}${out === null ? "" : ` e "${out}"`}, veio ${r.code}: ${JSON.stringify(r.out)}`]);
 /** Uma recusa, pela SUA mensagem: so o exit 2 deixava passar uma recusa desligada que caia na seguinte (as duas leituras do C1). */
 const recusaCom = (r, trecho) => (r.code === 2 && r.out.includes(trecho) ? [] : [`esperava exit 2 com "${trecho}", veio ${r.code}: ${JSON.stringify(r.out)}`]);
@@ -94,6 +114,7 @@ export function registar() {
   registarResultado("plano: uma linha vazia no meio recusa (#347)", recusaCom(cli("a\n\nb\n"), "linha vazia no meio"));
   registarResultado("plano: sem argumento recusa (#347)", recusaCom(cli(null, { semArgumento: true }), "falta o ficheiro"));
   registarResultado("plano: um ficheiro ilegivel recusa (#347)", recusaCom(cli(null, { ilegivel: true }), "nao consegui ler"));
+  registarResultado("plano: corrido atraves de um symlink, responde na mesma (#366)", espera(cliPorSymlink(".agent/scripts/x.mjs\n"), 0, "true"));
   registarResultado("plano: caminhosDe aceita o `\\n` final e so ele (#347)", [
     ...(JSON.stringify(caminhosDe("a\nb\n").caminhos) === '["a","b"]' ? [] : ["o `\\n` final nao foi aceite"]),
     ...(caminhosDe("a\n\n").erro ? [] : ["uma linha vazia antes do fim passou"]),
