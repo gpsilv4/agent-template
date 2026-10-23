@@ -37,7 +37,7 @@
  */
 import { spawn } from "child_process";
 import { availableParallelism } from "os";
-import { pathToFileURL } from "url";
+import { ehMain } from "./eh-main.mjs";
 
 /** O tecto por omissao: o melhor ponto medido foi 4, e num runner de 2 cores sao 2. */
 export const TECTO = 4;
@@ -175,7 +175,7 @@ export function reprova(motivo, escreve = (l) => process.stdout.write(l)) {
   process.exitCode = 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (ehMain(import.meta.url)) {
   const { max, comandos, erros } = leArgs(process.argv.slice(2));
   if (erros.length) {
     // Um argumento que nao e uma suite REPROVA: engolido, era uma suite que nunca corria com o passo verde.

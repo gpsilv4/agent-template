@@ -278,6 +278,7 @@ not to* line, so every agent sees it.
     │   ├── surface-patterns.mjs   <- Pattern tables: what can't drop, what can't appear
     │   ├── patch.mjs           <- Text patching with THREE outcomes: applied / already-set / no-target
     │   ├── derivado.mjs        <- "Is this repo the template, or a project derived from it?"
+    │   ├── eh-main.mjs         <- "Is this module what node is running?" — real paths, safe behind a symlink (#373)
     │   └── ficheiros.mjs       <- Reads that tell "missing" apart from "unreadable"
     │
     └── tests/                  <- Everything that TESTS the machinery above
