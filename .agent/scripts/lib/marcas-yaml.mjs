@@ -42,12 +42,14 @@ export const paraMarcas = (f, t) =>
  *    da marca, sem saber de que job era, e deixava-o passar (auditoria do #308).
  *  - O push de um MERGE num repo privado (#347, PR B): `pull_request || publico || committer != web-flow`.
  *    E verdadeiro em TODO o PR e em todo o repo publico — so salta, num privado, o push que o GitHub fez ao
- *    mergear (o PR ja correu tudo; num privado free cada job e cobrado ao minuto). So nos tres jobs do
+ *    mergear (o PR ja correu tudo; num privado free cada job e cobrado ao minuto). So nos dois jobs do
  *    `ci.yml` que o PR tambem corre (`JOBS_DO_MERGE`): noutro workflow — um so de `push`, como um `deploy` —
  *    ou noutro job, o "o PR ja correu isto" nao e verdade, e a mesma forma CONTA (as duas leituras do PR B).
  *    O portao (`Guard Tests`) recalcula o salto no SEU shell e reprova qualquer outro `skipped`.
+ *    O `secret-scan` SAIU da lista (#372): um commit pela UI web no `main` tem o mesmo committer, e com o
+ *    salto nunca era varrido. Posto la de volta, o `if:` conta como enfraquecimento.
  */
-const JOBS_DO_MERGE = new Set(["quality", "guard-tests", "secret-scan"]);
+const JOBS_DO_MERGE = new Set(["quality", "guard-tests"]);
 const CI_DO_MERGE = /(^|\/)\.github\/workflows\/ci\.ya?ml$/;
 const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
 const MERGE_PRIVADO = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*\|\|[ \t]*!github\.event\.repository\.private[ \t]*\|\|[ \t]*github\.event\.head_commit\.committer\.username[ \t]*!=[ \t]*'web-flow'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;

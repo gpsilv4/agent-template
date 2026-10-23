@@ -87,7 +87,7 @@ export const SUITES = [
   // exactamente o buraco que este mapa existe para fechar. E o `test-hooks.mjs` importa o
   // `FAIL_FAST` dele, de outra arvore: regra propria, para nao ficar de fora (#241).
   { re: /^\.agent\/scripts\/tests\/harness\/relatorio\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
-  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado|guard-direto)\.mjs$/, verifica: [S("test-guards.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado|guard-direto|repo-descartavel)\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O `lib/alcance.mjs` deriva do git que pastas e ficheiros cada guard tem de varrer, e o
   // `tests-alcance.mjs` (que corre no `test-guards.mjs`) e quem o exercita. Sem esta regra,
   // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir

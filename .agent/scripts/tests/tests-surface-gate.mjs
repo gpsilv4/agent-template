@@ -406,7 +406,7 @@ export function registar() {
       muda(dir, agregador(null), agregador(cond)),
     { code: 1, includes: [IF] });
   }
-  // O push de um merge num privado (#347, PR B): a forma exacta, so como `if:` de JOB, e so nos tres jobs do
+  // O push de um merge num privado (#347, PR B): a forma exacta, so como `if:` de JOB, e so nos dois jobs do
   // `ci.yml` que o PR tambem corre. Cada forma excluida tem o par que CONTA: uma cauda, um `)`, as aspas
   // trocadas, uma continuacao, cada operador, o passo, outro job, outro workflow.
   const MP = "github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'";
@@ -437,6 +437,10 @@ export function registar() {
   // Outro job (um `deploy` a jusante) e outro workflow (so de `push`): o "o PR ja correu isto" e falso (as duas leituras).
   test("gate: a forma do merge num privado noutro job do ci.yml conta (#347)", (dir) =>
     muda(dir, comJob(null, "deploy"), comJob(MP, "deploy")),
+  { code: 1, includes: [IF] });
+  // O `secret-scan` saiu da isencao (#372): um commit pela UI web no `main` tem o mesmo committer, e nunca era varrido.
+  test("gate: a forma do merge num privado no `secret-scan` conta (#372)", (dir) =>
+    muda(dir, comJob(null, "secret-scan"), comJob(MP, "secret-scan")),
   { code: 1, includes: [IF] });
   test("gate: a forma do merge num privado noutro workflow conta (#347)", (dir) =>
     muda(dir, comJob(null), comJob(MP), { ficheiro: ".github/workflows/deploy.yml" }),

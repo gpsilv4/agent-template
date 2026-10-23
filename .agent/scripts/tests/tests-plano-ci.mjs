@@ -153,8 +153,16 @@ export function registar() {
     if (!ehDerivado((rel) => leOuNull(join(ROOT, rel))))
       registarResultado("plano: no template, o job `simulators` existe e a sua regex e exigida (TP15)", temSimuladores ? [] : ["o ci.yml do template nao tem o job `simulators`"]);
   }
-  registarResultado("plano: um prefixo mudado so num sitio do ci.yml reprova (controlo, #347)", regexQueDivergem(ci.replace("|\\.githooks/)'", "|\\.githook/)'")).length > 0 ? [] : ["a regex mudada passou"]);
-  registarResultado("plano: um `grep` alargado a `.github/` no ci.yml reprova (controlo, #347)", regexQueDivergem(ci.replace("|\\.githooks/)'", "|\\.githooks/|\\.github/)'")).length > 0 ? [] : ["o grep alargado passou"]);
+  // Cada controlo exige que o `replace` MUDOU o texto (#372 A8, `TP15`): num derivado com o `grep` escrito doutra
+  // forma, o `ci` ficava igual e o controlo reprovava pela razao errada (ou passava sem comparar nada).
+  const mutado = (de, para) => { const m = ci.replace(de, para); return m === ci ? null : m; };
+  for (const [nome, para, falha] of [
+    ["um prefixo mudado so num sitio do ci.yml reprova (controlo, #347)", "|\\.githook/)'", "a regex mudada passou"],
+    ["um `grep` alargado a `.github/` no ci.yml reprova (controlo, #347)", "|\\.githooks/|\\.github/)'", "o grep alargado passou"],
+  ]) {
+    const m = mutado("|\\.githooks/)'", para);
+    registarResultado(`plano: ${nome}`, m === null ? ["o controlo nao mudou o ci.yml: o `grep` nao tem a forma esperada"] : regexQueDivergem(m).length > 0 ? [] : [falha]);
+  }
   registarResultado("plano: um ci.yml sem as regex reprova, e nao passa sem comparar (#347)", regexQueDivergem("jobs: {}\n").length > 0 ? [] : ["zero regex passou"]);
 
   // --- O plano e copiado SOZINHO da base -----------------------------------------------------------------

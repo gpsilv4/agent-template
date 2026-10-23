@@ -6,17 +6,18 @@
  * O `if:` de job do `guard-tests` deixa saltar as suites no push de um merge num repo PRIVADO. O portao
  * nao confia nesse `if:`: recalcula o salto no seu shell, e reprova qualquer outro `skipped`. Se o
  * recalculo partir — ou o `if:` for alargado num PR futuro —, um push ficava verde sem medir nada (`TP2`).
- * Por isso le-se o passo REAL do `ci.yml` (e nao uma copia), e corre-se com `bash -e`, como o runner, para
+ * Por isso le-se o passo REAL do `ci.yml` (e nao uma copia), e corre-se com `bash -e`, como o runner (e o corpo
+ * abre com `set -eu`, para falhar fechado tambem sem ele, #372), para
  * cada combinacao do evento. A mensagem do merge passa pelo `.githooks/commit-msg` real.
  */
 import { pathToFileURL } from "url";
-import { execFileSync } from "child_process";
 import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
+import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -63,23 +64,22 @@ const COM_IA = `${LIMPA}\nCo-Authored-By: Claude <noreply@anthropic.com>\n`;
  *  e o contexto que falta, de proposito duas). */
 const MERGE = { SUITES: "skipped", VARREDURA: "skipped", EVENTO: "push", PRIVADO: "true", COMMITTER: "web-flow" };
 
+/** Cada vermelho diz PORQUE (#372 A4): so o exit deixava passar um vermelho por outra razao. Os cinco que caem no
+ *  mesmo `::error::` do salto afirmam tambem a parte que muda — a mensagem sozinha nao dizia que condicao falhou. */
+const SALTO = "saltaram fora do push de um merge num privado";
 const CASOS = [
   { nome: "o push de um merge num privado, com a mensagem limpa, passa", env: MERGE, msg: LIMPA, verde: true },
-  { nome: "o push de um merge num privado com atribuicao a IA reprova", env: MERGE, msg: COM_IA, verde: false },
+  { nome: "o push de um merge num privado com atribuicao a IA reprova", env: MERGE, msg: COM_IA, verde: false, diz: ["COMMIT RECUSADO"] },
   // So o evento muda: sem isto, apagar a condicao do evento passava (o `COMMITTER` vazio ja reprovava).
-  { nome: "suites saltadas num PR reprovam", env: { ...MERGE, EVENTO: "pull_request" }, msg: LIMPA, verde: false },
-  { nome: "suites saltadas num repo publico reprovam", env: { ...MERGE, PRIVADO: "false" }, msg: LIMPA, verde: false },
-  { nome: "suites saltadas num push directo (outro committer) reprovam", env: { ...MERGE, COMMITTER: "dono" }, msg: LIMPA, verde: false },
-  { nome: "suites saltadas sem o contexto do evento (vazio) reprovam", env: { ...MERGE, PRIVADO: "", COMMITTER: "" }, msg: LIMPA, verde: false },
-  { nome: "suites saltadas com a varredura vermelha reprovam", env: { ...MERGE, VARREDURA: "failure" }, msg: LIMPA, verde: false },
-  { nome: "suites vermelhas reprovam", env: { ...MERGE, SUITES: "failure" }, msg: LIMPA, verde: false },
+  { nome: "suites saltadas num PR reprovam", env: { ...MERGE, EVENTO: "pull_request" }, msg: LIMPA, verde: false, diz: [SALTO, "(pull_request,"] },
+  { nome: "suites saltadas num repo publico reprovam", env: { ...MERGE, PRIVADO: "false" }, msg: LIMPA, verde: false, diz: [SALTO, "privado=false"] },
+  { nome: "suites saltadas num push directo (outro committer) reprovam", env: { ...MERGE, COMMITTER: "dono" }, msg: LIMPA, verde: false, diz: [SALTO, "committer=dono"] },
+  { nome: "suites saltadas sem o contexto do evento (vazio) reprovam", env: { ...MERGE, PRIVADO: "", COMMITTER: "" }, msg: LIMPA, verde: false, diz: [SALTO, "privado=, committer=,"] },
+  { nome: "suites saltadas com a varredura vermelha reprovam", env: { ...MERGE, VARREDURA: "failure" }, msg: LIMPA, verde: false, diz: [SALTO, "varredura=failure"] },
+  { nome: "suites vermelhas reprovam", env: { ...MERGE, SUITES: "failure" }, msg: LIMPA, verde: false, diz: ["nao passaram: failure"] },
   { nome: "suites verdes num push, sem varredura, passam (como antes)", env: { ...MERGE, SUITES: "success", COMMITTER: "dono" }, msg: COM_IA, verde: true },
-  { nome: "suites verdes num PR com a varredura saltada reprovam (como antes)", env: { ...MERGE, SUITES: "success", EVENTO: "pull_request" }, msg: LIMPA, verde: false },
+  { nome: "suites verdes num PR com a varredura saltada reprovam (como antes)", env: { ...MERGE, SUITES: "success", EVENTO: "pull_request" }, msg: LIMPA, verde: false, diz: ["a varredura de mutacao nao passou (pull_request): skipped"] },
 ];
-
-/** O git e o shell sem a configuracao de quem corre (um `commit.gpgsign` global partia o commit da fixture),
- *  como nas outras suites que montam repos. */
-const ISOLADO = { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
 
 /** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real. */
 function corre(corpo, env, mensagem) {
@@ -88,17 +88,12 @@ function corre(corpo, env, mensagem) {
     const repo = join(dir, "repo");
     mkdirSync(repo);
     cpSync(join(ROOT, ".githooks"), join(repo, ".githooks"), { recursive: true });
-    const git = (args) => execFileSync("git", args, { cwd: repo, stdio: "pipe", env: { ...process.env, ...ISOLADO } });
+    const git = gitEm(repo);
     git(["init", "-q"]);
-    git(["-c", "user.name=t", "-c", "user.email=t@t", "add", "-A"]);
+    git(["add", "-A"]);
     writeFileSync(join(dir, "msg"), mensagem);
-    git(["-c", "user.name=t", "-c", "user.email=t@t", "-c", "core.hooksPath=/dev/null", "commit", "-q", "-F", join(dir, "msg")]);
-    try {
-      execFileSync("bash", ["-e", "-c", corpo], { cwd: repo, stdio: "pipe", env: { ...process.env, ...ISOLADO, ...env, RUNNER_TEMP: dir } });
-      return 0;
-    } catch (err) {
-      return typeof err.status === "number" ? err.status : -1;
-    }
+    git(["commit", "-q", "-F", join(dir, "msg")]);
+    return correCorpo(corpo, { cwd: repo, env, runnerTemp: dir });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -134,7 +129,36 @@ export function registar() {
   // O extractor nao pode devolver um corpo que passa tudo por estar vazio ou cortado.
   registarResultado("portao: o corpo lido e o shell inteiro do passo", /varredura-shards\.mjs/.test(corpo) && /commit-msg/.test(corpo) ? [] : ["o corpo lido nao tem o `varredura-shards` e o `commit-msg`"]);
   for (const c of CASOS) {
-    const rc = corre(corpo, c.env, c.msg);
-    registarResultado(`portao: ${c.nome} (#347)`, (rc === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${rc}`]);
+    const r = corre(corpo, c.env, c.msg);
+    registarResultado(`portao: ${c.nome} (#347)`, [
+      ...((r.code === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${r.code}`]),
+      ...(c.diz ?? []).filter((t) => !r.out.includes(t)).map((t) => `o vermelho nao foi o esperado: faltou "${t}"`),
+    ]);
   }
+
+  // O `secret-scan` corre em TODO o push (#372 A1): com o salto do merge, um commit pela UI web no `main` (o mesmo
+  // committer `web-flow`) nunca era varrido. No template, o job tem de existir e nao saltar; num derivado, SKIP (`TP15`).
+  // NENHUMA tag publicou o salto no `secret-scan` (entrou e saiu entre a v0.60.0 e a v0.61.0): so um projeto que o
+  // copiou do `main` o tem, e ai nada o avisa — tira-se a mao.
+  const p = problemasDoSecretScan(ci);
+  if (p.length && ehDerivado(lerRaiz)) {
+    console.log(`  SKIP  portao: ${p[0]} — num derivado, tirar a mao (#372)`);
+    registarResultado("portao: o `secret-scan` num derivado, nada a medir (#372)", []);
+  } else {
+    registarResultado("portao: o `secret-scan` existe e nao salta o push do merge num privado (#372)", p);
+  }
+  // O controlo: o `if:` do salto, posto num `secret-scan` sintetico, tem de reprovar; um ficheiro sem o job tambem.
+  const sint = (cond) => `jobs:\n  secret-scan:\n    name: Secret Scan\n${cond}    runs-on: ubuntu-latest\n`;
+  registarResultado("portao: o `if:` do salto no `secret-scan`, e o job em falta, reprovam (controlo, #372)", [
+    ...(problemasDoSecretScan(sint("")).length === 0 ? [] : ["o `secret-scan` limpo reprovou"]),
+    ...(problemasDoSecretScan(sint("    if: github.event_name == 'pull_request' || github.event.head_commit.committer.username != 'web-flow'\n")).length > 0 ? [] : ["o `if:` do salto passou"]),
+    ...(problemasDoSecretScan("jobs:\n  outro:\n    runs-on: x\n").length > 0 ? [] : ["um ci.yml sem o `secret-scan` passou"]),
+  ]);
+}
+
+/** Os problemas do job `secret-scan` do `ci.yml` (#372 A1): tem de existir, e nao pode ter o `if:` do salto do merge. */
+export function problemasDoSecretScan(ci) {
+  const job = /\n  secret-scan:[ \t]*\r?\n((?:    .*\r?\n|\r?\n)*)/.exec(ci)?.[1] ?? null;
+  if (job === null) return ["o ci.yml nao tem o job `secret-scan`"];
+  return /^    if:.*committer\.username/m.test(job) ? ["o job `secret-scan` tem o `if:` do salto do merge: um commit pela UI web no `main` nunca era varrido"] : [];
 }
