@@ -60,6 +60,16 @@ export function registar() {
 
   // O salto do push de um merge num privado (#347, PR B): "ja tem" = o `if:` E o shell do portao.
   registarResultado("2b CI: o salto do merge so no template da a nota (#347)", so(notas({ ciLa: IF_MERGE + PORTAO }), "push de um merge num repo privado"));
+  // O que a nota MANDA trazer nao inclui o `Secret Scan` (#372): mandado, cada `/upgrade` reintroduzia nos derivados
+  // um push que salta a varredura de segredos. O `simulate-upgrade` so mede que a nota aparece, nao o que diz.
+  {
+    const [n = ""] = notas({ ciLa: IF_MERGE + PORTAO });
+    const [ordem, aviso] = n.split("O `Secret Scan` NAO salta");
+    registarResultado("2b CI: a nota do salto do merge nao manda trazer o `if:` do `Secret Scan` (#372)", [
+      ...(aviso === undefined ? ["a nota nao diz que o `Secret Scan` nao salta"] : []),
+      ...(/Secret Scan|tres `if:`/.test(ordem) ? ["a parte que manda trazer os `if:` nomeia o `Secret Scan` (ou tres jobs)"] : []),
+    ]);
+  }
   registarResultado("2b CI: o salto do merge nos dois lados, nao (#347)", nenhuma(notas({ ciLa: IF_MERGE + PORTAO, ciAqui: IF_MERGE + PORTAO })));
   registarResultado("2b CI: so o `if:` do salto no projeto (a meias) da a nota (#347)", so(notas({ ciLa: IF_MERGE + PORTAO, ciAqui: IF_MERGE }), "push de um merge num repo privado"));
   // O simetrico (leitura do C0): so o shell do portao, sem os `if:`. Sem ele, tirar a metade `if:` passava.

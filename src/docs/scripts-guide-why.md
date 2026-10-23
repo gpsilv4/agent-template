@@ -152,9 +152,9 @@ medicao real faz-se no CI dos derivados depois do `/upgrade`, e fica no #347.
 | Evento (privado, com app) | Antes | Depois de A, B e C1 | Com o C2 |
 |---|---|---|---|
 | PR de codigo, sem maquinaria | 13-14 (10 jobs) | ~10-11 (a app num job) | ~7-8 (sem os 3 shards) |
-| push do merge para o `main` | 10-11 (7 jobs) | 1 (so o `Guard Tests`) | 1 |
-| PR de codigo completo (PR + push) | ~24 | ~11-12 | ~8-9 |
-| PR de maquinaria (um `/upgrade`) + push | ~84 (62 nos shards) | ~71-72 (84 - ~3 da app - ~9,5 do push) | ~71-72: a varredura aplica-se; quem ajuda e o #357 (num derivado, varrer so o que difere da tag) |
+| push do merge para o `main` | 10-11 (7 jobs) | 2 (o `Guard Tests` e o `Secret Scan`, #372) | 2 |
+| PR de codigo completo (PR + push) | ~24 | ~12-13 | ~9-10 |
+| PR de maquinaria (um `/upgrade`) + push | ~84 (62 nos shards) | ~72-73 (84 - ~3 da app - ~8,5 do push) | ~72-73: a varredura aplica-se; quem ajuda e o #357 (num derivado, varrer so o que difere da tag) |
 
 O tempo de RELOGIO de um PR nao muda (~4 min num privado, dominado pelo `Guard Suites`); o push do merge passa de
 ~4 min a segundos. Num repo publico nada muda: os minutos nao contam. O D (saltar o pesado num PR so de docs) foi
@@ -181,12 +181,12 @@ Juntar tudo poupava mais 2 min por corrida, e abria isso. A Fase 0 (tres passage
 
 #### O push de um merge num privado (PR B)
 
-O `quality`, o `guard-tests` e o `secret-scan` tem o mesmo `if:` de job:
+O `quality` e o `guard-tests` tem o mesmo `if:` de job (o `secret-scan` tambem o tinha; saiu no #372, ver os limites):
 `github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'`.
 E verdadeiro em todo o PR e em todo o repo publico: so salta, num privado, o push que o GitHub faz ao mergear
 (committer `web-flow`, num merge commit ou num squash). Esse push corria o mesmo codigo que o PR acabou de
 verificar, e custava 10-11 min cobrados por PR num derivado com app (7 jobs no CI da v0.60; ~5 no template, sem
-app). Passa a 1 (so o portao), como na tabela acima.
+app). Passa a 2 (o portao e o `Secret Scan`, #372), como na tabela acima.
 
 **O portao (`Guard Tests`) nao confia no `if:`.** Corre sempre (`always()`), e no seu shell aceita as suites
 `skipped` so com as tres condicoes recalculadas (nao e um PR, `private == true`, committer `web-flow`) e a
@@ -195,7 +195,7 @@ continua a ser apanhada no `main`, que de outro modo ninguem lia. Qualquer outro
 alargado num PR futuro avisa uma vez no `check-test-surface` (sai pelo trailer) e, depois disso, o portao
 reprova cada push que ele deixasse de verificar. O shell real e testado em `tests-portao-ci.mjs`.
 
-**O medidor da superficie** isenta esta forma so EXACTA, so como `if:` de job e so nesses tres jobs do
+**O medidor da superficie** isenta esta forma so EXACTA, so como `if:` de job e so nesses dois jobs do
 `ci.yml` (`marcas-yaml.mjs`, `isencoesDeJob`). Num passo, com uma cauda, noutro job ou noutro workflow, conta:
 num workflow so de `push` (um `deploy`, o `release.yml`) o "o PR ja correu isto" e falso, e a primeira versao,
 que isentava em qualquer job, deixava-o desligar sem marca (as duas leituras do PR B).
@@ -203,7 +203,7 @@ que isentava em qualquer job, deixava-o desligar sem marca (as duas leituras do 
 **Limites, aceites e escritos:**
 - um PR mergeado com o CI vermelho ou desatualizado deixa o `main` por verificar ate ao PR seguinte (num
   privado free a protecao nao e imposta, logo o merge vermelho ja era possivel);
-- um commit pela UI web directamente no `main` tambem tem o committer `web-flow`, e salta;
+- um commit pela UI web directamente no `main` tambem tem o committer `web-flow`, e salta o `quality` e o `guard-tests`. **O `Secret Scan` ja nao salta (#372):** com o salto, esse commit nunca era varrido (no PR, a action so varre os commits do PR), e o segredo ficava no historico sem aviso. Custa +1 min cobrado por merge num privado;
 - um committer forjado salta (o campo vem do commit);
 - o `commit-msg` ignora as linhas que comecam por `#` (os comentarios do git, tambem fora do editor): uma
   atribuicao escrita num cabecalho markdown do corpo de um squash passa — o mesmo limite que ja tinha no

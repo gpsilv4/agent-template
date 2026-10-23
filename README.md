@@ -295,6 +295,7 @@ not to* line, so every agent sees it.
             ├── guard-direto.mjs          <- Runs one guard module directly, without the full checker
             ├── fixture-ordem.mjs         <- Fixtures for the owner-first ordering
             ├── relatorio.mjs             <- PASS/FAIL counters and the fail-fast mode, one source
+            ├── repo-descartavel.mjs      <- The throwaway git repo the CI gate's real shell runs in
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -408,7 +409,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Build | `npm run build` — verify bundle (skipped if there is no `build` script) |
 | Unit Tests | `npm run test:unit` (skipped if there is no `test:unit` script) |
 | Security Audit | the `Audit` step: `npm audit --audit-level=high` — **informative, does not block the merge** (`continue-on-error`) |
-| Secret Scan | `gitleaks` — scans full history for committed secrets (runs always, even on the bare template) |
+| Secret Scan | `gitleaks` — scans the commits of each PR and of each push for committed secrets (runs always, even on the bare template; #372) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every push/PR** in the `guard-tests` job |
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every push/PR** in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every push/PR** in the `guard-tests` job |
@@ -473,9 +474,9 @@ Branch protection rules (require status checks, block force push) require **GitH
 
 > **Note**: the `Code Quality` job checks for `package.json` **after checkout** (its `Projeto` step), and its app steps skip on the bare template.
 >
-> **Two consequences of one job (#347), written down:**
+> **Three consequences of one job (#347), written down:**
 > - **A red step stops the next ones.** A `tsc` error means the unit tests and the audit do not run in that run. They used to run in jobs of their own. The PR is red either way; the signal per run is smaller.
-> - **In a PRIVATE repo, the push of a PR merge skips `Code Quality`, `Guard Suites` and `Secret Scan`** (#347): the PR already ran them on the same code. `Guard Tests` still runs, re-checks that it really is a merge push (`web-flow`, private, not a PR) and checks the merge message with `.githooks/commit-msg`. Limits: a PR merged red, a web-UI commit straight to `main`, or a forged committer also skip — see `src/docs/scripts-guide-why.md`. Public repos run everything on push, as before.
+> - **In a PRIVATE repo, the push of a PR merge skips `Code Quality` and `Guard Suites`** (#347): the PR already ran them on the same code. `Guard Tests` still runs, re-checks that it really is a merge push (`web-flow`, private, not a PR) and checks the merge message with `.githooks/commit-msg`. `Secret Scan` does **not** skip (#372): a web-UI commit straight to `main` has the same committer, and would never be scanned. Limits: a PR merged red, a web-UI commit straight to `main`, or a forged committer also skip the other two — see `src/docs/scripts-guide-why.md`. Public repos run everything on push, as before.
 > - **On the bare template the `Audit` step shows a tolerated X on every run.** `npm audit` fails without a lockfile, and `continue-on-error` keeps the job green. Guarding it would take a new `if:`, which the surface checker counts. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
 
 ## Placeholders

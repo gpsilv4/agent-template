@@ -54,8 +54,8 @@ The rule "ZERO sensitive data in committed files" (`.agent/rules/core-rules.md`)
 1. **Prevention — GitHub Secret Scanning + Push Protection** (public repositories; see
    `src/docs/github-security.md`): `Settings > Advanced Security` → **Secret Protection** and **Push protection**.
    Push protection **blocks the push** if a secret is detected — the cheapest, strongest gate.
-2. **CI gate — Gitleaks** (`.github/workflows/ci.yml`, `secret-scan` job): scans the full git
-   history on every push/PR. Runs even on the bare template, on any plan — the layer that covers
+2. **CI gate — Gitleaks** (`.github/workflows/ci.yml`, `secret-scan` job): scans the commits of every
+   PR and every push (#372: a direct web-UI commit on `main` included). Runs even on the bare template, on any plan — the layer that covers
    a private repository without secret scanning.
    **Note:** on **organization-owned** repos `gitleaks-action` needs a free `GITLEAKS_LICENSE`
    (set it as a repository secret — the env line in `ci.yml` is already there); personal repos

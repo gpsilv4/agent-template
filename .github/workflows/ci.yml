@@ -475,6 +475,7 @@ jobs:
           PRIVADO: ${{ github.event.repository.private }}
           COMMITTER: ${{ github.event.head_commit.committer.username }}
         run: |
+          set -eu
           echo "  suites: $SUITES · varredura: $VARREDURA"
           # As suites SALTADAS (#347, PR B) so no push de um merge num privado — recalculado AQUI, e nao
           # confiado ao `if:` do `guard-tests`: um `if:` alargado num PR futuro (que avisa uma vez e sai pelo
@@ -595,12 +596,12 @@ jobs:
         if: github.event_name == 'pull_request'
         run: node .agent/scripts/simulate-upgrade.mjs
 
-  # Runs on every PR and push, including the bare template (no package.json guard) — except the push of a
-  # PR merge in a PRIVATE repo (#347, the `if:` below): the PR already scanned it. Scans the full history.
+  # Runs on every PR and every push, including the bare template (no package.json guard) (#372). On a PR the
+  # action scans the PR's commits; on a push, the pushed commits — a commit made directly on `main` through
+  # the web UI included. It does NOT take the merge skip of `quality`/`guard-tests` (#347 B): that skip reads
+  # the committer `web-flow`, which a web-UI commit also has, and nothing would ever scan that commit again.
   secret-scan:
     name: Secret Scan
-    # O mesmo salto do `quality` (#347, PR B).
-    if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # gitleaks-action v3 lista os commits do PR (evento pull_request) via API -> precisa
