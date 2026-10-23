@@ -42,6 +42,7 @@ import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync,
 import { dirname, join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import { ehDerivado } from "./lib/derivado.mjs";
+import { ehMain } from "./lib/eh-main.mjs";
 
 /** O que nunca se copia sem decisao do utilizador: uma licenca nao se herda por omissao. */
 export const PERGUNTAR = ["LICENSE"];
@@ -223,16 +224,10 @@ const lista = (titulo, xs) => {
   if (xs.length) console.log(`\n${titulo} (${xs.length}):\n${xs.map((x) => `  ${x}`).join("\n")}`);
 };
 
-// `realpath` dos dois lados: o node resolve symlinks no `import.meta.url` e nao no `argv[1]`, logo num
-// caminho com um (o `/var` do macOS e um) a comparacao crua dava falso e a CLI saia 0 sem fazer nada.
-const principal = (() => {
-  try {
-    return realpathSync(process.argv[1] ?? "") === realpathSync(fileURLToPath(import.meta.url));
-  } catch {
-    return false;
-  }
-})();
-if (principal) {
+// `realpath` dos dois lados (`lib/eh-main.mjs`, uma so fonte desde o #373): o node resolve symlinks no
+// `import.meta.url` e nao no `argv[1]`, logo num caminho com um (o `/var` do macOS e um) a comparacao crua
+// dava falso e a CLI saia 0 sem fazer nada.
+if (ehMain(import.meta.url)) {
   const args = process.argv.slice(2);
   // Um `--dry-run` (o palpite natural, com o README em ingles) nao pode cair na copia real.
   const desconhecidos = args.filter((a) => a !== "--simular");

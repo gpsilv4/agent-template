@@ -80,6 +80,8 @@ try {
   escreve(tpl, ".github/workflows/ci.yml", "jobs: {}\n");
   cpSync(join(SCRIPTS, "adotar-template.mjs"), join(tpl, ".agent/scripts/adotar-template.mjs"));
   cpSync(join(SCRIPTS, "lib/derivado.mjs"), join(tpl, ".agent/scripts/lib/derivado.mjs"));
+  // O que o `adotar-template.mjs` importa tem de vir com ele (#373: a guarda de entry point partilhada).
+  cpSync(join(SCRIPTS, "lib/eh-main.mjs"), join(tpl, ".agent/scripts/lib/eh-main.mjs"));
   git(tpl, "init", "-q", "-b", "main");
   git(tpl, "add", "-A");
   git(tpl, "commit", "-q", "-m", "template");
@@ -123,7 +125,8 @@ try {
     const m = planear(tpl, projeto());
     return [
       ...espera(m.colisoes.length === 0, `num projeto vazio nada colide, e saiu ${m.colisoes}`),
-      ...espera(m.copiados.length === 9, `devia copiar 9 (todos menos o LICENSE), copiou ${m.copiados.length}`),
+      // O total vem da fixture, e nao de um numero escrito a mao (`TP8`): era 9, e partiu ao entrar o `eh-main.mjs` (#373).
+      ...((total) => espera(total > 1 && m.copiados.length === total - 1, `devia copiar ${total - 1} (os ${total} da fixture menos o LICENSE), copiou ${m.copiados.length}`))(git(tpl, "ls-files").trim().split("\n").length),
     ];
   });
 

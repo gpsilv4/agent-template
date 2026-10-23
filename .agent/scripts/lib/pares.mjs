@@ -45,6 +45,9 @@ const PARES_DO_TEMPLATE = [
   // O PLANO do CI (#347, C1): as tres recusas da CLI. Uma que nao fica vermelha e um "false" por nao ter lido — a
   // varredura deixava de correr num PR que a pedia (no C2). O dono e o `tests-plano-ci.mjs`.
   { alvo: ".agent/scripts/lib/plano-ci.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$]|function )recusa\(/, neutro: "(() => {})(" },
+  // A guarda de entry point partilhada (#373): sem sitio de recusa, ficava isenta — mas e a logica que, errada, CALA
+  // as CLIs que decidem um veredicto (`TP2`). Cada `realpathSync(` desligado tem de pintar um caso do `tests-eh-main.mjs`.
+  { alvo: ".agent/scripts/lib/eh-main.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])realpathSync\(/, neutro: "(() => undefined)(" },
   // O PORTAO dos shards da varredura (#308): cada recusa e um shard em falta, repetido ou a
   // discordar — desligar uma deixava a perna completa passar com sitios por medir.
   { alvo: ".agent/scripts/lib/varredura-shards.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },

@@ -188,6 +188,25 @@ const PARES = [
   ["node", "node -i x.mjs", "node -ip x.mjs"],
 ];
 
+/**
+ * Os milissegundos de `cmd` ACIMA do arranque medido na mesma corrida (#373 A10, `TP3`). O `decide` cronometra o
+ * repo de fixture e o spawn do hook alem da decisao; desde o #337 corre ao lado de outras tres suites, e num runner
+ * de 2 vCPU era o spawn, e nao o codigo, a chegar ao tecto. A base e o MINIMO de `amostras`, medida logo antes:
+ * um pico durante a base nao a infla (falha fechado), e um pico na chamada longa continua vermelho.
+ * @param {(c: string) => void} corre sincrono @returns {{ ms: number, base: number }}
+ */
+export function msAcimaDaBase(corre, cmd, { base = `cat ${H}`, amostras = 3 } = {}) {
+  const t = (c) => {
+    const i = performance.now();
+    corre(c);
+    return performance.now() - i;
+  };
+  const b = Math.min(...Array.from({ length: amostras }, () => t(base)));
+  return { ms: t(cmd) - b, base: b };
+}
+/** Uma espera SINCRONA (o `decide` e sincrono: um `setTimeout` nao acrescentava tempo a regiao medida). */
+const espera = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
 export function registar({ test, corre, repo, eq, contem }) {
   const decide = (comando, esperado, extra) => {
     const d = repo();
@@ -254,20 +273,29 @@ export function registar({ test, corre, repo, eq, contem }) {
   // caracteres, no processo do hook. A folga e larga de proposito (o `main` faz isto em ~5 ms): o teste so tem
   // de ver a classe de crescimento, e nao o numero de uma maquina.
   // Passado o tecto de posicoes ou de voltas, NEGA (nao se sabe quem corre) — e depressa. Cada forma e uma das
-  // que a auditoria mediu em segundos; o tempo inclui o spawn do hook.
+  // que a auditoria mediu em segundos; o tempo e o que fica ACIMA do arranque medido na mesma corrida (`msAcimaDaBase`, #373).
   for (const [nome, cmd] of [
     ["`{ `x661 + `exec `x529", `cat ${H} echo ${"{ ".repeat(661)}${"exec ".repeat(529)}`],
     ["`{ `x661 + `env A=1 `x331", `cat ${H} echo ${"{ ".repeat(661)}${"env A=1 ".repeat(331)}`],
     ["`npx ` + `{ env `x500", `cat ${H} | npx ${"{ env ".repeat(500)}`],
     ["`{ x time -p `x300", `cat ${H} echo ${"{ x time -p ".repeat(300)}`],
   ]) {
-    test(`posicao: ${nome} (~4000 caracteres) nega em menos de 1 s`, () => {
-      const t = performance.now();
-      decide(cmd, "deny");
-      const ms = performance.now() - t;
-      if (ms > 1000) throw new Error(`${ms.toFixed(0)} ms para ${cmd.length} caracteres`);
+    test(`posicao: ${nome} (~4000 caracteres) nega em menos de 1 s acima do arranque`, () => {
+      const { ms, base } = msAcimaDaBase((c) => decide(c, c === cmd ? "deny" : "allow"), cmd);
+      if (ms > 1000) throw new Error(`${ms.toFixed(0)} ms acima do arranque (${base.toFixed(0)} ms) para ${cmd.length} caracteres`);
     });
   }
+  // O controlo da medicao (#373): com um `corre` falso e um tecto pequeno, um arranque LENTO nas duas chamadas nao
+  // conta (a base desconta-o), e so a chamada longa lenta conta. Sem a base, o primeiro caso ja era vermelho.
+  test("posicao: a medicao desconta o arranque lento, e apanha so a decisao lenta (controlo, #373)", () => {
+    const alvo = "o-comando-longo";
+    // Folga larga (200 ms contra um tecto de 120): o `Atomics.wait` nunca acorda cedo, mas num runner carregado
+    // pode acordar tarde, e o controlo nao pode ele proprio ser o flake que o #373 tirou.
+    const ambos = msAcimaDaBase(() => espera(200), alvo);
+    const soLonga = msAcimaDaBase((c) => espera(c === alvo ? 200 : 0), alvo);
+    if (ambos.ms > 120) throw new Error(`um arranque lento nas duas chamadas contou como decisao lenta: ${ambos.ms.toFixed(0)} ms`);
+    if (soLonga.ms < 120) throw new Error(`uma decisao lenta nao contou: ${soLonga.ms.toFixed(0)} ms`);
+  });
   // Abaixo do tecto o veredicto nao muda: 32 `{` num `cat` continuam a ser uma leitura.
   test("posicao: abaixo do tecto de posicoes, um `cat` com `{` continua a deixar", () =>
     decide(`cat ${H} echo ${"{ ".repeat(MAX)}`, "allow"));

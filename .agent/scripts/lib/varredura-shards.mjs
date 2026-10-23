@@ -22,7 +22,7 @@
  */
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { pathToFileURL } from "url";
+import { ehMain } from "./eh-main.mjs";
 
 /**
  * Confere os relatorios de todos os shards de UMA corrida. Cada relatorio:
@@ -87,7 +87,7 @@ export function planoDe(valor, problemas) {
   return undefined;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (ehMain(import.meta.url)) {
   const [pasta, ...modos] = process.argv.slice(2);
   let relatorios = [];
   let ilegiveis = [];

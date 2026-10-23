@@ -100,6 +100,8 @@ export const PREFIXOS_DE_TESTE = [
   "plano-ci-test-",
   // Do `tests-portao-sombra.mjs` (#347, C1): o shell do portao num repo de fixture com base e HEAD.
   "portao-sombra-test-",
+  // Do `tests-eh-main.mjs` (#373): as CLIs corridas atras de um symlink que o teste cria.
+  "eh-main-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
   // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
   "paralelo-test-",

@@ -35,6 +35,8 @@ export const entryPoint = "test-guards.mjs";
 
 const PLANO = ".agent/scripts/lib/plano-ci.mjs";
 const SHARDS = ".agent/scripts/lib/varredura-shards.mjs";
+/** O que o `varredura-shards` importa (#373): a fixture copia-o com ele, senao cada caso rebentava no import. */
+const EH_MAIN = ".agent/scripts/lib/eh-main.mjs";
 /** Um plano que responde sempre `false` (o PR a tentar mudar a regra), e um que responde outra coisa. */
 const PLANO_NUNCA = 'console.log("false");\n';
 const PLANO_QUE_MENTE = 'console.log("talvez");\n';
@@ -58,6 +60,7 @@ function corre(corpo, env, o, { semE = false } = {}) {
     const escreve = (rel, txt) => { mkdirSync(dirname(join(repo, rel)), { recursive: true }); writeFileSync(join(repo, rel), txt); };
     mkdirSync(repo);
     cpSync(join(ROOT, SHARDS), join(repo, SHARDS), { recursive: true });
+    cpSync(join(ROOT, EH_MAIN), join(repo, EH_MAIN));
     if (o.basePlano !== null) escreve(PLANO, o.basePlano);
     escreve(".agent/scripts/x.mjs", "export const x = 1;\n");
     escreve("src/docs/a.md", "# a\n");

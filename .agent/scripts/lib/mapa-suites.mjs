@@ -93,6 +93,10 @@ export const SUITES = [
   // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir
   // que uma lacuna de alcance passe em silencio.
   { re: /^\.agent\/scripts\/lib\/alcance\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // A guarda de entry point partilhada (#373): o `tests-eh-main.mjs` (no `test-guards.mjs`) e quem a exercita.
+  // Sem esta regra, a generica de `lib/` mandava-a para o `test-registo`, que nao a mede. E o `test-adotar-template.mjs`
+  // tambem: a CLI da adocao decide pela guarda, e a suite dela corre-a de um tmpdir (o `/var` do macOS, um symlink).
+  { re: /^\.agent\/scripts\/lib\/eh-main\.mjs$/, verifica: [S("test-guards.mjs"), S("test-adotar-template.mjs")] },
   // O parser do `tools:` dos agentes (#238): o Guard 11 e o hook `guard-subagent-bash` leem-no.
   { re: /^\.agent\/scripts\/lib\/agentes\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   // O harness do simulador de `/upgrade`, extraido quando a suite passou as 500 linhas. Sem
