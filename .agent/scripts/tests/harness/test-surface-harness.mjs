@@ -18,6 +18,7 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join, sep } from "path";
 // O modo fail-fast lido do MESMO sitio que o motor escreve (#157, `TP8`).
 import { FAIL_FAST } from "./relatorio.mjs";
+import { ISOLADO } from "./repo-descartavel.mjs";
 import { TEST_GLOBS_DO_PROJETO, CONFIG_GLOBS_DO_PROJETO } from "../../config/superficie-de-teste.mjs";
 import { ehDerivado } from "../../lib/derivado.mjs";
 
@@ -59,8 +60,30 @@ export const CHECKER_MODULOS = [...modulosImportadosPor(".agent/scripts/check-te
   (f) => f !== ".agent/scripts/check-test-surface.mjs"
 );
 
+/** O git da FIXTURE e o do verificador, sem a configuracao de quem corre (#379): a do runner pode decidir quando
+ *  o git empacota objetos, e os casos que apagam um objeto solto falhariam numa maquina e nao noutra (`TP3`).
+ *  E PREVENTIVO, nao demonstrado: o log do flake so mostrava os nomes dos casos, e com a config por omissao um repo
+ *  desta dimensao nunca se empacota sozinho. O que fica provado e a DETECCAO (`apagaObjetoSolto`). */
 const git = (dir, args) =>
-  execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], env: { ...process.env, ...ISOLADO } }).trim();
+
+/**
+ * Apaga o objeto SOLTO `sha` do repo da fixture, para fingir uma baseline ilegivel, e confirma que desapareceu.
+ * Um `rmSync` com `force` sobre um objeto que o git empacotou nao apaga nada e nao o diz: o caso via a baseline
+ * legivel e falhava sem defeito (#379). Aqui a fixture diz que e ela que esta invalida, e nao o verificador.
+ */
+function apagaObjetoSolto(dir, sha) {
+  rmSync(join(dir, ".git/objects", sha.slice(0, 2), sha.slice(2)), { force: true });
+  let existe = true;
+  try {
+    execFileSync("git", ["cat-file", "-e", sha], { cwd: dir, stdio: "ignore", env: { ...process.env, ...ISOLADO } });
+  } catch (err) {
+    // So o exit 1 e "o objeto nao existe"; o 128 (repo partido, sha invalido) e outra coisa, e falhava aberto.
+    if (err.status !== 1) throw err;
+    existe = false;
+  }
+  if (existe) throw new Error(`fixture invalida: o objeto ${sha.slice(0, 12)} nao estava solto (o git empacotou-o) — o caso nao mediria nada`);
+}
 
 /** O repo-modelo, montado UMA vez por processo e copiado para cada teste (#308). Montar de raiz
  *  custava ~66 ms por teste (quatro processos git), copiar ~8 ms — e a varredura de mutacao corre
@@ -98,6 +121,10 @@ function montaModelo() {
   }
   writeFileSync(join(dir, "tests/exemplo.test.js"), 'test("soma", () => { expect(1 + 1).toBe(2); });\n');
   git(dir, ["init", "-q", "-b", "main"]);
+  // Nada se empacota sozinho (#379): os casos que apagam um objeto solto precisam dele solto. O `maintenance.auto`
+  // tambem, porque o `gc.auto` so desliga a tarefa `gc` da manutencao automatica.
+  git(dir, ["config", "gc.auto", "0"]);
+  git(dir, ["config", "maintenance.auto", "false"]);
   git(dir, ["add", "-A"]);
   git(dir, ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "base"]);
   return { dir, base: git(dir, ["rev-parse", "HEAD"]) };
@@ -119,7 +146,7 @@ function corre(dir, base, env = {}) {
     // E a config git GLOBAL tambem: um `url.*.insteadOf` reescrevia o `origin` que o verificador le.
     const herdado = { ...process.env };
     delete herdado.GITHUB_REPOSITORY;
-    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8", env: { ...herdado, GIT_CONFIG_GLOBAL: "/dev/null", ...env } }) };
+    return { code: 0, out: execFileSync("node", args, { cwd: dir, encoding: "utf8", env: { ...herdado, ...ISOLADO, ...env } }) };
   } catch (err) {
     return { code: err.status ?? 1, out: (err.stdout ?? "") + (err.stderr ?? "") };
   }
@@ -165,9 +192,18 @@ export function registarResultado(nome, problemas, out) {
 function test(nome, mutate, expect, { env } = {}) {
   const { dir, base } = sandbox();
   try {
-    const ref = mutate ? mutate(dir, base) ?? base : base;
-    const { code, out } = corre(dir, ref, env);
-    const problemas = avaliar({ code, out, expect });
+    let problemas;
+    let out = "";
+    // Um `throw` no `mutate` (a fixture que se declara invalida, #379) e um FAIL com o nome do caso, e a suite
+    // continua: sem o `catch`, rebentava a suite inteira, sem `resumo()` nem a linha `FAIL` que a varredura procura.
+    try {
+      const ref = mutate ? mutate(dir, base) ?? base : base;
+      const r = corre(dir, ref, env);
+      out = r.out;
+      problemas = avaliar({ code: r.code, out, expect });
+    } catch (err) {
+      problemas = [`setup rebentou: ${err instanceof Error ? err.message : String(err)}`];
+    }
     if (problemas.length) {
       falhas.push({ nome, problemas, out });
       console.log(`  FAIL  ${nome}`);
@@ -211,7 +247,7 @@ function seOGlobExistir(glob, nome, regista) {
  *  deixar passar. Sem ela, um lookahead alargado passava a suite inteira (auditoria do #277). */
 const DEPOIS_DO_IF = "        with:\n          a: b\n";
 
-export { test, sandbox, commit, corre, git, ROOT, CHECKER, seOGlobExistir, DEPOIS_DO_IF };
+export { test, sandbox, commit, corre, git, apagaObjetoSolto, ROOT, CHECKER, seOGlobExistir, DEPOIS_DO_IF };
 
 /** Imprime o resumo e sai. Ver a nota no cabecalho sobre porque vive aqui. */
 export function resumo() {

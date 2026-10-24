@@ -105,6 +105,13 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O `throw` da fixture que se declara invalida (#379): desligado, um objeto empacotado passava por apagado.
+    alvo: ".agent/scripts/tests/harness/test-surface-harness.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<![\w.$])throw new Error\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // Guard 17 (tamanho de ficheiro). A catraca so vale se cada um dos seus sitios de recusa
     // estiver medido: uma excecao que deixa de avisar e uma catraca aberta, e ninguem repara.
     // O simulador NAO casava a convencao `check-*.mjs` da descoberta, logo nunca foi medido —
