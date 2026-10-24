@@ -11,7 +11,8 @@
  * isolado como funcao pura, e aqui chama-se com entradas fabricadas, uma por assercao.
  */
 import { pathToFileURL } from "url";
-import { avaliar, registarResultado } from "./harness/test-surface-harness.mjs";
+import { rmSync } from "fs";
+import { avaliar, registarResultado, sandbox, git, apagaObjetoSolto } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -67,4 +68,22 @@ export function registar() {
     { code: 0, out: "  OK    tudo\n  NOTE  proibido\n", expect: { code: 0, excludes: ["proibido"] } },
     ['output NAO devia conter "proibido"']
   );
+
+  // O controlo da fixture (#379): com o objeto EMPACOTADO a forca, apagar o ficheiro solto nao faz nada — e o
+  // `apagaObjetoSolto` tem de o dizer, em vez de deixar os casos da baseline ilegivel falharem (ou passarem)
+  // como se fosse o verificador.
+  {
+    const { dir } = sandbox();
+    let problemas;
+    try {
+      git(dir, ["repack", "-a", "-d", "-q"]);
+      apagaObjetoSolto(dir, git(dir, ["rev-parse", "HEAD^{tree}"]));
+      problemas = ["um objeto empacotado passou por apagado"];
+    } catch (err) {
+      problemas = /fixture invalida/.test(err.message) ? [] : [`rebentou por outra razao: ${err.message}`];
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    registarResultado("surface-harness: a fixture deteta um objeto empacotado em vez de o dar por apagado (controlo, #379)", problemas);
+  }
 }

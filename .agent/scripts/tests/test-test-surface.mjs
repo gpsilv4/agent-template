@@ -20,7 +20,7 @@
  *   node .agent/scripts/tests/test-test-surface.mjs
  */
 
-import { test, commit, git, resumo, contagem, seOGlobExistir } from "./harness/test-surface-harness.mjs";
+import { test, commit, git, apagaObjetoSolto, resumo, contagem, seOGlobExistir } from "./harness/test-surface-harness.mjs";
 import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/registo.mjs";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
@@ -380,7 +380,7 @@ test("nao consegue medir: arvore da baseline ausente REPROVA", (dir) => {
   // ARVORE. Apagar o objeto solto da arvore separa "nao ha superficie" de "nao consegui
   // ler" — a distincao que o `TP2` exige.
   const tree = git(dir, ["rev-parse", "HEAD^{tree}"]);
-  rmSync(join(dir, ".git/objects", tree.slice(0, 2), tree.slice(2)), { force: true });
+  apagaObjetoSolto(dir, tree); // confirma que desapareceu: empacotado, o rm nao fazia nada (#379)
   return "HEAD";
 }, { code: 1, includes: ["nao conseguiu listar os ficheiros da baseline"] });
 
@@ -425,7 +425,7 @@ test("blob da baseline ausente REPROVA (e nao trata o ficheiro como novo)", (dir
   // primeiro — e o que se afirma e que o verificador **reprova por nao conseguir medir**, em
   // vez de tratar o ficheiro como novo e dar exit 0 sobre uma suite esvaziada.
   const blob = git(dir, ["rev-parse", "HEAD:tests/exemplo.test.js"]);
-  rmSync(join(dir, ".git/objects", blob.slice(0, 2), blob.slice(2)), { force: true });
+  apagaObjetoSolto(dir, blob); // confirma que desapareceu: empacotado, o rm nao fazia nada (#379)
   writeFileSync(join(dir, "tests/exemplo.test.js"), 'test("soma", () => { expect(1).toBe(1); });\n');
   return "HEAD";
 }, { code: 1, includes: ["nao conseguiu listar as alteracoes"] });
