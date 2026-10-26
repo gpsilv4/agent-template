@@ -71,7 +71,7 @@ Stack: {{STACK}}.
 
 ## CI/CD & Governance
 
-- **CI Pipeline**: `.github/workflows/ci.yml` — corre em cada PR/push (TypeScript, lint, build, tests, audit)
+- **CI Pipeline**: `.github/workflows/ci.yml` — corre em cada PR e push (TypeScript, lint, build, tests, audit); salvo o push com committer `web-flow` num privado (#347)
 - **E2E Pipeline**: `.github/workflows/e2e.yml` — trigger manual para testes E2E e seguranca
 - **PR Template**: `.github/pull_request_template.md` — checklist alinhada com `/review`
 - **Dependabot**: `.github/dependabot.yml` — updates automaticos semanais

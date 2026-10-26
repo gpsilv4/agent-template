@@ -39,6 +39,7 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 | **Corre localmente ou chama a rede?** | Um servidor local le o teu disco; um remoto tambem **envia**. Sao riscos diferentes e a resposta muda a decisao |
 | **O que le?** Codigo, `.env`, base de dados, credenciais? | Um servidor com acesso a secrets contorna o `deny` de leitura do agente — o `deny` cobre as ferramentas do agente, nao os subprocessos de outro programa |
 | **O que envia para fora, e para quem?** | "Nao envia nada" verifica-se no **codigo**, nao so na documentacao: o README do graphify diz que o codigo nao sai da maquina, e a etiquetagem dele envia nomes de simbolos ao primeiro backend com chave no ambiente (#261) |
+| **Alguma ferramenta aceita um caminho, URI ou URL escolhido pelo MODELO?** | Se sim, le tudo o que o processo le, fora do `deny` do agente (`file:` chega ao `.env` e ao `~/.ssh`), e um GET com dados na query **e envio**: um documento hostil leva o agente a fazer essa chamada. Preferir servidores com uma raiz fixa, ou corre-lo num contentor com `--network none` e so a pasta precisa montada, e so-leitura (`-v <pasta>:/data:ro`) (#378) |
 | **Quem o mantem?** | Um servidor abandonado com acesso ao repo e divida de supply-chain |
 | **O instalador escreve em instrucoes ou na configuracao dos agentes?** (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `.cursor/rules`, `.claude/settings.json`, hooks) | Se sim, e **fronteira**: correr o instalador a mao e ler o diff. Corrido pelo Bash, escreve sem o caminho aparecer no comando, e o guard nao o ve. O texto que injecta e DADOS de terceiros, nao regra do projeto — o graphify acrescenta hooks que dizem "MANDATORY: ... you MUST" a cada Grep/Read (#261) |
 | **Que ferramentas expoe, e quais delas ESCREVEM?** | Ler e um risco; escrever no repo, na BD ou na rede e outro. Preferir servidores so-leitura |
@@ -55,6 +56,24 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 - **Ambitos por ferramenta**: no Claude Code, `.mcp.json` no repo e partilhado com quem clona —
   o que e conveniente e perigoso ao mesmo tempo. Um servidor que so *tu* queres vai na config
   de utilizador, nao no repo.
+
+## Converter um documento sem servidor permanente
+
+Uma conversao de cada vez, num contentor sem rede, com o documento a entrar pelo **stdin** (o que a
+reduz a ler um stream: sem acesso a ficheiros nem a URIs), e o resultado tratado como DADOS. A imagem
+fixa-se por digest (o `--network none` vale para o contentor, nao para o `pull`), e os recursos tem
+tecto: sem eles, uma zip-bomb esgota a memoria ou o disco do host.
+
+```
+docker run --rm -i --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --memory 512m --pids-limit 64 <imagem>@sha256:<digest> < doc.docx | head -c 20000000 > <tmp>/doc.md
+```
+
+**O exemplo que o motivou (#378):** o `markitdown-mcp` NAO e aprovado por omissao. A ferramenta
+`convert_to_markdown(uri)` aceita `file:` (le o que o processo le) e `http(s):` (um GET sem politica
+de destino), nao tem limite contra uma zip-bomb, e no Claude Code pouco deixa de funcionar sem ele:
+o `Read` ja le PDF e imagens; perdem-se os formatos Office (DOCX, XLSX, PPTX), que e o caso da receita acima. Nos outros agentes (Gemini CLI, Cursor, Codex) nao se verificou se
+leem PDF ou DOCX nativamente, e isso muda a resposta a "o que deixa de funcionar sem ele?".
 
 ## Verificado, nao prometido
 

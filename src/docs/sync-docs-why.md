@@ -14,7 +14,7 @@ teve durante meses: documentado em todo o lado e corrido por nada.
 
 O `check-test-surface` vive no `guard-tests` mas com `if: github.event_name == 'pull_request'`,
 porque precisa da base do PR — logo nao corre no push para `main`. Os `test-*.mjs`, o
-`check-doc-versions` e o `check-backlog` correm sempre: nao dependem de `package.json`.
+`check-doc-versions` e o `check-backlog` correm com ou sem `package.json` (o unico push em que nao correm e o do committer `web-flow` num privado, #347).
 
 ## Constante adaptavel: porque entra na tabela do `/upgrade`
 
