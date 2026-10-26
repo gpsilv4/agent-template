@@ -110,6 +110,29 @@ export const PARES_DOS_HOOKS = [
     neutro: "(() => {})(",
   },
   {
+    // O hook dos nomes proibidos nos textos publicados (#375b). Cada `negar(` e um estado: a lib em falta, a lista
+    // que nao serve, o texto por ler, o nome achado. Mutado um, esse caso publica.
+    alvo: ".claude/hooks/guard-textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])(?<!function\s)negar\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // ...e o que ele le (#375b). O que NAO se consegue ler vai para o `porLer` (o hook nega): desligado um, uma
+    // expansao ou um pipe passavam a texto lido, e o nome dentro deles publicava-se.
+    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])out\.porLer\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
+    // ...e o que ele LE: desligado um `out.textos.push(`, esse texto (um ficheiro, um heredoc) nao era procurado.
+    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])out\.textos\.push\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e
