@@ -13,7 +13,7 @@
  * Uso no portao: `node .agent/scripts/lib/varredura-shards.mjs <pasta-com-os-relatorios> [modo...]`. Os
  * MODOS esperados (#317): sem eles, tirar a `skips` da matriz deixava o portao verde sem ela — cada modo
  * so era conferido se aparecesse. Sem modos na linha de comando, o comportamento e o de antes (um derivado
- * com o `ci.yml` antigo nao parte); o `superficie-gate.mjs` exige que sejam exactamente os da matriz.
+ * com o `ci.yml` antigo nao parte); o gate (`estrutura-workflow.mjs`) exige que sejam os da matriz.
  *
  * A FATIA (`--shard=k/n`, a particao) vive em `./varredura-fatia.mjs`, e nao aqui: este modulo
  * tem sitios de recusa, e o varredor importa-la arrastava-o para a fixture do

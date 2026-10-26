@@ -21,7 +21,8 @@ import { modosDaMatriz, modosDoPortao } from "../lib/gate-modos.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { pathToFileURL } from "url";
 import { test, commit, git, registarResultado, ROOT } from "./harness/test-surface-harness.mjs";
-import { blocoOn, unidadesDaMaquinaria, perdidas, aceites, defeitosDeEstrutura } from "../lib/superficie-gate.mjs";
+import { blocoOn, unidadesDaMaquinaria, perdidas, aceites } from "../lib/superficie-gate.mjs";
+import { defeitosDeEstrutura } from "../lib/estrutura-workflow.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(

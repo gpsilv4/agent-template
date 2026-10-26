@@ -119,7 +119,7 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
-  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/estrutura-workflow|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
@@ -148,8 +148,9 @@ export const SUITES = [
   // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
   // E quem o IMPORTA tambem (#271): o mapa de suites (a ligacao ao `PARES`) e a cobertura da superficie.
   { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
-  // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271).
-  { re: /^\.agent\/scripts\/lib\/varredura-paralela\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271); e o `varredura-tempos.mjs`
+  // (#374b) alcanca-o o `tests-varredura-shards.mjs`, do mesmo `test-guards`, ao correr o varredor.
+  { re: /^\.agent\/scripts\/lib\/varredura-(?:paralela|tempos)\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   // Os shards da varredura (#308). A fatia vai na fixture do `test-mutation-sweep` (o varredor
   // importa-a) e e testada no `tests-varredura-shards.mjs`; o portao so no segundo.
   // O `--diff` da varredura, que saiu do `mutation-sweep.mjs` (#317): quem o exercita e a suite dele e o
