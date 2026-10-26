@@ -2,8 +2,8 @@
 /**
  * Os TEXTOS PUBLICOS do repo contra a lista de nomes proibidos — {{PROJECT_NAME}}
  *
- * PORQUE EXISTE (#375): o `commit-msg` trava uma mensagem de commit (e o hook do Claude Code, no #375b, travara um
- * `gh` que publica). Nenhum ve o que JA esta publicado, nem o que se escreveu pela UI web ou por outro agente.
+ * PORQUE EXISTE (#375): o `commit-msg` trava uma mensagem de commit, e o hook do Claude Code (`guard-textos-publicos`,
+ * #375b) um `gh` ou um `git tag` que publica. Nenhum ve o que JA esta publicado, nem o que se escreveu pela UI web ou por outro agente.
  * Este comando le tudo o que o repo tem de publico e editavel e diz onde aparece um nome da lista. Foi a mao
  * que se fez a 2026-10-22, sobre 212 PRs e 156 issues (#339, item 2b): 62 mencoes em 41 textos.
  *

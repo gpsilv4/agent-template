@@ -334,6 +334,7 @@ not to* line, so every agent sees it.
 │   ├── guard-protected-branch.mjs  <- DENY commit/push on protected branches; no force-push
 │   ├── protegidos.json             <- THIS project's protected branches (data; /upgrade keeps it)
 │   ├── guard-subagent-bash.mjs     <- DENY a subagent's Bash outside what its `tools:` declares
+│   ├── guard-textos-publicos.mjs   <- DENY a gh/git tag/commit that publishes a forbidden name (#375b)
 │   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
 │   ├── prompt-fase0.mjs            <- UserPromptSubmit: reminds of Fase 0 when the
@@ -345,7 +346,8 @@ not to* line, so every agent sees it.
 │   │                                  their import-free leaf `fronteira-dados`),
 │   │                                  git verbs, the guard's deadline (`resposta`),
 │   │                                  porcelain parsing, a subagent's scope (`ambito-agente`),
-│   │                                  the protected-branch list (`protegidos`)
+│   │                                  the protected-branch list (`protegidos`), what a command
+│   │                                  publishes (`textos-publicos`)
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
@@ -360,6 +362,7 @@ not to* line, so every agent sees it.
 │       ├── tests-protegidos.mjs    <- protegidos.json: fails closed when missing or broken
 │       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
 │       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
+│       ├── tests-textos-publicos.mjs <- A forbidden name in what gh/git publishes, and what it cannot read
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
 │                                      repo being measured, not the hook's own
@@ -427,7 +430,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
-| Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan says so (the Claude Code hook joins in #375b). In a PRIVATE repo where the names are legitimate: `git config --local agent-template.nomesProibidos desligado` (#375) |
+| Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan and the Claude Code hook (`guard-textos-publicos`, once a session) say so. In a PRIVATE repo where the names are legitimate: `git config --local agent-template.nomesProibidos desligado` (#375) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `Projeto` step only proves a `package.json` exists (without one, every app step skips in its own shell, and an unknown answer fails). Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.

@@ -4,8 +4,8 @@
  * PORQUE EXISTE (#375): um repo publico nao pode nomear o que e privado (repos, clientes, pessoas). A regra
  * vivia so na memoria do agente, e 20 textos publicos nomearam-nos na mesma (#339, item 2b). A lista nao pode
  * viver no repo — publica-la era o proprio defeito —, logo vive num ficheiro do utilizador, e quem a le e
- * este modulo: o `commit-msg` (`.githooks/lib/commit-msg.mjs`) e o comando `check-textos-publicos.mjs` (e, no #375b,
- * o hook do Claude Code).
+ * este modulo: o `commit-msg` (`.githooks/lib/commit-msg.mjs`) e o comando `check-textos-publicos.mjs`, e o hook do Claude Code
+ * (`.claude/hooks/guard-textos-publicos.mjs`, #375b).
  *
  * Vive em `.agent/scripts/lib/`, e nao em `.githooks/lib/`, porque o `/upgrade` copia esta pasta sozinho e a
  * `.githooks/` vai para a fronteira, que o utilizador aplica a mao: com a lib la, o comando e a sua suite

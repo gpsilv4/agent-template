@@ -118,9 +118,10 @@ export const SUITES = [
   // `lib/pares.mjs` junta-os a varredura. Mexer na lista obriga a correr os dois.
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
-  // A lista de NOMES PROIBIDOS (#375): o `tests-nomes-proibidos.mjs` (no `test-guards`) mede-a, e os dois que a leem
-  // tambem — o `commit-msg` (o `test-commit-msg`) e o comando de varredura (o `test-textos-publicos`).
-  { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs")] },
+  // A lista de NOMES PROIBIDOS (#375): o `tests-nomes-proibidos.mjs` (no `test-guards`) mede-a, e os tres que a leem
+  // tambem — o `commit-msg` (o `test-commit-msg`), o comando de varredura (o `test-textos-publicos`) e o hook
+  // `guard-textos-publicos` (o `test-hooks`, #375b).
+  { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/(check-textos-publicos|tests\/test-textos-publicos)\.mjs$/, verifica: [S("test-textos-publicos.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
   { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/estrutura-workflow|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
