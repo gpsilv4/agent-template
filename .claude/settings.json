@@ -2,6 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "permissions": {
     "deny": [
+      "Bash(git config*agent-template.nomesProibidos*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./**/.env)",
@@ -79,6 +80,7 @@
       "Bash(node .agent/scripts/check-doc-versions.mjs)",
       "Bash(node .agent/scripts/check-backlog.mjs)",
       "Bash(node .agent/scripts/check-codigo-morto.mjs)",
+      "Bash(node .agent/scripts/check-textos-publicos.mjs)",
       "Bash(node .agent/scripts/check-bundle-sizes.mjs)",
       "Bash(node .agent/scripts/tests/test-guards.mjs)",
       "Bash(node .agent/scripts/tests/test-bundle-sizes.mjs)",
@@ -114,6 +116,7 @@
       "Bash(node .agent/scripts/mutation-sweep.mjs --diff)",
       "Bash(node .agent/scripts/tests/test-baseline-superficie.mjs)",
       "Bash(node .agent/scripts/tests/test-codigo-morto.mjs)",
+      "Bash(node .agent/scripts/tests/test-textos-publicos.mjs)",
       "Bash(node .agent/scripts/tests/test-derivado-maduro.mjs)",
       "Bash(node .agent/scripts/tests/test-mapa-suites.mjs)",
       "Bash(node .agent/scripts/tests/test-release-da-tag.mjs)",

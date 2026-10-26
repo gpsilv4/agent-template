@@ -561,3 +561,11 @@ para nao ser descoberto:
   (as partes da fixa e o `continua`), mas nao exprime um regex que aceite tudo (uma fixa vazia), que se mede a
   mao; e o `check-test-surface` corre o codigo do HEAD do PR, logo um PR que relaxe o modulo E use o relaxamento
   so e travado por quem le o diff (o vao que o `TP4` ja assume).
+
+## O que o detector de codigo morto nao ve
+
+Saiu do `scripts-guide.md` no #375, para dar lugar a entrada do `check-textos-publicos.mjs` no orcamento de bytes.
+
+O `check-codigo-morto.mjs` so olha para **imports**. Funcoes internas que ninguem chama e exportacoes por usar
+ficam de fora, e o cabecalho dele di-lo, com a razao: a classe que viaja para os derivados e a dos imports, e um
+analisador de ambito escrito a mao com defeitos era pior do que nenhum.

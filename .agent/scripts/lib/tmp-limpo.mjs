@@ -104,6 +104,10 @@ export const PREFIXOS_DE_TESTE = [
   "eh-main-test-",
   // Do `tests-regex-runner.mjs` (#374a): o `ci.yml` de fixture que o `repetidosPorJob` le.
   "regex-runner-test-",
+  // Do `tests-nomes-proibidos.mjs` (#375): a lista de nomes, e o repo onde ela nao pode estar.
+  "nomes-proibidos-test-",
+  // Do `test-textos-publicos.mjs` (#375): a lista, e o repo onde ela nao pode estar.
+  "textos-publicos-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
   // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
   "paralelo-test-",

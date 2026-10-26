@@ -33,6 +33,7 @@ export function registar() {
     mkdirSync(join(dir, "config"));
     copyFileSync(join(ROOT, ".agent/scripts/lib/pares.mjs"), join(dir, "lib/pares.mjs"));
     copyFileSync(join(ROOT, ".agent/scripts/lib/pares-hooks.mjs"), join(dir, "lib/pares-hooks.mjs"));
+    copyFileSync(join(ROOT, ".agent/scripts/lib/pares-publicos.mjs"), join(dir, "lib/pares-publicos.mjs"));
     // Num processo filho: o registo chama `registar()` sem esperar, e um `await` aqui deixava o
     // resultado por registar — o teste passava sem ter medido nada.
     const alvosCom = (paresDoProjeto) => {
@@ -50,18 +51,22 @@ export function registar() {
     if (comProprio.length !== base.length + 1) p.push(`PARES tem ${comProprio.length}, esperado ${base.length + 1} (os do template mais o proprio)`);
     if (base.length === 0) p.push("sem nenhum par do template — a copia do pares.mjs nao foi lida");
     registarResultado("pares: um par declarado em config/guards-do-projeto.mjs entra na varredura", p);
-    // Os pares dos hooks vivem em `pares-hooks.mjs` (#243): entram TODOS, juntos, pela ordem deles e
-    // NO SITIO onde estavam (entre os mesmos vizinhos) — a varredura corre pela ordem da tabela.
-    {
-      const dosHooks = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e",
-        `const { PARES_DOS_HOOKS } = await import(${JSON.stringify(pathToFileURL(join(dir, "lib/pares-hooks.mjs")).href)}); console.log(JSON.stringify(PARES_DOS_HOOKS.map((x) => x.alvo)));`],
+    // Os pares dos hooks vivem em `pares-hooks.mjs` (#243), e os do que chega a um texto publico em
+    // `pares-publicos.mjs` (#375): cada bloco entra TODO, junto, pela ordem dele e NO SITIO onde estava
+    // (entre os mesmos vizinhos) — a varredura corre pela ordem da tabela.
+    for (const [modulo, nome, antesEsperado, depoisEsperado] of [
+      ["pares-hooks.mjs", "PARES_DOS_HOOKS", ".agent/scripts/lib/baseline-superficie.mjs", ".agent/scripts/check-bundle-sizes.mjs"],
+      ["pares-publicos.mjs", "PARES_DOS_TEXTOS_PUBLICOS", ".agent/scripts/guards/anti-patterns.mjs", ".agent/scripts/check-test-surface.mjs"],
+    ]) {
+      const doBloco = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e",
+        `const { ${nome} } = await import(${JSON.stringify(pathToFileURL(join(dir, "lib", modulo)).href)}); console.log(JSON.stringify(${nome}.map((x) => x.alvo)));`],
         { encoding: "utf8" }));
-      const i = base.indexOf(dosHooks[0]);
-      const [antes, depois] = [base[i - 1], base[i + dosHooks.length]];
-      registarResultado("pares: os pares de pares-hooks.mjs entram todos, contiguos, pela ordem e no mesmo sitio", [
-        ...(dosHooks.length > 0 ? [] : ["pares-hooks.mjs sem pares — a copia nao foi lida"]),
-        ...(i >= 0 && JSON.stringify(base.slice(i, i + dosHooks.length)) === JSON.stringify(dosHooks) ? [] : ["os pares dos hooks nao estao todos, juntos e pela ordem, em PARES"]),
-        ...(antes === ".agent/scripts/lib/baseline-superficie.mjs" && depois === ".agent/scripts/check-bundle-sizes.mjs" ? [] : [`o bloco dos hooks mudou de sitio: entre ${antes} e ${depois}`]),
+      const i = base.indexOf(doBloco[0]);
+      const [antes, depois] = [base[i - 1], base[i + doBloco.length]];
+      registarResultado(`pares: os pares de ${modulo} entram todos, contiguos, pela ordem e no mesmo sitio`, [
+        ...(doBloco.length > 0 ? [] : [`${modulo} sem pares — a copia nao foi lida`]),
+        ...(i >= 0 && JSON.stringify(base.slice(i, i + doBloco.length)) === JSON.stringify(doBloco) ? [] : [`os pares de ${modulo} nao estao todos, juntos e pela ordem, em PARES`]),
+        ...(antes === antesEsperado && depois === depoisEsperado ? [] : [`o bloco de ${modulo} mudou de sitio: entre ${antes} e ${depois}`]),
       ]);
     }
 

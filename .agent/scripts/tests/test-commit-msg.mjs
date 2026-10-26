@@ -14,14 +14,23 @@
  * Sai `!= 0` se algum teste falhar. Corre no job `guard-tests` do `ci.yml`.
  */
 
-import { execFileSync } from "child_process";
+import { execFileSync, spawnSync } from "child_process";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, copyFileSync, chmodSync } from "fs";
 import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
+import { VARIAVEL } from "../lib/nomes-proibidos.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".githooks/commit-msg");
+// A lista de nomes proibidos (#375) e, por omissao, a de QUEM CORRE (`TP3`): cada execucao do hook corre sem a
+// variavel e com uma `HOME` que nao existe — uma pasta que este repo nao tem. Com a variavel apontada para um
+// ficheiro em falta ja nao seria "sem lista", e sim `ilegivel`. Os casos dos nomes, mais abaixo, montam a sua.
+const semVariavel = (env) => Object.fromEntries(Object.entries(env).filter(([k]) => k !== VARIAVEL));
+const SEM_LISTA = { ...semVariavel(process.env), HOME: join(ROOT, ".agent/scripts/tests/nao-existe") };
+// O git das fixtures sem o `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE`/`GIT_CONFIG*` de quem corre (`TP3`): dentro de um
+// hook ou de um `rebase -x`, um `git -C <tmp> config --local` escrevia no repo de `GIT_DIR` — no clone real.
+const semGit = (env) => Object.fromEntries(Object.entries(env).filter(([k]) => !/^GIT_/.test(k)));
 
 let passed = 0;
 const falhas = [];
@@ -49,7 +58,7 @@ function test(nome, msg, expect) {
     let code = 0;
     let err = "";
     try {
-      execFileSync(process.execPath, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+      execFileSync(process.execPath, args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: SEM_LISTA, cwd: dir });
     } catch (e) {
       code = e.status ?? -1;
       err = e.stderr ?? "";
@@ -326,7 +335,7 @@ function commitComHooks(nome, hooks, msg, esperaRecusa, motivo) {
   try {
     const g = (...a) => execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", ...a], {
       cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
+      env: { ...SEM_LISTA, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" },
     });
     g("init", "-q");
     g("config", "core.hooksPath", hooks(dir));
@@ -361,6 +370,86 @@ commitComHooks("sem o `lib/`, o ponteiro FALHA e o commit nao passa (falha fecha
   chmodSync(join(h, "commit-msg"), 0o755);
   return h;
 }, "fix: x\n", true, "lib/commit-msg.mjs");
+
+// --- Os NOMES PROIBIDOS (#375) --------------------------------------------------
+// Cada caso monta um repo de fixture com o ponteiro, o `lib/` e a lib da lista COPIADOS: o hook resolve a raiz
+// pelo seu proprio sitio, logo uma lista "dentro do repo" fica dentro da fixture, nunca deste repo. Os nomes
+// sao inventados. A recusa cita linhas, e o nome nunca aparece nela (`naoInclui`). `onde: "omissao"` corre sem a
+// variavel e com uma HOME vazia (o "sem lista" real); `desligado` liga o interruptor LOCAL do repo da fixture.
+function testNomes(nome, { msg, lista, onde = "fora", semLib = false, desligado = false, comentario, hooksNoutro = false }, expect) {
+  const dir = mkdtempSync(join(tmpdir(), "commit-msg-test-"));
+  try {
+    const raiz = join(dir, "repo");
+    // `hooksNoutro`: o `core.hooksPath` aponta para os hooks de OUTRO clone — o commit e no `raiz`, o hook vive fora.
+    const base = hooksNoutro ? join(dir, "outro") : raiz;
+    mkdirSync(raiz, { recursive: true });
+    for (const rel of [".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", ...(semLib ? [] : [".agent/scripts/lib/nomes-proibidos.mjs"])]) {
+      mkdirSync(dirname(join(base, rel)), { recursive: true });
+      copyFileSync(join(ROOT, rel), join(base, rel));
+    }
+    const caminho = onde === "dentro" ? join(raiz, "lista") : join(dir, "lista");
+    if (onde === "pasta") mkdirSync(caminho);
+    else if (lista !== undefined) writeFileSync(caminho, lista);
+    writeFileSync(join(dir, "MSG"), msg);
+    const isolado = { ...semGit(process.env), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+    if (desligado || comentario) {
+      const git = (...a) => execFileSync("git", ["-C", raiz, ...a], { stdio: "ignore", env: isolado });
+      git("init", "-q");
+      if (desligado) git("config", "--local", "agent-template.nomesProibidos", "desligado");
+      if (comentario) git("config", "--local", "core.commentChar", comentario);
+    }
+    // Como o git o corre: na raiz da worktree (o hook decide o interruptor e o "dentro do repo" pela cwd).
+    const env = onde === "omissao" ? { ...semVariavel(isolado), HOME: join(dir, "home") } : { ...isolado, [VARIAVEL]: caminho };
+    // `spawnSync`, e nao `execFileSync`: o stderr de um hook que PASSA tambem se afirma (o aviso do desligado).
+    const r = spawnSync(process.execPath, [join(base, ".githooks/commit-msg"), join(dir, "MSG")], { encoding: "utf8", env, cwd: raiz });
+    const code = r.status ?? -1;
+    const err = r.stderr ?? "";
+    const problemas = [];
+    if (code !== expect.code) problemas.push(`exit ${code}, esperado ${expect.code}`);
+    for (const s of expect.includes ?? []) if (!err.includes(s)) problemas.push(`o stderr devia conter "${s}"`);
+    for (const s of expect.naoInclui ?? []) if (err.toLowerCase().includes(s.toLowerCase())) problemas.push(`o stderr NAO devia conter "${s}"`);
+    if (problemas.length) {
+      falhas.push({ nome, problemas, err });
+      console.log(`  FAIL  ${nome}`);
+      for (const p of problemas) console.log(`          ${p}`);
+    } else {
+      passed++;
+      console.log(`  PASS  ${nome}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+const LISTA = "# privados\nprojeto-secreto\n";
+testNomes("nomes: um nome da lista no corpo recusa, e a recusa cita as linhas e nao o nome",
+  { msg: "fix: x\n\nvisto no Projeto Secreto\n", lista: LISTA },
+  { code: 1, includes: ["linha 3 da mensagem: o nome da linha 2 da lista"], naoInclui: ["projeto secreto", "projeto-secreto"] });
+testNomes("nomes: uma variante (sublinhado) no titulo recusa", { msg: "fix(projeto_secreto): x\n", lista: LISTA }, { code: 1, includes: ["linha 1 da mensagem"] });
+testNomes("nomes: uma mensagem limpa passa com a lista", { msg: "fix: projetos secretos em geral\n", lista: LISTA }, { code: 0 });
+testNomes("nomes: sem lista passa CALADO (o CI corre isto sem lista)", { msg: "fix: projeto-secreto\n", onde: "omissao" }, { code: 0, naoInclui: ["lista"] });
+testNomes("nomes: a variavel apontada para um ficheiro em falta recusa (quem a definiu disse que ha lista)", { msg: "fix: x\n" }, { code: 1, includes: ["nao se consegue ler"] });
+testNomes("nomes: num repo DESLIGADO (`git config --local`) passa, mas DIZ que esta desligado", { msg: "fix: projeto-secreto\n", lista: LISTA, desligado: true },
+  { code: 0, includes: ["DESLIGADOS neste repo"], naoInclui: ["projeto-secreto"] });
+testNomes("nomes: com os hooks noutro clone (`core.hooksPath`), o interruptor que conta e o do repo do COMMIT",
+  { msg: "fix: projeto-secreto\n", lista: LISTA, desligado: true, hooksNoutro: true }, { code: 0, includes: ["DESLIGADOS neste repo"] });
+testNomes("nomes: a recusa diz que quem desliga e o UTILIZADOR, sem o comando literal (um agente le-a)", { msg: "fix: projeto-secreto\n", lista: LISTA },
+  { code: 1, includes: ["UTILIZADOR, nunca um agente", "O contrato da lista de nomes proibidos"], naoInclui: ["git config --local"] });
+testNomes("nomes: uma linha `#339 ...` (que o `-m` mantem na mensagem) tambem e lida, e recusa",
+  { msg: "fix: x\n\n#339 visto no projeto-secreto\n", lista: LISTA }, { code: 1, includes: ["linha 3 da mensagem"] });
+testNomes("nomes: a tesoura segue o `core.commentChar` do repo (`;`)",
+  { msg: "fix: tirar um nome vazado\n; ------------------------ >8 ------------------------\ndiff --git a/f b/f\n-projeto-secreto\n", lista: LISTA, comentario: ";" }, { code: 0 });
+testNomes("nomes: com um nome E uma atribuicao a IA, recusa pelo nome, e o nome nao sai na linha da IA",
+  { msg: "fix: x\n\nCo-Authored-By: Claude <bot@projeto-secreto.com>\n", lista: LISTA },
+  { code: 1, includes: ["nomeia um nome da lista"], naoInclui: ["projeto-secreto", "Co-Authored-By"] });
+testNomes("nomes: o diff abaixo da tesoura do `git commit -v` nao conta (apagar um nome vazado passa)",
+  { msg: "fix: tirar um nome vazado\n# ------------------------ >8 ------------------------\n# Do not modify or remove the line above.\ndiff --git a/f b/f\n-projeto-secreto\n", lista: LISTA }, { code: 0 });
+testNomes("nomes: a linha da mensagem e a do FICHEIRO, contando os comentarios do git",
+  { msg: "# um comentario do template\nfix: x\n\nvisto no projeto-secreto\n", lista: LISTA }, { code: 1, includes: ["linha 4 da mensagem"] });
+testNomes("nomes: uma lista vazia recusa, com a razao", { msg: "fix: x\n", lista: "# so isto\n\n" }, { code: 1, includes: ["nao tem nenhum nome"] });
+testNomes("nomes: uma lista ilegivel (uma pasta) recusa", { msg: "fix: x\n", onde: "pasta" }, { code: 1, includes: ["nao se consegue ler"] });
+testNomes("nomes: uma lista DENTRO do repo recusa", { msg: "fix: x\n", lista: LISTA, onde: "dentro" }, { code: 1, includes: ["DENTRO do repo"] });
+testNomes("nomes: sem a lib da lista (um derivado antigo) recusa com a razao, nao rebenta", { msg: "fix: x\n", lista: LISTA, semLib: true },
+  { code: 1, includes: ["nao consegui carregar a lista", "/upgrade"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

@@ -118,6 +118,10 @@ export const SUITES = [
   // `lib/pares.mjs` junta-os a varredura. Mexer na lista obriga a correr os dois.
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
+  // A lista de NOMES PROIBIDOS (#375): o `tests-nomes-proibidos.mjs` (no `test-guards`) mede-a, e os dois que a leem
+  // tambem — o `commit-msg` (o `test-commit-msg`) e o comando de varredura (o `test-textos-publicos`).
+  { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs")] },
+  { re: /^\.agent\/scripts\/(check-textos-publicos|tests\/test-textos-publicos)\.mjs$/, verifica: [S("test-textos-publicos.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
   { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/estrutura-workflow|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
@@ -147,7 +151,7 @@ export const SUITES = [
   // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
   // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
   // E quem o IMPORTA tambem (#271): o mapa de suites (a ligacao ao `PARES`) e a cobertura da superficie.
-  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks|-publicos)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
   // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271); e o `varredura-tempos.mjs`
   // (#374b) alcanca-o o `tests-varredura-shards.mjs`, do mesmo `test-guards`, ao correr o varredor.
   { re: /^\.agent\/scripts\/lib\/varredura-(?:paralela|tempos)\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },

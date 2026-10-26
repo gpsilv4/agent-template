@@ -209,12 +209,13 @@ not to* line, so every agent sees it.
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   ├── backlog-review.md       <- /backlog-review — Review the existing backlog against the code
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/                    <- 9 entry points at the root: what you INVOKE
+└── scripts/                    <- 10 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── check-codigo-morto.mjs  <- Imports nobody uses: dead code travels to derived projects
+    ├── check-textos-publicos.mjs <- Issues, PRs, comments, releases vs. your forbidden-names list (by hand, #375)
     ├── adotar-template.mjs     <- Brings the template into an EXISTING project: copies only what
     │                              is missing, writes .agent/adocao.json (copied + collisions)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
@@ -255,6 +256,8 @@ not to* line, so every agent sees it.
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     │   ├── pares-hooks.mjs     <- ...its entries for .claude/hooks/, joined in the same place
+    │   ├── pares-publicos.mjs  <- ...and for the commit-msg and the forbidden names (#375)
+    │   ├── nomes-proibidos.mjs <- The forbidden-names list, kept OUTSIDE the repo, and how a name matches (#375)
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
@@ -364,7 +367,8 @@ not to* line, so every agent sees it.
                                   the prefixes in `tools:`, hook-enforced), debugger (full Bash)
 
 .githooks/                      <- Versioned git hooks (tool-independent)
-├── commit-msg                 <- Rejects AI attribution in commit messages (a pointer to lib/).
+├── commit-msg                 <- Rejects AI attribution, and any name from your forbidden-names
+│                                 list, in commit messages (a pointer to lib/).
 │                                 Enable per clone: git config core.hooksPath .githooks
 │                                 (the CI re-runs it on every PR, so it holds either way)
 └── lib/commit-msg.mjs         <- The logic: a hook has no extension, and CodeQL picks files by it.
@@ -423,6 +427,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
+| Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan says so (the Claude Code hook joins in #375b). In a PRIVATE repo where the names are legitimate: `git config --local agent-template.nomesProibidos desligado` (#375) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 
 > **Why the steps are guarded:** the `Projeto` step only proves a `package.json` exists (without one, every app step skips in its own shell, and an unknown answer fails). Each step then checks for its own toolchain (`tsconfig.json`, a `lint`/`build`/`test:unit` script) so a project that doesn't use it gets a skip instead of a red X. Once your stack is fixed, drop the guard and let the step fail for real. The audit is deliberately non-blocking — transitive high-severity advisories are common and often unfixable without a breaking bump; review the report and escalate it to a hard gate (remove `continue-on-error`) once your dependency tree is clean.
