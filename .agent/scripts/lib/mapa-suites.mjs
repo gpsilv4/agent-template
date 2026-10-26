@@ -35,10 +35,9 @@ export const SUITES = [
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
-  // A `medida-upgrade.mjs` e a `projeto-de-ontem.mjs` entram aqui e nao na generica de `lib/`:
-  // a primeira e o instrumento que responde a seccao 2b (dos DOIS lados, template e derivado),
-  // a segunda e a fixture do modo template. Quem lhes mexe tem de correr esta suite, que e a
-  // unica que as exercita.
+  // A `projeto-de-ontem.mjs` entra aqui e nao na generica de `lib/`: e a fixture do modo template,
+  // e esta suite e a unica que a exercita. A `medida-upgrade.mjs` (o instrumento da 2b, dos DOIS
+  // lados) tem regra propria abaixo: o `test-guards` tambem a exercita, desde o #374a.
   // O filtro do que NAO e do template tem DOIS consumidores — o motor do `/upgrade` e o
   // `simulate-derived` (#182) — e a primeira regra que casa vence. Na regra do upgrade, mexer nele
   // deixava a copia do derivado sem ninguem a medir.
@@ -56,8 +55,12 @@ export const SUITES = [
   // O que os dois modos do `/upgrade` imprimem: a ordem e a promessa tem casos puros no
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
+  // As tres libs com regex do runner ou do caminho de uma suite (#374a): o `tests-regex-runner.mjs`, do `test-guards`,
+  // prende-as umas as outras, logo mexer numa corre tambem o `test-guards`. Antes dos grupos: a primeira regra vence.
+  { re: /^\.agent\/scripts\/lib\/medida-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs")], only: "upgrade" },
+  { re: /^\.agent\/scripts\/lib\/(passo-paralelo|surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs")] },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|medida-upgrade|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },
@@ -116,7 +119,7 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
-  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/gate-modos|lib\/passo-paralelo|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
@@ -163,7 +166,7 @@ export const SUITES = [
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
-  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/surface-patterns|lib\/marcas-yaml)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/marcas-yaml)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da

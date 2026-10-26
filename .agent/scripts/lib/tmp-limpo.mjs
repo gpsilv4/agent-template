@@ -102,6 +102,8 @@ export const PREFIXOS_DE_TESTE = [
   "portao-sombra-test-",
   // Do `tests-eh-main.mjs` (#373): as CLIs corridas atras de um symlink que o teste cria.
   "eh-main-test-",
+  // Do `tests-regex-runner.mjs` (#374a): o `ci.yml` de fixture que o `repetidosPorJob` le.
+  "regex-runner-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de
   // derivado disse-o primeiro, outra vez — ela corre todas as suites, e eu tinha corrido so as minhas.
   "paralelo-test-",
