@@ -53,7 +53,7 @@
  *   node .agent/scripts/simulate-upgrade.mjs --projeto=/caminho/do/projeto   # mede a 2b de um derivado
  */
 
-import { readdirSync, rmSync, existsSync } from "fs";
+import { readdirSync, rmSync, existsSync, writeFileSync } from "fs";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -350,6 +350,30 @@ if (fase1.length === 0) {
   const { congelados, limite } = await adapta2bGuard17({ dir, fatal });
   if (congelados) ok(`adaptacao 2b (Guard 17): ${congelados} ficheiro(s) do projeto congelado(s) em TETOS`);
   else ok(`adaptacao 2b (Guard 17): nenhum ficheiro do projeto acima das ${limite} linhas por congelar`);
+}
+// As SUITES NOVAS: a 2b diz "o template corre N verificacoes que o ci.yml deste projeto nao corre", e a suite chega
+// pelo `.agent/scripts/`. Sem a linha no `guard-tests` do projeto, existe e nunca corre — o que o teste "cada suite
+// em disco corre no guard-tests" reprova. A primeira desde a v0.60.0 foi a do #375a. As duas formas do job: a cadeia
+// do runner em paralelo (#337) e um passo por suite (a de antes). Sem nenhuma das duas, nao se adapta: a fase 2 o diz.
+{
+  const ciRel = ".github/workflows/ci.yml";
+  const ci = leOuNull(join(dir, ciRel));
+  const doProjeto = comandosDoCI(dir) ?? [];
+  const faltam = COMANDOS.filter((c) => /(?:^|\/)tests\/test-[\w-]+\.mjs$/.test(c) && !doProjeto.includes(c));
+  if (ci !== null && faltam.length) {
+    const ls = ci.split("\n");
+    const runner = ls.findIndex((l) => /^[^#]*suites-em-paralelo\.mjs -- \\\s*$/.test(l));
+    const ultimo = ls.findLastIndex((l) => /^\s+run: node \S*tests\/test-[\w-]+\.mjs\s*$/.test(l));
+    if (runner >= 0) ls.splice(runner + 1, 0, ...faltam.map((c) => `${ls[runner + 1].match(/^\s*/)[0]}node ${c} \\`));
+    else if (ultimo >= 0) {
+      const ind = ls[ultimo].match(/^\s*/)[0];
+      ls.splice(ultimo + 1, 0, ...faltam.flatMap((c) => [`${ind.slice(2)}- name: ${c.split("/").pop()} — negative tests`, `${ind}run: node ${c}`]));
+    }
+    if (runner >= 0 || ultimo >= 0) {
+      writeFileSync(join(dir, ciRel), ls.join("\n"));
+      ok(`adaptacao 2b (suites novas): ${faltam.length} acrescentada(s) ao guard-tests do projeto (${faltam.join(", ")})`);
+    }
+  }
 }
 
 console.log("\n  --- FASE 2: depois das adaptacoes ---\n");

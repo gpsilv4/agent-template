@@ -10,7 +10,7 @@
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { test, writeF, patchSettings, ROOT, registarResultado } from "./harness/test-harness.mjs";
-import { emFalta } from "../lib/permissoes.mjs";
+import { cobre, emFalta } from "../lib/permissoes.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 
@@ -139,6 +139,18 @@ const REDUNDANTES = new Set([
 ]);
 // O controlo negativo, em qualquer repo: uma regra sem sonda e uma tapada por outra saem; as que
 // mudam o veredicto nao.
+// Um `*` NO MEIO de uma regra `Bash` (#375): a doc do Claude Code aceita-o em qualquer sitio. So por prefixo, a regra
+// `Bash(git config*chave*)` nao cobria nenhuma sonda, e o guard dava-a por regra sem efeito. A forma `git -C . config`
+// fica DE FORA, como a doc diz: uma regra casa a invocacao, nao o programa.
+registarResultado("G11: um `*` no meio de uma regra Bash cobre como a doc diz, e o prefixo continua igual (#375)", (() => {
+  const r = ["Bash(git config*a.b*)"];
+  const casos = [
+    [r, "git config --local a.b desligado x", true], [r, "git config a.b desligado x", true],
+    [r, "git status x", false], [r, "git -C . config a.b x", false], [["Bash(git * main)"], "git push origin main", true],
+    [["Bash(git push:*)"], "git push x", true], [["Bash(git push:*)"], "git pushx", false], [["Bash(rm -rf*)"], "rm -rf x", true],
+  ];
+  return casos.filter(([regras, alvo, esperado]) => cobre(regras, "Bash", alvo) !== esperado).map(([regras, alvo, esperado]) => `${regras[0]} sobre "${alvo}": esperado ${esperado}`);
+})());
 registarResultado("G11: a remocao um a um apanha a regra sem sonda e a tapada (#301)", (() => {
   const fora = semEfeito({ deny: ["Read(./**/.env*)", "Read(./**/*.kdbx)", "Read(./.env)"], ask: ["Edit(./.githooks/**)", "Bash(cargo add:*)"] });
   const esperado = ["Read(./**/*.kdbx)", "Read(./.env)", "Bash(cargo add:*)"];

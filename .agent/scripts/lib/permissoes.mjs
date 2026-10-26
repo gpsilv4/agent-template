@@ -67,6 +67,12 @@ export function cobre(regras, ferramenta, alvo) {
       return alvo.startsWith("~/") === glob.startsWith("~/") && globParaRegex(glob).test(alvo);
     }
     const corpo = m[2];
+    // Um `*` NO MEIO ("A `*` can go anywhere in the rule", a doc de permissoes do Claude Code): o resto e literal,
+    // e o `:*` final e o mesmo que ` *`. So o prefixo nao chegava: `Bash(git config*chave*)` nunca cobria nada (#375).
+    if (corpo.replace(/(?::\*| \*|\*)\s*$/, "").includes("*")) {
+      const partes = corpo.trim().replace(/:\*$/, " *").split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
+      return new RegExp(`^${partes.join(".*")}$`).test(alvo);
+    }
     const palavra = /^(.*?)(?::\*| \*)\s*$/.exec(corpo);
     if (palavra) {
       const p = palavra[1].trim();
@@ -101,6 +107,9 @@ export const SONDAS = [
   ...["Edit", "Write"].flatMap((f) => [".claude/settings.json", ".claude/settings.local.json", ".env.local", "a/.env"].map((alvo) => ({ lista: "deny", ferramenta: f, alvo }))),
   ...BASH("deny", ["git push --force", "git push -f", "git reset --hard", "rm -rf", "rm -fr", "rm -Rf", "rm -fR", "rm -r -f", "rm -f -r", "rm --recursive --force"]),
   ...BASH("deny", ["git push --force-with-lease"], { nota: true }),
+  // O interruptor dos nomes proibidos (#375): so o UTILIZADOR o desliga, e um agente recusado que o desligasse
+  // passava calado dai em diante. Nota, e nao reprova: o `settings.json` e do utilizador, e o `/upgrade` nao lho impoe.
+  ...BASH("deny", ["git config --local agent-template.nomesProibidos desligado"], { nota: true }),
   // A FRONTEIRA: sem isto um agente edita os hooks, os git hooks e os agentes sem perguntar (R7B-1).
   // Um ficheiro na raiz da pasta e um em `lib/`: `Edit(./.claude/hooks/*.mjs)` cobria o primeiro e
   // deixava aberto o `lib/fronteira.mjs`, que e onde a decisao vive (leitura independente do #301).
