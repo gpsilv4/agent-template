@@ -19,6 +19,12 @@ updates:
       # status checks; sem isso, nao ligar.
       # - automerge
     versioning-strategy: increase
+    # Uma versao publicada hoje so entra passados 7 dias (#377): um pacote comprometido costuma ser
+    # retirado em horas ou dias, e o auto-merge (quando ligado) fundia-o na corrida semanal seguinte.
+    # As atualizacoes de SEGURANCA nao esperam: o `cooldown` so vale para as de versao (documentacao
+    # das opcoes do Dependabot). Custo: com a corrida a segunda, as outras chegam 7 a 13 dias depois.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore
       prefix-development: chore
@@ -39,6 +45,9 @@ updates:
       - ci
       # Descomentar para LIGAR o auto-merge de patch/minor neste ecosystem.
       # - automerge
+    # O mesmo `cooldown` do `npm` acima (#377): uma action comprometida corre no CI com os segredos dele.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
       include: scope

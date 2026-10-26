@@ -134,7 +134,7 @@ jobs:
       #   run: node .agent/scripts/check-bundle-sizes.mjs
 
       # NAO por os doc guards nem o backlog aqui: este job salta a app num template sem
-      # app, e eles sao maquinaria. Vivem no job `guard-tests`, que corre sempre.
+      # app, e eles sao maquinaria. Vivem no job `guard-tests`, que corre com ou sem `package.json` (o unico salto e o do `if:` abaixo, #347).
 
       - name: Unit Tests
         env:
