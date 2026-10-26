@@ -16,7 +16,7 @@
  *
  * O MOTOR DE MEDICAO vive em `lib/varredura-paralela.mjs` (fila de sitios, uma copia por worker,
  * baselines deduplicadas por suite) e e exercitado por estes testes atraves do varredor — nao
- * tem suite propria, e por isso e aqui que ele esta coberto.
+ * tem suite propria, e por isso e aqui que ele esta coberto (e o `lib/varredura-tempos.mjs`, #374b).
  *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *

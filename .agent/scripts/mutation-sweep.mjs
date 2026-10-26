@@ -99,7 +99,8 @@ import { PARES } from "./lib/pares.mjs";
 import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
 import { alvosDoDiff } from "./lib/varredura-diff.mjs";
-import { medeCobertura, quantosWorkers, resumoDeTempos, copiaDoRepo } from "./lib/varredura-paralela.mjs";
+import { medeCobertura, quantosWorkers, copiaDoRepo } from "./lib/varredura-paralela.mjs";
+import { resumoDeTempos } from "./lib/varredura-tempos.mjs";
 import { qualShard, particao, totalDeSitios, ENV_SHARD, ENV_RELATORIO } from "./lib/varredura-fatia.mjs";
 
 const listarSo = process.argv.includes("--list");

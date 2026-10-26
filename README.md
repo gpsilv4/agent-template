@@ -258,12 +258,14 @@ not to* line, so every agent sees it.
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
+    │   ├── varredura-tempos.mjs   <- ...and its time summary, by target (moved out at 500 lines, #374b)
     │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
     │   ├── varredura-shards.mjs <- The gate's check that every sweep shard reported, and all sites were measured
     │   ├── plano-ci.mjs       <- Does the sweep apply to this PR? Read from the BASE commit by the gate (#347)
     │   ├── varredura-diff.mjs <- The sweep's `--diff`: which targets the branch touches
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
+    │   ├── estrutura-workflow.mjs <- The CI gate's structure: jobs, `needs:`, aggregators, shape defects (#374b)
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved

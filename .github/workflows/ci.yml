@@ -450,7 +450,7 @@ jobs:
       # um tirado da matriz deixava sitios por medir com o resto verde. Os relatorios deles juntos
       # provam-no (`lib/varredura-shards.mjs`): indices 1..n, o mesmo total, e a soma dos medidos. E os
       # MODOS da matriz, passados ao portao (#317): sem eles, um modo tirado da matriz passava verde — o
-      # `superficie-gate.mjs` exige que sejam os mesmos, para nao serem duas listas a concordar a mao.
+      # gate (`lib/estrutura-workflow.mjs`) exige que sejam os mesmos, para nao serem duas listas a concordar a mao.
       # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
       # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
       # ficheiros e passa; e o passo de baixo que decide se os confere.

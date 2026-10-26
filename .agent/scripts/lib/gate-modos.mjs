@@ -3,7 +3,7 @@
  *
  * A matriz do job `sweep` diz que modos correm (`completa`, `skips`); a linha do portao
  * (`varredura-shards.mjs <pasta> <modos...>`) diz que modos se exigem. Sao duas listas, e o
- * `superficie-gate.mjs` exige que sejam iguais (#317). Aqui so se LEEM — sem sitios de recusa: `null`
+ * gate (`estrutura-workflow.mjs`) exige que sejam iguais (#317). Aqui so se LEEM — sem sitios de recusa: `null`
  * e "nao consegui ler", e quem decide reprovar (fechado) e o chamador.
  *
  * As formas de YAML que se leem, porque um derivado pode escrever qualquer uma (leituras do #317):
