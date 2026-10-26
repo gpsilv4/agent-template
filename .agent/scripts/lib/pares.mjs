@@ -15,6 +15,7 @@
 
 import { existsSync } from "fs";
 import { PARES_DOS_HOOKS } from "./pares-hooks.mjs";
+import { PARES_DOS_TEXTOS_PUBLICOS } from "./pares-publicos.mjs";
 
 // A config e OBRIGATORIA aqui (#243): sem ela a varredura media menos e reportava 100% (o
 // `check-doc-versions` tolera-a, e la um guard por ligar da WARN). Decide-se pela EXISTENCIA: um
@@ -333,26 +334,8 @@ const PARES_DO_TEMPLATE = [
     sinal: /(?<![\w.$])warn\(/,
     neutro: "(() => {})(",
   },
-  {
-    // O hook `commit-msg` do git. Nao vive em `.claude/hooks/` porque nao e so-Claude-Code: e
-    // o git que o corre, logo vale para qualquer ferramenta e qualquer pessoa. O `sinal` e o
-    // `recusar(` — e por ai que ele explica a recusa antes de sair `!= 0`. O alvo e o MODULO:
-    // o `.githooks/commit-msg` e so um ponteiro que o importa (#278).
-    alvo: ".githooks/lib/commit-msg.mjs",
-    suite: ".agent/scripts/tests/test-commit-msg.mjs",
-    // : sem isto o padrao casava a DEFINICAO, e mutar uma definicao da erro
-    // de sintaxe — a suite ficava vermelha pela razao errada e contava como cobertura.
-    sinal: /(?<![\w.$])(?<!function\s)recusar\(/,
-    neutro: "(() => {})(",
-  },
-  {
-    // O PONTEIRO que o git chama pelo nome (#278). O unico sitio e a chamada ao modulo: sem ela o
-    // hook sai 0 com qualquer mensagem — e a suite, que o corre como o git, tem de o notar.
-    alvo: ".githooks/commit-msg",
-    suite: ".agent/scripts/tests/test-commit-msg.mjs",
-    sinal: /(?<![\w.$])correr\(/,
-    neutro: "(() => {})(",
-  },
+  // Os pares do `commit-msg` e dos nomes proibidos vivem em `pares-publicos.mjs` (#375), no mesmo sitio da ordem.
+  ...PARES_DOS_TEXTOS_PUBLICOS,
   {
     alvo: ".agent/scripts/check-test-surface.mjs",
     suite: ".agent/scripts/tests/test-test-surface.mjs",

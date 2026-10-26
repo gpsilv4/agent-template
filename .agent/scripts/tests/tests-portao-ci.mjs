@@ -18,6 +18,7 @@ import { registarResultado, ROOT } from "./harness/test-harness.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
+import { VARIAVEL } from "../lib/nomes-proibidos.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -81,19 +82,24 @@ const CASOS = [
   { nome: "suites verdes num PR com a varredura saltada reprovam (como antes)", env: { ...MERGE, SUITES: "success", EVENTO: "pull_request" }, msg: LIMPA, verde: false, diz: ["a varredura de mutacao nao passou (pull_request): skipped"] },
 ];
 
-/** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real. */
+/** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real — com a lib da lista de
+ *  nomes que o `commit-msg` importa (#375), como no checkout do CI, e sem lista (no CI nao ha nenhuma). */
 function corre(corpo, env, mensagem) {
   const dir = mkdtempSync(join(tmpdir(), "portao-ci-test-"));
   try {
     const repo = join(dir, "repo");
     mkdirSync(repo);
     cpSync(join(ROOT, ".githooks"), join(repo, ".githooks"), { recursive: true });
+    const lib = ".agent/scripts/lib/nomes-proibidos.mjs";
+    mkdirSync(join(repo, ".agent/scripts/lib"), { recursive: true });
+    cpSync(join(ROOT, lib), join(repo, lib));
+    env = { ...env, HOME: join(dir, "home-sem-lista") };
     const git = gitEm(repo);
     git(["init", "-q"]);
     git(["add", "-A"]);
     writeFileSync(join(dir, "msg"), mensagem);
     git(["commit", "-q", "-F", join(dir, "msg")]);
-    return correCorpo(corpo, { cwd: repo, env, runnerTemp: dir });
+    return correCorpo(corpo, { cwd: repo, env, runnerTemp: dir, semVars: [VARIAVEL] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

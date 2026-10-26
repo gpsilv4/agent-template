@@ -30,7 +30,39 @@
  * escrita para ser facil de estender, e a mensagem de recusa diz onde.
  */
 
+import { execFileSync } from "child_process";
 import { readFileSync } from "fs";
+import { dirname, join, resolve } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
+
+/** A raiz do repo DESTE ficheiro (`.githooks/lib/`): e dela que vem a lib da lista. */
+const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+
+/** O repo do COMMIT: o git corre o hook na raiz da worktree. E outro que o `RAIZ` quando o `core.hooksPath` aponta
+ *  para os hooks de outro clone — e e este que decide o interruptor e o "lista dentro do repo" (#375). */
+const REPO = process.cwd();
+
+/** O caracter de comentario do git (`core.commentChar`, `#` por omissao; `auto` escolhe um que a mensagem nao
+ *  use, e entao a tesoura e os comentarios ficam no `#` que a maioria tem). */
+function caracterDeComentario() {
+  try {
+    const c = execFileSync("git", ["config", "--get", "core.commentChar"], { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return c && c !== "auto" ? c : "#";
+  } catch {
+    return "#";
+  }
+}
+
+/** Os NOMES PROIBIDOS (#375): a lista vive fora do repo, e a lib que a le em `.agent/scripts/lib/` (o `/upgrade`
+ *  copia essa pasta sozinho; esta vai para a fronteira). Importada assim, e nao no topo, para uma lib em falta
+ *  (um derivado antigo) RECUSAR com a razao em vez de rebentar com um `ERR_MODULE_NOT_FOUND` sem contexto. */
+let nomes;
+let erroDaLib;
+try {
+  nomes = await import(pathToFileURL(join(RAIZ, ".agent/scripts/lib/nomes-proibidos.mjs")).href);
+} catch (err) {
+  erroDaLib = err;
+}
 
 /** Recusa o commit: imprime e sai `!= 0`. Existe como FUNCAO e nao como `console.error` +
  *  `process.exit` soltos pela mesma razao que o `fatal()` dos verificadores deste repo — a
@@ -147,6 +179,47 @@ const FORMAS = [
 ];
 
 /**
+ * Recusa uma mensagem que nomeie uma entrada da lista de NOMES PROIBIDOS (#375). Sem lista, passa calado: o CI
+ * corre este hook sobre cada mensagem de um PR, e la nunca ha lista (quem o diz e o comando
+ * `check-textos-publicos.mjs`). Num repo DESLIGADO (`git config --local`), tambem: num repo privado os nomes podem
+ * ser legitimos. Uma lista que existe e nao serve recusa. Corre ANTES da verificacao da IA, que imprime a linha:
+ * com um nome nela, era por ai que ele saia. As recusas citam as LINHAS, nunca o nome: quem as le pode ser um agente.
+ * @param {{ texto: string, n: number }[]} linhas  a mensagem, sem os comentarios do git, com a linha do FICHEIRO
+ */
+function verificaNomes(linhas) {
+  if (!nomes) {
+    recusar("COMMIT RECUSADO — nao consegui carregar a lista de nomes proibidos.", [
+      `\`.agent/scripts/lib/nomes-proibidos.mjs\`: ${erroDaLib instanceof Error ? erroDaLib.message : String(erroDaLib)}`,
+      "Um projeto anterior a v0.61.0: o `/upgrade` traz a lib (o `.agent/scripts/` copia-se sozinho).",
+    ]);
+  }
+  const lista = nomes.carregaLista({ raiz: REPO });
+  if (lista.estado === "sem-lista") return;
+  // Desligado passa, mas DIZ-O: calado, um interruptor ligado por engano ficava invisivel para sempre.
+  if (lista.estado === "desligado") {
+    console.error(`  commit-msg: os nomes proibidos estao DESLIGADOS neste repo (git config --local ${nomes.INTERRUPTOR}).`);
+    return;
+  }
+  if (lista.estado !== "ok") {
+    recusar(`COMMIT RECUSADO — ${nomes.RAZOES[lista.estado]}.`, [
+      `A lista: ${lista.caminho} (\`$${nomes.VARIAVEL}\` muda o caminho).`,
+      "Corrigir a lista, ou retira-la (sem lista nao ha verificacao). Nunca com --no-verify.",
+    ]);
+  }
+  const re = nomes.padroes(lista.nomes);
+  const achados = linhas.flatMap((l) => nomes.encontra(l.texto, re).map((n) => `linha ${l.n} da mensagem: o nome da linha ${n} da lista`));
+  if (achados.length === 0) return;
+  recusar("COMMIT RECUSADO — a mensagem nomeia um nome da lista de nomes proibidos.", [
+    ...achados,
+    "",
+    `A lista: ${lista.caminho}. Reescrever essas linhas da mensagem e repetir o commit.`,
+    "Uma mensagem de commit e imutavel depois de mergeada, e um repo publico nao a esquece.",
+    "Num repo PRIVADO, onde estes nomes podem ser legitimos, quem decide desligar e o UTILIZADOR, nunca um agente:",
+    "o interruptor esta em `src/docs/upgrade-why.md`, \"O contrato da lista de nomes proibidos (#375)\".",
+  ]);
+}
+
+/**
  * Corre o hook sobre o ficheiro da mensagem que o git passa (`$1`). Sai `0` se a mensagem esta
  * limpa; recusa (sai `1`) se atribui o trabalho a uma IA, ou se nao a consegue ler.
  * @param {string | undefined} caminho
@@ -163,23 +236,34 @@ export function correr(caminho) {
     recusar(`commit-msg: nao consegui ler ${caminho}: ${err.message}`);
   }
 
-  // Os comentarios do git (`#` no inicio da linha) nao entram na mensagem final, logo tambem nao
-  // entram aqui — senao o texto de ajuda do proprio git podia disparar o hook.
+  // Os comentarios do git (`#` no inicio da linha) ficam fora da verificacao da IA — senao o texto de ajuda do
+  // proprio git podia disparar o hook. (Com o editor o git apaga-os; com `-m`/`-F` nao, e os nomes leem-nos.)
   // `\r\n` (Windows) e `\r` sozinho: uma mensagem escrita assim (`git commit -F`) deixava um `\r`
   // na linha, e o `(.+)$` das formas deixava de casar — escapava tudo menos o emoji (#289).
-  const linhas = msg
-    .split(/\r\n|\r|\n/)
-    .filter((l) => !/^\s*#/.test(l));
+  // A TESOURA do `git commit -v` (`# --- >8 ---`): o git apaga tudo abaixo dela, e o diff que la vem nao comeca
+  // por `#`. Sem o corte, apagar um nome vazado de um ficheiro (`-nome` no diff) recusava o commit que o tira.
+  // Cada linha guarda o numero que tem no FICHEIRO, antes de sairem os comentarios: e esse que a recusa cita.
+  // A tesoura e os comentarios seguem o `core.commentChar` do repo.
+  const c = caracterDeComentario().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const todas = msg.split(/\r\n|\r|\n/);
+  const tesoura = todas.findIndex((l) => new RegExp(`^${c} -+ >8 -+$`).test(l));
+  const acima = (tesoura >= 0 ? todas.slice(0, tesoura) : todas).map((texto, i) => ({ texto, n: i + 1 }));
+  const linhas = acima.filter(({ texto }) => !new RegExp(`^\\s*${c}`).test(texto));
+
+  // Os NOMES leem TODAS as linhas acima da tesoura, comentarios incluidos: com `-m`/`-F` e sem editor, o git
+  // so limpa espacos (`--cleanup=whitespace`), e uma linha `#339 ...` FICA na mensagem. Um nome num comentario
+  // que o git apagaria (o branch no texto de estado) tambem recusa: falha fechado.
+  verificaNomes(acima);
 
   const achados = [];
-  for (const [i, linha] of linhas.entries()) {
+  for (const { texto: linha, n } of linhas) {
     for (const f of FORMAS) {
       const m = linha.match(f.re);
       if (!m) continue;
       // Cada forma decide pelo seu `decide`; por omissao (os trailers), basta casar a `IA` — e
       // so ela, senao um co-autor humano era recusado.
       if (!(f.decide ?? ((v) => IA_UMA.test(v)))(f.valor(m), m)) continue;
-      achados.push({ n: i + 1, linha: linha.trim(), forma: f.nome });
+      achados.push({ n, linha: linha.trim(), forma: f.nome });
     }
   }
 

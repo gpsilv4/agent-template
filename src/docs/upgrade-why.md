@@ -582,3 +582,23 @@ pasta da fronteira que e symlink (`.githooks` -> `.husky`) e as colisoes de um a
 o que a arvore de trabalho ja tem igual ao staging conta como aplicado (a 2b corrida outra vez na §3
 nao o repete); e os `.claude/agents/` intactos saem no mesmo bloco. Os achados baixos ficaram no #317.
 
+
+## O contrato da lista de nomes proibidos (#375)
+
+A lista vive FORA do repo, e um derivado que a use depende de tres coisas que o template nao pode mudar sem
+avisar:
+
+- **O caminho:** `$NOMES_PROIBIDOS_FICHEIRO`, ou, sem ela, `~/.config/agent-template/nomes-proibidos`.
+- **O formato:** um nome por linha; `#` no inicio comenta; as linhas em branco, e as sem nenhuma letra ou digito,
+  nao contam. `-`, ` ` e `_` sao o mesmo separador, a caixa nao conta, os dois lados vao a NFC (os acentos
+  contam), e um nome dentro de uma palavra maior nao casa.
+- **Os estados:** sem ficheiro no caminho por omissao, o `commit-msg` passa calado e o `check-textos-publicos.mjs`
+  sai `2`; uma lista ilegivel (com a variavel apontada para um ficheiro em falta, ou um symlink sem alvo), vazia ou
+  DENTRO do repo recusa nos dois.
+- **O interruptor por repo:** a lista vale para todos os repos de quem a tem, e num derivado PRIVADO os nomes dela
+  podem ser legitimos (o proprio nome do repo). `git config --local agent-template.nomesProibidos desligado`
+  desliga-a nesse repo: o `commit-msg` passa, e o comando sai `2` a dize-lo. So a config local conta.
+
+A lib (`.agent/scripts/lib/nomes-proibidos.mjs`) chega pelo `.agent/scripts/`, que o `/upgrade` copia sozinho;
+o `commit-msg` que a importa vem pela fronteira (`.githooks/`). Entre os dois passos, um `commit-msg` antigo
+continua a funcionar sem os nomes, e um novo sem a lib recusa com a razao — nunca passa em silencio.

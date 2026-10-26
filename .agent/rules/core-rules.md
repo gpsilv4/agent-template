@@ -97,6 +97,7 @@
 - Nunca expor chaves secretas no frontend.
 - Apenas chaves publicas (`NEXT_PUBLIC_*`, `VITE_*`, etc.) no cliente.
 - **ZERO** dados sensiveis em ficheiros commitados — nunca incluir API keys (reais ou de teste), secrets, tokens, passwords, credenciais ou URLs com keys em codigo, documentacao, `.agent/` ou `src/docs/`. Usar placeholders descritivos: `<real-key>`, `(ver .env.local)`, etc.
+- **Nomes que nao podem ser publicos** (repos privados, clientes): numa lista FORA do repo, `~/.config/agent-template/nomes-proibidos`. O `commit-msg` recusa-os; `node .agent/scripts/check-textos-publicos.mjs` varre issues, PRs e releases (#375). Num repo privado, so o UTILIZADOR a desliga (`upgrade-why.md`); o agente nunca.
 
 ### Mobile
 

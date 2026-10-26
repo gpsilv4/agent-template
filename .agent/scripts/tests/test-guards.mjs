@@ -21,7 +21,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // disco. O `tests-agentes.mjs` exercita o `lib/agentes.mjs` (o parser do `tools:`, #238), e o
 // `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
 // nesse modulo corre ESTE comando. O `tests-pares.mjs` exercita o `lib/pares.mjs` e o
-// `lib/pares-hooks.mjs` que ele junta (#243). O `tests-settings-sondas.mjs` exercita o `lib/permissoes.mjs`
+// `lib/pares-hooks.mjs` e o `lib/pares-publicos.mjs` que ele junta (#243, #375). O `tests-nomes-proibidos.mjs`
+// exercita o `lib/nomes-proibidos.mjs` (a lista guardada fora do repo, #375). O `tests-settings-sondas.mjs` exercita o `lib/permissoes.mjs`
 // (as sondas do Guard 11, #301). O `tests-varredura-shards.mjs` exercita o `lib/varredura-fatia.mjs` e o
 // `lib/varredura-shards.mjs` (os shards da varredura, #308), e o `--diff` do `lib/varredura-diff.mjs` (#317). O `tests-suites-em-paralelo.mjs` exercita o
 // `lib/suites-em-paralelo.mjs` (as suites do `Guard Suites` em paralelo, #337). O `tests-medida-upgrade-ci.mjs` exercita o

@@ -88,6 +88,7 @@ gh pr checks --watch
 - Variaveis de ambiente locais configuradas (`.env.local`)
 - Variaveis de ambiente de **producao** configuradas no painel de hosting
 - **ZERO dados sensiveis em ficheiros commitados**
+- **Nenhum nome proibido nos textos publicos** (#375): `node .agent/scripts/check-textos-publicos.mjs` sai `0`. So o `2` de `sem-lista` ou de um repo desligado nao reprova a release; os outros `2` (o `gh` a falhar, uma leitura cortada, uma lista que nao serve) reprovam ate serem corrigidos. As notas da release saem da tag, que ele so le depois de criada — reler o ficheiro dela antes do `git tag -a`.
 
 ## 5. Base de Dados — Migracoes
 
