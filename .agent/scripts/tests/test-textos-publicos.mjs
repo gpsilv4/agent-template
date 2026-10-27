@@ -22,6 +22,9 @@ import { VARIAVEL, INTERRUPTOR, RAZOES } from "../lib/nomes-proibidos.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/check-textos-publicos.mjs");
 const LISTA = "# privados\nprojeto-secreto\n";
+/** O ambiente do git de uma fixture: sem os `GIT_*` de quem corre (um `GIT_DIR` herdado escrevia no repo REAL), nem
+ *  a config global e do sistema (`TP3`). */
+const GIT_LIMPO = () => ({ ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k))), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" });
 
 let passed = 0;
 const falhas = [];
@@ -53,7 +56,7 @@ function corre({ lista = LISTA, ler, dentro = false, desligado = false }) {
     const caminho = dentro ? join(raiz, "lista") : join(dir, "lista");
     if (lista !== null) writeFileSync(caminho, lista);
     if (desligado) {
-      const git = (...a) => execFileSync("git", ["-C", raiz, ...a], { stdio: "ignore", env: { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k))), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" } });
+      const git = (...a) => execFileSync("git", ["-C", raiz, ...a], { stdio: "ignore", env: GIT_LIMPO() });
       git("init", "-q");
       git("config", "--local", INTERRUPTOR, "desligado");
     }
@@ -164,17 +167,29 @@ function falsoCorre({ issues = 1, prs = 1, reviews = 1, lixo = false } = {}) {
 // --- A CLI, como se corre ------------------------------------------------------------------------------
 {
   const dir = mkdtempSync(join(tmpdir(), "textos-publicos-test-"));
-  try {
-    let code = 0;
-    let out = "";
+  // A CLI pergunta o interruptor ao repo onde VIVE (`RAIZ`), e nao ao `cwd`: um clone com o interruptor desligado (o
+  // que as docs mandam num derivado privado) punha este caso vermelho (#396, M3). O `GIT_DIR` ABSOLUTO aponta-a para
+  // um repo descartavel; um relativo resolvia-se contra a `RAIZ`.
+  const repo = (nome, desligado) => {
+    const r = join(dir, nome);
+    mkdirSync(r);
+    execFileSync("git", ["init", "-q"], { cwd: r, env: GIT_LIMPO() });
+    if (desligado) execFileSync("git", ["config", "--local", INTERRUPTOR, "desligado"], { cwd: r, env: GIT_LIMPO() });
+    return join(r, ".git");
+  };
+  const cli = (gitDir) => {
     try {
-      out = execFileSync(process.execPath, [CLI], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, [VARIAVEL]: join(dir, "nao-existe") } });
+      return { code: 0, out: execFileSync(process.execPath, [CLI], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...GIT_LIMPO(), GIT_DIR: gitDir, [VARIAVEL]: join(dir, "nao-existe") } }) };
     } catch (e) {
-      code = e.status ?? -1;
-      out = `${e.stdout ?? ""}${e.stderr ?? ""}`;
+      return { code: e.status ?? -1, out: `${e.stdout ?? ""}${e.stderr ?? ""}` };
     }
+  };
+  try {
     // A razao EXACTA: so "NAO MEDIDO" passava tambem num clone desligado, pela razao errada.
-    afirma("a CLI com a variavel para um ficheiro em falta sai 2 e diz porque (sem rede: nao chega a ler)", { code, out }, { ...NAO_MEDIDO, includes: ["NAO MEDIDO", RAZOES.ilegivel] });
+    afirma("a CLI com a variavel para um ficheiro em falta sai 2 e diz porque (sem rede: nao chega a ler)", cli(repo("limpo", false)), { ...NAO_MEDIDO, includes: ["NAO MEDIDO", RAZOES.ilegivel] });
+    // O controlo: o positivo sozinho passava SEMPRE (um `GIT_DIR` invalido cai no `catch` e da "ligado"). Com o
+    // `GIT_DIR` para um repo desligado a razao muda: e o `GIT_DIR`, e nao o clone real, que decide.
+    afirma("controlo: com o GIT_DIR para um repo desligado, a CLI diz desligado (o GIT_DIR decide, #396)", cli(repo("desligado", true)), { ...NAO_MEDIDO, includes: [RAZOES.desligado] });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
