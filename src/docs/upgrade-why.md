@@ -488,6 +488,9 @@ tem quem o diga (medidos, com teste — duas leituras independentes do #308; as 
 | o `guard-tests` e o `guard-gate` com o mesmo nome (dois `Guard Tests`) | `check-test-surface` |
 | o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
 | `sweep` sem shards, com o template em shards | 2b: "reparte a varredura completa em shards ... trazer JUNTOS" |
+| (C2, #347) o `if:` do plano no `sweep` sem o shell do portao novo: cada PR sem maquinaria fica vermelho (o portao antigo le o `sweep` saltado como "nao mediu") | 2b: "o template so arranca os shards ... quando o plano da base diz"; o vermelho e do proprio portao — fechado |
+| (C2, #347) o shell do portao novo sem o passo do plano e o `if:` (por exemplo, trazido com a nota do salto do merge): `PLANO_JOB` vazio, cada PR vermelho | as duas notas da 2b dizem que o shell traz o plano; o vermelho e do proprio portao — fechado |
+| (C2, #347) o `if:` do `sweep` noutra forma que nao a do template | `check-test-surface`: "condicao `if:`", sem trailer que a aceite (a isencao so vale para a forma exacta) |
 | a matriz em shards trazida SEM os passos do portao no `guard-gate` (um shard em falta passava verde) | `check-test-surface`: "nenhum job confere os relatorios deles" |
 | o portao trazido sem os MODOS, ou com modos que nao sao os da matriz (#317: um modo que deixasse de correr passava verde; um a mais punha todos os PRs vermelhos) | `check-test-surface`: "nao recebe o(s) modo(s)" / "exige o(s) modo(s) ... que a matriz nao tem"; em runtime, o portao: "nenhum relatorio" |
 | (runtime) o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
@@ -513,8 +516,9 @@ Nenhum repo precisa de mexer na protecao. O `always()` e excecao a marca do `if:
 job corre; sem ele, um `needs` vermelho SALTAVA o gate, e um check saltado conta como passado).
 
 **O custo num privado free** (minutos faturados; cada job arredonda ao minuto): os tres jobs da
-matriz (dois shards e a `--skips`) fazem checkout e setup em todo o PR, mesmo quando "nao
-aplicavel", e o gate corre sempre; e cada shard repete as baselines e as provas do prefixo que a sua
+matriz (dois shards e a `--skips`) so arrancam num PR em que o plano da base diz que a varredura se
+aplica (o C2 do #347; antes, faziam checkout e setup em todo o PR para dizer "nao aplicavel"), e o
+gate corre sempre; e cada shard repete as baselines e as provas do prefixo que a sua
 fatia pede — ~+4-6 min por PR que toca nos verificadores, contra metade do tempo de parede da
 completa, e ~+1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
 gasta ~40 min a medir um gate ja condenado. Num publico nao se paga. Os tempos medidos (o do derivado

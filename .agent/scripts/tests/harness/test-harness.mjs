@@ -16,7 +16,8 @@
  * Uso:
  *   node .agent/scripts/tests/test-guards.mjs
  *
- * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml
+ * Sai != 0 se algum teste falhar. Corre em cada PR, e em cada push salvo o de um merge num privado (#347), no
+ * job `guard-tests` do ci.yml
  * (sem `package.json` e sem depender do passo `Projeto` do `Code Quality` — o template puro e exatamente o caso coberto).
  */
 

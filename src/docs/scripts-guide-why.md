@@ -228,9 +228,10 @@ diff, logo concordam POR CONSTRUCAO: os PRs com `sombra: concorda` provam o enca
 show`, o `node`, a concordancia no portao), nao que a decisao esteja certa. O que prende a decisao sao os testes
 cruzados. Fica para o C2, onde a decisao passa a desligar shards:
 - os caminhos que o git CITA (`core.quotePath`: acentos, aspas, `\`) nao casam nem no `grep` nem no plano — o C2
-  usa `git -c core.quotePath=false diff --name-only --no-renames -z`, partido por `\0`;
+  usa `git -c core.quotePath=false diff --name-only --no-renames -z`, passado a linhas por um `tr` (ver abaixo);
 - uma renomeacao para fora da maquinaria (o `--no-renames`);
-- o ramo `sombra: desligada` passa a vermelho (so e legitimo enquanto a base nao tem o plano).
+- o ramo `sombra: desligada`: no C2 a base sem o plano passa a "aplica tudo" (custa minutos, nunca um buraco), e
+  o portao exige os shards medidos tambem ai.
 Na medicao nao conta um PR que toque no `lib/varredura-shards.mjs`: e a comparacao, e corre do HEAD.
 Os casos da sombra registam-se com `registarResultado`, que o `check-test-surface` nao conta: apagar um passava
 calado. E uma classe que ja existia (#359).
@@ -238,6 +239,30 @@ calado. E uma classe que ja existia (#359).
 **O C2 so entra** depois de 3 PRs que toquem em maquinaria e 3 que nao toquem com `sombra: concorda`. Os testes
 cruzados (`tests-plano-ci.mjs`) prendem o plano a descoberta da varredura e aos `PARES` do template; um alvo do
 PROJETO fora dos prefixos e uma nota, e nao um vermelho (o derivado nao tem onde estender os prefixos).
+
+#### A troca (C2)
+
+O criterio cumpriu-se a 2026-10-26: 10 PRs com maquinaria e 3 sem, todos com `sombra: concorda`. No C2 o plano
+passa a decidir:
+- **um passo do `guard-tests`** (`Plano da varredura`, antes das suites) le o plano da BASE, corre-o sobre o diff e
+  escreve `aplica=true|false`; o `if:` do `sweep` le esse output. Num PR sem maquinaria os shards ficam `skipped`.
+  Um passo, e nao um job novo: um job seria +1 minuto cobrado em CADA PR, e um id que o BOOTSTRAP e o `/upgrade`
+  teriam de conhecer (um `needs:` para um job ausente invalida o workflow).
+- **o portao e a autoridade:** recalcula o plano com as MESMAS linhas (o `tests-plano-passo.mjs` exige-as iguais,
+  letra a letra), exige o output do job IGUAL ao seu (um output perdido chega vazio, e e vermelho), e com `true`
+  passa `VARREDURA_PLANO=true` ao `varredura-shards`, para um shard "nao aplicavel" nao passar por medido. Imprime
+  `plano: aplica (plano=true)`, `plano: nao aplicavel (plano=false)` ou `plano: a base nao tem o plano (aplica tudo)`.
+- **o diff:** `--no-renames` (uma renomeacao para fora da maquinaria aplica) e `-z` passado a linhas por um `tr`:
+  o nome tal como e, sem as aspas que o git poe num nome com `"`, `\` ou um caracter de controlo (o plano da base
+  continua a ler uma linha por caminho). Um nome com uma quebra de linha so acrescenta linhas; um que acabe nela
+  deixa uma linha vazia, que o plano recusa — vermelho em cada PR que lhe toque, e um admin tira-o por push direto.
+- **o `if:` do `sweep` e uma marca** do `check-test-surface`, e nenhum trailer a aceita. Tem uma isencao, so na
+  forma exacta e so no job `sweep` do `ci.yml` (`lib/marcas-yaml.mjs`), pela mesma razao das outras duas: o portao
+  recalcula a decisao. As tres isencoes tem par na varredura (`isenta(`), medidas pela primeira vez neste PR.
+
+**O que fica de fora:** um derivado que tirou o `if:` do `sweep` para varrer tambem em `push` deixa de o fazer se
+adotar o C2 (o plano e so de PR) — a nota da 2b avisa-o. E um derivado que traga o `if:` sem o portao novo fica
+vermelho em cada PR sem maquinaria: falha fechada, e a nota diz "juntos".
 
 **O "deploy" nao e o que isto atrasa.** No metodo do template, o deploy de producao e do alojamento
 (depois do merge); o runner atrasa o **portao** antes do merge — o CI do PR.

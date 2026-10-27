@@ -32,7 +32,7 @@ export const paraMarcas = (f, t) =>
     : t;
 
 /**
- * As DUAS isencoes da marca do `if:` que so valem como `if:` de PRIMEIRO NIVEL de um job — a mesma forma num
+ * As TRES isencoes da marca do `if:` que so valem como `if:` de PRIMEIRO NIVEL de um job — a mesma forma num
  * passo continua a contar. Cada uma so na forma EXACTA (aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma
  * continuacao na linha seguinte). O `if:` passa a `@@if-...@@:`, que a marca nao le.
  *  - O `if: always()` de um AGREGADOR (#308): sem ele, uma dependencia vermelha SALTAVA o agregador — e um
@@ -48,11 +48,23 @@ export const paraMarcas = (f, t) =>
  *    O portao (`Guard Tests`) recalcula o salto no SEU shell e reprova qualquer outro `skipped`.
  *    O `secret-scan` SAIU da lista (#372): um commit pela UI web no `main` tem o mesmo committer, e com o
  *    salto nunca era varrido. Posto la de volta, o `if:` conta como enfraquecimento.
+ *  - O PLANO da varredura (#347, C2): `pull_request && needs.guard-tests.outputs.aplica == 'true'`. Os shards so
+ *    arrancam quando o plano da base diz que a varredura se aplica. So no job `sweep` do `ci.yml`: o portao
+ *    (`Guard Tests`) recalcula o plano da BASE no seu shell e e a autoridade — plano `true` com o `sweep` saltado,
+ *    ou um output do job diferente do plano dele, e vermelho. Um derivado que traga este `if:` sem o portao novo
+ *    fica vermelho em cada PR sem maquinaria (o portao antigo le um `skipped` num PR como "nao mediu").
+ * Cada uma passa pela mesma troca, numa chamada literal por linha: e o que deixa a varredura medir cada
+ * isencao como um sitio seu (o par em `PARES`).
  */
 const JOBS_DO_MERGE = new Set(["quality", "guard-tests"]);
+const JOBS_DO_PLANO = new Set(["sweep"]);
 const CI_DO_MERGE = /(^|\/)\.github\/workflows\/ci\.ya?ml$/;
 const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
 const MERGE_PRIVADO = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*\|\|[ \t]*!github\.event\.repository\.private[ \t]*\|\|[ \t]*github\.event\.head_commit\.committer\.username[ \t]*!=[ \t]*'web-flow'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+/** Exportado para a nota da 2b (`medida-upgrade-ci.mjs`) ler a MESMA forma, e nao uma copia (`TP8`). */
+export const PLANO_DO_SWEEP = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*&&[ \t]*needs\.guard-tests\.outputs\.aplica[ \t]*==[ \t]*'true'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+/** A linha com o `if:` trocado pela `marca`, se a forma for EXACTAMENTE `re`; senao `null`. */
+const isenta = (linha, re, marca) => (re.test(linha) ? linha.replace(re, marca) : null);
 function isencoesDeJob(t, ficheiro) {
   const ls = t.split(/\r?\n/);
   const iJobs = ls.findIndex((l) => /^["']?jobs["']?[ \t]*:/.test(l));
@@ -69,16 +81,20 @@ function isencoesDeJob(t, ficheiro) {
     while (f < fim && (!ls[f].trim() || /^[ \t]*#/.test(ls[f]) || ind(ls[f]) > jInd)) f++;
     const bloco = ls.slice(i + 1, f);
     const agrega = bloco.some((l) => !/^[ \t]*#/.test(l) && /\bneeds\.[\w-]+\.result\b/.test(l));
-    const doMerge = CI_DO_MERGE.test(ficheiro) && JOBS_DO_MERGE.has(/^[ \t]*["']?([\w-]+)["']?[ \t]*:/.exec(ls[i])?.[1]);
+    const id = /^[ \t]*["']?([\w-]+)["']?[ \t]*:/.exec(ls[i])?.[1];
+    const doMerge = CI_DO_MERGE.test(ficheiro) && JOBS_DO_MERGE.has(id);
+    const doPlano = CI_DO_MERGE.test(ficheiro) && JOBS_DO_PLANO.has(id);
     const naoVazias = bloco.filter((l) => l.trim() && !/^[ \t]*#/.test(l));
     const kInd = naoVazias.length ? Math.min(...naoVazias.map(ind)) : -1;
     for (let k = i + 1; k < f; k++) {
       if (ind(ls[k]) !== kInd) continue;
-      const re = agrega && SEMPRE.test(ls[k]) ? SEMPRE : doMerge && MERGE_PRIVADO.test(ls[k]) ? MERGE_PRIVADO : null;
-      if (!re) continue;
       const prox = ls.slice(k + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));
       if (prox !== undefined && ind(prox) > kInd) continue; // uma continuacao muda a condicao
-      ls[k] = re === SEMPRE ? ls[k].replace(SEMPRE, "$1@@if-agregador@@$2always()") : ls[k].replace(MERGE_PRIVADO, "$1@@if-merge-privado@@$2");
+      const isento =
+        (agrega && isenta(ls[k], SEMPRE, "$1@@if-agregador@@$2always()")) ||
+        (doMerge && isenta(ls[k], MERGE_PRIVADO, "$1@@if-merge-privado@@$2")) ||
+        (doPlano && isenta(ls[k], PLANO_DO_SWEEP, "$1@@if-plano@@$2"));
+      if (isento) ls[k] = isento;
     }
     i = f - 1;
   }

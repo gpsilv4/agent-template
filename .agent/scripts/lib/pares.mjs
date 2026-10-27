@@ -46,6 +46,10 @@ const PARES_DO_TEMPLATE = [
   // O PLANO do CI (#347, C1): as tres recusas da CLI. Uma que nao fica vermelha e um "false" por nao ter lido — a
   // varredura deixava de correr num PR que a pedia (no C2). O dono e o `tests-plano-ci.mjs`.
   { alvo: ".agent/scripts/lib/plano-ci.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$]|function )recusa\(/, neutro: "(() => {})(" },
+  // As isencoes da marca do `if:` (#347, C2): nao recusam, mas desligada uma, a forma exacta passava a contar — e a
+  // forma alargada a passar calada se o caso "nao conta" faltasse. Cada chamada e um sitio: a do agregador, a do
+  // merge num privado, a do plano. O neutro devolve a linha como estava (a isencao nao se aplica).
+  { alvo: ".agent/scripts/lib/marcas-yaml.mjs", suite: ".agent/scripts/tests/test-test-surface.mjs", sinal: /(?<![\w.$]|function )isenta\(/, neutro: "((l) => l)(" },
   // A guarda de entry point partilhada (#373): sem sitio de recusa, ficava isenta — mas e a logica que, errada, CALA
   // as CLIs que decidem um veredicto (`TP2`). Cada `realpathSync(` desligado tem de pintar um caso do `tests-eh-main.mjs`.
   { alvo: ".agent/scripts/lib/eh-main.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$])realpathSync\(/, neutro: "(() => undefined)(" },

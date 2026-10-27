@@ -167,6 +167,10 @@ jobs:
     # Sem a varredura (#308): as suites e os verificadores, ~3 min no template e num derivado. A
     # varredura de mutacao vive no job `sweep`, em paralelo — o tecto dela e o historico dele estao la.
     timeout-minutes: 20
+    # O PLANO da varredura (#347, C2), para o `if:` do `sweep`. Escrito pelo passo `plano`, abaixo; o portao
+    # recalcula-o e compara, logo um mapeamento partido (um output vazio) e vermelho.
+    outputs:
+      aplica: ${{ steps.plano.outputs.aplica }}
     steps:
       # `fetch-depth: 0`: o check-test-surface compara contra a base do PR, e num clone
       # raso o ref da base nao existe — o verificador sai != 0 quando nao consegue medir,
@@ -180,6 +184,46 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+      # O PLANO DA VARREDURA (#347, C2): os shards do `sweep` so arrancam quando o plano diz que a varredura se
+      # aplica — num privado, cada shard que arranca num PR sem maquinaria e um minuto cobrado para dizer "nao".
+      # O plano e o `lib/plano-ci.mjs` da BASE (um PR nao muda a regra que o julga), copiado sozinho e corrido sobre
+      # o diff. Corre ANTES das suites: o risco do `$GITHUB_PATH` (codigo do PR a mudar o `PATH`) so toca os passos
+      # seguintes. A autoridade e o portao `Guard Tests`, que recalcula o plano com as MESMAS linhas
+      # (`tests-plano-passo.mjs` exige-as iguais, letra a letra) e reprova um output diferente do seu.
+      #  - o diff com `-z`: os nomes saem tal como sao (sem as aspas que o git poe num nome com `"`, `\` ou um
+      #    caracter de controlo, e que escondiam o prefixo); o `tr` devolve-os um por linha, que e o que o plano da
+      #    base le. Um nome com uma quebra de linha so ACRESCENTA linhas (o prefixo fica sempre na primeira); um que
+      #    comece ou acabe nela deixa uma linha vazia no meio, que o plano recusa — vermelho, e em cada PR que lhe
+      #    toque, ate o de o apagar: um admin tira-o por push direto.
+      #  - `--no-renames`: um ficheiro renomeado para FORA da maquinaria lista o caminho antigo, e o plano diz `true`.
+      #  - uma base sem o plano: `true` (aplica tudo). Custa minutos, nunca um buraco.
+      # Sem `if:` neste passo (uma condicao num passo e marca no `check-test-surface`): fora de um PR, o shell sai sem
+      # escrever nada, e o `sweep` (so de PR) salta.
+      - name: Plano da varredura — os shards so arrancam quando se aplica
+        id: plano
+        env:
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" != pull_request ]; then
+            echo "  fora de um PR ($EVENTO): sem plano — o \`sweep\` e so de PR"
+            exit 0
+          fi
+          base="$(git rev-parse --verify HEAD^1)"
+          lista="$(git ls-tree "$base" -- .agent/scripts/lib/plano-ci.mjs)"
+          if [ -z "$lista" ]; then
+            plano=true
+            echo "  a base nao tem o plano: aplica tudo"
+          else
+            mkdir -p "$RUNNER_TEMP/plano"
+            git show "$base:.agent/scripts/lib/plano-ci.mjs" > "$RUNNER_TEMP/plano/plano-ci.mjs"
+            git -c core.quotePath=false diff --name-only --no-renames -z "$base..HEAD" > "$RUNNER_TEMP/plano/tocados.z"
+            tr '\0' '\n' < "$RUNNER_TEMP/plano/tocados.z" > "$RUNNER_TEMP/plano/tocados.txt"
+            plano="$(node "$RUNNER_TEMP/plano/plano-ci.mjs" "$RUNNER_TEMP/plano/tocados.txt")"
+          fi
+          case "$plano" in true|false) ;; *) echo "::error::o plano da base respondeu '$plano', e nao true/false"; exit 1;; esac
+          echo "aplica=$plano" >> "$GITHUB_OUTPUT"
+          echo "  plano: aplica=$plano"
       # As suites EM PARALELO (#337): as mesmas, todas, em todos os PRs — so mais depressa. Eram 17 passos em
       # serie, ~97% dos ~3 min do job; o runner corre-as com tecto `min(4, cores)` (com 9 ao mesmo tempo ficava
       # PIOR do que com 4, medido) e imprime a saida de cada uma inteira e pela ordem desta lista (a de uma que reprova sai logo). Os comandos
@@ -289,12 +333,12 @@ jobs:
   # reprova os estados maus de um derivado (a varredura em dois jobs, ou fora de um agregador; um
   # `needs:` partido; dois checks com o mesmo nome) — `src/docs/upgrade-why.md`, #308.
   #
-  # A MESMA condicao para todas as pernas, num passo so: uma matriz, e nao dois jobs com a condicao
-  # copiada (`TP8`). `fail-fast: false`: uma perna vermelha nao cancela a outra a meio da medicao.
+  # A MESMA condicao para todas as pernas, no `if:` do job (o plano, #347 C2): uma matriz, e nao dois jobs com
+  # a condicao copiada (`TP8`). `fail-fast: false`: uma perna vermelha nao cancela a outra a meio da medicao.
   #
-  # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as pernas fazem
-  # checkout e setup em TODO o PR, mesmo quando a condicao diz "nao aplicavel", e o `guard-gate`
-  # corre sempre — o custo por PR esta no paragrafo dos SHARDS, abaixo (um numero so, `TP8`). Num publico nao se
+  # O CUSTO num privado (minutos faturados, cada job arredonda ao minuto): as pernas so arrancam num PR
+  # em que o plano diz que a varredura se aplica (#347, C2; antes, faziam checkout e setup em TODO o PR
+  # para dizer "nao aplicavel"), e o `guard-gate` corre sempre — o custo por PR esta no paragrafo dos SHARDS, abaixo (um numero so, `TP8`). Num publico nao se
   # paga. O ganho e o tempo de parede de um PR que toca nos verificadores.
   #
   # A PERNA COMPLETA EM SHARDS (#308, o desenho do #159): `shard: [1, 2]` reparte os sitios por duas
@@ -311,9 +355,11 @@ jobs:
     # min num privado a medir para nada (antes, um passo vermelho saltava o da varredura). Custa ~3
     # min de parede; o paralelismo das pernas, que e o ganho, fica.
     needs: guard-tests
-    # Tambem ao nivel do JOB: num `push` o job arrancava, fazia o checkout e ficava VERDE sem ter
-    # medido nada (`TP2`). Assim aparece como `skipped`.
-    if: github.event_name == 'pull_request'
+    # So num PR, e so quando o PLANO da base diz que a varredura se aplica (#347, C2; o passo `plano` do
+    # `guard-tests`). Num PR sem maquinaria os shards aparecem `skipped` e nao se paga nenhum. Saltar aqui nao
+    # desliga nada em silencio: o portao recalcula o plano e reprova um `sweep` saltado com o plano `true`. A forma
+    # e EXACTA (uma isencao da marca do `if:`, `lib/marcas-yaml.mjs`): outra conta como enfraquecimento.
+    if: github.event_name == 'pull_request' && needs.guard-tests.outputs.aplica == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -349,7 +395,9 @@ jobs:
     #
     timeout-minutes: 75
     steps:
-      # `fetch-depth: 0`: a condicao compara contra a base do PR (`HEAD^1`).
+      # `fetch-depth: 0`: era para a condicao, que comparava contra a base (`HEAD^1`) e saiu com o C2 (#347). Fica
+      # porque as suites que a varredura recorre podem ler a historia do repo (as tags, a base), e isso nao foi
+      # medido; encurta-lo e uma medicao a fazer, e nao uma poupanca a adivinhar.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -362,54 +410,28 @@ jobs:
       # logo custa minutos, nao segundos. Estava COMENTADA — o instrumento que prova que as
       # suites afirmam algo era o unico verificador que nao corria automaticamente em lado
       # nenhum, e a regra "cada verificador tem a sua suite" ficava em "corre se te lembrares".
-      # Corre onde e relevante: quando o PR toca nos verificadores ou nos hooks.
+      # Corre onde e relevante: quando o PR toca nos verificadores ou nos hooks — decidido pelo `if:` do job
+      # (o plano, #347 C2). Quando este passo corre, a varredura aplica-se: o `grep` e o "nao aplicavel" que
+      # aqui viviam sairam com o C2 (e o ramo do commit-raiz com eles: o plano nao corre fora de um PR).
       - name: Mutation sweep — cada aviso tem de ficar vermelho
         env:
           MODO: ${{ matrix.modo }}
           # O shard vai por ambiente e nao por `--shard`: o comando fica o de sempre (e o do `allow`).
           SWEEP_SHARD: ${{ matrix.shard }}/${{ matrix.de }}
-          # A prova deste shard para o `guard-gate`: escrita em TODOS os ramos (mesmo "nao aplicavel"),
-          # porque um relatorio em falta e o que o portao reprova.
+          # A prova deste shard para o `guard-gate`, escrita pelo `mutation-sweep.mjs`: um relatorio em falta e o
+          # que o portao reprova.
           SWEEP_RELATORIO: ${{ runner.temp }}/varredura/${{ matrix.modo }}-${{ matrix.shard }}.json
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$SWEEP_RELATORIO")"
-          nao_aplicavel() { printf '{"modo":"%s","k":%s,"n":%s,"aplicavel":false}\n' "$MODO" "${SWEEP_SHARD%/*}" "${SWEEP_SHARD#*/}" > "$SWEEP_RELATORIO"; }
-          # Commit-RAIZ. AQUI, com o `if: pull_request` acima, este ramo nao corre (o merge ref
-          # de um PR tem sempre pai) — e fica de proposito, nao por copia: um derivado que tire o
-          # `if:` para varrer tambem em `push` corre-o no commit inicial do repo. Medido: o
-          # o derivado privado B fez exatamente isso. Sem o ramo, `git rev-parse HEAD^1` sai 128,
-          # o `set -e` mata o step e o PRIMEIRO CI desse derivado nasce vermelho. Nao e o `TP2`:
-          # e "provei que nao ha intervalo", nao "nao consegui ler".
-          if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
-            echo "  HEAD e um commit-raiz (repo novo) — nao ha intervalo a verificar."
-            nao_aplicavel
-            exit 0
-          fi
-          # SEM PIPE, e de proposito. Com `pipefail`, `git diff | grep -q` caia no `else` em
-          # VERDE por dois caminhos: um `git diff` que falha, e o SIGPIPE que o `grep -q` provoca
-          # ao sair no primeiro match com o escritor ainda a escrever — "nao aplicavel"
-          # precisamente quando havia match (TP11). Trocar o `git diff` por `printf "$x" |` NAO
-          # resolve: o builtin corre num subshell do pipe e leva o mesmo SIGPIPE (medido, #155).
-          # Capturar isola a falha do `git diff` (`set -e` mata o step); o here-string tira o
-          # pipe; e o exit 2 do `grep` (erro) deixa de se confundir com o 1 (sem match).
-          tocados="$(git diff --name-only "$base..HEAD")"
-          rc=0
-          grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
-          if [ "$rc" -eq 0 ] && [ "$MODO" = completa ]; then
+          if [ "$MODO" = completa ]; then
             node .agent/scripts/mutation-sweep.mjs
-          elif [ "$rc" -eq 0 ] && [ "$MODO" = skips ]; then
+          elif [ "$MODO" = skips ]; then
             # Os `skip()`/`note()`, completos (#192): um guard que deixa de dizer que nao correu e o
             # `TP2`. Completos e nao `--diff`: o portao nao depende do mapa.
             node .agent/scripts/mutation-sweep.mjs --skips
-          elif [ "$rc" -eq 0 ]; then
-            echo "::error::modo da matriz desconhecido: '$MODO' — nao sei que varredura correr."
-            exit 1
-          elif [ "$rc" -eq 1 ]; then
-            echo "Nenhum verificador/hook tocado neste PR — varredura nao aplicavel."
-            nao_aplicavel
           else
-            echo "::error::grep saiu $rc a decidir se a varredura se aplica — nao consegui decidir."
+            echo "::error::modo da matriz desconhecido: '$MODO' — nao sei que varredura correr."
             exit 1
           fi
       # So num shard verde (o passo de cima falhou e este nao corre): vermelho, o portao ja reprova pelo
@@ -430,8 +452,8 @@ jobs:
   # `src/docs/upgrade-why.md`). Com a varredura num job
   # seu, `Guard Tests` deixava de a incluir — um PR com a varredura vermelha passava a poder ser
   # mergeado, sem nenhuma definicao mudada. Este job tem o nome antigo e so fica verde com as suites
-  # verdes E a varredura verde (ou saltada: so corre em `pull_request`, e num PR que nao toca nos
-  # verificadores as pernas saem verdes sem medir). Assim nenhum repo — este, ou um derivado com a
+  # verdes E a varredura verde (ou saltada: fora de um `pull_request`, ou num PR em que o plano da base diz
+  # que nao se aplica — e so ai, recalculado pelo portao). Assim nenhum repo — este, ou um derivado com a
   # protecao ligada — precisa de mudar as definicoes. Num privado de conta free a protecao nao e
   # imposta (`src/docs/github-security.md`): ai e so o semaforo. O required e SO este nome: os das
   # pernas (`Mutation sweep (completa 1/2)`, ...) nao sao estaveis num `push` (saltadas, sem expandir).
@@ -455,7 +477,7 @@ jobs:
       # Os tres passos correm SEMPRE, sem `if:` (uma condicao num passo do portao e marca no
       # `check-test-surface`): sem relatorios (um `push`), o download por `pattern` traz zero
       # ficheiros e passa; e o passo de baixo que decide se os confere.
-      # `fetch-depth: 2`: a sombra do plano le a BASE (`HEAD^1`, o pai do merge ref de um PR) e o diff contra ela.
+      # `fetch-depth: 2`: o plano le a BASE (`HEAD^1`, o pai do merge ref de um PR) e o diff contra ela.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
@@ -472,6 +494,8 @@ jobs:
         env:
           SUITES: ${{ needs.guard-tests.result }}
           VARREDURA: ${{ needs.sweep.result }}
+          # O plano que o `sweep` leu (#347, C2): tem de ser IGUAL ao que este shell recalcula da base.
+          PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }}
           EVENTO: ${{ github.event_name }}
           PRIVADO: ${{ github.event.repository.private }}
           COMMITTER: ${{ github.event.head_commit.committer.username }}
@@ -495,35 +519,48 @@ jobs:
             echo "::error::as suites (Guard Suites) nao passaram: $SUITES"
             exit 1
           fi
-          # `skipped` so FORA de um `pull_request` (o job `sweep` e so de PR: num `push`, num `merge_group`
-          # ou num `workflow_dispatch` que um derivado acrescente, salta). Num PR, saltada e "nao
-          # mediu": se o `if:` do `sweep` ficar mais estreito, o gate nao fica verde por isso (`TP2`).
-          # Qualquer outro estado (`failure`, `cancelled`) reprova.
-          if [ "$VARREDURA" = success ]; then
-            # A SOMBRA DO PLANO (#347, C1): num PR, o plano da varredura (`lib/plano-ci.mjs`) tem de CONCORDAR com o
-            # que os shards decidiram pelo `grep` do `sweep`. Nada deixa de correr; discordar e vermelho. O que a BASE
-            # protege e o CONTEUDO do plano (um PR nao muda a regra que o julga); este shell e o `grep` sao do PR, e
-            # o que os prende sao os testes cruzados (`tests-plano-ci.mjs`) e o medidor da superficie (o portao e um
-            # agregador: mudar isto avisa e so passa com o trailer). O MESMO diff do `sweep` (`$base..HEAD`, com
-            # renomeacoes). So atribuicoes soltas: um `export x=$(...)` ou um `local` mascaravam o erro ao `set -e`.
-            # Um `VARREDURA_PLANO` herdado (um `env:` de cima) imprimia "concorda" sem plano: limpa-se antes.
-            unset VARREDURA_PLANO
-            if [ "$EVENTO" = pull_request ]; then
-              base="$(git rev-parse --verify HEAD^1)"
-              lista="$(git ls-tree "$base" -- .agent/scripts/lib/plano-ci.mjs)"
-              if [ -z "$lista" ]; then
-                echo "sombra: desligada (a base nao tem o plano)"
-              else
-                mkdir -p "$RUNNER_TEMP/plano"
-                git show "$base:.agent/scripts/lib/plano-ci.mjs" > "$RUNNER_TEMP/plano/plano-ci.mjs"
-                git diff --name-only "$base..HEAD" > "$RUNNER_TEMP/plano/tocados.txt"
-                plano="$(node "$RUNNER_TEMP/plano/plano-ci.mjs" "$RUNNER_TEMP/plano/tocados.txt")"
-                case "$plano" in true|false) ;; *) echo "::error::o plano da base respondeu '$plano', e nao true/false"; exit 1;; esac
-                export VARREDURA_PLANO="$plano"
-              fi
+          # O PLANO DA VARREDURA (#347, C2): num PR, os shards so arrancam quando o plano da base diz que a varredura
+          # se aplica (o passo `plano` do `guard-tests` escreve-o, o `if:` do `sweep` le-o). ESTE shell e a autoridade:
+          # recalcula-o da BASE (um PR nao muda a regra que o julga) com as MESMAS linhas do passo, letra a letra
+          # (`tests-plano-passo.mjs`), e exige o output do job IGUAL — um output perdido (vazio) e vermelho. Com
+          # `false`, o `sweep` tem de ter saltado; com `true`, tem de ter passado e TODOS os shards medido: o
+          # `VARREDURA_PLANO=true` faz o `varredura-shards` reprovar um relatorio "nao aplicavel" (`TP2`). O portao e
+          # um agregador: mudar isto avisa no `check-test-surface` e so passa com o trailer.
+          # So atribuicoes soltas: um `export x=$(...)` ou um `local` mascaravam o erro ao `set -e`.
+          # Um `VARREDURA_PLANO` herdado (um `env:` de cima) mudava o que o `varredura-shards` confere: limpa-se antes.
+          unset VARREDURA_PLANO
+          if [ "$EVENTO" = pull_request ]; then
+            base="$(git rev-parse --verify HEAD^1)"
+            lista="$(git ls-tree "$base" -- .agent/scripts/lib/plano-ci.mjs)"
+            if [ -z "$lista" ]; then
+              plano=true
+              echo "plano: a base nao tem o plano (aplica tudo)"
+            else
+              mkdir -p "$RUNNER_TEMP/plano"
+              git show "$base:.agent/scripts/lib/plano-ci.mjs" > "$RUNNER_TEMP/plano/plano-ci.mjs"
+              git -c core.quotePath=false diff --name-only --no-renames -z "$base..HEAD" > "$RUNNER_TEMP/plano/tocados.z"
+              tr '\0' '\n' < "$RUNNER_TEMP/plano/tocados.z" > "$RUNNER_TEMP/plano/tocados.txt"
+              plano="$(node "$RUNNER_TEMP/plano/plano-ci.mjs" "$RUNNER_TEMP/plano/tocados.txt")"
+              case "$plano" in true|false) ;; *) echo "::error::o plano da base respondeu '$plano', e nao true/false"; exit 1;; esac
+              if [ "$plano" = true ]; then echo "plano: aplica (plano=true)"; else echo "plano: nao aplicavel (plano=false)"; fi
             fi
+            if [ "$PLANO_JOB" != "$plano" ]; then
+              echo "::error::o plano que o \`sweep\` leu do Guard Suites e '$PLANO_JOB', e o da base e '$plano' — os shards decidiram por outro plano"
+              exit 1
+            fi
+            if [ "$plano" = false ]; then
+              if [ "$VARREDURA" = skipped ]; then exit 0; fi
+              echo "::error::o plano diz que a varredura nao se aplica, e o \`sweep\` nao saltou: $VARREDURA"
+              exit 1
+            fi
+            # Com `true` (tambem com a base sem o plano), a varredura tem de ter passado — e cai no ramo de baixo.
+            export VARREDURA_PLANO=true
+          fi
+          # `skipped` so FORA de um `pull_request` (o job `sweep` e so de PR: num `push`, num `merge_group`
+          # ou num `workflow_dispatch` que um derivado acrescente, salta). Num PR com o plano `true`, saltada e
+          # "nao mediu" (`TP2`). Qualquer outro estado (`failure`, `cancelled`) reprova.
+          if [ "$VARREDURA" = success ]; then
             node .agent/scripts/lib/varredura-shards.mjs "$RUNNER_TEMP/varredura" completa skips
-            if [ -n "${VARREDURA_PLANO:-}" ]; then echo "sombra: concorda (plano=$VARREDURA_PLANO)"; fi
             exit 0
           fi
           if [ "$VARREDURA" = skipped ] && [ "$EVENTO" != pull_request ]; then
@@ -565,13 +602,17 @@ jobs:
       # o template funciona num derivado era alguem lembrar-se de o experimentar.
       # E, num PR que toca na maquinaria, a `--skips` sobre o derivado MADURO (#308, parte 3): o R7B-7
       # so apareceu no CI de um derivado, porque nenhum CI do template a corria sobre um derivado com
-      # historia. A MESMA condicao da varredura (sem o pipe, `TP11`); por `SIMULATE_SKIPS` e nao por
-      # flag, para o comando ser o do `allow`. ~+8 min neste job, em paralelo com o `Guard Tests`.
+      # historia. Os MESMOS prefixos do plano da varredura (`lib/plano-ci.mjs`; o `tests-plano-ci.mjs` compara-os pelo
+      # comportamento), sem o pipe (`TP11`); por `SIMULATE_SKIPS` e nao por flag, para o comando ser o do `allow`.
+      # ~+8 min neste job, em paralelo com o `Guard Tests`. O diff e o do plano (`--no-renames`: renomear para fora
+      # da maquinaria conta), mas lido por linha: um nome que o git poe entre aspas (com `"`, `\` ou um caracter de
+      # controlo) escapa ao prefixo AQUI — limite aceite, porque so desliga a `--skips` sobre o derivado; quem
+      # decide a varredura e o plano (#347, C2).
       - name: Projeto derivado — o template funciona depois do bootstrap
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          tocados="$(git diff --name-only "$(git rev-parse HEAD^1)..HEAD")"
+          tocados="$(git -c core.quotePath=false diff --name-only --no-renames "$(git rev-parse HEAD^1)..HEAD")"
           rc=0
           grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
           if [ "$rc" -eq 0 ]; then

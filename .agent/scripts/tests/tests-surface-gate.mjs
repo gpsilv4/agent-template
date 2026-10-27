@@ -46,8 +46,9 @@ const workflow = ({ on = "on:\n  pull_request:\n    branches: [main]\n", topo = 
   `      - run: |\n          if git diff --name-only | grep -qE '^\\.agent/scripts/'; then echo varre; fi\n${extra}` +
   `  audit:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Audit\n        continue-on-error: true\n${audit}`;
 
-/** Escreve `antes` e commita; escreve `depois` e commita com `msg`. Devolve a baseline. */
-const muda = (dir, antes, depois, { ficheiro = CI, msg = "muda", msgAntes = "antes" } = {}) => {
+/** Escreve `antes` e commita; escreve `depois` e commita com `msg`. Devolve a baseline. (Tambem o usa o
+ *  `tests-surface-plano.mjs`.) */
+export const muda = (dir, antes, depois, { ficheiro = CI, msg = "muda", msgAntes = "antes" } = {}) => {
   mkdirSync(join(dir, ".github/workflows"), { recursive: true });
   // Sem `antes` (um workflow NOVO), a baseline e o commit da sandbox: nao ha nada a commitar.
   if (antes !== null) {

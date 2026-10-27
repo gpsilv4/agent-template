@@ -160,8 +160,11 @@ export function registar() {
         if (!err.message.startsWith("__fatal__")) return [`rebentou por outra razao: ${err.message}`];
         if (!err.message.includes("o que o template ignora")) return [`razao errada: ${err.message}`];
         // A razao do GIT vai junto: "dubious ownership" num mount e "nao e um repo" pedem
-        // correccoes diferentes, e so ele sabe qual e.
-        return /not a git repository|nao e um repositorio/i.test(err.message) ? [] : [`sem a razao do git: ${err.message}`];
+        // correccoes diferentes, e so ele sabe qual e. A frase depende da versao do git: ate a 2.55
+        // "not a git repository"; na 2.56 (a correccao do diagnostico de um `.git` invalido,
+        // `READ_GITFILE_ERR_NOT_A_REPO` no `setup.c`) "gitfile does not point to a valid repository".
+        // Medido no CI do #393: os runners com o git 2.56 reprovavam este caso, os com o 2.55 nao.
+        return /not a git repository|nao e um repositorio|gitfile does not point to a valid repository/i.test(err.message) ? [] : [`sem a razao do git: ${err.message}`];
       }
     } finally {
       rmSync(base, { recursive: true, force: true });

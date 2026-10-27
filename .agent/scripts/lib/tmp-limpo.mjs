@@ -100,6 +100,8 @@ export const PREFIXOS_DE_TESTE = [
   "plano-ci-test-",
   // Do `tests-portao-sombra.mjs` (#347, C1): o shell do portao num repo de fixture com base e HEAD.
   "portao-sombra-test-",
+  // Do `tests-plano-passo.mjs` (#347, C2): o passo do plano num repo de fixture com base e HEAD.
+  "plano-passo-test-",
   // Do `tests-eh-main.mjs` (#373): as CLIs corridas atras de um symlink que o teste cria.
   "eh-main-test-",
   // Do `tests-regex-runner.mjs` (#374a): o `ci.yml` de fixture que o `repetidosPorJob` le.

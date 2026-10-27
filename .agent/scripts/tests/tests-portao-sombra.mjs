@@ -1,16 +1,18 @@
 /**
- * A SOMBRA do plano no portao `Guard Tests` (#347, C1), corrida como o runner a corre.
+ * O PLANO da varredura no portao `Guard Tests` (#347; C1 em sombra, C2 a decidir), corrido como o runner o corre.
  *
- * NAO e um entry point: o `test-guards.mjs` descobre este modulo e chama `registar()`.
+ * NAO e um entry point: o `test-guards.mjs` descobre este modulo e chama `registar()`. (O nome ficou o do C1: mudar
+ * o nome de um modulo de suite e uma mudanca de superficie que nao compra nada.)
  *
- * Num PR com a varredura verde, o portao calcula o plano da varredura a partir do commit BASE (`lib/plano-ci.mjs`,
- * copiado sozinho) e exige que CONCORDE com o que os shards decidiram. Le-se o passo REAL do `ci.yml` (o
- * extractor do `tests-portao-ci.mjs`) e corre-se com `bash -e` (e um caso SEM o `-e`, #372) num repo git de fixture com DOIS commits: a base ja
- * tem o `varredura-shards.mjs` e o `plano-ci.mjs` reais (os da arvore de trabalho), e o HEAD muda so o que cada
- * caso diz — por isso um caso "so docs" chega a `false`, e o plano que corre e o da base.
+ * No C2 os shards so arrancam quando o plano da base diz que a varredura se aplica (o passo `plano` do `guard-tests`
+ * escreve-o, o `if:` do `sweep` le-o). O portao e a AUTORIDADE: recalcula o plano a partir do commit BASE
+ * (`lib/plano-ci.mjs`, copiado sozinho), exige o output do job IGUAL ao seu, e com `false` o `sweep` saltado, com
+ * `true` o `sweep` verde e todos os shards medidos. Le-se o passo REAL do `ci.yml` (o extractor do
+ * `tests-portao-ci.mjs`) e corre-se com `bash -e` (e um caso SEM o `-e`, #372) num repo git de fixture com DOIS
+ * commits: a base ja tem o `varredura-shards.mjs` e o `plano-ci.mjs` reais (os da arvore de trabalho), e o HEAD muda
+ * so o que cada caso diz — por isso um caso "so docs" chega a `false`, e o plano que corre e o da base.
  *
- * As linhas `sombra: concorda` e `sombra: desligada` afirmam-se nos DOIS sentidos: a medicao do C2 le-as, e um
- * "desligada" contado como "concorda" provava o que nao aconteceu.
+ * As linhas `plano: ...` afirmam-se: a medicao do salto (um PR sem maquinaria, antes da tag) le-as.
  */
 import { pathToFileURL } from "url";
 import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
@@ -51,6 +53,7 @@ function relatorios(aplicavel) {
  * Corre o `corpo` num repo de fixture. `o.head`: o que o HEAD muda — "maquinaria", "docs", "renomeia" (com o
  * conteudo identico, para a deteccao de renomeacoes do git disparar), ou nada (`semPai`: so um commit).
  * `o.basePlano`: o conteudo do plano na base (`null` = a base nao o tem); `o.headPlano`: o do HEAD, se mudar.
+ * `o.aplicavel`: os relatorios dos shards (`undefined` = nenhum, o `sweep` saltou).
  * @returns {{code: number, out: string}}
  */
 function corre(corpo, env, o, { semE = false } = {}) {
@@ -78,7 +81,7 @@ function corre(corpo, env, o, { semE = false } = {}) {
     }
     const pasta = join(dir, "varredura");
     mkdirSync(pasta);
-    relatorios(o.aplicavel).forEach((r, i) => writeFileSync(join(pasta, `r${i}.json`), JSON.stringify(r)));
+    if (o.aplicavel !== undefined) relatorios(o.aplicavel).forEach((r, i) => writeFileSync(join(pasta, `r${i}.json`), JSON.stringify(r)));
     // Um `VARREDURA_PLANO` de quem corre os testes nao entra: e o caso que o `unset` do portao cobre, e o
     // `herdado` abaixo testa-o de proposito.
     return correCorpo(corpo, { cwd: repo, env, runnerTemp: dir, semE, semVars: ["VARREDURA_PLANO"] });
@@ -87,7 +90,9 @@ function corre(corpo, env, o, { semE = false } = {}) {
   }
 }
 
-const PR = { SUITES: "success", VARREDURA: "success", EVENTO: "pull_request", PRIVADO: "false", COMMITTER: "" };
+/** Um PR com a varredura a correr (plano `true` no job e shards verdes), e um em que ela saltou (plano `false`). */
+const PR = { SUITES: "success", VARREDURA: "success", PLANO_JOB: "true", EVENTO: "pull_request", PRIVADO: "false", COMMITTER: "" };
+const PR_SALTOU = { ...PR, VARREDURA: "skipped", PLANO_JOB: "false" };
 /** O texto do job `id` do `ci.yml`, ate ao job SEGUINTE, qualquer que seja (#372 A8, `TP15`): ate ao `simulators:`
  *  assumia a ordem do template, e num derivado (sem esse job) ia ate ao fim do ficheiro. Sem o job: `""`. */
 export function fatiaDoJob(ci, id) {
@@ -97,43 +102,63 @@ export function fatiaDoJob(ci, id) {
   return prox < 0 ? ci.slice(ini) : ci.slice(ini, ini + 1 + prox);
 }
 
-/** A recusa do `varredura-shards` quando o plano e os shards discordam. Cada vermelho afirma-se pela SUA mensagem
- *  (#372 A4): so o exit deixava passar um vermelho por outra razao — apagado o `case` do portao, o "talvez" ainda
- *  reprovava, no `planoDe`. */
+/** Cada vermelho afirma-se pela SUA mensagem (#372 A4): so o exit deixava passar um vermelho por outra razao. */
 const DISCORDA = "decidiu o contrario";
-const CONCORDA = "sombra: concorda";
-const DESLIGADA = "sombra: desligada";
+const OUTRO_PLANO = "os shards decidiram por outro plano";
+const NAO_SALTOU = "e o `sweep` nao saltou";
+const NAO_PASSOU = "a varredura de mutacao nao passou (pull_request): skipped";
+const APLICA = "plano: aplica (plano=true)";
+const NAO_APLICA = "plano: nao aplicavel (plano=false)";
+const SEM_PLANO = "plano: a base nao tem o plano (aplica tudo)";
+/** A linha que faz o `varredura-shards` conferir o plano (N2): os controlos tiram-na. */
+const EXPORTA = /^[ \t]*export VARREDURA_PLANO=true\n/m;
+
+/** O portao do C2 reconhece-se pelo output do job no `env:` (o `VARREDURA_PLANO` tambem estava no C1). */
+export const temPortaoC2 = (passo) => passo !== null && passo.env.some((l) => /^PLANO_JOB:[ \t]*\$\{\{[ \t]*needs\.guard-tests\.outputs\.aplica[ \t]*\}\}$/.test(l));
 
 export function registar() {
   const lerRaiz = (rel) => leOuNull(join(ROOT, rel));
   const ci = lerRaiz(".github/workflows/ci.yml");
   const passo = ci === null ? null : passoDoPortao(ci);
-  const temSombra = passo !== null && /VARREDURA_PLANO/.test(passo.corpo);
-  // Um derivado que trouxe os scripts sem o portao novo (adotar e opcional): nada a testar aqui.
-  if (!temSombra && ehDerivado(lerRaiz)) {
-    console.log("  SKIP  portao: o ci.yml deste projeto nao tem a sombra do plano no portao `Guard Tests` (#347, opcional)");
-    registarResultado("portao: sem a sombra num derivado, nada a medir (#347)", []);
+  // Um derivado que trouxe os scripts sem o portao novo (adotar e opcional): nada a testar aqui (`TP15`).
+  if (!temPortaoC2(passo) && ehDerivado(lerRaiz)) {
+    console.log("  SKIP  portao: o ci.yml deste projeto nao tem o plano da varredura no portao `Guard Tests` (#347 C2, opcional)");
+    registarResultado("portao: sem o plano num derivado, nada a medir (#347)", []);
     return;
   }
-  registarResultado("portao: o shell do portao tem a sombra do plano (#347)", temSombra ? [] : ["o corpo do portao nao tem o `VARREDURA_PLANO`"]);
-  if (!temSombra) return;
+  registarResultado("portao: o portao le o plano do job (`PLANO_JOB`) no `env:` (#347 C2)", temPortaoC2(passo) ? [] : ["o `env:` do portao nao tem `PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }}`"]);
+  registarResultado("portao: o discriminador do C2 reprova um `env:` sem o output, ou com outro (controlo)", [
+    ...(temPortaoC2({ env: ["VARREDURA: ${{ needs.sweep.result }}"] }) ? ["um portao sem `PLANO_JOB` passou por C2"] : []),
+    ...(temPortaoC2({ env: ["PLANO_JOB: ${{ needs.guard-tests.outputs.x }}"] }) ? ["um `PLANO_JOB` de outro output passou"] : []),
+  ]);
+  if (!temPortaoC2(passo)) return;
   const plano = lerRaiz(PLANO);
   const casos = [
-    { nome: "maquinaria tocada e os shards mediram: verde, e concorda", env: PR, o: { head: "maquinaria", aplicavel: true, basePlano: plano }, verde: true, tem: `${CONCORDA} (plano=true)`, sem: DESLIGADA },
-    { nome: "maquinaria tocada e os shards disseram \"nao aplicavel\": vermelho", env: PR, o: { head: "maquinaria", aplicavel: false, basePlano: plano }, verde: false, diz: DISCORDA },
-    { nome: "so docs e os shards disseram \"nao aplicavel\": verde, e concorda", env: PR, o: { head: "docs", aplicavel: false, basePlano: plano }, verde: true, tem: `${CONCORDA} (plano=false)`, sem: DESLIGADA },
-    { nome: "so docs e os shards mediram: vermelho", env: PR, o: { head: "docs", aplicavel: true, basePlano: plano }, verde: false, diz: DISCORDA },
-    // O MESMO diff do `sweep` (com renomeacoes): o destino fora da maquinaria e o unico caminho listado.
-    { nome: "um ficheiro renomeado para fora da maquinaria, \"nao aplicavel\": verde (o diff do `sweep`)", env: PR, o: { head: "renomeia", aplicavel: false, basePlano: plano }, verde: true, tem: `${CONCORDA} (plano=false)` },
-    // O PR muda o seu proprio plano para "nunca": o portao le o da BASE, e a maquinaria tocada discorda.
-    { nome: "o plano do PR mudado para \"nunca\" nao conta: le-se o da base (vermelho)", env: PR, o: { head: "maquinaria", aplicavel: false, basePlano: plano, headPlano: PLANO_NUNCA }, verde: false, diz: DISCORDA },
+    { nome: "maquinaria tocada e os shards mediram: verde, e diz que aplica", env: PR, o: { head: "maquinaria", aplicavel: true, basePlano: plano }, verde: true, tem: APLICA },
+    // N2: com o plano `true`, um `sweep` verde com todos os relatorios "nao aplicavel" nao mediu nada (`TP2`).
+    { nome: "plano true e os shards todos \"nao aplicavel\": vermelho (N2)", env: PR, o: { head: "maquinaria", aplicavel: false, basePlano: plano }, verde: false, diz: DISCORDA, controlo: true },
+    { nome: "so docs e o `sweep` saltou: verde, e diz que nao se aplica", env: PR_SALTOU, o: { head: "docs", basePlano: plano }, verde: true, tem: NAO_APLICA },
+    { nome: "so docs e o `sweep` correu: vermelho", env: { ...PR, PLANO_JOB: "false" }, o: { head: "docs", aplicavel: true, basePlano: plano }, verde: false, diz: NAO_SALTOU },
+    { nome: "maquinaria tocada e o `sweep` saltou: vermelho", env: { ...PR, VARREDURA: "skipped" }, o: { head: "maquinaria", basePlano: plano }, verde: false, diz: NAO_PASSOU },
+    // O output do job perdido (um re-run parcial, um `id` errado, um `outputs:` mal escrito) chega vazio (A1).
+    { nome: "o output do job vazio: vermelho", env: { ...PR, PLANO_JOB: "" }, o: { head: "maquinaria", aplicavel: true, basePlano: plano }, verde: false, diz: OUTRO_PLANO },
+    // O caso que o C2 tem de apanhar: o job disse `false` (os shards saltaram) e a base diz `true`.
+    { nome: "o job diz false e a base diz true: vermelho", env: PR_SALTOU, o: { head: "maquinaria", basePlano: plano }, verde: false, diz: OUTRO_PLANO },
+    // `--no-renames` (A2 da v2): o caminho antigo, dentro da maquinaria, entra no diff. No C1 este caso era verde com `false`.
+    { nome: "um ficheiro renomeado para fora da maquinaria: aplica", env: PR, o: { head: "renomeia", aplicavel: true, basePlano: plano }, verde: true, tem: APLICA, renomes: true },
+    // O PR muda o seu proprio plano para "nunca": o portao le o da BASE.
+    { nome: "o plano do PR mudado para \"nunca\" nao conta: le-se o da base (vermelho)", env: PR_SALTOU, o: { head: "maquinaria", basePlano: plano, headPlano: PLANO_NUNCA }, verde: false, diz: OUTRO_PLANO },
     { nome: "um plano que responde outra coisa que true/false: vermelho", env: PR, o: { head: "maquinaria", aplicavel: true, basePlano: PLANO_QUE_MENTE }, verde: false, diz: "o plano da base respondeu" },
     { nome: "um HEAD sem pai: vermelho", env: PR, o: { semPai: true, aplicavel: true, basePlano: plano }, verde: false, diz: "Needed a single revision" },
-    { nome: "a base sem o plano: a sombra desliga-se, e di-lo", env: PR, o: { head: "docs", aplicavel: false, basePlano: null }, verde: true, tem: DESLIGADA, sem: CONCORDA },
-    // Um `push` com a varredura verde (um derivado que tirou o `if:` do `sweep`): se o plano corresse, discordava.
-    { nome: "um push com a varredura verde: sem plano, como antes", env: { ...PR, EVENTO: "push" }, o: { head: "maquinaria", aplicavel: false, basePlano: plano }, verde: true, sem: "sombra:" },
-    // Um `VARREDURA_PLANO` herdado de cima (as duas leituras do C1): sem o `unset`, este push dizia "concorda".
-    { nome: "um VARREDURA_PLANO herdado nao conta: o push continua sem sombra", env: { ...PR, EVENTO: "push", VARREDURA_PLANO: "false" }, o: { head: "maquinaria", aplicavel: false, basePlano: plano }, verde: true, sem: "sombra:" },
+    { nome: "a base sem o plano e os shards mediram: verde, e di-lo", env: PR, o: { head: "docs", aplicavel: true, basePlano: null }, verde: true, tem: SEM_PLANO },
+    // A5 da 3.a passagem: o buraco do N2 pelo ramo da base sem plano.
+    { nome: "a base sem o plano e os shards todos \"nao aplicavel\": vermelho (A5)", env: PR, o: { head: "docs", aplicavel: false, basePlano: null }, verde: false, diz: DISCORDA, controlo: true },
+    { nome: "a base sem o plano e o `sweep` saltou: vermelho", env: { ...PR, VARREDURA: "skipped" }, o: { head: "docs", basePlano: null }, verde: false, diz: NAO_PASSOU },
+    // Um `push` com a varredura verde (um derivado que varre no push): sem plano, como antes.
+    { nome: "um push com a varredura verde: sem plano, como antes", env: { ...PR, EVENTO: "push", PLANO_JOB: "" }, o: { head: "maquinaria", aplicavel: true, basePlano: plano }, verde: true, sem: "plano:" },
+    // Um `VARREDURA_PLANO=false` herdado de cima: sem o `unset`, o `varredura-shards` reprovava os relatorios que mediram.
+    { nome: "um VARREDURA_PLANO herdado nao conta: o push continua verde", env: { ...PR, EVENTO: "push", PLANO_JOB: "", VARREDURA_PLANO: "false" }, o: { head: "maquinaria", aplicavel: true, basePlano: plano }, verde: true, sem: "plano:" },
+    { nome: "um push com a varredura saltada: verde", env: { ...PR, EVENTO: "push", PLANO_JOB: "", VARREDURA: "skipped" }, o: { head: "maquinaria", basePlano: plano }, verde: true, sem: "plano:" },
   ];
   // O `fetch-depth: 2` do checkout do portao: tira-lo dava vermelho no CI (o `HEAD^1`), mas nunca aqui (a fixture
   // tem a historia toda) — fica fixado pelo texto (leitura 1 do C1).
@@ -143,14 +168,26 @@ export function registar() {
   const sintetico = "jobs:\n  guard-gate:\n    steps:\n      - uses: actions/checkout@v7\n  secret-scan:\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n";
   registarResultado("portao: a fatia do `guard-gate` acaba no job seguinte, sem `simulators` (#372)", /fetch-depth/.test(fatiaDoJob(sintetico, "guard-gate")) ? ["a fatia apanhou o `fetch-depth` do job seguinte"] : []);
   registarResultado("portao: o checkout do portao traz a base (`fetch-depth: 2`) (#347)", /- uses: actions\/checkout@\S+\n\s+with:\n\s+fetch-depth: 2\n/.test(gate) ? [] : ["o checkout do `guard-gate` nao tem `fetch-depth: 2`"]);
+  const veredicto = (r, c) => [
+    ...((r.code === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${r.code}: ${r.out.trim().split("\n").slice(-2).join(" | ")}`]),
+    ...(c.tem && !r.out.includes(c.tem) ? [`faltou a linha "${c.tem}"`] : []),
+    ...(c.sem && r.out.includes(c.sem) ? [`nao devia ter "${c.sem}"`] : []),
+    ...(c.diz && !r.out.includes(c.diz) ? [`o vermelho nao foi o esperado: faltou "${c.diz}"`] : []),
+  ];
   for (const c of casos) {
-    const r = corre(passo.corpo, c.env, c.o);
-    registarResultado(`portao: ${c.nome} (#347)`, [
-      ...((r.code === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${r.code}: ${r.out.trim().split("\n").slice(-2).join(" | ")}`]),
-      ...(c.tem && !r.out.includes(c.tem) ? [`faltou a linha "${c.tem}"`] : []),
-      ...(c.sem && r.out.includes(c.sem) ? [`nao devia ter "${c.sem}"`] : []),
-      ...(c.diz && !r.out.includes(c.diz) ? [`o vermelho nao foi o esperado: faltou "${c.diz}"`] : []),
-    ]);
+    registarResultado(`portao: ${c.nome} (#347)`, veredicto(corre(passo.corpo, c.env, c.o), c));
+    // Os CONTROLOS medidos: sem o `export VARREDURA_PLANO=true`, os relatorios "nao aplicavel" passavam (o N2 e o
+    // A5 provam a linha); sem o `--no-renames`, a renomeacao para fora da maquinaria dava `false` e outro plano.
+    if (c.controlo) {
+      const sem = passo.corpo.replace(EXPORTA, "");
+      const r = corre(sem, c.env, c.o);
+      registarResultado(`portao: o mesmo sem o \`export VARREDURA_PLANO=true\` fica verde (controlo) — ${c.nome}`, sem !== passo.corpo && r.code === 0 ? [] : [`o controlo saiu ${r.code}${sem === passo.corpo ? " (o corpo nao tem a linha)" : ""}: o caso nao prova o export`]);
+    }
+    if (c.renomes) {
+      const sem = passo.corpo.replace(/ --no-renames/g, "");
+      const r = corre(sem, c.env, c.o);
+      registarResultado("portao: o mesmo sem o `--no-renames` reprova por outro plano (controlo)", sem !== passo.corpo && r.code !== 0 && r.out.includes(OUTRO_PLANO) ? [] : [`o controlo saiu ${r.code}: o caso nao prova o \`--no-renames\``]);
+    }
   }
 
   // O portao falha fechado POR SI (#372 A2): um `defaults: run: shell:` sem `-e` num derivado punha-o verde com
@@ -158,16 +195,11 @@ export function registar() {
   // de ficar verde — senao o caso nao mede nada.
   const SET = /^set -eu\n/;
   const vermelho = { head: "maquinaria", aplicavel: false, basePlano: plano };
-  if (!SET.test(passo.corpo) && ehDerivado(lerRaiz)) {
-    console.log("  SKIP  portao: o portao deste projeto nao abre com `set -eu` (#372: vem com o shell do portao, se o projeto o adotar)");
-    registarResultado("portao: sem o `set -eu` num derivado, nada a medir (#372)", []);
-  } else {
-    const r = corre(passo.corpo, PR, vermelho, { semE: true });
-    registarResultado("portao: sem o `-e` do runner, os shards a discordar continuam vermelhos (#372)", [
-      ...(SET.test(passo.corpo) ? [] : ["o corpo do portao nao abre com `set -eu`"]),
-      ...(r.code !== 0 && r.out.includes(DISCORDA) ? [] : [`esperava vermelho com "${DISCORDA}", saiu ${r.code}`]),
-    ]);
-    const semSet = corre(passo.corpo.replace(SET, ""), PR, vermelho, { semE: true });
-    registarResultado("portao: o mesmo corpo sem o `set -eu` e sem o `-e` fica verde (controlo, #372)", semSet.code === 0 ? [] : [`o controlo saiu ${semSet.code}: o caso acima nao prova o \`set -eu\``]);
-  }
+  const r = corre(passo.corpo, PR, vermelho, { semE: true });
+  registarResultado("portao: sem o `-e` do runner, os shards \"nao aplicavel\" com o plano true continuam vermelhos (#372)", [
+    ...(SET.test(passo.corpo) ? [] : ["o corpo do portao nao abre com `set -eu`"]),
+    ...(r.code !== 0 && r.out.includes(DISCORDA) ? [] : [`esperava vermelho com "${DISCORDA}", saiu ${r.code}`]),
+  ]);
+  const semSet = corre(passo.corpo.replace(SET, ""), PR, vermelho, { semE: true });
+  registarResultado("portao: o mesmo corpo sem o `set -eu` e sem o `-e` fica verde (controlo, #372)", semSet.code === 0 ? [] : [`o controlo saiu ${semSet.code}: o caso acima nao prova o \`set -eu\``]);
 }

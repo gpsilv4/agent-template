@@ -8,10 +8,11 @@
  * PR que mudasse a regra mudava a decisao que o julga. E por ser copiado sozinho que nao importa NADA do repo
  * (um teste em `tests-plano-ci.mjs` exige so `node:*`).
  *
- * NO C1 (sombra): o portao calcula o plano da base e exige que CONCORDE com o que os shards decidiram pelo
- * `grep` do passo do `sweep`. Nada deixa de correr; um falso vermelho mostra o defeito antes de o C2 desligar
- * shards. Os prefixos sao os mesmos do `grep` do `sweep` e do dos `Simuladores` — o mesmo teste compara os tres
- * pelo comportamento, e a descoberta da varredura (`alvos-no-disco.mjs`, `PARES`) contra eles.
+ * NO C2: o passo `plano` do `guard-tests` corre-o (lido da base) e escreve `aplica=true|false`, e o `if:` do
+ * `sweep` so arranca os shards com `true`. O portao recalcula-o com as mesmas linhas e e a autoridade (o C1 foi a
+ * sombra que o mediu: 13 PRs a concordar). Os prefixos sao os mesmos do `grep` dos `Simuladores` — o
+ * `tests-plano-ci.mjs` compara-os pelo comportamento, e a descoberta da varredura (`alvos-no-disco.mjs`, `PARES`)
+ * contra eles. O diff chega com `-z` passado a linhas por um `tr`: o nome tal como e, sem as aspas do git.
  *
  * Uso: `node plano-ci.mjs <ficheiro com um caminho por linha>` — imprime `true` ou `false` e sai 0; um
  * ficheiro vazio (um PR sem diff) e `false`. Sem argumento, ilegivel, ou com uma linha vazia no meio: sai 2.

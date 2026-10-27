@@ -28,6 +28,9 @@ const PORTAO = '          [ "$COMMITTER" = web-flow ]\n';
 const PARALELO = "          exec node .agent/scripts/lib/suites-em-paralelo.mjs -- x\n";
 const SHARDS = "          SWEEP_SHARD: 1/2\n";
 const VARRE = ["node .agent/scripts/mutation-sweep.mjs"];
+/** O C2 (#347): o `if:` do `sweep` na forma exacta, e o portao a ler o output do job. */
+const IF_PLANO = "    if: github.event_name == 'pull_request' && needs.guard-tests.outputs.aplica == 'true'\n";
+const PORTAO_PLANO = "          PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }}\n";
 
 /** As notas que saem com os dois lados por omissao IGUAIS (nada a dizer) e `o` a mudar um deles. */
 function notas(o) {
@@ -58,6 +61,26 @@ export function registar() {
   // Um `sweep` que existe mas corre OUTRA coisa (leitura do C0): sem isto, afrouxar para `sweepAqui?.length` passava.
   registarResultado("2b CI: os shards, num `sweep` sem a varredura de mutacao, nao (#347)", nenhuma(notas({ ciLa: SHARDS, sweepAqui: ["node .agent/scripts/outro.mjs"] })));
 
+  // O PLANO da varredura (#347, C2): "ja tem" = o `if:` exacto E o portao a ler o `PLANO_JOB`. A meias, a nota.
+  const C2 = IF_PLANO + PORTAO_PLANO;
+  registarResultado("2b CI: o plano so no template da a nota (#347 C2)", so(notas({ ciLa: C2 }), "quando o plano da base diz"));
+  registarResultado("2b CI: o plano nos dois lados, nao (#347 C2)", nenhuma(notas({ ciLa: C2, ciAqui: C2 })));
+  registarResultado("2b CI: so o `if:` do plano no projeto (a meias) da a nota (#347 C2)", so(notas({ ciLa: C2, ciAqui: IF_PLANO }), "quando o plano da base diz"));
+  registarResultado("2b CI: so o portao do plano no projeto (a meias) da a nota (#347 C2)", so(notas({ ciLa: C2, ciAqui: PORTAO_PLANO }), "quando o plano da base diz"));
+  // A forma e a da isencao: um `if:` com uma cauda no projeto nao e "ja adotado" (e e o que o `check-test-surface` reprova).
+  registarResultado("2b CI: o `if:` do plano noutra forma no projeto da a nota (#347 C2)", so(notas({ ciLa: C2, ciAqui: IF_PLANO.replace("'true'", "'true' && true") + PORTAO_PLANO }), "forma EXACTA"));
+  registarResultado("2b CI: um template sem o portao do plano nao da a nota (#347 C2)", nenhuma(notas({ ciLa: IF_PLANO })));
+  {
+    const [n = ""] = notas({ ciLa: C2 });
+    registarResultado("2b CI: a nota do plano avisa a meia adocao e o `sweep` em `push` (#347 C2, R5/R6)", ["VERMELHO cada PR sem maquinaria", "o shell sem o passo e o `if:`", "varrer tambem em `push`", "forma EXACTA"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
+  }
+  // O shell do portao e UM so, e hoje traz o C2 (leitura 2 do C2): a nota do salto do merge, seguida a letra, trazia o
+  // plano sem o passo — cada PR vermelho. Tem de o dizer.
+  {
+    const [n = ""] = notas({ ciLa: IF_MERGE + PORTAO });
+    registarResultado("2b CI: a nota do salto do merge diz que o shell do portao traz o plano (#347 C2)", n.includes("traz TAMBEM o plano da varredura") ? [] : ["a nota do salto do merge nao avisa que o shell traz o C2"]);
+  }
+
   // O salto do push de um merge num privado (#347, PR B): "ja tem" = o `if:` E o shell do portao.
   registarResultado("2b CI: o salto do merge so no template da a nota (#347)", so(notas({ ciLa: IF_MERGE + PORTAO }), "push de um merge num repo privado"));
   // O que a nota MANDA trazer nao inclui o `Secret Scan` (#372): mandado, cada `/upgrade` reintroduzia nos derivados
@@ -83,7 +106,7 @@ export function registar() {
   registarResultado("2b CI: os jobs curtos nos dois lados, nao (#347)", nenhuma(notas({ ciAqui: "jobs:\n  detect:\n  unit-tests:\n", ciLa: "jobs:\n  detect:\n" })));
 
   // A ORDEM, que era a de antes de sair do `medida-upgrade.mjs`.
-  const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: SHARDS + IF_MERGE + PORTAO, ciAqui: "jobs:\n  detect:\n  unit-tests:\n" });
-  const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "push de um merge", "passos de UM job"];
-  registarResultado("2b CI: as cinco notas saem pela ordem de sempre (#347)", todas.length === 5 && ordem.every((t, i) => todas[i].includes(t)) ? [] : [`sairam: ${JSON.stringify(todas.map((n) => n.slice(0, 40)))}`]);
+  const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: "jobs:\n  detect:\n  unit-tests:\n" });
+  const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", "passos de UM job"];
+  registarResultado("2b CI: as seis notas saem pela ordem de sempre (#347)", todas.length === 6 && ordem.every((t, i) => todas[i].includes(t)) ? [] : [`sairam: ${JSON.stringify(todas.map((n) => n.slice(0, 40)))}`]);
 }
