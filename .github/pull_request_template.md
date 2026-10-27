@@ -20,6 +20,7 @@
 - [ ] E2E tests pass (`npm run test:e2e`)
 - [ ] Security tests pass (`npm run test:security`)
 - [ ] Dependency audit reviewed (`npm run test:audit`) — it is informative in CI, so green does not mean clean
+- [ ] Each acceptance criterion from the Phase 0 is listed with the test or measurement that proves it, or as "not verified: <reason>" (`/review` §9)
 - [ ] Doc guards pass (`node .agent/scripts/check-doc-versions.mjs`) — no WARN
 - [ ] If `.agent/scripts/`, `.claude/hooks/`, `.githooks/` or `.github/scripts/` changed: all guard suites pass (the ones the `guard-tests` job in `ci.yml` runs)
 - [ ] `/review` §8 ran: anti-pattern greps from BOTH `anti-patterns.md` and `anti-patterns-template.md`

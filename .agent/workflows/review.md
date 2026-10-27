@@ -4,8 +4,6 @@
 
 Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 
-> Para alteracoes com **UI**, correr tambem `/design-review` (qualidade visual, UX, a11y, estados) — este `/review` cobre codigo/seguranca.
-
 > Este workflow **e a Fase 3** do Metodo de Trabalho por Ticket (`process-rules.md`): cada
 > passagem **declara o angulo antes de correr**, e um angulo ja usado nesta alteracao **nao
 > conta como passagem**. Numa passagem com angulo novo e sem achados, **apresenta-se e
@@ -136,6 +134,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] **Nunca filtrar o sumario de uma corrida** (`| tail`, `| grep`): esconde o `1 failed` no meio dos `125 passed`
 - [ ] **Restruturas de UI**: os `data-testid` afetados foram corrigidos **no mesmo PR**? (`process-rules.md`)
 - [ ] **Triagem proativa** (`process-rules.md`): cada item tocado justifica teste novo? **unit** (funcao pura/regra de negocio), **E2E** (fluxo de utilizador), **security** (rota/input/header novo). Propor ao utilizador — nao esperar que peca
+- [ ] Cada **criterio de pronto** -> o teste/medicao que o prova, ou "nao verificado: <razao>" (`review-why.md`)
 - [ ] Cada teste **novo** nasce com o seu **controlo negativo**: quebrar de proposito o codigo que ele cobre e confirmar que fica vermelho **na assercao certa**. Um teste que passa com o defeito no ecra nao afirma nada
 
 ## 10. Sincronizacao de Conhecimento (Docs Sync)  — a partir de `S`

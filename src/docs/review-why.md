@@ -92,6 +92,22 @@ que julgue nao ter `Bash` responde por leitura onde podia ter medido, e um que o
 saber nao o usa. Pedir-lhe que enumere as ferramentas que tem de facto custa uma linha e
 decide se o que ele devolve e medicao ou leitura.
 
+## Porque cada criterio de pronto se liga ao que o prova
+
+O `/plan` (§1, "Definicao de Pronto") dizia que os criterios de aceitacao "sao a base do
+`/review`" — e o `/review` nunca os lia. So o leitor da Fase 4 os recebia, e a Fase 4 nao corre num
+`S` e num `M` so se for pedida: na maioria dos tickets, ninguem conferia os criterios um a um
+antes do commit (#389).
+
+A caixa da §9 pede uma linha por criterio: o teste ou a medicao que o prova, ou "nao verificado"
+com a razao. As duas saidas valem — um criterio por verificar, DITO, e uma resposta; um que ninguem
+listou e o que passa calado. Num `S` e uma linha no chat.
+
+Vem da analise do OpenSpec (v1.15.0, 2026-10-26): o passo `verify` dele liga cada cenario ao teste
+que o cobre e declara o que nao verificou. La e so um prompt; aqui e uma caixa da checklist do `/review`.
+Tornar a ligacao mecanica (um guard que exija um teste citado
+por criterio) ficou parqueado no #392, ate esta forma ter sido usada.
+
 ## Racionalizacoes do `/review`
 
 > As desculpas que um agente usa para saltar um passo do `/review`, e porque nao colam. Cada

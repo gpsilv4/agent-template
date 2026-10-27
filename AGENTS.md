@@ -25,7 +25,7 @@ Stack: {{STACK}}.
 ## Workflows (ler on-demand quando invocados)
 
 `setup` · `grill` · `plan` · `review` · `design-review` · `refactor` · `deploy` · `debug` · `e2e-tests` · `security-tests` · `audit` · `market-scan` · `backlog-review` · `upgrade`
-→ ficheiros em `.agent/workflows/<nome>.md`. No Claude Code sao tambem slash commands (`.claude/commands/`).
+→ ficheiros em `.agent/workflows/<nome>.md`. No Claude Code e no Gemini CLI sao tambem slash commands (`.claude/commands/`, `.gemini/commands/`).
 
 > **Projeto por configurar?** Se `.agent/.template-version` **nao existir**, ler e seguir
 > **`.agent/BOOTSTRAP.md`** antes de qualquer outra coisa.
@@ -36,4 +36,4 @@ Stack: {{STACK}}.
 - **Perguntar primeiro**: criar branch; alteracoes destrutivas (migracoes, `DROP`, apagar dados); adicionar dependencias **ou um servidor MCP** (`.agent/rules/mcp-policy.md`).
 - **Nunca**: `git commit`/`push` sem autorizacao explicita; expor secrets/keys; commitar dados sensiveis.
 
-> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida, lembram a Fase 0 quando o pedido e uma ordem de implementacao, restringem o Bash dos subagentes ao que o `tools:` declara, e reinjectam as Fronteiras depois de a janela compactar) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.
+> Prosa nao e garantia. A rede tem tres camadas: os **guards** em `.agent/scripts/` (so precisam de `node` — qualquer agente, e o CI corre-os), os **hooks** em `.claude/hooks/` (so-Claude Code: negam commit/push em branch protegido, afirmam o estado no arranque, dizem que suite ficou em divida, lembram a Fase 0 quando o pedido e uma ordem de implementacao, restringem o Bash dos subagentes ao que o `tools:` declara, negam um `gh`/`git` que publique um nome proibido, e reinjectam as Fronteiras depois de a janela compactar) e o **CI**. Os hooks sao uma barreira contra o descuido, **nao** contra quem a queira contornar; fora do Claude Code perde-se o automatismo, nao a verificacao.

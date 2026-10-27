@@ -34,7 +34,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 
 1. [ ] `README.md` — contagens de testes, stack, scripts atualizados
 2. [ ] `CLAUDE.md` — referencias a `.agent/` files corretas
-3. [ ] `GEMINI.md` — **espelho** de `CLAUDE.md` (atualizar **em par** — so difere a sintaxe `@[...]`). Verificar paridade: `node .agent/scripts/check-doc-versions.mjs`
+3. [ ] `GEMINI.md` — **espelho** de `CLAUDE.md` (atualizar **em par** — so difere o prefixo `@./` dos imports). Verificar paridade: `node .agent/scripts/check-doc-versions.mjs`
 4. [ ] `.agent/rules/` — todas as regras refletem o estado atual do codigo (e dentro do orcamento de bytes)
 5. [ ] **Backlog** mexido -> o procedimento vive em `.agent/rules/backlog-method.md`; `check-backlog.mjs` a sair 0
 5b. [ ] **Verificador** alterado (`.agent/scripts/`) -> `.agent/rules/scripts-guide.md`; **hook** alterado (`.claude/hooks/` ou `.githooks/`) -> `.agent/rules/hooks-guide.md`. Sao dois catalogos separados desde que juntos passaram o orcamento; o detalhe vive la e nao nas rules carregadas
@@ -95,7 +95,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
     `simulate-derived.mjs`. Um `.githooks/commit-msg` sem extensao escapou as tres e o
     placeholder sobrevivia ao bootstrap — apanhado pela simulacao de projeto derivado.
 27. [ ] `.githooks/` — hook novo ou alterado? Entao (a) tem a sua suite `test-*.mjs`, (b) esta
-    em `PARES` em `lib/pares.mjs` com o seu `sinal`, (c) a suite corre no job `guard-tests`
+    em `PARES` (os do `.githooks/` em `lib/pares-publicos.mjs`) com o seu `sinal`, (c) a suite corre no job `guard-tests`
     do `ci.yml`, e (d) o passo `git config core.hooksPath .githooks` continua documentado no
     `/setup` e no `CONTRIBUTING.md` — sem ele o hook nao corre em clone nenhum
 28. [ ] **Guards de documentacao** — correr `node .agent/scripts/check-doc-versions.mjs` (e, apos qualquer alteracao aos proprios scripts, `node .agent/scripts/tests/test-guards.mjs` + `node .agent/scripts/tests/test-bundle-sizes.mjs`, que quebram cada guard de proposito e exigem que ele avise) (orcamento de bytes das rules, paridade CLAUDE/GEMINI, paridade workflows↔wrappers + workflows nas tabelas, versao CHANGELOG, `.nvmrc`, termos obsoletos, versoes de deps). Atualizar tudo o que estiver desatualizado, sobretudo apos merge de Dependabot PRs.

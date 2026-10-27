@@ -40,7 +40,7 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
 - Definir, em bullets **testaveis**, o que significa a feature estar concluida (comportamento observavel, nao tarefas). Ex: "utilizador sem sessao e redirecionado para /login"; "export gera PDF com as colunas X, Y, Z".
 - Incluir edge cases e estados (vazio, erro, loading) que contam como "pronto".
-- Estes criterios sao a base do `/review` e dos testes E2E — se nao for testavel, nao e criterio.
+- Estes criterios sao a base do `/review` (§9: cada um ligado ao que o prova) e dos testes E2E — se nao for testavel, nao e criterio.
 
 ## 2. Base de Dados
 
