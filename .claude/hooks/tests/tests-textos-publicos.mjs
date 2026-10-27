@@ -48,7 +48,11 @@ function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligad
     if (pasta) mkdirSync(caminho, { recursive: true });
     else if (lista !== null) writeFileSync(caminho, lista);
     if (lista !== null || pasta) env.NOMES_PROIBIDOS_FICHEIRO = caminho;
-    for (const [rel, conteudo] of Object.entries(ficheiros)) writeFileSync(rel.startsWith("~/") ? join(env.HOME, rel.slice(2)) : join(cwd, rel), conteudo);
+    for (const [rel, conteudo] of Object.entries(ficheiros)) {
+      const f = rel.startsWith("~/") ? join(env.HOME, rel.slice(2)) : join(cwd, rel);
+      mkdirSync(dirname(f), { recursive: true });
+      writeFileSync(f, conteudo);
+    }
     const r = spawnSync(process.execPath, [hook], { input: JSON.stringify({ session_id: sessao, cwd, tool_input: { command: comando } }), encoding: "utf8", env });
     const out = (r.stdout ?? "").trim();
     const j = out ? JSON.parse(out) : {};
@@ -128,8 +132,45 @@ export function registar({ test }) {
   test("textos-publicos: um caminho relativo depois de um `cd` que nao se resolve nega", () => afirma(corre(`cd "$X" && gh issue comment 3 --body-file c.md`), NAO_LEU));
   test("textos-publicos: a razao do que nao leu nao traz o VALOR (que pode ter o nome)", () => afirma(corre(`gh pr create --title x --body "projeto-secreto $X"`), NAO_LEU));
 
-  // --- O que passa -----------------------------------------------------------------------------------
+  // --- Um ficheiro escrito no MESMO comando (#396) ----------------------------------------------------
+  // O ficheiro lido existe e esta LIMPO em todos: a negacao so pode vir da escrita (o hook le antes de correr).
+  const LIMPOS = { "pr.md": "texto limpo\n", "n.md": "notas\n", "t.txt": "tag\n", "b.json": "{}\n", "b.md": "ok\n", "a.md": "ok\n" };
+  const ESCRITO = { decisao: "deny", inclui: ["escrito neste mesmo comando", "numa chamada e publicar noutra"] };
   const DEIXA = { decisao: "allow", aviso: false };
+  test("textos-publicos: um cat > f <<'EOF' antes de --body-file f nega, mesmo com o f velho limpo (#396)", () => {
+    afirma(corre(`cat > pr.md <<'EOF'\nvisto no projeto-secreto\nEOF\ngh pr create --title t --body-file pr.md`, { ficheiros: LIMPOS }), ESCRITO);
+    afirma(corre(`gh pr create --title t --body-file pr.md`, { ficheiros: LIMPOS }), DEIXA);
+  });
+  test("textos-publicos: cada forma de escrever o ficheiro lido nega (#396)", () => {
+    for (const c of [`printf x | tee pr.md && gh pr create -t t --body-file pr.md`, `cp a.md pr.md && gh pr create -t t -F pr.md`,
+      `cp ../a.md . && gh issue comment 3 --body-file a.md`, `echo x >> pr.md && gh issue comment 3 --body-file pr.md`,
+      `gh issue comment 3 --body-file pr.md &> pr.md`, `gh pr create -t t -F pr.md > pr.md`, `git log -1 > n.md && gh release create v1 -F n.md`,
+      `printf x > t.txt; git tag -a v1 -F t.txt`, `echo x > b.json && gh api repos/{owner}/{repo}/issues --input b.json`,
+      `echo x > b.md && gh api -X PATCH repos/o/r/issues/comments/1 -F body=@b.md`, `echo x | dd of=pr.md && gh issue comment 3 --body-file pr.md`,
+      `echo x > "$F" && gh issue comment 3 --body-file pr.md`, `x=$(tee pr.md </dev/null); gh issue comment 3 --body-file pr.md`,
+      `for i in 1 2; do gh issue comment $i --body-file pr.md; echo x > pr.md; done`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  test("textos-publicos: o que as leituras do #396 acharam tambem nega (pasta absoluta, pipeline, ciclo, interior)", () => {
+    const NA_HOME = { ...LIMPOS, "~/a.md": "ok\n", "~/d/a.md": "ok\n" };
+    for (const c of [`cp ../a.md ~/ && gh issue comment 3 --body-file ~/a.md`, `cp -r ../d ~/ && gh issue comment 3 --body-file ~/d/a.md`,
+      `cp -t ~/ ../a.md && gh issue comment 3 --body-file ~/a.md`, `cp --target-directory=. ../x.md && gh issue comment 3 --body-file a.md`,
+      `gh issue comment 3 --body-file pr.md | tee pr.md`, `if true; then for i in 1 2; do gh issue comment $i --body-file pr.md; echo x > pr.md; done; fi`,
+      `x=$(tee pr.md </dev/null); cd .. && gh issue comment 3 --body-file repo/pr.md`])
+      afirma(corre(c, { ficheiros: NA_HOME }), ESCRITO);
+  });
+  test("textos-publicos: o que nao escreve o ficheiro lido continua a passar (#396)", () => {
+    for (const c of [`echo x > outro.md && gh pr create -t t --body-file pr.md`, `cat pr.md && gh pr create -t t --body-file pr.md`,
+      `git add -A && git commit -F pr.md`, `cd . && gh issue comment 3 --body-file pr.md`, `find . -name x && gh issue comment 3 --body-file ./pr.md`,
+      `mkdir -p . && gh issue comment 3 --body-file pr.md`, `gh issue edit 3 --body-file pr.md`, `gh issue comment 3 --body-file pr.md 2>&1`,
+      `gh issue comment 3 --body-file pr.md 2>/dev/null`, `gh issue comment 3 --body-file pr.md && rm pr.md`, `gh issue comment 3 --body-file pr.md; mv pr.md old.md`,
+      `URL=$(gh pr create -t t --body-file pr.md) && rm pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), DEIXA);
+    // Depois de um `cd` que nao se resolve, so o filtro dos descritores impede o `2>&1` de contar como escrita de tudo.
+    afirma(corre(`cd "$X" && gh issue comment 3 --body-file ~/pr.md 2>&1`, { ficheiros: { "~/pr.md": "texto limpo\n" } }), DEIXA);
+  });
+
+  // --- O que passa -----------------------------------------------------------------------------------
   test("textos-publicos: um texto limpo passa", () => afirma(corre(`gh pr create --title "feat: x" --body "projetos secretos em geral"`), DEIXA));
   test("textos-publicos: um comando que nao publica (gh issue view) passa sem ler a lista, mesmo vazia", () => afirma(corre(`gh issue view 3`, { lista: "# nada\n" }), DEIXA));
   test("textos-publicos: um comando sem gh nem git passa", () => afirma(corre(`ls -la`, { lista: "# nada\n" }), DEIXA));
