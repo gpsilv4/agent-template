@@ -55,15 +55,17 @@ export const regexDoCi = (ci) => [...ci.matchAll(/grep -qE '([^']+)' <<<"\$tocad
 /** Os caminhos de prova: um debaixo de cada prefixo, e os quase-acertos. */
 // E caminhos de FORA plausiveis (leitura 2 do C1): um `grep` alargado (`|\.github/`, `|scripts/`) nao divergia nos outros.
 const PROVA = [".agent/scripts/a.mjs", ".claude/hooks/a.mjs", ".githooks/a", ".agent/scriptsx/a", "x/.agent/scripts/a", ".claude/hook/a", ".githooksx/a", ".agent/a", "README.md", "src/docs/a.md", ".github/workflows/ci.yml", "scripts/check-x.mjs", ".claude/agents/a.md"];
-/** Os problemas de comparar cada regex do `ci.yml` com o plano, pelo comportamento. Menos do que as esperadas e um
- *  problema: sem a dos `Simuladores` (com o job), a comparacao passava sem comparar nada (`TP2`). */
+/** Os problemas de comparar cada regex do `ci.yml` com o plano, pelo comportamento. Um job `simulators` sem a SUA
+ *  regex e um problema: a comparacao passava sem comparar a dele (`TP2`). */
 export function regexQueDivergem(ci) {
   const rs = regexDoCi(ci);
   // Quantas se esperam vem do ci.yml, e nao de um numero fixo (TP15): desde o C2 o `sweep` nao tem `grep` (decide-o
   // o plano), e o BOOTSTRAP remove o job `simulators` num derivado. Com o job, a dele e exigida; sem ele, zero e
   // legitimo — e quem chama di-lo num SKIP, em vez de contar um verde que nao comparou nada (`TP2`).
-  const esperadas = /^  simulators:[ \t]*(?:#.*)?$/m.test(ci) ? 1 : 0;
-  if (rs.length < esperadas) return [`o ci.yml tem ${rs.length} regex de \`grep -qE ... <<<"$tocados"\`, e esperava pelo menos ${esperadas} (a dos \`Simuladores\`)`];
+  // A dos `Simuladores` conta-se DENTRO do job (o `simulate-upgrade` do C2, `TP15`): contada no ficheiro, a regex do
+  // `sweep` de um derivado da v0.60.0 satisfazia a exigencia, e um `simulators` sem a sua passava.
+  const simuladores = /^  simulators:[ \t]*(?:#.*)?\n[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$|(?![\s\S]))/m.exec(ci)?.[0];
+  if (simuladores !== undefined && regexDoCi(simuladores).length === 0) return ["o job `simulators` do ci.yml nao tem a sua regex de `grep -qE ... <<<\"$tocados\"` (a dos `Simuladores`)"];
   return rs.flatMap((r) => PROVA.filter((c) => new RegExp(r).test(c) !== PREFIXOS_MAQUINARIA.test(c)).map((c) => `a regex '${r}' do ci.yml e o plano decidem diferente em ${c}`));
 }
 
