@@ -4,7 +4,7 @@
 
 Atualiza um **derivado** com o template de origem, sem apagar o que e dele.
 
-> **E o inverso da Matriz de Propagacao** (`.agent/rules/sync-docs.md`): _"o template ganhou X,
+> **E o inverso da Matriz de Propagacao** (`.agent/rules/propagation.md`): _"o template ganhou X,
 > o que trago"_. Decide por **categoria de ficheiro**, nao por uma lista de nomes, que envelhece.
 
 ## 0. Fase 0 — mostrar e esperar

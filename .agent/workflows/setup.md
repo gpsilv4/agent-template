@@ -127,8 +127,9 @@ Antes de tocar no codigo, ler:
 
 A tabela completa vive em **`src/docs/agent-guide.md`** (e em `CLAUDE.md`/`GEMINI.md`/
 `AGENTS.md`, que sao espelhos). Nao se repete aqui: era uma **quinta** copia mantida a mao, e
-a unica que nenhum guard verificava — logo era a primeira a envelhecer. Os Guards 7/9/10
-validam as outras quatro.
+a unica que nenhum guard verificava — logo era a primeira a envelhecer. Os Guards 2/7/9
+validam as outras quatro (o 7 a do `CLAUDE.md`, o 2 o espelho `GEMINI.md`, o 9 as do `AGENTS.md` e
+do `agent-guide.md`).
 
 Os dois que interessam no primeiro dia: **`/grill`** antes de um ticket `L` ou ambiguo, e
 **`/review`** antes de qualquer commit.

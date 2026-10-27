@@ -228,7 +228,7 @@ not to* line, so every agent sees it.
     │   └── guards-do-projeto.mjs <- THIS project's own guards, their sweep pairs, its script dirs
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
-    │   ├── budgets.mjs         <- Guards 1/1b/1c: byte budgets + 1d: Boundaries copied to pointers
+    │   ├── budgets.mjs         <- Guards 1/1b/1c/1e: byte budgets + 1d: Boundaries copied to pointers
     │   ├── settings.mjs        <- Guard 11: .claude/settings.json permission boundary
     │   │                          (deny/ask cover every rule the template ships, hooks
     │   │                          included), and that every hook on disk is wired to the `hooks` key
@@ -264,10 +264,11 @@ not to* line, so every agent sees it.
     │   ├── varredura-tempos.mjs   <- ...and its time summary, by target (moved out at 500 lines, #374b)
     │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
     │   ├── varredura-shards.mjs <- The gate's check that every sweep shard reported, and all sites were measured
-    │   ├── plano-ci.mjs       <- Does the sweep apply to this PR? Read from the BASE commit by the gate (#347)
+    │   ├── plano-ci.mjs       <- Does the sweep apply to this PR? Read from the BASE commit by the `guard-tests` plan step (drives the `sweep` `if:`), recomputed by the gate (#347)
     │   ├── varredura-diff.mjs <- The sweep's `--diff`: which targets the branch touches
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
+    │   ├── superficie-gate.mjs <- The CI gate in the test surface: `on:`/`env:`/`defaults:`, machinery steps, the `Test-Surface:` trailer (#285)
     │   ├── estrutura-workflow.mjs <- The CI gate's structure: jobs, `needs:`, aggregators, shape defects (#374b)
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
@@ -317,7 +318,7 @@ not to* line, so every agent sees it.
 │   ├── codeql.yml              <- CodeQL on the template's machinery (hidden folders) — TEMPLATE-ONLY: the bootstrap removes it
 │   ├── release.yml             <- Every `vX.Y.Z` tag creates its GitHub Release (title and notes from the tag)
 │   └── dependabot-auto-merge.yml <- Auto-merge patch/minor Dependabot PRs (OPT-IN, off by default)
-├── codeql/codeql-config.yml    <- Where the template's code is (`.agent/scripts`, `.claude/hooks`, `.github`) — template-only
+├── codeql/codeql-config.yml    <- Where the template's code is (`.agent/scripts`, `.claude/hooks`, `.githooks`, `.github`) — template-only
 ├── scripts/release-da-tag.sh   <- What `release.yml` runs (idempotent: an existing Release is left alone)
 ├── ISSUE_TEMPLATE/
 │   ├── bug_report.md           <- Structured bug reporting template
@@ -363,6 +364,7 @@ not to* line, so every agent sees it.
 │       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
 │       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
 │       ├── tests-textos-publicos.mjs <- A forbidden name in what gh/git publishes, and what it cannot read
+│       ├── tests-posicao.mjs       <- The position lexer (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
 │                                      repo being measured, not the hook's own
@@ -423,6 +425,9 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every PR and push** (†) in the `guard-tests` job |
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every PR and push** (†) in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every PR and push** (†) in the `guard-tests` job |
+| Sweep plan | the `Plano da varredura` step: runs the BASE commit's `lib/plano-ci.mjs` on the PR's diff and writes `aplica=true\|false` for the `sweep` job's `if:` — first step of the `guard-tests` job, PR only (#347) |
+| Commit messages | `.githooks/commit-msg` over every commit message in the range (no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
+| Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every PR and push (†) in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
@@ -606,7 +611,7 @@ upgrade is cheap.
 
 **Your projects -> template.** A rule that proved itself in a real project is worth more than
 one invented here. Update the file in the template repo, then add the row to the propagation
-matrix in `.agent/rules/sync-docs.md` so `/upgrade` knows the category. Existing projects are
+matrix in `.agent/rules/propagation.md` so `/upgrade` knows the category. Existing projects are
 never modified in place.
 
 ## Contributing

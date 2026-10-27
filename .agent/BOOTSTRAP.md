@@ -625,12 +625,13 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
-- **`.claude/agents/*.md`** (`code-reviewer`, `debugger`, `plan-auditor`): subagentes read-only/investigacao. Ajustar se o processo mudar.
+- **`.claude/agents/*.md`** (`code-reviewer`, `debugger`, `plan-auditor`): os tres sem Write/Edit; o `code-reviewer` e o `plan-auditor` com o Bash limitado aos prefixos do `tools:` (imposto por um hook), o `debugger` com Bash livre. Ajustar se o processo mudar.
 - **`.claude/hooks/*.mjs`** (**so-Claude Code**): a camada que corre **antes** da ferramenta, e
-  a unica que nao depende de o agente se lembrar. Cinco: nega `commit`/`push` em branch
+  a unica que nao depende de o agente se lembrar. Os hooks: nega `commit`/`push` em branch
   protegido, afirma o estado real no arranque, diz que suite ficou em divida ao parar, lembra a
-  Fase 0 quando o prompt parece uma ordem de implementacao, e reinjecta as Fronteiras quando a
-  janela compacta. **So uma coisa a customizar**: os branches protegidos, em
+  Fase 0 quando o prompt parece uma ordem de implementacao, restringe o Bash dos subagentes ao que
+  o `tools:` declara, nega um `gh`/`git` que publique um nome proibido, e reinjecta as Fronteiras
+  quando a janela compacta. **So uma coisa a customizar**: os branches protegidos, em
   **`.claude/hooks/protegidos.json`** (por omissao `["main", "master", "develop"]`; uma lista
   vazia respeita-se). O `/upgrade` nao o substitui (#257). Detalhe em
   **`.agent/rules/hooks-guide.md`**; a suite negativa e `node .claude/hooks/tests/test-hooks.mjs`.

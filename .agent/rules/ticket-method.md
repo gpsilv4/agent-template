@@ -67,8 +67,8 @@ ficar visivel cedo, nao para o impedir.
 **Auditar o plano antes de o ler** (`L`, ou toca no nucleo do dominio): o `plan-auditor`
 (subagente no Claude Code; noutro agente, sessao nova com `.claude/agents/plan-auditor.md` como
 prompt) julga a **metade verificavel** — satisfaz os criterios de aceitacao?, mantem-se
-no ambito?, as provas propostas provam algo?, replica algum precedente do repo? Read-only de
-proposito: **um auditor que pode editar o que audita nao e auditor.** Nao substitui a tua
+no ambito?, as provas propostas provam algo?, replica algum precedente do repo? Sem Write/Edit
+de proposito: **um auditor que pode editar o que audita nao e auditor.** Nao substitui a tua
 leitura; poupa-te a lê-lo quando esta obviamente incompleto.
 
 ## Fase 1 — Desenvolver
