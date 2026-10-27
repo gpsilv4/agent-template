@@ -577,7 +577,8 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
     protecao exige: so verde com os dois anteriores) e `secret-scan` —, e saem os outros. Se o
     `ci.yml` colidiu (o CI do projeto ja se chama assim), esses quatro jobs entram nele. **Os nomes
     `ci.yml`, `guard-tests` e `sweep` mantem-se**: a medicao do `/upgrade` (2b) le esses dois jobs
-    pelo id, o `needs:` do `guard-gate` aponta para eles, e o `/upgrade` acrescenta la os passos novos.
+    pelo id, o `needs:` do `guard-gate` aponta para eles, o `if:` do `sweep` le o plano do `guard-tests`
+    (`needs.guard-tests.outputs.aplica`, #347), e o `/upgrade` acrescenta la os passos novos.
     O nome de check `Guard Tests` e so do `guard-gate` (o `guard-tests` chama-se `Guard Suites`). O
     `npm audit` decide-se como no bullet acima. Se o projeto nao tinha CI, o `ci.yml` do template e o CI.
   - **O trailer `Test-Surface:`** (`CONTRIBUTING.md`): mudar o `on:` do `ci.yml`, ou um passo que cite

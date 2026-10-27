@@ -87,7 +87,10 @@ function comandosDe(job) {
   //  - os dois simuladores: correriam DENTRO da copia e voltariam a copiar — recursao;
   //  - o `suites-em-paralelo` (#337): e um DESPACHANTE, e as suites que ele corre estao nas linhas seguintes
   //    e leem-se uma a uma. Sozinho, sem argumentos, so sabe reprovar.
-  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade", "suites-em-paralelo"];
+  //  - o `plano-ci` (#347, C2): o passo do plano no `guard-tests` corre uma COPIA da base em `$RUNNER_TEMP`, nao um
+  //    verificador do repo. Lido, entrava na bateria como `"$RUNNER_TEMP/plano/plano-ci.mjs` (medido, leitura 2 do
+  //    C2): "ausente na copia" no `simulate-derived`, e um REPROVA falso em cada `/upgrade`.
+  const EXCLUIR = ["check-test-surface", "simulate-derived", "simulate-upgrade", "suites-em-paralelo", "plano-ci"];
   return [...new Set(nodesDe(job))].filter((c) => !EXCLUIR.some((x) => c.includes(x)));
 }
 

@@ -444,6 +444,25 @@ export function registar() {
       rmSync(raiz, { recursive: true, force: true });
     }
   });
+  // O PLANO da varredura (#347, C2): o passo dele no `guard-tests` corre a copia da base em `$RUNNER_TEMP`, que nao e
+  // um verificador. O controlo: a mesma linha com um caminho do repo entra (o `EXCLUIR` nao apaga o job inteiro).
+  test("o plano copiado da base para o `$RUNNER_TEMP` nao entra na bateria (#347 C2)", () => {
+    const raiz = mkdtempSync(join(tmpdir(), "sim-up-ci-"));
+    try {
+      mkdirSync(join(raiz, ".github/workflows"), { recursive: true });
+      writeFileSync(
+        join(raiz, ".github/workflows/ci.yml"),
+        'jobs:\n  guard-tests:\n    steps:\n      - name: Plano\n        run: |\n          plano="$(node "$RUNNER_TEMP/plano/plano-ci.mjs" "$RUNNER_TEMP/plano/tocados.txt")"\n      - run: node .agent/scripts/tests/test-guards.mjs\n'
+      );
+      const c = comandosDoCI(raiz) ?? [];
+      return [
+        ...(c.some((x) => x.includes("plano-ci")) ? [`o plano entrou: ${c.join(", ")}`] : []),
+        ...(c.some((x) => x.endsWith("test-guards.mjs")) ? [] : [`a suite do mesmo job saiu: ${c.join(", ")}`]),
+      ];
+    } finally {
+      rmSync(raiz, { recursive: true, force: true });
+    }
+  });
   // O passo que SUBSTITUI outros (#337), trazido SEM tirar os antigos: cada suite corre 2x, verde, e so
   // a 2b o pode ver (o `comandosDe` tira os repetidos). E o `ci.yml` real DESTE repo nao repete nada — num derivado
   // tambem: uma suite repetida de proposito no mesmo job e o defeito que a NOTE existe para mostrar.

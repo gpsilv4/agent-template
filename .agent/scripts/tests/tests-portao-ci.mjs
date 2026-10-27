@@ -31,13 +31,17 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-guards.mjs";
 
-const PASSO = "      - name: Suites e varredura verdes, e todos os shards mediram";
+const PASSO = "Suites e varredura verdes, e todos os shards mediram";
 
-/** O passo do portao: as linhas entre o `- name:` e o `run: |` (o `env:`) e o corpo do `run: |` sem a
- *  indentacao — ou `null` se o passo nao existir. */
-export function passoDoPortao(ci) {
+/** O passo do portao (ver `passoDoCi`). */
+export const passoDoPortao = (ci) => passoDoCi(ci, PASSO);
+
+/** O passo `- name: <nome>` de um job do `ci.yml`: as linhas entre o `- name:` e o `run: |` (o `id:`, o `env:`) e o
+ *  corpo do `run: |` sem a indentacao — ou `null` se o passo nao existir. O `tests-plano-passo.mjs` le assim o passo
+ *  do plano (#347, C2). */
+export function passoDoCi(ci, nome) {
   const ls = ci.split(/\r?\n/);
-  const i = ls.indexOf(PASSO);
+  const i = ls.indexOf(`      - name: ${nome}`);
   if (i < 0) return null;
   const r = ls.findIndex((l, j) => j > i && /^        run: \|$/.test(l));
   if (r < 0 || ls.slice(i + 1, r).some((l) => /^      - /.test(l))) return null;
@@ -79,7 +83,9 @@ const CASOS = [
   { nome: "suites saltadas com a varredura vermelha reprovam", env: { ...MERGE, VARREDURA: "failure" }, msg: LIMPA, verde: false, diz: [SALTO, "varredura=failure"] },
   { nome: "suites vermelhas reprovam", env: { ...MERGE, SUITES: "failure" }, msg: LIMPA, verde: false, diz: ["nao passaram: failure"] },
   { nome: "suites verdes num push, sem varredura, passam (como antes)", env: { ...MERGE, SUITES: "success", COMMITTER: "dono" }, msg: COM_IA, verde: true },
-  { nome: "suites verdes num PR com a varredura saltada reprovam (como antes)", env: { ...MERGE, SUITES: "success", EVENTO: "pull_request" }, msg: LIMPA, verde: false, diz: ["a varredura de mutacao nao passou (pull_request): skipped"] },
+  // (O PR com as suites verdes e a varredura saltada vive no `tests-portao-sombra.mjs` desde o C2: o ramo do PR le a
+  // BASE, e a fixture deste modulo tem um so commit. LIMITE aceite (leitura 2 do C2): num derivado com o salto do
+  // merge e SEM o C2 esse caso nao corre — so existe em quem copiou o `main`, porque nenhuma tag teve um sem o outro.)
 ];
 
 /** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real — com a lib da lista de
@@ -109,7 +115,7 @@ export function registar() {
   // O extractor sobre YAML sintetico: corre em qualquer projeto (um derivado sem o salto da SKIP abaixo, e um
   // modulo sem nenhum teste reprova no registo). Nao pode ler o `run:` de OUTRO passo, nem cortar o corpo.
   {
-    const p = (corpo, entre = "        env:\n          A: b\n") => `jobs:\n  g:\n    steps:\n${PASSO}\n${entre}        run: |\n${corpo}\n      - run: depois\n`;
+    const p = (corpo, entre = "        env:\n          A: b\n") => `jobs:\n  g:\n    steps:\n      - name: ${PASSO}\n${entre}        run: |\n${corpo}\n      - run: depois\n`;
     const lido = passoDoPortao(p("          linha 1\n\n          linha 3"));
     registarResultado("portao: o extractor le o env: e o corpo inteiro do passo, ate ao passo seguinte (#347)", [
       ...(lido?.corpo === "linha 1\n\nlinha 3" ? [] : [`corpo lido: ${JSON.stringify(lido?.corpo)}`]),

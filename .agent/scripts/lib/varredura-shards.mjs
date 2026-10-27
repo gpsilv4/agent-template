@@ -30,15 +30,16 @@ import { ehMain } from "./eh-main.mjs";
  * nenhum, e a varredura nem correu).
  * @param {Array<{modo: string, k: number, n: number, total?: number, medidos?: number, aplicavel: boolean}>} relatorios
  * @param {string[]} [modos] os modos que TEM de ter relatorios (a matriz do `sweep`)
- * @param {{plano?: boolean}} [o] o PLANO da base (#347, C1, em sombra): com ele, cada relatorio tem de
- *   ter `aplicavel === plano` — o plano e o `grep` do `sweep` tem de decidir o mesmo. Sem ele, como antes.
+ * @param {{plano?: boolean}} [o] o PLANO da base (#347): com ele, cada relatorio tem de ter `aplicavel ===
+ *   plano`. No C2 o portao so o passa com `true` (com `false`, os shards nem arrancam): um shard "nao aplicavel"
+ *   com o plano a dizer que se aplica nao mediu nada (`TP2`). Sem ele, como antes.
  * @returns {string[]} os problemas; vazio = a varredura inteira foi medida
  */
 export function confere(relatorios, modos = [], { plano } = {}) {
   const problemas = [];
   if (typeof plano === "boolean") {
     const contra = relatorios.filter((r) => r.aplicavel !== plano).map((r) => `${r.modo} ${r.k}/${r.n}`);
-    if (contra.length) problemas.push(`o plano da base diz que a varredura ${plano ? "se aplica" : "nao se aplica"}, e ${contra.join(", ")} decidiu o contrario — o plano e o \`grep\` do \`sweep\` discordam`);
+    if (contra.length) problemas.push(`o plano da base diz que a varredura ${plano ? "se aplica" : "nao se aplica"}, e ${contra.join(", ")} decidiu o contrario — o plano da base e os relatorios dos shards discordam`);
   }
   if (relatorios.length === 0) problemas.push("nenhum relatorio de shard — a varredura nao deixou prova de ter corrido");
   for (const m of modos) if (!relatorios.some((r) => r.modo === m)) problemas.push(`${m}: nenhum relatorio — o modo saiu da matriz, ou nao correu`);
@@ -58,6 +59,8 @@ export function confere(relatorios, modos = [], { plano } = {}) {
     const esperado = Array.from({ length: n }, (_, i) => i + 1);
     if (ks.join(",") !== esperado.join(",")) problemas.push(`${modo}: shards ${ks.join(",")} de ${n} — esperado exactamente ${esperado.join(",")}`);
     const aplicaveis = rs.filter((r) => r.aplicavel);
+    // Todos "nao aplicavel": o `sweep` da v0.60.0 (com o seu `grep`) num PR sem maquinaria, num derivado que nao
+    // adotou o C2. No template, o portao passa o plano, e ai este ramo so e alcancado com o plano `false` (#347).
     if (aplicaveis.length === 0) continue;
     if (aplicaveis.length !== rs.length) {
       problemas.push(`${modo}: uns shards correram e outros disseram "nao aplicavel" — a mesma decisao tinha de valer para todos`);

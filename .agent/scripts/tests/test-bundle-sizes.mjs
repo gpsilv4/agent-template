@@ -15,7 +15,8 @@
  * Uso:
  *   node .agent/scripts/tests/test-bundle-sizes.mjs
  *
- * Sai != 0 se algum teste falhar. Corre em cada push/PR no job `guard-tests` do ci.yml.
+ * Sai != 0 se algum teste falhar. Corre em cada PR, e em cada push salvo o de um merge num privado (#347), no
+ * job `guard-tests` do ci.yml.
  */
 
 import { mkdirSync, rmSync, writeFileSync, readFileSync } from "fs";
