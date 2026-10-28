@@ -375,7 +375,8 @@ not to* line, so every agent sees it.
 ├── commit-msg                 <- Rejects AI attribution, and any name from your forbidden-names
 │                                 list, in commit messages (a pointer to lib/).
 │                                 Enable per clone: git config core.hooksPath .githooks
-│                                 (the CI re-runs it on every PR, so it holds either way)
+│                                 (the CI re-runs the AI-attribution part on every PR;
+│                                 the forbidden-names list only exists locally)
 └── lib/commit-msg.mjs         <- The logic: a hook has no extension, and CodeQL picks files by it.
 
 .gemini/                        <- Native Gemini CLI layer

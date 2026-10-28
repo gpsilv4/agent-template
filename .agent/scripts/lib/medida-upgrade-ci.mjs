@@ -57,7 +57,8 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
   if (temPlano(ciLa) && !temPlano(ciAqui))
     note(
       "o template so arranca os shards da varredura quando o plano da base diz que ela se aplica (#347, C2) e o deste projeto nao — OPCIONAL (so minutos: num repo privado cada shard de um PR sem maquinaria e um minuto cobrado); " +
-        "trazer JUNTOS o passo `Plano da varredura` e o `outputs:` do `guard-tests`, o `if:` do `sweep` e o shell do portao `Guard Tests`. " +
+        "trazer JUNTOS o passo `Plano da varredura` e o `outputs:` do `guard-tests`, o `if:` do `sweep` e o shell do portao `Guard Tests`, " +
+        "e TIRAR do passo da varredura o corpo antigo (o `tocados=`, o `grep` e o `nao_aplicavel`): o plano le o diff sem renomeacoes e o `grep` com elas, discordam num PR que move ou renomeia um ficheiro da maquinaria, e o portao reprova. " +
         "O `if:` tem de ser a forma EXACTA do template: outra forma e uma marca de enfraquecimento que o `check-test-surface` reprova sem trailer que a aceite. " +
         "O `if:` sem o shell do portao poe VERMELHO cada PR sem maquinaria (o portao antigo le um `sweep` saltado num PR como \"nao mediu\"); " +
         "e o shell sem o passo e o `if:` poe VERMELHO cada PR (le um `PLANO_JOB` vazio, ou um `sweep` que nao saltou). " +

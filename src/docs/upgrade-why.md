@@ -589,7 +589,7 @@ nao o repete); e os `.claude/agents/` intactos saem no mesmo bloco. Os achados b
 
 ## O contrato da lista de nomes proibidos (#375)
 
-A lista vive FORA do repo, e um derivado que a use depende de tres coisas que o template nao pode mudar sem
+A lista vive FORA do repo, e um derivado que a use depende de quatro coisas que o template nao pode mudar sem
 avisar:
 
 - **O caminho:** `$NOMES_PROIBIDOS_FICHEIRO`, ou, sem ela, `~/.config/agent-template/nomes-proibidos`.

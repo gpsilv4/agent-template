@@ -93,7 +93,7 @@ export function registar() {
   // Os modos conferem-se em separado: a `--skips` de um shard nao completa a completa.
   conferido("cada modo confere-se sozinho", [rel({ k: 1, n: 2, medidos: 6 }), rel({ modo: "skips", k: 1, n: 1, total: 3, medidos: 3 })], "completa: shards 1 de 2");
 
-  // --- A SOMBRA do plano (#347, C1): o plano da base e o `grep` do `sweep` tem de decidir o mesmo -----------
+  // --- O plano da base (#347; nasceu no C1, quando o `grep` do `sweep` ainda existia) e os shards decidem o mesmo -
   {
     const aplica = [rel({ k: 1, n: 2, medidos: 6 }), rel({ k: 2, n: 2, medidos: 4 })];
     const nao = [rel({ k: 1, n: 2, aplicavel: false }), rel({ k: 2, n: 2, aplicavel: false })];

@@ -1,5 +1,5 @@
 /**
- * O PLANO da varredura no portao `Guard Tests` (#347; C1 em sombra, C2 a decidir), corrido como o runner o corre.
+ * O PLANO da varredura no portao `Guard Tests` (#347; C1 em sombra, C2 em vigor desde o #393), corrido como o runner o corre.
  *
  * NAO e um entry point: o `test-guards.mjs` descobre este modulo e chama `registar()`. (O nome ficou o do C1: mudar
  * o nome de um modulo de suite e uma mudanca de superficie que nao compra nada.)
