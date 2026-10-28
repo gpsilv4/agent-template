@@ -9,11 +9,13 @@
  *
  * O QUE FAZ, por estado da lista, e so quando o comando PUBLICA texto (os outros nem leem a lista):
  *   - `ok`: nega se um texto tem um nome, ou se ha um texto que nao se consegue ler (uma expansao, um pipe);
- *   - `desligado` num comando que publica NOUTRO repo (`-R`, `git -C`, `cd`...): arma na mesma — desligar e para os
+ *   - `desligado` num comando que publica NOUTRO repo (`-R`, `GH_REPO=`, um gist, um `repo create`, um URL, um
+ *     `gh api` fora deste repo, `git -C`, `cd`...; a lista inteira no `lib/`): arma na mesma — desligar e para os
  *     nomes legitimos do proprio repo privado, e nao o deixa publicar noutro;
  *   - `sem-lista` e `desligado`: deixa, e diz-o UMA vez por sessao ao utilizador (`systemMessage`);
  *   - `ilegivel`, `vazia`, `dentro-do-repo`, ou a lib em falta: nega, com a razao.
- * A razao cita a ORIGEM e a linha da lista, nunca o nome nem o texto: entra no contexto do agente.
+ * A razao cita a ORIGEM e a linha da lista, nunca o nome nem o texto: entra no contexto do agente. Le os TEXTOS, nao
+ * os identificadores (o nome de um repo, de uma label, de uma tag, de um branch; #399, a verificacao e o #404).
  * E, com ou sem lista, nega um `git config` da chave do interruptor por repo (#397): desligar e do utilizador.
  * Fora de um repo nao ha "dentro do repo" (#397): so quando o git nao acha nenhum repo a partir do `cwd`; outra falha
  * do git (prazo, `safe.directory`, git ausente, um repo avariado) mantem o `cwd` como raiz, e falha fechada — e um

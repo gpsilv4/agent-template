@@ -244,13 +244,25 @@ export function correr(caminho) {
   // por `#`. Sem o corte, apagar um nome vazado de um ficheiro (`-nome` no diff) recusava o commit que o tira.
   // Cada linha guarda o numero que tem no FICHEIRO, antes de sairem os comentarios: e esse que a recusa cita.
   // A tesoura e os comentarios seguem o `core.commentChar` do repo.
+  // So conta a tesoura com a FORMA que o git escreve (#399): comentarios e logo um `diff --git`/`--cc`/`--combined` ou
+  // um `Submodule ` (o `diff.submodule=log`, medido), ou nada.
+  // Num `-m`/`-F` o git nao corta, e uma tesoura escrita a mao escondia o que vinha depois. Corta-se so o diff: os
+  // comentarios entre a tesoura e ele (o bloco de estado do `commit.cleanup=scissors`) leem-se, como acima dela.
+  // Limite: uma tesoura forjada seguida de uma dessas linhas passa (barreira contra o descuido). E as linhas `#` nao
+  // contam para a atribuicao, embora com `-m` o git as guarde (ja antes do #399).
   const c = caracterDeComentario().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const comentario = new RegExp(`^${c}`);
   const todas = msg.split(/\r\n|\r|\n/);
-  const tesoura = todas.findIndex((l) => new RegExp(`^${c} -+ >8 -+$`).test(l));
-  const acima = (tesoura >= 0 ? todas.slice(0, tesoura) : todas).map((texto, i) => ({ texto, n: i + 1 }));
+  const inicioDoDiff = (i) => {
+    let j = i + 1;
+    while (j < todas.length && comentario.test(todas[j])) j++;
+    return todas.slice(j).every((l) => l.trim() === "") || /^(?:diff --(?:git|cc|combined) |Submodule )/.test(todas[j]) ? j : -1;
+  };
+  const tesoura = todas.findIndex((l, i) => new RegExp(`^${c} -+ >8 -+$`).test(l) && inicioDoDiff(i) >= 0);
+  const acima = (tesoura >= 0 ? todas.slice(0, inicioDoDiff(tesoura)) : todas).map((texto, i) => ({ texto, n: i + 1 }));
   const linhas = acima.filter(({ texto }) => !new RegExp(`^\\s*${c}`).test(texto));
 
-  // Os NOMES leem TODAS as linhas acima da tesoura, comentarios incluidos: com `-m`/`-F` e sem editor, o git
+  // Os NOMES leem TODAS as linhas acima do diff, comentarios incluidos: com `-m`/`-F` e sem editor, o git
   // so limpa espacos (`--cleanup=whitespace`), e uma linha `#339 ...` FICA na mensagem. Um nome num comentario
   // que o git apagaria (o branch no texto de estado) tambem recusa: falha fechado.
   verificaNomes(acima);

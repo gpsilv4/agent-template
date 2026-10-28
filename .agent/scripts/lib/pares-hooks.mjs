@@ -133,6 +133,14 @@ export const PARES_DOS_HOOKS = [
     neutro: "(() => {})(",
   },
   {
+    // ...e para ONDE publica (#399): desligado um `out.alvoExterno = true`, um repo DESLIGADO publicava noutro repo
+    // sem verificacao. O neutro mantem o valor (`falhou = falhou;`): um `false` desfaria o `true` de outro sitio.
+    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])out\.alvoExterno = true/,
+    neutro: "out.alvoExterno = out.alvoExterno",
+  },
+  {
     alvo: ".claude/hooks/guard-protected-branch.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     // `(?<!function\s)`: sem isto o padrao casava a DEFINICAO `function negar(razao)`, e
