@@ -123,8 +123,12 @@ export const SUITES = [
   // `guard-textos-publicos` (o `test-hooks`, #375b).
   { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/(check-textos-publicos|tests\/test-textos-publicos)\.mjs$/, verifica: [S("test-textos-publicos.mjs")] },
+  // A estrutura do gate (#382): o dono no `test-guards` (a funcao pura), e o gate de ponta a ponta.
+  { re: /^\.agent\/scripts\/lib\/estrutura-workflow\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  // Os modos da varredura (#317): as formas de YAML leem-se pela estrutura, no `tests-estrutura-workflow.mjs` (#382).
+  { re: /^\.agent\/scripts\/lib\/gate-modos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
-  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/estrutura-workflow|lib\/gate-modos|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/superficie-gate|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
@@ -199,7 +203,8 @@ export const SUITES = [
   // O `lib/ficheiros.mjs` serve os dois simuladores: o `blocoDaConstante` mudou-se para la (#179).
   // E os dois, com o `lib/derivado.mjs`, servem tambem o `tests-settings-sondas.mjs` (#301), que
   // decide "template ou derivado" pela mesma regra do resto da maquinaria.
-  // ...e o `tests-surface-gate.mjs` (#308), pela mesma razao.
+  // ...e o `harness/test-surface-harness.mjs` e o `tests-surface-blocos.mjs` (#308), pela mesma razao; no `test-guards`,
+  // tambem o `tests-estrutura-workflow.mjs` (#382).
   { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
   { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },

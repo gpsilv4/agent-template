@@ -15,8 +15,8 @@
  * O `lib/superficie-gate.mjs` (o `on:`/`env:`/`defaults:` e os passos da maquinaria de um workflow, e o
  * trailer `Test-Surface:`, #285) testa-se no modulo descoberto `tests-surface-gate.mjs` — e com ele o
  * `lib/gate-modos.mjs`, que le os modos da varredura na matriz e no portao (#317). A estrutura do gate (os jobs, os
- * `needs:`, os agregadores, os defeitos de forma) saiu para o `lib/estrutura-workflow.mjs` (#374b) e testa-se
- * no mesmo modulo. O `lib/passo-paralelo.mjs` (o passo das suites em paralelo como um conjunto, #341) testa-se
+ * `needs:`, os agregadores, os defeitos de forma) saiu para o `lib/estrutura-workflow.mjs` (#374b): aqui so de ponta
+ * a ponta; a funcao pura no `tests-estrutura-workflow.mjs`, do `test-guards` (#382). O `lib/passo-paralelo.mjs` (o passo das suites em paralelo como um conjunto, #341) testa-se
  * no `tests-surface-blocos.mjs`.
  *
  *   node .agent/scripts/tests/test-test-surface.mjs
