@@ -72,7 +72,7 @@ function dentroDe(raiz, caminho) {
 /**
  * Le a lista. Devolve `{ estado, nomes, caminho }`: `nomes` e `[{ nome, linha }]`, com a linha do ficheiro
  * (as recusas citam a LINHA, nao o nome: a mensagem entra no contexto de um agente, #375 R7).
- * @param {{ env?: Record<string, string | undefined>, home?: string, raiz: string, desligado?: (raiz: string) => boolean }} opcoes
+ * @param {{ env?: Record<string, string | undefined>, home?: string, raiz: string | null, desligado?: (raiz: string) => boolean }} opcoes
  */
 export function carregaLista({ env = process.env, home = homedir(), raiz, desligado = desligadoNoRepo }) {
   const caminho = caminhoDaLista({ env, home });
@@ -86,7 +86,10 @@ export function carregaLista({ env = process.env, home = homedir(), raiz, deslig
     existe = !(err && err.code === "ENOENT");
   }
   let real;
-  if (desligado(raiz)) recusa(r, "desligado");
+  // `raiz: null` (e so `null`: com uma lista presente, um `undefined` esquecido continua a lancar) = fora de um repo (#397): sem repo nao ha
+  // interruptor nem "dentro do repo". So o hook o passa, e so quando o git disse que o `cwd` nao e um repo.
+  const semRepo = raiz === null;
+  if (!semRepo && desligado(raiz)) recusa(r, "desligado");
   else if (!existe) recusa(r, env[VARIAVEL] ? "ilegivel" : "sem-lista");
   else {
     try {
@@ -97,7 +100,7 @@ export function carregaLista({ env = process.env, home = homedir(), raiz, deslig
   }
   // Pelo caminho REAL dos dois lados: um symlink fora do repo para uma lista dentro dele continua dentro.
   // O `.native` devolve a caixa REAL do disco: num macOS sem caixa, `/users/...` passava por fora do repo.
-  if (real && dentroDe(realpathSync.native(raiz), real)) recusa(r, "dentro-do-repo");
+  if (real && !semRepo && dentroDe(realpathSync.native(raiz), real)) recusa(r, "dentro-do-repo");
   else if (real) {
     try {
       texto = readFileSync(real, "utf8");

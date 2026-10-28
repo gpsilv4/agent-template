@@ -11,10 +11,11 @@
  * NAO e um entry point. O `test-hooks.mjs` descobre-o e chama `registar()`.
  */
 import { execFileSync, spawnSync } from "child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
+import { SEM_PRAZO_ATE } from "../lib/resposta.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error("tests-textos-publicos.mjs nao e um entry point: nao corre testes por si.\nCorrer `node .claude/hooks/tests/test-hooks.mjs`.");
@@ -27,19 +28,23 @@ export const entryPoint = "test-hooks.mjs";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const HOOK = join(ROOT, ".claude/hooks/guard-textos-publicos.mjs");
 const LISTA = "# privados\nprojeto-secreto\n";
-const SEM_GIT = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k) && k !== "NOMES_PROIBIDOS_FICHEIRO"));
+// Sem o `NODE_OPTIONS` de quem corre: umas opcoes que escrevem avisos no stderr punham vermelho cada "allow" (#397).
+const SEM_GIT = () => Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^GIT_/.test(k) && k !== "NOMES_PROIBIDOS_FICHEIRO" && k !== "NODE_OPTIONS"));
 
 /**
  * Corre o hook. `lista`: o conteudo (`null`: sem lista, com uma HOME vazia); `pasta`: uma PASTA no lugar dela;
  * `dentro`: a lista no `cwd` (um repo git). `desligado`: o interruptor local no `cwd`. `ficheiros`: escritos no `cwd`.
- * `hook`: outro ficheiro de hook (a copia sem a lib). Devolve `{ decisao, razao, aviso }`.
+ * `hook`: outro ficheiro de hook (a copia sem a lib). `semRepo` (#397, M1): o `cwd` NAO e um repo e e a HOME, com a
+ * lista no caminho por omissao (`~/.config/...`), como numa sessao aberta na `$HOME`; `envExtra` junta ao ambiente.
+ * Devolve `{ decisao, razao, aviso, status, stderr }`.
  */
-function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligado = false, ficheiros = {}, sessao = "s1", dir: dado, hook = HOOK } = {}) {
+function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligado = false, ficheiros = {}, sessao = "s1", dir: dado, hook = HOOK, semRepo = false, envExtra = {} } = {}) {
   const dir = dado ?? mkdtempSync(join(tmpdir(), "textos-hook-test-"));
   try {
+    if (semRepo) return correSemRepo(comando, realpathSync(dir), envExtra, semRepo === "quebrado");
     const cwd = join(dir, "repo");
     mkdirSync(cwd, { recursive: true });
-    const env = { ...SEM_GIT(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", HOME: join(dir, "home") };
+    const env = { ...SEM_GIT(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", HOME: join(dir, "home"), ...envExtra };
     // Sempre um repo: a marca da sessao fica no `.claude/state/` dele, dentro do tmpdir, e nunca no repo real.
     execFileSync("git", ["init", "-q"], { cwd, env });
     if (desligado) execFileSync("git", ["config", "--local", "agent-template.nomesProibidos", "desligado"], { cwd, env });
@@ -53,13 +58,33 @@ function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligad
       mkdirSync(dirname(f), { recursive: true });
       writeFileSync(f, conteudo);
     }
-    const r = spawnSync(process.execPath, [hook], { input: JSON.stringify({ session_id: sessao, cwd, tool_input: { command: comando } }), encoding: "utf8", env });
-    const out = (r.stdout ?? "").trim();
-    const j = out ? JSON.parse(out) : {};
-    return { decisao: j.hookSpecificOutput?.permissionDecision ?? "allow", razao: j.hookSpecificOutput?.permissionDecisionReason ?? "", aviso: j.systemMessage ?? "" };
+    return chama(hook, comando, cwd, env, sessao);
   } finally {
     if (!dado) rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** O hook, como o Claude Code o chama: o payload no stdin. Guarda o exit code e o stderr (um "allow" silencioso pode
+ *  ser um crash, e o `afirma` exige que nao seja). */
+function chama(hook, comando, cwd, env, sessao = "s1") {
+  const r = spawnSync(process.execPath, [hook], { input: JSON.stringify({ session_id: sessao, cwd, tool_input: { command: comando } }), encoding: "utf8", env });
+  const out = (r.stdout ?? "").trim();
+  const j = out ? JSON.parse(out) : {};
+  return { decisao: j.hookSpecificOutput?.permissionDecision ?? "allow", razao: j.hookSpecificOutput?.permissionDecisionReason ?? "", aviso: j.systemMessage ?? "", status: r.status, stderr: r.stderr ?? "" };
+}
+
+/** O `cwd` fora de qualquer repo, que e a HOME e tem a lista no caminho por omissao. O `GIT_CEILING_DIRECTORIES` no
+ *  pai (caminhos REAIS: no macOS o `/var` e `/private/var`) impede o git de subir para um repo onde o `TMPDIR` esteja;
+ *  e a precondicao afirma-se, senao o caso podia correr dentro de um repo e passar sem provar nada. */
+function correSemRepo(comando, dir, envExtra, quebrado = false) {
+  const cwd = join(dir, "casa");
+  mkdirSync(join(cwd, ".config", "agent-template"), { recursive: true });
+  // `quebrado`: um `.git` que aponta para nada (uma worktree partida): o git falha, mas NAO por estar fora de um repo.
+  if (quebrado) writeFileSync(join(cwd, ".git"), "gitdir: /nao/existe/.git/worktrees/x\n");
+  writeFileSync(join(cwd, ".config", "agent-template", "nomes-proibidos"), LISTA);
+  const env = { ...SEM_GIT(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", HOME: cwd, GIT_CEILING_DIRECTORIES: dir, ...envExtra };
+  if (spawnSync("git", ["rev-parse", "--show-toplevel"], { cwd, env, encoding: "utf8" }).status === 0) throw new Error("precondicao: o cwd do caso esta dentro de um repo");
+  return chama(HOOK, comando, cwd, env);
 }
 
 /** Afirma a decisao, o que a razao (ou o aviso) tem, e que o NOME nunca aparece. */
@@ -70,6 +95,9 @@ function afirma(r, { decisao, inclui = [], aviso }) {
   if (aviso === false && r.aviso) p.push(`nao devia avisar: ${r.aviso}`);
   if (typeof aviso === "string" && !r.aviso.includes(aviso)) p.push(`o aviso devia ter "${aviso}": "${r.aviso}"`);
   if (/projeto[-_ ]secreto/i.test(`${r.razao}${r.aviso}`)) p.push("o NOME saiu na razao ou no aviso");
+  // Um "allow" e o stdout vazio: tambem e o que deixa um hook que rebentou FORA do seu `try` (um import, a sintaxe).
+  // So vale com exit 0 e o stderr calado (#397). Um erro DENTRO do `try` sai 0 e calado, de proposito: isso nao se ve aqui.
+  if (decisao === "allow" && (r.status !== 0 || r.stderr.trim())) p.push(`allow com exit ${r.status} e stderr "${r.stderr.trim().slice(0, 120)}": pode ser um crash`);
   if (p.length) throw new Error(p.join("; "));
 }
 
@@ -208,4 +236,102 @@ export function registar({ test }) {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // --- Os seguimentos do /audit pre-tag (#397) -------------------------------------------------------
+  const NEGA_NOME = { decisao: "deny", inclui: ["o nome da linha 2 da lista"] };
+  test("textos-publicos: fora de um repo, com o cwd na HOME que tem a lista, publica sem o falso 'DENTRO do repo' (#397, M1)", () => {
+    afirma(corre(`gh issue create -R o/r --title t --body ok`, { semRepo: true }), { decisao: "allow", aviso: false });
+    afirma(corre(`gh issue create -R o/r --title t --body "projeto-secreto"`, { semRepo: true }), NEGA_NOME);
+    // O controlo: num repo com a lista DENTRO, continua a negar.
+    afirma(corre(`gh pr create --title x --body y`, { dentro: true }), { decisao: "deny", inclui: ["DENTRO do repo"] });
+    // Um repo AVARIADO (o `.git` aponta para nada) nao e "fora de um repo": o `cwd` serve de raiz, e a lista nele nega.
+    afirma(corre(`gh issue create -R o/r --title t --body ok`, { semRepo: "quebrado" }), { decisao: "deny", inclui: ["DENTRO do repo"] });
+  });
+  // Um `git` FALSO no PATH: nesta maquina e no CI o git nao esta traduzido, e um caso com `LANG=pt_PT` nao media nada
+  // (leitura 2 do #397). O falso diz a frase em portugues sem `LC_ALL=C`, ou a falha que se lhe pede.
+  test("textos-publicos: o hook le a frase do git em LC_ALL=C; e as outras falhas do git mantem o cwd como raiz (#397, R2)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "textos-hook-test-"));
+    try {
+      const falso = (nome, corpo) => {
+        const d = join(dir, nome);
+        mkdirSync(d);
+        writeFileSync(join(d, "git"), `#!/bin/sh\n${corpo}\n`, { mode: 0o755 });
+        return d;
+      };
+      const FORA = "fatal: not a git repository (or any of the parent directories): .git";
+      const traduz = falso("traduz", `if [ "$LC_ALL" = C ]; then echo "${FORA}" >&2; else echo "fatal: nao e um repositorio git (nem nenhuma das pastas acima): .git" >&2; fi\nexit 128`);
+      afirma(corre(`gh issue create -R o/r --title t --body ok`, { semRepo: true, envExtra: { PATH: `${traduz}:${process.env.PATH}`, LANG: "pt_PT.UTF-8" } }), { decisao: "allow", aviso: false });
+      // Falha fechada: a lista no `cwd` volta a contar como "dentro do repo".
+      const DENTRO = { decisao: "deny", inclui: ["DENTRO do repo"] };
+      const dubio = falso("dubio", `echo "fatal: detected dubious ownership in repository at '$PWD'" >&2\nexit 128`);
+      afirma(corre(`gh issue create -R o/r --title t --body ok`, { semRepo: true, envExtra: { PATH: `${dubio}:${process.env.PATH}` } }), DENTRO);
+      // E sem nenhum git no PATH (uma pasta vazia).
+      mkdirSync(join(dir, "vazia"));
+      afirma(corre(`gh issue create -R o/r --title t --body ok`, { semRepo: true, envExtra: { PATH: join(dir, "vazia") } }), DENTRO);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  test("textos-publicos: um cwd que ja nao existe nega, em vez de rebentar e permitir (#397, leitura 1)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "textos-hook-test-"));
+    try {
+      const env = { ...SEM_GIT(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", HOME: dir, NOMES_PROIBIDOS_FICHEIRO: join(dir, "lista") };
+      writeFileSync(env.NOMES_PROIBIDOS_FICHEIRO, LISTA);
+      afirma(chama(HOOK, `gh pr create --title x --body y`, join(dir, "apagada"), env), { decisao: "deny", inclui: ["ja nao existe"] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  test("textos-publicos: uma opcao global do git com valor (--config-env, --attr-source) nao esconde o commit/tag (#397, M2)", () => {
+    for (const c of [`git --config-env a=B commit -m "projeto-secreto"`, `git --attr-source X tag -a v1 -m "projeto-secreto"`]) afirma(corre(c), NEGA_NOME);
+  });
+  test("textos-publicos: o git config da chave do interruptor nega, com e sem lista, e outra chave passa (#397, M4)", () => {
+    const INTERRUPTOR = { decisao: "deny", inclui: ["interruptor dos nomes proibidos", "decisao do utilizador"] };
+    for (const c of [`git -C . config --local agent-template.nomesproibidos desligado`, `git config --get agent-template.nomesProibidos`,
+      `git --git-dir=.git config AGENT-TEMPLATE.NOMESPROIBIDOS x`, `git --config-env a=B config agent-template.nomesProibidos desligado`, `git config --unset agent-template.nomesProibidos`]) {
+      afirma(corre(c), INTERRUPTOR);
+      afirma(corre(c, { lista: null }), INTERRUPTOR);
+    }
+    afirma(corre(`git -C . config user.name x`), { decisao: "allow", aviso: false });
+  });
+  test("textos-publicos: um comando com mais de 4000 caracteres (o worker com prazo) le o nome DEPOIS do caracter 4000 (#397, M5)", () => {
+    const longo = (fim) => `gh pr create --title t --body "${"linha de texto ".repeat(300)}${fim}"`;
+    if (longo("").length <= SEM_PRAZO_ATE) throw new Error(`o caso nao passa dos ${SEM_PRAZO_ATE} caracteres: nao mede o worker`);
+    afirma(corre(longo("projeto-secreto")), NEGA_NOME);
+    afirma(corre(longo("fim")), { decisao: "allow", aviso: false });
+  });
+  test("textos-publicos: um 'allow' de um hook que rebentou (exit 3, stdout vazio) reprova o afirma (#397, controlo semeado)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "textos-hook-test-"));
+    try {
+      // Os dois ramos: um exit != 0 calado, e um exit 0 com o stderr escrito.
+      for (const [nome, corpo] of [["rebenta.mjs", "process.exit(3);\n"], ["fala.mjs", "console.error('TypeError: x');\n"]]) {
+        const falso = join(dir, nome);
+        writeFileSync(falso, corpo);
+        const r = corre(`gh pr create --title x --body y`, { hook: falso });
+        let lancou = false;
+        try { afirma(r, { decisao: "allow", aviso: false }); } catch { lancou = true; }
+        if (!lancou) throw new Error(`o afirma aceitou como 'allow' o hook ${nome}`);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  test("textos-publicos: as opcoes globais do git com valor vivem numa so lista; uma copia NOVA noutro hook reprova (#397, M2)", () => {
+    // As tres copias do nucleo da fronteira convergem no #336 (com um corpus diferencial); ate la, sao as unicas excecoes.
+    const CONHECIDAS = new Set(["lib/fronteira-dados.mjs", "lib/fronteira.mjs", "lib/verbos-git.mjs", "guard-protected-branch.mjs"]);
+    const raiz = join(ROOT, ".claude/hooks");
+    const fontes = {};
+    const anda = (d, rel = "") => { for (const n of readdirSync(d)) { const p = join(d, n); const r = rel ? `${rel}/${n}` : n; if (statSync(p).isDirectory()) { if (n !== "tests") anda(p, r); } else if (n.endsWith(".mjs")) fontes[r] = readFileSync(p, "utf8"); } };
+    anda(raiz);
+    if (copiasDaLista(fontes, CONHECIDAS).length) throw new Error(`copias da lista fora da fonte: ${copiasDaLista(fontes, CONHECIDAS).join(", ")}`);
+    // Os controlos: uma copia em regex SEM `exec-path`, e uma em array.
+    for (const copia of ["/^--(?:git-dir|config-env)$/", `["-C", "--attr-source"]`])
+      if (!copiasDaLista({ "lib/nova.mjs": copia }, CONHECIDAS).includes("lib/nova.mjs")) throw new Error(`o teste nao viu a copia ${copia}`);
+  });
+}
+
+/** Os ficheiros, fora dos `conhecidos`, que escrevem uma opcao global do git com valor. O marcador e qualquer das que
+ *  so servem para isto (o `git-dir`/`work-tree` nao: o `textos-publicos` le-os por outra razao, o repo do comando). */
+function copiasDaLista(fontes, conhecidos) {
+  return Object.entries(fontes).filter(([rel, t]) => !conhecidos.has(rel) && /exec-path|config-env|attr-source|namespace/.test(t)).map(([rel]) => rel);
 }

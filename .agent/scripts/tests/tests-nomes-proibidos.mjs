@@ -120,6 +120,27 @@ export function registar() {
     return estadoE(carrega(raiz, fora, join(fora, "atalho")), "dentro-do-repo");
   }), "");
 
+  // #397 (M1): fora de um repo o hook passa `raiz: null`. A mesma lista que DENTRO da `raiz` seria `dentro-do-repo` e
+  // lida, e o interruptor nem e perguntado (o `desligado` que diz sempre "sim" nao conta).
+  registarResultado("nomes-proibidos: `raiz: null` (fora de um repo) le a lista e nao pergunta o interruptor (#397)", comDir(({ raiz, fora }) => {
+    const p = join(raiz, "lista");
+    writeFileSync(p, "projeto-secreto\n");
+    const r = carregaLista({ env: { [VARIAVEL]: p }, home: fora, raiz: null, desligado: () => true });
+    return [...estadoE(r, "ok"), ...(r.nomes.length === 1 ? [] : [`leu ${r.nomes.length} nomes, esperado 1`])];
+  }), "");
+  // E so o `null`: um consumidor que se esqueca da `raiz` (`undefined`) nao pode saltar o `dentro-do-repo` calado.
+  registarResultado("nomes-proibidos: `raiz: undefined` continua a lancar, e nao e tratado como fora de um repo (#397)", comDir(({ raiz, fora }) => {
+    const p = join(raiz, "lista");
+    writeFileSync(p, "projeto-secreto\n");
+    try {
+      const r = carregaLista({ env: { [VARIAVEL]: p }, home: fora, raiz: undefined, desligado: () => false });
+      return [`nao lancou: estado "${r.estado}"`];
+    } catch (err) {
+      // Pela razao certa: o `realpathSync` da raiz, e nao outro erro qualquer.
+      return err && err.code === "ERR_INVALID_ARG_TYPE" ? [] : [`lancou outro erro: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }), "");
+
   registarResultado("nomes-proibidos: uma lista boa e `ok`, com a LINHA de cada nome, sem comentarios, e com CRLF (#375)", comDir(({ raiz, fora }) => {
     const p = join(fora, "lista");
     writeFileSync(p, "# privados\r\nprojeto-secreto\r\n\r\n  Cliente Alfa  \r\n");
