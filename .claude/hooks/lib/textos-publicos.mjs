@@ -36,11 +36,13 @@
  *
  * O QUE FICA DE FORA, dito: uma invocacao que nao e esta forma (`/usr/bin/env -S gh`, um alias, `sh -c '...'`,
  * `curl` a API) — o hook e uma barreira contra o descuido, nao contra quem a queira contornar (`CLAUDE.md`).
- * E o texto que o `gh` le de um editor (`gh pr create` sem `--body`): esse nao esta no comando.
+ * E o texto que o `gh` le de um editor (`gh pr create` sem `--body`): esse nao esta no comando. Do interruptor (#397),
+ * so o `git config` que NOMEIA a chave: `git config --list`/`-l`/`--get-regexp` (que a mostram), o `--rename-section`,
+ * e uma escrita do `.git/config` pela shell ou pelo `Edit` ficam de fora.
  */
 import { isAbsolute, resolve, sep } from "path";
 import { comandos } from "./posicao.mjs";
-import { CABECAS } from "./fronteira-dados.mjs";
+import { CABECAS, GIT_GLOBAIS_COM_VALOR } from "./fronteira-dados.mjs";
 
 /** As flags de texto e de ficheiro (`-`, ou um caminho) dos subcomandos que publicam, POR GRUPO: a mesma letra muda
  *  de sentido (o `-d` e o `--draft` do `gh pr create`, o `-m` o `--merge` do `gh pr merge`, o `--comment` do `gh pr
@@ -60,8 +62,8 @@ const GH = {
 /** O `gh api`: `-f k=v` e texto, `-F k=@caminho` le um ficheiro, `--input` tambem. Com `-X GET`, nao publica. */
 const API = { campo: ["-f", "--raw-field", "-F", "--field"], ficheiro: ["--input"], comValor: ["-X", "--method", "-H", "--header", "-q", "--jq", "-t", "--template", "--hostname"] };
 const GIT = { texto: ["-m", "--message"], ficheiro: ["-F", "--file"] };
-/** As opcoes globais do `git` que levam um valor a seguir; as tres primeiras mudam o REPO do comando. */
-const GIT_COM_VALOR = ["-C", "--git-dir", "--work-tree", "-c", "--namespace", "--exec-path"];
+/** A chave do interruptor por repo (#397, M4): o `git config` dela e do utilizador, nunca do agente. */
+const INTERRUPTOR = /^agent-template\.nomesproibidos(?:=|$)/i;
 /** As palavras de controlo que o lexer deixa no inicio do comando seguinte (`for ...; do gh ...`). */
 const CONTROLO = new Set(["do", "then", "else", "elif", "{", "if", "while", "until", "!", "exec", "coproc"]);
 /** O stdin escrito como ficheiro: o mesmo que `-`. Outro `/dev/fd/N` nao se sabe o que e. */
@@ -155,14 +157,15 @@ function corpoDeCat(cru) {
 }
 
 /**
- * Os textos que `texto` publica: `{ publica, alvoExterno, textos: [{origem, texto}], porLer: [motivo] }`. `publica` e
+ * Os textos que `texto` publica: `{ publica, alvoExterno, interruptor, textos: [{origem, texto}], porLer: [motivo] }`
+ * (`interruptor`: um `git config` da chave do interruptor por repo, que o hook nega sempre, #397). `publica` e
  * verdade se ha UM subcomando destes com uma flag de texto (sem isso o hook nem le a lista).
  * @param {string} texto  o comando
  * @param {{ cwd: string, home?: string, ler: (caminho: string) => string }} ctx
  */
 export function textosDoComando(texto, { cwd, home, ler }) {
   const cmds = comandos(texto);
-  const out = { publica: false, alvoExterno: false, textos: [], porLer: [] };
+  const out = { publica: false, alvoExterno: false, interruptor: false, textos: [], porLer: [] };
   let dir = cwd;
   // #396: o que cada comando pode ESCREVER (`p: null` = um alvo que nao se resolve), e os ficheiros que o hook leu.
   const escritas = [];
@@ -295,9 +298,11 @@ export function textosDoComando(texto, { cwd, home, ler }) {
         const opt = ws[i].texto;
         if (opt === "-C" || opt === "--git-dir" || opt === "--work-tree" || /^--(?:git-dir|work-tree)=/.test(opt)) out.alvoExterno = true;
         if (opt === "-C") base = !ws[i + 1] || temExpansao(ws[i + 1].cru) ? null : caminho(ws[i + 1].texto, base);
-        i += GIT_COM_VALOR.includes(opt) ? 2 : 1;
+        i += GIT_GLOBAIS_COM_VALOR.includes(opt) ? 2 : 1;
       }
       const sub = ws[i]?.texto;
+      // O interruptor (#397, M4): ler ou escrever a chave, por qualquer forma de `git config`, nega antes de o resto.
+      if (sub === "config" && ws.slice(i + 1).some((w) => INTERRUPTOR.test(w.texto))) out.interruptor = true;
       if (sub !== "tag" && sub !== "commit") continue;
       const comValor = sub === "tag" ? ["-u", "--local-user"] : ["-C", "-c", "--author", "--date", "--fixup", "--squash"];
       for (const [f, w] of valores(ws, i + 1, GIT.texto, [...GIT.ficheiro, ...comValor]).pares) { out.publica = true; doTexto(w, `git ${sub} ${f}`); }

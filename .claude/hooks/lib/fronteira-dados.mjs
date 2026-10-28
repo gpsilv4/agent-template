@@ -59,6 +59,12 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
  *  E o mesmo escape do `check-codigo-morto.mjs` e do `test-bundle-sizes.mjs`, COPIADO de proposito:
  *  este modulo e a folha da fronteira e nao importa de `.agent/scripts/` (camadas separadas). */
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** As opcoes GLOBAIS do `git` (antes do verbo) que consomem a palavra seguinte, numa so lista (#397, `TP8`): eram
+ *  quatro copias e divergiam. Hoje so o `textos-publicos.mjs` a le; o `fronteira.mjs`, o `verbos-git.mjs` e o
+ *  `guard-protected-branch.mjs` convergem no #336, com o corpus diferencial (la, mudar a lista troca negacoes por
+ *  permissoes). O `--exec-path` so leva valor com `=` (sem ele o git imprime e sai: consumir o seguinte e inofensivo);
+ *  o `--super-prefix` ja nao existe nos git recentes, e fica pelos antigos. */
+export const GIT_GLOBAIS_COM_VALOR = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix", "--config-env", "--attr-source"];
 /** O texto NOMEIA a fronteira: so o nome das pastas de topo (`.claude`, `.githooks`), em qualquer sitio. Mais
  *  largo do que o `FRONTEIRA` de proposito — e o "isto fala da fronteira?" de quem decide o alcance, e nao "isto
  *  e um caminho dela". Derivado da lista: eram quatro copias escritas a mao em dois ficheiros (`TP8`). */
