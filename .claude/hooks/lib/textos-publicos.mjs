@@ -30,9 +30,18 @@
  * descritor). A licao (`PreToolUse` que le do disco o que o proprio comando muda) nao cabe no catalogo dos `TP`,
  * cheio: fica aqui.
  *
- * O ALVO EXTERNO (`alvoExterno`): o comando publica noutro repo (`-R`, `GH_REPO`, um `gh api repos/<o>/<r>`, `git -C`,
- * um `cd`). Num repo DESLIGADO o hook arma na mesma: desligar e para os nomes legitimos do proprio repo privado, e um
- * `gh issue create -R <repo-publico>` corrido de la publicava-os.
+ * O ALVO EXTERNO (`alvoExterno`): o comando publica noutro repo (`-R`/`-Rx`/`--repo`, um `GH_REPO=` em qualquer comando
+ * do texto, um `gh api` fora de `repos/{owner}/{repo}`, um `graphql` com `mutation`, um gist, um `repo create`, um
+ * `repo edit <repo>`, um URL no lugar do issue/PR, `git -C`, um `cd`; #399). Num repo DESLIGADO o hook arma na mesma:
+ * desligar e para os nomes legitimos do proprio repo privado, e um `gh issue create -R <repo-publico>` corrido de la
+ * publicava-os. Um URL do PROPRIO repo tambem arma (falso positivo aceite). Nao se veem: o `gh repo set-default`
+ * (guardado no `.git/config`), um `GH_REPO` ja exportado no ambiente de quem corre, o `--hostname`/`GH_HOST`, uma rota
+ * deste repo que cria outro (`repos/{owner}/{repo}/generate`, `/forks`), e um `graphql -F query=@f` com o `f` escrito
+ * no mesmo comando (a `mutation` decide-se pelo ficheiro velho; o #396 nega-o so com a lista armada).
+ *
+ * OS IDENTIFICADORES nao se leem (#399; a verificacao e o #404): o nome de um repo (`gh repo create|rename`), de uma
+ * label (`gh label create|edit`, `--name`), de uma tag (`git tag`, `gh release create <tag>`) e de um branch
+ * (`gh pr create --head`, `git push`). So os textos.
  *
  * O QUE FICA DE FORA, dito: uma invocacao que nao e esta forma (`/usr/bin/env -S gh`, um alias, `sh -c '...'`,
  * `curl` a API) — o hook e uma barreira contra o descuido, nao contra quem a queira contornar (`CLAUDE.md`).
@@ -54,13 +63,14 @@ const GH = {
   issue: { subs: ["create", "edit", "comment", "close", "reopen"] },
   pr: { subs: ["create", "edit", "comment", "review", "merge", "close", "reopen"] },
   release: { subs: ["create", "edit"] },
-  repo: { subs: ["create", "edit"], flags: { texto: ["--description", "-d", "--homepage", "-h"], ficheiro: [] } },
+  // As flags com valor do `repo edit` (#399): sem elas, o `x` de `--add-topic x` passava pelo repo do posicional.
+  repo: { subs: ["create", "edit"], flags: { texto: ["--description", "-d", "--homepage", "-h"], ficheiro: [], comValor: ["--add-topic", "--remove-topic", "--default-branch", "--visibility"] } },
   label: { subs: ["create", "edit"], flags: { texto: ["--description", "-d"], ficheiro: [] } },
   // O `gist` publica os FICHEIROS posicionais: o `-f` (o nome no gist) leva valor, e nao e texto a ler.
   gist: { subs: ["create", "edit"], flags: { texto: ["--desc", "-d"], ficheiro: [], comValor: ["--filename", "-f"] }, posicionais: true },
 };
 /** O `gh api`: `-f k=v` e texto, `-F k=@caminho` le um ficheiro, `--input` tambem. Com `-X GET`, nao publica. */
-const API = { campo: ["-f", "--raw-field", "-F", "--field"], ficheiro: ["--input"], comValor: ["-X", "--method", "-H", "--header", "-q", "--jq", "-t", "--template", "--hostname"] };
+const API = { campo: ["-f", "--raw-field", "-F", "--field"], ficheiro: ["--input"], comValor: ["-X", "--method", "-H", "--header", "-q", "--jq", "-t", "--template", "--hostname", "-p", "--preview", "--cache"] };
 const GIT = { texto: ["-m", "--message"], ficheiro: ["-F", "--file"] };
 /** A chave do interruptor por repo (#397, M4): o `git config` dela e do utilizador, nunca do agente. */
 const INTERRUPTOR = /^agent-template\.nomesproibidos(?:=|$)/i;
@@ -114,6 +124,19 @@ function cabeca(ws) {
     return { i, atribuicoes };
   }
   return { i: -1, atribuicoes };
+}
+
+/** As palavras que DEFINEM uma variavel com os argumentos (`export GH_REPO=x`). */
+const DEFINEM = new Set(["export", "declare", "typeset", "local", "readonly", "env"]);
+/** Um `GH_REPO=` na posicao de atribuicao, ou como argumento de `DEFINEM` — nunca dentro de um texto
+ *  (`--body "GH_REPO=x funciona?"`). O vazio (`GH_REPO= gh ...`) tambem conta, como antes do #399: zero negar->deixar. */
+function defineGhRepo(ws) {
+  // As atribuicoes que o `cabeca()` recolhe passam as `CABECAS` (`sudo`, `time`, `timeout 60 env ...`), como no `main`.
+  if (cabeca(ws).atribuicoes.includes("GH_REPO")) return true;
+  const k = ws.findIndex((w) => /^GH_REPO=/.test(w.texto));
+  // Depois de um `export`/`declare`, tudo e um argumento dele (`export FOO GH_REPO=x`); antes, so prefixos.
+  const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
 }
 
 /**
@@ -232,9 +255,13 @@ export function textosDoComando(texto, { cwd, home, ler }) {
     return out.porLer.push(`${origem}: o valor tem uma expansao que so a shell resolve`);
   };
 
+  // Um `GH_REPO=<repo>` em QUALQUER comando do texto (`export GH_REPO=x && gh ...`, um interior) muda o alvo dos `gh`
+  // (#399). Sem ordem: um interior vem no fim da lista do lexer, e falhar fechado custa pouco.
+  if (cmds.some((c) => defineGhRepo(c.argv))) out.alvoExterno = true;
+
   for (const cmd of cmds) {
     const ws = cmd.argv;
-    const { i: h, atribuicoes } = cabeca(ws);
+    const { i: h } = cabeca(ws);
     escreve(cmd, ws, h);
     if (h < 0) continue;
     const nome = ws[h].texto.replace(/^.*\//, "");
@@ -248,16 +275,21 @@ export function textosDoComando(texto, { cwd, home, ler }) {
       continue;
     }
     if (nome === "gh") {
-      if (atribuicoes.includes("GH_REPO")) out.alvoExterno = true;
       let i = h + 1;
       while (i < ws.length && /^-/.test(ws[i].texto)) i += ws[i].texto === "-R" || ws[i].texto === "--repo" ? 2 : 1;
       const grupo = ws[i]?.texto;
-      if (ws.slice(h + 1).some((w) => w.texto === "-R" || w.texto === "--repo" || w.texto.startsWith("--repo="))) out.alvoExterno = true;
+      // `-R x`, `-Ro/r` (colado: so com a `/` de um repo, para um `--title "-Refactor x"` nao contar), `--repo x` e
+      // `--repo=x` (#399).
+      if (ws.slice(h + 1).some((w) => /^(?:-R|--repo(?:=.*)?|-R[^\s/]+\/\S+)$/.test(w.texto))) out.alvoExterno = true;
       if (grupo === "api") {
         const { pares: metodo } = valores(ws, i + 1, ["-X", "--method"]);
         if (metodo.some(([, w]) => /^get$/i.test(w.texto))) continue;
-        const rota = ws.slice(i + 1).find((w) => !/^-/.test(w.texto) && /^\/?repos\//.test(w.texto));
-        if (rota && !rota.texto.includes("{owner}")) out.alvoExterno = true;
+        // A rota e o primeiro posicional que nenhuma flag consumiu (#399): `-f body=x repos/...` nao a desloca.
+        const consumidos = new Set([...valores(ws, i + 1, API.campo, [...API.comValor, ...API.ficheiro]).usados, ...valores(ws, i + 1, API.ficheiro, [...API.campo, ...API.comValor]).usados]);
+        const rota = ws.slice(i + 1).find((w, k) => !consumidos.has(i + 1 + k) && !/^-/.test(w.texto))?.texto.replace(/^\//, "");
+        // So `repos/{owner}/{repo}` e "este repo"; um `gists`, um `user/repos` ou um `repos/{owner}/outro` nao (#399).
+        if (rota !== undefined && rota !== "graphql" && !/^repos\/\{owner\}\/\{repo\}(?:\/|$)/.test(rota)) out.alvoExterno = true;
+        const antes = out.textos.length;
         for (const [f, w] of valores(ws, i + 1, API.campo, API.comValor).pares) {
           out.publica = true;
           const eq = w.texto.indexOf("=");
@@ -267,6 +299,13 @@ export function textosDoComando(texto, { cwd, home, ler }) {
           else doTexto(v, origem);
         }
         for (const [f, w] of valores(ws, i + 1, API.ficheiro, API.comValor).pares) { out.publica = true; doFicheiro(cmd, w, dir, `gh api ${f}`); }
+        // O `graphql` so e externo com uma `mutation` (#399): uma consulta que le o proprio repo nao publica nada
+        // noutro sitio. Uma `query` que nao se le (vai para o `porLer`, e nao para os textos), ou um corpo sem ela
+        // (`--input`), conta como externo (falha fechado).
+        if (rota === "graphql") {
+          const consultas = out.textos.slice(antes).filter((t) => / query$/.test(t.origem));
+          if (!consultas.length || consultas.some((t) => /\bmutation\b/.test(t.texto))) out.alvoExterno = true;
+        }
         continue;
       }
       const def = GH[grupo];
@@ -282,6 +321,16 @@ export function textosDoComando(texto, { cwd, home, ler }) {
       const fi = valores(ws, j + 1, flags.ficheiro, [...flags.texto, ...(flags.comValor ?? []), "-R", "--repo"]);
       for (const [f, w] of t.pares) { out.publica = true; doTexto(w, origem(f)); }
       for (const [f, w] of fi.pares) { out.publica = true; doFicheiro(cmd, w, dir, origem(f)); }
+      // Os posicionais que nenhuma flag consumiu: o repo de `gh repo edit dono/outro`, ou o URL de outro repo (#399).
+      // Limite: as flags com valor dos grupos (`--label`, `--assignee`, `--milestone`, `-B`/`-H`, `-r`) nao estao nos
+      // `comValor`, logo o valor delas conta como posicional — so pesa se comecar por `https://`, o que e raro.
+      const posicionais = ws.slice(j + 1).filter((w, k) => !t.usados.has(j + 1 + k) && !fi.usados.has(j + 1 + k) && !/^-./.test(w.texto));
+      // Um gist nao e o repo, e um `repo create` faz um repo novo.
+      if (grupo === "gist" || (grupo === "repo" && sub === "create")) out.alvoExterno = true;
+      if (grupo === "repo" && sub === "edit" && posicionais.length) out.alvoExterno = true;
+      // Um URL conta mesmo quando aponta para este repo: comparar com o `remote` custava um `git` por comando, e o
+      // `gh` pode nem usar esse `remote` (`gh repo set-default`). Um falso positivo aceite (#399).
+      if (posicionais.some((w) => /^https?:\/\//.test(w.texto))) out.alvoExterno = true;
       if (def.posicionais) {
         for (let k = j + 1; k < ws.length; k++) {
           if (t.usados.has(k) || fi.usados.has(k) || /^-./.test(ws[k].texto)) continue;

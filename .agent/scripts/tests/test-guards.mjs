@@ -29,7 +29,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // `lib/medida-upgrade-ci.mjs` (as notas da 2b sobre a forma do `ci.yml`, #347), e o `tests-plano-ci.mjs` o `lib/plano-ci.mjs` (o
 // plano da varredura, lido da base pelo portao, #347). O `tests-eh-main.mjs` exercita o `lib/eh-main.mjs` (a guarda de
 // entry point segura com symlinks, #373), e o `tests-regex-runner.mjs` prende as regex do runner e do caminho de uma
-// suite de `lib/passo-paralelo.mjs`, `lib/surface-patterns.mjs` e `lib/medida-upgrade.mjs` umas as outras (#374a).
+// suite de `lib/passo-paralelo.mjs`, `lib/surface-patterns.mjs` e `lib/medida-upgrade.mjs` umas as outras (#374a). O
+// `tests-commit-msg-tesoura.mjs` exercita a tesoura do `.githooks/lib/commit-msg.mjs` com commits verdadeiros (#399).
 // Fica escrito porque o mapa de suites exige que a suite
 // **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 import { fileURLToPath } from "url";

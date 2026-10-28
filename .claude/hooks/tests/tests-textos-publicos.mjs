@@ -147,6 +147,52 @@ export function registar({ test }) {
       afirma(corre(c, { desligado: true }), NEGA);
     afirma(corre(`gh api repos/{owner}/{repo}/issues -f body="projeto-secreto"`, { desligado: true }), { decisao: "allow", aviso: "DESLIGADA neste repo" });
   });
+  // #399: os alvos que publicavam fora do repo sem se verem. Retirar uma regra poe o seu teste VERMELHO (o comando
+  // passava a ser deixado); a varredura mede cada sitio do `out.alvoExterno = true`.
+  const DESL = { desligado: true };
+  test("textos-publicos: num repo DESLIGADO, um gist e um `repo create` sao externos", () => {
+    afirma(corre(`gh gist create --public -d "projeto-secreto" notas.md`, { ...DESL, ficheiros: { "notas.md": "x" } }), NEGA);
+    afirma(corre(`gh repo create dono/novo --public -d "projeto-secreto"`, DESL), NEGA);
+  });
+  test("textos-publicos: num repo DESLIGADO, `gh repo edit dono/outro` e externo; sem o repo, nao (mesmo com `--add-topic x`)", () => {
+    afirma(corre(`gh repo edit dono/outro -d "projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`gh repo edit --add-topic x -d "projeto-secreto"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
+  test("textos-publicos: num repo DESLIGADO, um URL no lugar do issue e externo (mesmo do proprio repo: falso positivo aceite)", () =>
+    afirma(corre(`gh issue comment https://github.com/o/publico/issues/3 -b "projeto-secreto"`, DESL), NEGA));
+  test("textos-publicos: num repo DESLIGADO, o `-R` colado (`-Ro/r`) e externo; um titulo `-Refactor x`, nao", () => {
+    afirma(corre(`gh issue create -Ro/publico --title x --body "projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`gh issue create --title "-Refactor x" --body "projeto-secreto"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
+  test("textos-publicos: num repo DESLIGADO, `GH_REPO=` depois de `time`/`sudo`/`timeout 5 env` e de `export FOO` e externo (como no main)", () => {
+    for (const c of [`time GH_REPO=o/publico gh issue create --title x --body "projeto-secreto"`, `sudo GH_REPO=o/publico gh issue create --title x --body "projeto-secreto"`,
+      `timeout 5 env GH_REPO=o/publico gh issue create --title x --body "projeto-secreto"`, `export FOO GH_REPO=o/publico && gh issue create --title x --body "projeto-secreto"`])
+      afirma(corre(c, DESL), NEGA);
+  });
+  test("textos-publicos: num repo DESLIGADO, um `export GH_REPO=` noutro comando e externo (e o vazio, como antes); num texto, nao", () => {
+    afirma(corre(`export GH_REPO=o/publico && gh issue create --title x --body "projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`GH_REPO= gh issue create --title x --body "projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`gh issue create --title "projeto-secreto" --body "GH_REPO=x funciona?"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
+  test("textos-publicos: num repo DESLIGADO, um `gh api` fora de `repos/{owner}/{repo}` e externo, e a rota nao se desloca com as flags", () => {
+    afirma(corre(`gh api gists -f description="projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`gh api -f body="projeto-secreto" repos/{owner}/outro/issues/1/comments`, DESL), NEGA);
+    afirma(corre(`gh api -f body="projeto-secreto" repos/{owner}/{repo}/issues/1/comments`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+    afirma(corre(`gh api -H "Accept: x" repos/{owner}/{repo}/issues -f title="projeto-secreto"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
+  test("textos-publicos: num repo DESLIGADO, o `graphql` so e externo com uma `mutation` (ou sem nenhuma `query` lida, como no `--input`)", () => {
+    afirma(corre(`gh api graphql -f query='mutation { addComment(input:{body:"projeto-secreto"}) { clientMutationId } }'`, DESL), NEGA);
+    afirma(corre(`gh api graphql --input q.json -f x="projeto-secreto"`, { ...DESL, ficheiros: { "q.json": "{}" } }), NEGA);
+    afirma(corre(`gh api graphql -f query='query{repository(owner:"o",name:"projeto-secreto"){id}}'`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
+  test("textos-publicos: a rotina deixa — num repo DESLIGADO a falar de si, e com a lista armada sem nomes (#399)", () => {
+    for (const c of [`gh pr comment 3 -b "projeto-secreto"`, `gh repo edit -d "projeto-secreto"`, `gh issue create --label bug --title "projeto-secreto" --body b`,
+      `gh release create v1 --notes "projeto-secreto"`])
+      afirma(corre(c, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+    for (const c of [`git push -u origin "$(git branch --show-current)"`, `git push origin --delete x`, `git push origin :x`, `git push --tags`, `git tag -l 'v0.*'`,
+      `git tag -d v1`, `gh label list`, `gh pr create --head feature/x --title t --body b`, `gh repo create --source . --private`])
+      afirma(corre(c), { decisao: "allow" });
+  });
 
   // --- O que nao se consegue ler nega (TP2) ---------------------------------------------------------
   const NAO_LEU = { decisao: "deny", inclui: ["Nao consegui ler o texto"] };

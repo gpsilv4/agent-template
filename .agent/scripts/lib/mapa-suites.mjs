@@ -214,6 +214,8 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/registo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/lib\/ordem-por-alvo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
+  // A tesoura vive na lib: o `test-guards` descobre o `tests-commit-msg-tesoura.mjs` (os commits verdadeiros, #399).
+  { re: /^\.githooks\/lib\/commit-msg\.mjs$/, verifica: [S("test-commit-msg.mjs"), S("test-guards.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
