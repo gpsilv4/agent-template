@@ -60,7 +60,8 @@ export function confere(relatorios, modos = [], { plano } = {}) {
     if (ks.join(",") !== esperado.join(",")) problemas.push(`${modo}: shards ${ks.join(",")} de ${n} — esperado exactamente ${esperado.join(",")}`);
     const aplicaveis = rs.filter((r) => r.aplicavel);
     // Todos "nao aplicavel": o `sweep` da v0.60.0 (com o seu `grep`) num PR sem maquinaria, num derivado que nao
-    // adotou o C2. No template, o portao passa o plano, e ai este ramo so e alcancado com o plano `false` (#347).
+    // adotou o C2. No template (C2), o portao so chama isto com o plano `true`: ai este ramo e alcancado so depois de o
+    // problema ja estar registado acima (#347).
     if (aplicaveis.length === 0) continue;
     if (aplicaveis.length !== rs.length) {
       problemas.push(`${modo}: uns shards correram e outros disseram "nao aplicavel" — a mesma decisao tinha de valer para todos`);
@@ -79,7 +80,7 @@ export function confere(relatorios, modos = [], { plano } = {}) {
 
 /**
  * O `VARREDURA_PLANO` que o portao exporta (#347, C1). `"true"`/`"false"` -> o booleano; AUSENTE -> `undefined`
- * (o portao antigo, ou a base sem o plano: o `confere` como antes). Qualquer outro valor, `""` incluido, e um
+ * (o portao antigo, ou um `push`; desde o C2 uma base sem o plano exporta `true`: o `confere` como antes). Qualquer outro valor, `""` incluido, e um
  * problema — nunca "como antes" por um valor mal escrito (`TP2`).
  * @param {string | undefined} valor @param {string[]} problemas
  */

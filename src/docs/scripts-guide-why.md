@@ -211,10 +211,11 @@ que isentava em qualquer job, deixava-o desligar sem marca (as duas leituras do 
 
 Num repo publico nada muda: o template corre tudo no push, como antes.
 
-#### O plano da varredura, em sombra (C1)
+#### O plano da varredura, em sombra (C1) — historico: substituido pelo C2, abaixo
 
-Os shards da varredura arrancam em todos os PRs e, num PR sem maquinaria, concluem "nao aplicavel" em segundos —
-num privado, cada um custa um minuto cobrado. Antes de os desligar (o C2), o C1 prova a decisao nova em PRs reais:
+Antes do C2, os shards da varredura arrancavam em todos os PRs e, num PR sem maquinaria, concluiam "nao aplicavel"
+em segundos — num privado, cada um custava um minuto cobrado. Antes de os desligar (o C2), o C1 provou a decisao
+nova em PRs reais (o que se segue descreve o C1 como ficou entre o #360 e o #393):
 - **o plano** (`lib/plano-ci.mjs`) decide se a varredura se aplica, com os mesmos prefixos do `grep` do `sweep`;
 - **o portao** le-o do commit BASE (`git show "$base:..."`, copiado sozinho, antes de qualquer codigo do PR) e
   exige que CONCORDE com o que os shards decidiram. Nada deixa de correr; discordar e vermelho. Imprime

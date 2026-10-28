@@ -72,7 +72,7 @@ export function registar() {
   registarResultado("2b CI: um template sem o portao do plano nao da a nota (#347 C2)", nenhuma(notas({ ciLa: IF_PLANO })));
   {
     const [n = ""] = notas({ ciLa: C2 });
-    registarResultado("2b CI: a nota do plano avisa a meia adocao e o `sweep` em `push` (#347 C2, R5/R6)", ["VERMELHO cada PR sem maquinaria", "o shell sem o passo e o `if:`", "varrer tambem em `push`", "forma EXACTA"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
+    registarResultado("2b CI: a nota do plano avisa a meia adocao e o `sweep` em `push` (#347 C2, R5/R6)", ["VERMELHO cada PR sem maquinaria", "o shell sem o passo e o `if:`", "varrer tambem em `push`", "forma EXACTA", "TIRAR do passo da varredura o corpo antigo"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
   }
   // O shell do portao e UM so, e hoje traz o C2 (leitura 2 do C2): a nota do salto do merge, seguida a letra, trazia o
   // plano sem o passo — cada PR vermelho. Tem de o dizer.
