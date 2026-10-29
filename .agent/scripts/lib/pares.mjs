@@ -439,6 +439,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // A ESTRUTURA do gate (#382): cada `defeito(` e um workflow que desliga o gate sem tocar num teste. O dono
+    // (`tests-estrutura-workflow.mjs`) corre primeiro no `test-guards`: a funcao e pura, cada sitio custa milissegundos.
+    alvo: ".agent/scripts/lib/estrutura-workflow.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$]|function )defeito\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A adocao num projeto existente (#288). Os sitios de recusa sao os `throw`: cada um impede
     // escrever num sitio errado (o proprio template, um projeto ja adotado, um ficheiro que
     // apareceu entretanto). Desligar um deixa a copia seguir em frente sobre o que nao devia.

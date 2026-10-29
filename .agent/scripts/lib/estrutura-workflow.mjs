@@ -5,7 +5,8 @@
  * Saiu do `superficie-gate.mjs` quando ele chegou as 494 linhas (o Guard 17 reprova acima de 500), sem mudar
  * comportamento: as linhas vieram tal e qual. O gate importa daqui o que partilha (o `semComentario`, o `indent`,
  * a `MAQUINARIA`, o `idDe`, os `agregadoresDe` e os `defeitosNovos`); este modulo nao importa o gate (sem ciclo).
- * Os defeitos reportam-se por `out.push(`, que nao e sinal da varredura: a lacuna e o #382.
+ * Cada defeito sai por `defeito(`, o sinal do par em `lib/pares.mjs` (#382); o dono na varredura e o
+ * `tests/tests-estrutura-workflow.mjs`, no `test-guards`, onde cada sitio morre em milissegundos.
  */
 import { modosDaMatriz, modosDoPortao } from "./gate-modos.mjs";
 
@@ -138,18 +139,20 @@ export function defeitosDeEstrutura(texto) {
   const ids = new Set(jobs.map((j) => j.id));
   const { vigiados, agregadores } = agregadoresDe(jobs);
   const out = [];
+  // Cada chamada e um sitio da varredura (#382); o `out.push(` do `needsDe` e leitura, e fica de fora.
+  const defeito = (m) => out.push(m);
   for (const j of jobs) {
-    for (const n of needsDe(j.ls)) if (!ids.has(n)) out.push(`o job \`${j.id}\` tem \`needs: ${n}\`, e o job \`${n}\` nao existe — o GitHub rejeita o workflow inteiro`);
+    for (const n of needsDe(j.ls)) if (!ids.has(n)) defeito(`o job \`${j.id}\` tem \`needs: ${n}\`, e o job \`${n}\` nao existe — o GitHub rejeita o workflow inteiro`);
   }
   const varrem = jobs.filter((j) => j.ls.some((l) => VARREDURA.test(l)));
-  if (varrem.length > 1) out.push(`a varredura de mutacao corre em ${varrem.length} jobs (${varrem.map((j) => `\`${j.id}\``).join(", ")}) — corre duas vezes; um passo que mudou de job sai do antigo`);
+  if (varrem.length > 1) defeito(`a varredura de mutacao corre em ${varrem.length} jobs (${varrem.map((j) => `\`${j.id}\``).join(", ")}) — corre duas vezes; um passo que mudou de job sai do antigo`);
   // So quando as suites correm NOUTRO job deste workflow: um job que so corre a varredura, num
   // workflow sem suites, e ele proprio o check — nao ha nada de que ficar de fora (as fixtures do
   // `check-test-surface` tem esse workflow, e foi o controlo negativo do diferencial que o mostrou).
   const haSuites = jobs.some((j) => j.ls.some((l) => SUITES.test(l)));
   for (const j of varrem) {
     const lida = jobs.some((a) => agregadores.has(a.id) && new RegExp(`\\bneeds\\.${j.id}\\.result\\b`).test(a.ls.join("\n")));
-    if (haSuites && !j.ls.some((l) => SUITES.test(l)) && !lida) out.push(`a varredura corre no job \`${j.id}\`, sem as suites e sem um agregador que leia \`needs.${j.id}.result\` — fica fora do check que a protecao exige`);
+    if (haSuites && !j.ls.some((l) => SUITES.test(l)) && !lida) defeito(`a varredura corre no job \`${j.id}\`, sem as suites e sem um agregador que leia \`needs.${j.id}.result\` — fica fora do check que a protecao exige`);
   }
   // Os SHARDS (#308): cada shard so ve a sua fatia, e "todos verdes" nao prova que todos correram — quem
   // o prova e o portao (`lib/varredura-shards.mjs`). Um derivado que traga a matriz em shards SEM o
@@ -158,7 +161,7 @@ export function defeitosDeEstrutura(texto) {
   // vem sem comentarios.
   const ativa = (j, re) => j.ls.some((l) => re.test(l));
   if (jobs.some((j) => ativa(j, /\bSWEEP_SHARD\b/)) && !jobs.some((j) => agregadores.has(j.id) && ativa(j, /\bvarredura-shards\.mjs\b/))) {
-    out.push("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job AGREGADOR confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
+    defeito("a varredura e repartida em shards (`SWEEP_SHARD`) e nenhum job AGREGADOR confere os relatorios deles (`lib/varredura-shards.mjs`) — um shard em falta passava verde");
   }
   // Os MODOS (#317): a matriz e a linha do portao sao duas listas, e tem de ser IGUAIS (`lib/gate-modos.mjs`).
   // Um modo que nao chegue ao portao passava verde se deixasse de correr; um a mais punha todos os PRs
@@ -166,19 +169,19 @@ export function defeitosDeEstrutura(texto) {
   for (const j of jobs.filter((x) => ativa(x, /\bSWEEP_SHARD\b/))) {
     const daMatriz = modosDaMatriz(j.ls);
     if (daMatriz === null) {
-      out.push(`nao consegui ler os modos da matriz do job \`${j.id}\` (\`modo: [a, b]\` ou \`- modo: x\`) — sem eles, o portao nao sabe que modos exigir`);
+      defeito(`nao consegui ler os modos da matriz do job \`${j.id}\` (\`modo: [a, b]\` ou \`- modo: x\`) — sem eles, o portao nao sabe que modos exigir`);
       continue;
     }
     for (const a of jobs.filter((x) => agregadores.has(x.id))) {
       for (const recebe of modosDoPortao(a.ls)) {
         if (recebe === null) {
-          out.push(`nao consegui ler os modos que o portao recebe no job \`${a.id}\` — escreve-os por extenso, sem variaveis`);
+          defeito(`nao consegui ler os modos que o portao recebe no job \`${a.id}\` — escreve-os por extenso, sem variaveis`);
           continue;
         }
         const faltam = daMatriz.filter((x) => !recebe.includes(x));
         const sobram = recebe.filter((x) => !daMatriz.includes(x));
-        if (faltam.length) out.push(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) nao recebe o(s) modo(s) ${faltam.join(", ")} da matriz — um modo que nao corresse passava verde`);
-        if (sobram.length) out.push(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) exige o(s) modo(s) ${sobram.join(", ")}, que a matriz nao tem — todos os PRs ficavam vermelhos`);
+        if (faltam.length) defeito(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) nao recebe o(s) modo(s) ${faltam.join(", ")} da matriz — um modo que nao corresse passava verde`);
+        if (sobram.length) defeito(`o portao (\`lib/varredura-shards.mjs\`, job \`${a.id}\`) exige o(s) modo(s) ${sobram.join(", ")}, que a matriz nao tem — todos os PRs ficavam vermelhos`);
       }
     }
   }
@@ -189,7 +192,7 @@ export function defeitosDeEstrutura(texto) {
   }
   for (const [nome, js] of nomes) {
     if (js.length > 1 && js.some((id) => vigiados.has(id) || agregadores.has(id))) {
-      out.push(`os jobs ${js.map((j) => `\`${j}\``).join(" e ")} tem o mesmo nome de check, \`${nome}\` — uma protecao que o exija pode dar-se por satisfeita com o primeiro a acabar`);
+      defeito(`os jobs ${js.map((j) => `\`${j}\``).join(" e ")} tem o mesmo nome de check, \`${nome}\` — uma protecao que o exija pode dar-se por satisfeita com o primeiro a acabar`);
     }
   }
   return out;
