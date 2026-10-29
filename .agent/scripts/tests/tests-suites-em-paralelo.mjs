@@ -144,8 +144,9 @@ console.log(JSON.stringify({ codigo, out: out.replace(/x{1000,}/g, "<volume>") }
 
 /**
  * As suites que o job `guard-tests` de um `ci.yml` CORRE, lido como o `bash` o executa. No passo do runner so
- * contam as da CADEIA de `\` que nasce na linha dele: com o `exec`, uma linha depois de um `\` em falta nunca
- * corre — e o passo ficava verde com uma suite a menos (auditoria final do #337). Fora dele, cada `node <suite>`.
+ * contam as da propria linha dele (#383) e as da CADEIA de `\` que nasce nela: com o `exec`, uma linha depois de
+ * um `\` em falta nunca corre — e o passo ficava verde com uma suite a menos (auditoria final do #337). Fora
+ * dele, cada `node <suite>`.
  */
 export function suitesQueOCICorre(ci) {
   const job = (ci.split(/^  guard-tests:[ \t]*(?:#.*)?$/m)[1] ?? "").split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
@@ -153,7 +154,18 @@ export function suitesQueOCICorre(ci) {
   const corre = new Set();
   for (let i = 0; i < ls.length; i++) {
     if (/^[ \t]*#/.test(ls[i])) continue;
-    if (/^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*)?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs\b/.test(ls[i])) {
+    const runner = ls[i].match(/^[ \t]*(?:-[ \t]+)?(?:run:[ \t]*(["']?))?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs\b/);
+    if (runner) {
+      // As suites na PROPRIA linha (#383): os `node <suite>` seguidos depois do `--`, ate ao primeiro token que
+      // nao o seja (um `\`, um `#`, um `&&`, uma suite entre aspas, ou colada a `;`/`&`/`|`: com o `exec`, o que
+      // vem depois nao corre). Sai o comentario, e depois so a aspa que fecha o `run: "`.
+      let resto = (ls[i].split(/[ \t]--(?=[ \t]|$)/)[1] ?? "").replace(/[ \t]#.*$/, "");
+      if (runner[1]) resto = resto.replace(new RegExp(`${runner[1]}[ \\t]*$`), "");
+      // O caminho pode vir entre aspas (`node "x"`), e um `\` colado ao fim continua a linha (1.a leitura do #383).
+      for (const m of resto.matchAll(/[ \t]*(?:node[ \t]+(["']?)([^\s"'#\\;&|]+)\1(?=[\s;&|\\]|$)|(\S+))/g)) {
+        if (m[2] === undefined) break;
+        corre.add(m[2]);
+      }
       let j = i;
       while (/\\[ \t]*$/.test(ls[j]) && j + 1 < ls.length) {
         const m = ls[j + 1].match(/^[ \t]*node[ \t]+(\S+)[ \t]*(?:\\[ \t]*)?$/);

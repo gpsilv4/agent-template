@@ -71,8 +71,9 @@ const CONTAGENS = [
   // `run: node x` para `run: |` (para lhe acrescentar `set -euo pipefail`, a evolucao por que
   // os dois steps em causa passaram) dava 21 -> 20 numa e 2 -> 3 na outra, e reprovava um
   // refactor legitimo. Achado do leitor independente; ha um teste que o prende.
-  // O bloco conta UMA vez por step: o match vai do `run:` a primeira linha do corpo que invoca
-  // um verificador e para ai.
+  // O bloco conta UMA vez por step: o match vai do `run:` a PRIMEIRA invocacao de um verificador no
+  // corpo e para ai (o prefixo `[^#\n"']*?` e preguicoso, #383: guloso, comia as suites anteriores
+  // da mesma linha); as outras suites da linha do runner contam pela 4.a alternativa.
   // EXCEPTO as LINHAS DE CONTINUACAO (#337): a seguir a uma linha que acaba em `\`, uma linha que comeca
   // por `node <verificador>` e mais uma suite do mesmo comando — a forma do `suites-em-paralelo.mjs`, que
   // corre as 17 num passo. Sem esta 3.a alternativa o bloco contava 1, a contagem descia 17 -> 1, e apagar
@@ -80,9 +81,26 @@ const CONTAGENS = [
   // 1, como quando era um passo. So conta se a cadeia de `\` NASCE numa linha que e o proprio
   // `node ...suites-em-paralelo.mjs --` (2.a leitura): trocar o `node` dela por `echo`, ou apaga-la, deixava
   // as suites por correr e a contagem igual. O lookbehind so anda pelas linhas da cadeia (17), sem ambiguidade.
+  // A linha do runner pode ja trazer suites antes do `\` (a forma mista, #383): a primeira conta pelo bloco
+  // (quando e o primeiro verificador dele), as outras pela 4.a.
+  // A 4.a (#383): as suites na MESMA linha do runner, `exec node <runner> -- node <a> node <b>` (num `run:` de
+  // uma linha, entre aspas, ou no corpo de um bloco). Fica FORA do `^(?:...)`, porque o match comeca a meio da
+  // linha. Tres cuidados medidos, por o lookbehind correr onde o motor tenta a alternativa: a ancora `(?<=\S)`
+  // (sem ela o `[ \t]+` era tentado em cada espaco da indentacao: o teste das 2000 colunas, 7,7 s -> 6 ms); o
+  // lookahead da suite ANTES do lookbehind (uma linha de `node x` sem verificador fica linear); e o TETO
+  // `{0,50}` (sem ele, 30 mil suites numa linha = 50 s). LIMITE do teto: numa linha com mais de 51 suites as
+  // seguintes nao contam; a cadeia da 3.a nao tem teto (so corre no inicio de cada linha), logo na forma mista
+  // contam as das linhas seguintes. Um token colado a `;`/`&`/`|` fecha a cadeia (o que vem depois nao e
+  // argumento do runner). NAO conta (limitacoes assumidas): `echo x; exec node <runner> -- ...` (o runner a meio
+  // da linha: na forma de uma linha nao conta; num bloco conta so a primeira suite, pelo bloco) e uma suite
+  // depois de `&&` sem `exec` (o bash corre-a; com `exec`, nunca corre). CONTA A MAIS (limitacao assumida, como
+  // a 3.a): a linha do runner fora de um `run:` (num bloco de `env:`, num `name: |`) — a regex nao le o YAML;
+  // passar o passo para la nao faz descer. E um efeito no gate: um workflow cuja UNICA coisa contavel e a forma de
+  // uma linha passa a ser contavel, e entra no gate (`superficie-gate.mjs`: mudar essa linha pede o trailer).
   //   `\1[ \t]+` — so linhas MAIS indentadas que o `run:` sao corpo (o `\1` captura a
   //                indentacao dele), logo o match nao atravessa para o step seguinte;
-  //   `[^#\n]*` — o que vem antes do `node` nao pode ter um `#`: o `semComentarios` so tira
+  //   `[^#\n"']*?` — o que vem antes do `node` nao pode ter um `#` (nem uma aspa, #295; e preguicoso,
+  //                #383): o `semComentarios` so tira
   //                comentarios JS, nao os do YAML, e um `# node x-test.mjs` (linha inteira
   //                ou no fim de outra) nao pode contar como step;
   //   `\.githooks\/` — o `commit-msg` e um verificador que nao se chama `check-*`;
@@ -104,7 +122,7 @@ const CONTAGENS = [
   // Conta-se sobre o texto CRU (#295), mas nunca depois de uma aspa: `echo "skip node x-test.mjs"` no
   // lugar do passo nao conta (fazia a contagem nao descer). NAO conta (limitacao assumida): `node --flag x`. A forma de uma linha tem a mesma cegueira.
   {
-    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)|(?<=^[ \t]*(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--[ \t]*\\[ \t]*\r?\n(?:[ \t]+node[ \t]+\S+[ \t]*\\[ \t]*\r?\n)*)[ \t]+(?![ \t])node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))/m,
+    re: /^(?:[ \t]*(?:-[ \t]*)?run:\s*["']?node\s+\S*(?:test|check|sweep|simulate)|([ \t]*)(?:-[ \t]+)?run:[ \t]*[|>][-+0-9]*[ \t]*(?:#.*)?\r?\n(?:\1[ \t]+\S.*\r?\n|[ \t]*\r?\n)*?\1[ \t]+(?![ \t])(?:[^#\n"']*?[\s;&|(])?node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)|(?<=^[ \t]*(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--(?:[ \t]+node[ \t]+[^\s;&|]+)*[ \t]*\\[ \t]*\r?\n(?:[ \t]+node[ \t]+\S+[ \t]*\\[ \t]*\r?\n)*)[ \t]+(?![ \t])node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))|(?<=\S)[ \t]+(?=node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/))(?<=^[ \t]*(?:-[ \t]*)?(?:run:[ \t]*["']?)?(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--(?:[ \t]+node[ \t]+[^\s;&|]+){0,50}[ \t]+)node[ \t]+\S*(?:test|check|sweep|simulate|\.githooks\/)/m,
     msg: "steps de verificacao no CI",
     // CRU (#295): com as strings tiradas, `run: 'node .../test-x.mjs'` ficava `run: ''` e passar um
     // passo a aspas fazia a contagem descer (alarme falso) — e voltar a tira-las escondia a descida.

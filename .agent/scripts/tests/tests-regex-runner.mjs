@@ -44,7 +44,8 @@ const RUN = ".agent/scripts/lib/suites-em-paralelo.mjs";
  *    o `RUNNER` (a linha inteira, para a particao) recusa. O `RUNNER` e a contagem aceitam o `--max=0`, que o runner
  *    recusa no `leArgs`. Inofensivos: o runner recusa um `--max` invalido, e o passo fica vermelho;
  *  - a contagem conta as SUITES da cadeia (o caminho do runner nao tem `test|check|sweep|simulate`): a 1.a pela
- *    alternativa do bloco `run: |`, a 2.a pelo lookbehind, que so casa depois de um runner reconhecido — 2, senao 1;
+ *    alternativa do bloco `run: |`, a 2.a pelo lookbehind, que so casa depois de um runner reconhecido — 2, senao 1
+ *    (as suites na propria linha do runner, pela 4.a alternativa: ver `SUITES_NA_LINHA`, #383);
  *  - o oraculo, numa cadeia que a sua rede de seguranca NAO apanha (`node x/a.mjs`: ele tambem le qualquer
  *    `node ...tests/test-*.mjs` solto), da 2 quando reconhece o runner e 0 quando nao: igual ao `emParalelo`, texto a
  *    texto. Com um comentario no fim, ve o `\` que o bash ja tem dentro do comentario, e conta 2 (o runner real
@@ -66,11 +67,49 @@ const LINHAS = [
 ];
 
 /**
- * A forma de UMA linha, `- run: exec node <runner> -- node <suite>` (o `ci.yml` de um derivado na 2b-config): so a
- * nota da 2b a reconhece. A contagem da superficie da 0 e o oraculo perde a suite — o primeiro e um defeito, no seu
- * issue; aqui fica o comportamento de HOJE (o `/refactor`: o teste fixa, corrigir e outro ticket).
+ * A forma de UMA linha, `- run: exec node <runner> -- node <suite>` (o `ci.yml` de um derivado na 2b-config). Ate ao
+ * #383 a contagem dava 0 e o oraculo perdia a suite; o `RUNNER` (a particao) continua a recusa-la, de proposito.
  */
-const UMA_LINHA = [`- run: exec node ${RUN} -- node .agent/scripts/tests/test-a.mjs`, { RUNNER: false, emParalelo: true, contagem: 0, oraculo: 0 }];
+const UMA_LINHA = [`- run: exec node ${RUN} -- node .agent/scripts/tests/test-a.mjs`, { RUNNER: false, emParalelo: true, contagem: 1, oraculo: 1 }];
+
+const A = "node .agent/scripts/tests/test-a.mjs";
+const B = "node .agent/scripts/tests/test-b.mjs";
+const suites = (n) => Array.from({ length: n }, (_, k) => `node .agent/scripts/tests/test-s${k}.mjs`).join(" ");
+/**
+ * AS SUITES NA LINHA DO RUNNER (#383): o passo (as linhas dos `steps:`) e o que a contagem e o oraculo dao. As
+ * colunas sao separadas de proposito: o oraculo diz o que o `bash` corre, a contagem o que ela ve, e nas linhas de
+ * LIMITE da contagem (escrito no comentario da regex) os dois divergem. O teto `{0,50}` da 4.a alternativa: 51 e 52
+ * suites contam 51.
+ */
+const SUITES_NA_LINHA = [
+  ["uma linha, duas", `      - run: exec node ${RUN} -- ${A} ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["uma linha, sem exec", `      - run: node ${RUN} -- ${A} ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["uma linha, --max=2", `      - run: exec node ${RUN} --max=2 -- ${A} ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["uma linha entre aspas", `      - run: "exec node ${RUN} -- ${A} ${B}"\n`, { contagem: 2, oraculo: 2 }],
+  ["bloco, as duas na linha do runner", `      - run: |\n          exec node ${RUN} -- ${A} ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["bloco misto", `      - run: |\n          exec node ${RUN} -- ${A} \\\n            ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["comentario no fim", `      - run: exec node ${RUN} -- ${A} # ${B}\n`, { contagem: 1, oraculo: 1 }],
+  ["a suite entre aspas", `      - run: exec node ${RUN} -- "${A}"\n`, { contagem: 0, oraculo: 0 }],
+  // LIMITE da contagem: o runner a meio da linha; o bash corre-o.
+  ["echo antes do exec", `      - run: echo x; exec node ${RUN} -- ${A}\n`, { contagem: 0, oraculo: 1 }],
+  // Com `exec`, o `&& node check-b` nunca corre; sem `exec`, corre (LIMITE da contagem; e do oraculo, que salta o
+  // resto do passo como se houvesse sempre `exec` — uma suite a menos, o lado seguro).
+  ["&& com exec", `      - run: exec node ${RUN} -- ${A} && node .agent/scripts/check-b.mjs\n`, { contagem: 1, oraculo: 1 }],
+  ["&& sem exec", `      - run: node ${RUN} -- ${A} && node .agent/scripts/check-b.mjs\n`, { contagem: 1, oraculo: 1 }],
+  ["&& sem exec, uma suite depois", `      - run: node ${RUN} -- ${A} && ${B}\n`, { contagem: 1, oraculo: 1 }],
+  // Um `;`/`&`/`|` colado fecha o comando do runner: o `test-a` corre, o resto nao (2.a leitura do #383).
+  ["; colado, com exec", `      - run: exec node ${RUN} -- ${A}; ${B}\n`, { contagem: 1, oraculo: 1 }],
+  ["& colado, com exec", `      - run: exec node ${RUN} -- ${A}& ${B}\n`, { contagem: 1, oraculo: 1 }],
+  // O caminho entre aspas, e um `\` colado a ultima suite da linha (1.a leitura do #383): o bash corre-as.
+  ["o caminho entre aspas", `      - run: exec node ${RUN} -- node ".agent/scripts/tests/test-a.mjs"\n`, { contagem: 1, oraculo: 1 }],
+  ["bloco misto com o \\ colado", `      - run: |\n          exec node ${RUN} -- ${A}\\\n            ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["entre aspas, com um comentario depois", `      - run: "exec node ${RUN} -- ${A} ${B}" # nota\n`, { contagem: 2, oraculo: 2 }],
+  // LIMITE dos dois (escrito no comentario da regex): a linha do runner fora de um `run:` (um bloco de `env:`, um
+  // `name: |`) conta na mesma — nao se le o YAML. A cadeia de `\` (#337) ja tinha a mesma cegueira.
+  ["a linha do runner num bloco de env:", `      - run: echo ok\n        env:\n          X: |\n            exec node ${RUN} -- ${A} ${B}\n`, { contagem: 2, oraculo: 2 }],
+  ["o teto: 51 suites", `      - run: exec node ${RUN} -- ${suites(51)}\n`, { contagem: 51, oraculo: 51 }],
+  ["o teto: 52 suites", `      - run: exec node ${RUN} -- ${suites(52)}\n`, { contagem: 51, oraculo: 52 }],
+];
 
 /**
  * O DOMINIO DO CAMINHO de uma suite. O `SUITE` do `passo-paralelo` (uma linha `node <caminho>`) e o do runner (um
@@ -127,6 +166,10 @@ export function registar() {
       oraculo: suitesQueOCICorre(ci).size,
     }, esperado));
   }
+  registarResultado("regex do runner: as suites na linha do runner, contagem e oraculo como a tabela diz (#383)", SUITES_NA_LINHA.flatMap(([rotulo, passo, esperado]) => {
+    const ci = `jobs:\n  guard-tests:\n    steps:\n${passo}`;
+    return difere(rotulo, { contagem: contados(ci), oraculo: suitesQueOCICorre(ci).size }, esperado);
+  }));
 
   const dir = mkdtempSync(join(tmpdir(), "regex-runner-test-"));
   try {
