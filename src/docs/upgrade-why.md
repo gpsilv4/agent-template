@@ -461,6 +461,27 @@ encontra-o. Sem o teste, o primeiro PR que toque em `.agent/scripts/` depois do 
 `INCOMPLETA` na varredura do CI, a nomear a linha. A §2b nao o mostra antes, porque a bateria
 dela nao corre a varredura (minutos).
 
+## Porque os registos do harness passam a contar na superficie (#359)
+
+A `CONTAGENS` do template ganhou uma entrada, `registos, assercoes e linhas de casos
+(registarResultado)`: apagar um `registarResultado(`, uma afirmacao no idioma `c ? [] : ["msg"]`
+ou uma linha de uma tabela de casos passava calado (227 registos no template, nenhum contado).
+
+**O que isto pede a um derivado:** se a `CONTAGENS` dele ficou igual a do template, o `/upgrade`
+traz a entrada e nada mais muda. Se ele a **mudou**, o upgrade preserva a dele e a entrada nova
+nao chega: copia-se a mao do `surface-patterns.mjs` do template (como qualquer constante, na 2b).
+Ate la, os testes dela (`tests-surface-cobertura.mjs`) dizem `SKIP` com o nome da entrada, e nao
+`FAIL`: a guarda `seAContagemExistir` (no harness) chaveia pela **mensagem**, e num derivado uma
+entrada ausente e decisao dele. Chaveia so pela mensagem, e nao tambem pela regex, para a varredura
+de mutacao matar o neutro da entrada pelos casos de comportamento (com a regex na chave, num
+derivado o mutante sobrevivia em `SKIP`). Logo, **quem adaptar a regex muda-lhe tambem a
+mensagem** — senao os casos do template correm contra a regex dele, e podem reprovar.
+
+A entrada nao conta so os registos do harness: o idioma `c ? [] : ["msg"]`, as linhas `{ nome: ... }`
+e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a forma de muitos
+`test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
+explica-se no PR.
+
 ## Porque a varredura saiu do `guard-tests` para um job seu (#308)
 
 Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #80 do

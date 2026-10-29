@@ -234,8 +234,8 @@ cruzados. Fica para o C2, onde a decisao passa a desligar shards:
 - o ramo `sombra: desligada`: no C2 a base sem o plano passa a "aplica tudo" (custa minutos, nunca um buraco), e
   o portao exige os shards medidos tambem ai.
 Na medicao nao conta um PR que toque no `lib/varredura-shards.mjs`: e a comparacao, e corre do HEAD.
-Os casos da sombra registam-se com `registarResultado`, que o `check-test-surface` nao conta: apagar um passava
-calado. E uma classe que ja existia (#359).
+Os casos da sombra registam-se com `registarResultado`, que o `check-test-surface` nao contava: apagar um passava
+calado. Desde o #359 conta (a entrada `registos, assercoes e linhas de casos` do `surface-patterns.mjs`).
 
 **O C2 so entra** depois de 3 PRs que toquem em maquinaria e 3 que nao toquem com `sombra: concorda`. Os testes
 cruzados (`tests-plano-ci.mjs`) prendem o plano a descoberta da varredura e aos `PARES` do template; um alvo do

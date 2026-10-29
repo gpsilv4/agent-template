@@ -10,7 +10,8 @@
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { pathToFileURL } from "url";
-import { test, commit, git, registarResultado, ROOT, seOGlobExistir } from "./harness/test-surface-harness.mjs";
+import { execFileSync } from "child_process";
+import { test, commit, git, registarResultado, ROOT, seOGlobExistir, seAContagemExistir } from "./harness/test-surface-harness.mjs";
 import { CONTAGENS, MARCAS } from "../lib/surface-patterns.mjs";
 import { PARES } from "../lib/pares.mjs";
 
@@ -64,6 +65,65 @@ export function registar() {
     muda(dir, "tests/a.test.js", 'test("a", () => { if (x) throw new Error("um"); if (y) throw new Error("dois"); });\n',
       'test("a", () => { if (x) throw new Error("um"); });\n'),
   { code: 1, includes: ["assercoes (throw): 2 -> 1"] });
+
+  // --- Os registos do harness (#359) ------------------------------------------------
+  // Uma entrada com tres formas; cada caso apaga UMA linha de UMA forma. Atras da guarda: a entrada e do projeto.
+  // Os casos sao linhas `[rotulo, ..., { de, para }]` — a forma que a propria entrada conta: apagar um avisa.
+  {
+    const MSG = "registos, assercoes e linhas de casos (registarResultado)";
+    const REG = 'registarResultado("a", []);\n', IDI = '  ...(x ? [] : ["um"]),\n', INV = '  ...(x ? ["um"] : []),\n';
+    const OBJ = '  { nome: "a", v: 1 },\n', LIN = '  ["a", 1, { esperado: 1 }],\n', LINC = '  ["b", 2, { esperado: 2 }], // nota\n';
+    const DEF = "function registarResultado(n, p) {}\n";
+    const lista = (...ls) => `const p = [\n${ls.join("")}];\n`;
+    // Os limites escritos na entrada, presos pelo veredicto: um refactor que nao mantem um item por caso AVISA.
+    const CINCO = ["a", "b", "c", "d", "e"];
+    const SOLTOS = CINCO.map((n) => `registarResultado("${n}", x === 1 ? [] : ["falhou"]);\n`).join("");
+    const CICLO = lista(...CINCO.map((n) => `  ["${n}", { esperado: 1 }],\n`)) + 'for (const [n, { esperado }] of p) registarResultado(n, x === esperado ? [] : ["falhou"]);\n';
+    const IDIOMAS = `registarResultado("a", [\n${IDI}  ...(y ? [] : ["dois"]),\n]);\n`;
+    const FILTRO = 'registarResultado("a", [[x, "um"], [y, "dois"]].filter(([c]) => !c).map(([, m]) => m));\n';
+    seAContagemExistir(MSG, "cobertura (registos)", () => {
+      for (const [nome, antes, depois, { de, para }] of [
+        ["apagar um registo desce", REG + REG, REG, { de: 2, para: 1 }],
+        ["a definicao nao conta (o lookbehind)", DEF + REG + REG, DEF + REG, { de: 2, para: 1 }],
+        ["apagar uma linha do idioma `c ? [] : [\"msg\"]` desce", lista(IDI, IDI), lista(IDI), { de: 2, para: 1 }],
+        ["apagar uma linha do inverso `c ? [\"msg\"] : []` desce", lista(INV, INV), lista(INV), { de: 2, para: 1 }],
+        ["apagar uma linha `{ nome: ... }` de uma tabela desce", lista(OBJ, OBJ), lista(OBJ), { de: 2, para: 1 }],
+        ["apagar uma linha `[rotulo, ..., { esperado }]` desce", lista(LIN, LINC), lista(LINC), { de: 2, para: 1 }],
+        ["apagar a mesma forma com um comentario no fim desce", lista(LIN, LINC), lista(LIN), { de: 2, para: 1 }],
+        ["acrescentar fica calado", REG, REG + REG, { de: 1, para: 2 }],
+        ["5 registos soltos -> 1 registo num ciclo sobre 5 linhas avisa (10 -> 7, limite)", SOLTOS, CICLO, { de: 10, para: 7 }],
+        ["o idioma consolidado num `.filter().map()` avisa (3 -> 1, limite)", IDIOMAS, FILTRO, { de: 3, para: 1 }],
+      ]) {
+        test(`cobertura (registos): ${nome}`, (dir) => muda(dir, "tests/a.test.js", antes, depois),
+          para < de ? { code: 1, includes: [`${MSG}: ${de} -> ${para}`] } : { code: 0, excludes: [`${MSG}:`] });
+      }
+      test("cobertura (registos): mover um registo para outro ficheiro fica calado", (dir) => {
+        mkdirSync(join(dir, "tests"), { recursive: true });
+        writeFileSync(join(dir, "tests/a.test.js"), REG + REG);
+        writeFileSync(join(dir, "tests/b.test.js"), "");
+        commit(dir, "antes");
+        const ref = git(dir, ["rev-parse", "HEAD"]);
+        writeFileSync(join(dir, "tests/a.test.js"), REG);
+        writeFileSync(join(dir, "tests/b.test.js"), REG);
+        commit(dir, "depois");
+        return ref;
+      }, { code: 0, includes: [`${MSG}: 2 -> 1 — o total da superficie NAO desceu (movido, nao perdido)`] });
+      // O custo, num processo filho com `timeout` (a razao no `tests-surface-blocos.mjs`): um caso por cuidado
+      // escrito na entrada. Sem eles: 257 s, 10,9 s e 14,9 s; com eles, < 100 ms cada.
+      const nome = "cobertura (registos): linhas de espacos, `, {` e `?[\"\"` repetidos medem-se em < 5 s";
+      const re = CONTAGENS.find((c) => c.msg === MSG).re;
+      const codigo = `
+        const g = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags + "g")});
+        for (const t of ["\\n".repeat(20000), " ".repeat(200).concat("\\n").repeat(20000), "[\\"\\"" + ", {".repeat(50000), "?[\\"\\"".repeat(50000)]) t.match(g);`;
+      let problemas = [];
+      try {
+        execFileSync(process.execPath, ["-e", codigo], { timeout: 5000, stdio: "ignore" });
+      } catch (err) {
+        problemas = [err.signal ? `nao terminou em 5 s (${err.signal}) — backtracking?` : `rebentou: ${err.message}`];
+      }
+      registarResultado(nome, problemas, "");
+    });
+  }
 
   // --- Marcas que so uma entrada apanha --------------------------------------------
   test("cobertura: `test.concurrent.skip` acrescentado e detetado", (dir) =>

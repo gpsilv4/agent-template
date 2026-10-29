@@ -21,6 +21,7 @@ import { FAIL_FAST } from "./relatorio.mjs";
 import { ISOLADO } from "./repo-descartavel.mjs";
 import { TEST_GLOBS_DO_PROJETO, CONFIG_GLOBS_DO_PROJETO } from "../../config/superficie-de-teste.mjs";
 import { ehDerivado } from "../../lib/derivado.mjs";
+import { CONTAGENS } from "../../lib/surface-patterns.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-test-surface.mjs");
@@ -237,17 +238,44 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
  * lhe muda o texto) lia-se como "adaptado": 7 de 8 a descoberto, com a suite verde (#183).
  */
 function seOGlobExistir(glob, nome, regista) {
-  if ([...TEST_GLOBS_DO_PROJETO, ...CONFIG_GLOBS_DO_PROJETO].map(String).includes(glob)) return regista();
-  const ler = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return null; } };
-  if (ehDerivado(ler)) console.log(`  SKIP  ${nome} — glob ${glob} adaptado pelo projeto: o teste e dele (tests-surface-*.mjs)`);
-  else registarResultado(nome, [`o glob por omissao ${glob} saiu da config do TEMPLATE — repor, ou mudar este teste com ele`]);
+  return seExistir([...TEST_GLOBS_DO_PROJETO, ...CONFIG_GLOBS_DO_PROJETO].map(String).includes(glob), nome, regista, {
+    skip: `glob ${glob} adaptado pelo projeto: o teste e dele (tests-surface-*.mjs)`,
+    falta: `o glob por omissao ${glob} saiu da config do TEMPLATE — repor, ou mudar este teste com ele`,
+  });
+}
+
+/**
+ * O mesmo para UMA entrada das `CONTAGENS` (#359): a constante e do projeto (o `/upgrade` preserva a de um
+ * derivado que a mudou), mas os `tests-surface-*.mjs` sao do template e chegam-lhe. Chaveia so pela `msg`, e
+ * nao pela regex: presente, os casos correm contra a regex que o projeto TIVER. Chavear tambem pela regex (a
+ * primeira versao) tornava a varredura vacua — o neutro dela muda a regex, e a guarda reprovava (template) ou
+ * saltava (derivado: o mutante sobrevivia) antes de qualquer caso de comportamento correr (as duas leituras).
+ * O custo, assumido: um derivado que ADAPTE a regex muda-lhe tambem a `msg`, e os casos daqui passam a SKIP.
+ */
+function seAContagemExistir(msg, nome, regista, { contagens = CONTAGENS, ...deps } = {}) {
+  return seExistir(contagens.some((c) => c.msg === msg), nome, regista, {
+    skip: `a entrada "${msg}" das CONTAGENS foi adaptada pelo projeto: o teste e dele (tests-surface-*.mjs)`,
+    falta: `a entrada "${msg}" saiu das CONTAGENS do TEMPLATE — repor, ou mudar este teste com ela`,
+  }, deps);
+}
+
+/** Os tres ramos das duas guardas acima. Devolve o ramo, para os testes do proprio harness; as dependencias
+ *  injetam-se pela mesma razao. */
+function seExistir(presente, nome, regista, textos, {
+  ler = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return null; } },
+  derivado = ehDerivado, falha = registarResultado, log = console.log,
+} = {}) {
+  if (presente) { regista(); return "corre"; }
+  if (derivado(ler)) { log(`  SKIP  ${nome} — ${textos.skip}`); return "skip"; }
+  falha(nome, [textos.falta]);
+  return "falta";
 }
 
 /** Uma chave irma LOGO DEPOIS de um `if:` nas fixtures: o lookahead da continuacao YAML tem de a
  *  deixar passar. Sem ela, um lookahead alargado passava a suite inteira (auditoria do #277). */
 const DEPOIS_DO_IF = "        with:\n          a: b\n";
 
-export { test, sandbox, commit, corre, git, apagaObjetoSolto, ROOT, CHECKER, seOGlobExistir, DEPOIS_DO_IF };
+export { test, sandbox, commit, corre, git, apagaObjetoSolto, ROOT, CHECKER, seOGlobExistir, seAContagemExistir, DEPOIS_DO_IF };
 
 /** Imprime o resumo e sai. Ver a nota no cabecalho sobre porque vive aqui. */
 export function resumo() {

@@ -12,7 +12,7 @@
  */
 import { pathToFileURL } from "url";
 import { rmSync } from "fs";
-import { avaliar, registarResultado, sandbox, git, apagaObjetoSolto } from "./harness/test-surface-harness.mjs";
+import { avaliar, registarResultado, sandbox, git, apagaObjetoSolto, seAContagemExistir } from "./harness/test-surface-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -85,5 +85,34 @@ export function registar() {
       rmSync(dir, { recursive: true, force: true });
     }
     registarResultado("surface-harness: a fixture deteta um objeto empacotado em vez de o dar por apagado (controlo, #379)", problemas);
+  }
+
+  // A guarda de uma entrada das CONTAGENS (#359), nos tres ramos. Chamada com dependencias fabricadas: o ramo
+  // `falta` no template real reprovava esta suite, e o `skip` so se ve num derivado. Uma linha da tabela por caso,
+  // com o esperado num objeto no fim: e a forma que a propria entrada conta (apagar uma linha avisa).
+  {
+    const ramo = (contagens, derivado) => {
+      const visto = { corre: 0, falha: 0, log: 0 };
+      const r = seAContagemExistir("x", "n", () => visto.corre++, {
+        contagens, ler: () => null, derivado: () => derivado,
+        falha: (_n, p) => { visto.falha += p.length; }, log: () => visto.log++,
+      });
+      return `${r} ${visto.corre}/${visto.falha}/${visto.log}`;
+    };
+    const X = [{ re: /\bx\(/, msg: "x" }];
+    for (const [nome, contagens, derivado, { esperado }] of [
+      ["presente: os testes correm", X, false, { esperado: "corre 1/0/0" }],
+      ["presente num derivado: correm", X, true, { esperado: "corre 1/0/0" }],
+      ["ausente no template: FAIL", [], false, { esperado: "falta 0/1/0" }],
+      ["ausente num derivado: SKIP visivel", [], true, { esperado: "skip 0/0/1" }],
+      ["outra msg com a mesma regex, no template: FAIL", [{ re: /\bx\(/, msg: "y" }], false, { esperado: "falta 0/1/0" }],
+      // O neutro da varredura (`/(?!)/ || /.../`) muda a regex e mantem a msg: os casos tem de CORRER, para o
+      // matarem — num derivado tambem (a 1.a versao chaveava pela regex, e ali o mutante sobrevivia em SKIP).
+      ["a regex neutralizada pela varredura, num derivado: correm", [{ re: /(?!)/, msg: "x" }], true, { esperado: "corre 1/0/0" }],
+      ["a regex neutralizada pela varredura, no template: correm", [{ re: /(?!)/, msg: "x" }], false, { esperado: "corre 1/0/0" }],
+    ]) {
+      const visto = ramo(contagens, derivado);
+      registarResultado(`surface-harness: seAContagemExistir — ${nome}`, visto === esperado ? [] : [`esperado "${esperado}", deu "${visto}"`]);
+    }
   }
 }
