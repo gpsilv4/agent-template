@@ -15,15 +15,16 @@
  *     a fixa, que muda, e as unidades delas perdem-se — avisa;
  *   - o comprimento da cadeia NAO entra na fixa (2.a passagem): com ele, acrescentar uma suite avisava.
  * Le as linhas CRUAS (o `\`, os espacos e os comentarios contam para o `bash`) alinhadas com as LIMPAS pelo
- * indice; os limites do `run:` saem das limpas. E mais estrita que a contagem e o `suitesQueOCICorre` num
- * ponto, de proposito: um `\` seguido de espacos nao continua a linha no `bash`, e aqui fecha a cadeia.
+ * indice; os limites do `run:` saem das limpas. E mais estrita que a contagem e o `suitesQueOCICorre`, de
+ * proposito: um `\` seguido de espacos nao continua a linha no `bash`, e aqui fecha a cadeia; e as suites na
+ * linha do runner (a forma de uma linha e a mista, #383), que eles contam, aqui deixam o passo numa so unidade.
  *
  * E puro, e o par em `PARES` desliga os seus regexes (o do runner e o da suite): sem um deles, o passo volta a
  * uma unidade e os casos "nao avisa" do `tests-surface-blocos.mjs` ficam vermelhos.
  */
 
-/** A linha do runner (o mesmo padrao da contagem "steps de verificacao no CI", `surface-patterns.mjs`), sem o
- *  ` \`. Um `exec` e um `./` opcionais, e um `--max=N` opcional antes do `--`. */
+/** A linha do runner (o padrao da 3.a alternativa da contagem "steps de verificacao no CI", `surface-patterns.mjs`),
+ *  sem o ` \` e sem suites na mesma linha. Um `exec` e um `./` opcionais, e um `--max=N` opcional antes do `--`. */
 export const RUNNER = /^(?:exec[ \t]+)?node[ \t]+(?:\.\/)?\.agent\/scripts\/lib\/suites-em-paralelo\.mjs(?:[ \t]+--max=\d+)?[ \t]+--$/;
 /** Uma linha de SUITE, sem o ` \`: `node` e o caminho de uma suite, e nada mais. */
 export const SUITE = /^node[ \t]+((?:\.agent\/scripts\/tests|\.claude\/hooks\/tests)\/test-[\w-]+\.mjs)$/;

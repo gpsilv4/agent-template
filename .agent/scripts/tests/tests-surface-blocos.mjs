@@ -101,6 +101,17 @@ export function registar() {
       code: 1,
       includes: [`${MSG}: 3 -> 1`],
     });
+  // AS SUITES NA LINHA DO RUNNER (#383): a forma de uma linha e a mista. Com o trailer, o gate da maquinaria cala-se
+  // (tem saida); o que fica e a CONTAGEM, que nao tem. Sem a 4.a alternativa, esta dava 0 -> 0 (ou 1 -> 1) e calava.
+  const linha = (...ss) => `      - name: suites\n        run: exec node .agent/scripts/lib/suites-em-paralelo.mjs -- ${ss.map((s) => `node .agent/scripts/tests/${s}.mjs`).join(" ")}\n`;
+  const misto = (s, ...ss) => bloco("suites", `exec node .agent/scripts/lib/suites-em-paralelo.mjs -- node .agent/scripts/tests/${s}.mjs \\`, ...ss.map((x, i) => `  node .agent/scripts/tests/${x}.mjs${i < ss.length - 1 ? " \\" : ""}`));
+  const COM_TRAILER = "alteracao\n\nTest-Surface: .github/workflows/ci.yml — o caso do teste";
+  test("suites na linha do runner: tirar uma da forma de uma linha faz a contagem descer, com o trailer (#383)", (dir) =>
+    muda(dir, ci(linha("test-a", "test-b")), ci(linha("test-a")), COM_TRAILER), { code: 1, includes: [`${MSG}: 2 -> 1`] });
+  test("suites na linha do runner: tirar a da linha do runner na forma mista faz a contagem descer (#383)", (dir) =>
+    muda(dir, ci(misto("test-a", "test-b", "test-c")), ci(misto("test-b", "test-c")), COM_TRAILER), { code: 1, includes: [`${MSG}: 3 -> 2`] });
+  test("suites na linha do runner: um `--max=2` na forma de uma linha nao faz a contagem descer (#383)", (dir) =>
+    muda(dir, ci(linha("test-a", "test-b")), ci(linha("test-a", "test-b").replace("mjs --", "mjs --max=2 --")), COM_TRAILER), { code: 0, excludes: [`${MSG}:`] });
   // A marca "falha engolida" le o bloco como a shell o executa (`comoORunnerExecuta` junta as continuacoes):
   // um `|| true` numa linha propria, no fim da lista, e a mesma falha engolida.
   test("suites em paralelo: um `|| true` numa linha de continuacao propria e marcado (#337)", (dir) =>
@@ -190,7 +201,7 @@ export function registar() {
   // um `Date.now()` depois do `match` nunca chegava a ser lido — a suite PENDURAVA em vez de
   // ficar vermelha, e o sintoma era o job a morrer no tecto sem dizer porque.
   {
-    const nome = "bloco `run: |`: brancos, vazias, longas e indentacao de 2000 espacos medem-se em < 5 s";
+    const nome = "bloco `run: |`: brancos, vazias, longas, indentacao de 2000 espacos e 30 mil suites numa linha medem-se em < 5 s";
     const entrada = CONTAGENS.find((c) => c.msg === MSG);
     if (!entrada) {
       registarResultado(nome, [`nenhuma entrada de CONTAGENS com a msg "${MSG}"`], "");
@@ -201,7 +212,14 @@ export function registar() {
         for (const l of ["          ", "", "          echo" + " x".repeat(200)]) corpo(l).match(g);
         // Quadratico na indentacao: sem o \`(?![ \\t])\` da linha final, isto levava ~9 s.
         const fundo = " ".repeat(2000);
-        (["        run: |", ...Array(300).fill(fundo + "echo" + " y".repeat(1000)), "      - name: fim"].join("\\n") + "\\n").match(g);`;
+        (["        run: |", ...Array(300).fill(fundo + "echo" + " y".repeat(1000)), "      - name: fim"].join("\\n") + "\\n").match(g);
+        // A 4.a alternativa (#383): sem a ancora \`(?<=\\S)\`, uma suite depois de 2000 espacos levava ~7,7 s; sem o
+        // teto, 30 mil suites numa linha (com e sem o runner a frente) levavam ~50 s.
+        (["        run: |", ...Array(300).fill(fundo + "node .agent/scripts/tests/test-x.mjs"), "      - name: fim"].join("\\n") + "\\n").match(g);
+        const s = " node .agent/scripts/tests/test-x.mjs".repeat(30000);
+        for (const l of ["      - run: exec node .agent/scripts/lib/suites-em-paralelo.mjs --", "      - run: echo"]) (l + s + "\\n").match(g);
+        // A 3.a com essas 30 mil na linha do runner e uma cadeia de 300 linhas depois (2.a leitura do #383): ~0,4 s.
+        ("        run: |\\n          exec node .agent/scripts/lib/suites-em-paralelo.mjs --" + s + " \\\\\\n" + "            node x \\\\\\n".repeat(300) + "            node y\\n").match(g);`;
       let problemas = [];
       try {
         execFileSync(process.execPath, ["-e", codigo], { timeout: 5000, stdio: "ignore" });
