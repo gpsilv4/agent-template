@@ -54,6 +54,31 @@ const CONTAGENS = [
   // `test.each([...])` com a tabela esvaziada para `[]` mantem o `test(` e nao corre nada —
   // a mesma forma do `includes: []`. So as tabelas NAO VAZIAS contam.
   { re: /\.each\s*\(\s*\[[^\]]/, msg: "tabelas `each` nao vazias" },
+  // O vocabulario do HARNESS deste repo (#359): o `registarResultado(` regista um resultado ja avaliado, e nenhuma
+  // entrada acima o contava (227 chamadas) — apagar um passava calado. O registo e o contentor; as afirmacoes vivem
+  // dentro dele, no idioma `c ? [] : ["msg"]` (e no inverso `c ? ["msg"] : []`), e as tabelas de casos percorridas
+  // por um ciclo tem uma linha por caso (`{ nome: ... }`, ou `["rotulo", ..., { esperado }]`). Conta as tres
+  // formas: no template, 227 + 370 + 86 = 683 (medido com o `semStrings`, que deixa a mensagem como `""`).
+  // **Uma entrada e nao tres**, pela razao da dos passos do CI (#153): um refactor entre formas que mantem um item
+  // contavel por caso (testes MOVIDOS entre ficheiros, o #382; uma divisao nas 500 linhas, o #385) nao desce.
+  // Nos ultimos 12 merges e em 40 commits de cada derivado medido: 0 descidas. Uma descida NAO tem saida (como
+  // todas as `CONTAGENS`: so o `verificaGate` le o trailer) — explica-se no PR. Desce sem perder nada (limites
+  // assumidos): trocar a mensagem de um idioma por uma variavel (`c ? [] : [msg]`); consolidar linhas do idioma
+  // num `.filter().map()`; partir uma linha de tabela por varias linhas; passar 5 registos soltos para 1 registo
+  // num ciclo sobre 5 linhas (10 -> 7); passar uma verificacao para outra entrada (`registarResultado(n, c ? [] :
+  // ["m"])` -> `test(..., { includes: ["m"] })`: esta desce 2, as outras sobem); renomear o helper do harness; e o
+  // inverso partido por um formatador (`? [\n "m"\n] : []`: a mensagem para no `\n`, e o idioma direito nao).
+  // ESCONDE (limite, de todas as `CONTAGENS`, mais barato aqui por serem tres formas): apagar um caso e acrescentar,
+  // num ficheiro tocado, um item de outra forma (uma linha `{ nome: ... }` de dados) mantem o total. NAO conta: uma tabela sem objeto no fim (`["a", "b"],`), uma linha de
+  // tabela partida, uma afirmacao fora do idioma, e uma condicao trocada por uma constante (`true ? [] : ["x"]`
+  // mantem a contagem). Fora das pastas de testes casa em `lib/fora-do-template.mjs` (1) e `lib/saida-upgrade.mjs`
+  // (4): o idioma com uma string, que tambem e codigo que nao deve desaparecer calado.
+  // So `nome` na linha de objeto, e nao `name`: nas suites das apps derivadas, `{ name:` sao dados (medido).
+  // Linear, com tres cuidados medidos (o teste de tempo prende-os): `[ \t]` e nao `\s` nas ancoras de linha (20 mil
+  // linhas de 200 espacos: 257 s -> 62 ms); o `,{` da linha de tabela num LOOKAHEAD, e nao em sequencia (50 mil
+  // `, {` numa linha: 10,9 s -> 2 ms); e a mensagem do inverso para no `?` (50 mil `?[""`: 14,9 s -> 2 ms). Os dois
+  // ultimos nao mudam nenhuma contagem do repo (683 = 683, ficheiro a ficheiro).
+  { re: /(?<!function\s+)\bregistarResultado\s*\(|\?\s*\[\]\s*:\s*\[\s*""|\?\s*\[\s*""[^\]\n?]*\]\s*:\s*\[\]|^[ \t]*\{[ \t]*nome[ \t]*:|^[ \t]*\[[ \t]*""(?=[^\n]*,[ \t]*\{)[^\n]*\}[ \t]*\],?[ \t]*(?:\/\/.*)?$/m, msg: "registos, assercoes e linhas de casos (registarResultado)" },
   // A2: a "configuracao do runner" deste repo conta-se assim.
   // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
