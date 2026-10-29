@@ -447,6 +447,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Os passos que saltam por uma variavel (#353): cada `suspeito(` e um passo que deixa de correr sem marca. O dono
+    // (`tests-saltos-variavel.mjs`) corre primeiro no `test-guards`: a funcao e pura, cada sitio custa milissegundos.
+    alvo: ".agent/scripts/lib/saltos-variavel.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$]|function )suspeito\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A adocao num projeto existente (#288). Os sitios de recusa sao os `throw`: cada um impede
     // escrever num sitio errado (o proprio template, um projeto ja adotado, um ficheiro que
     // apareceu entretanto). Desligar um deixa a copia seguir em frente sobre o que nao devia.

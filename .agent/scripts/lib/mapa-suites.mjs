@@ -123,8 +123,9 @@ export const SUITES = [
   // `guard-textos-publicos` (o `test-hooks`, #375b).
   { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/(check-textos-publicos|tests\/test-textos-publicos)\.mjs$/, verifica: [S("test-textos-publicos.mjs")] },
-  // A estrutura do gate (#382): o dono no `test-guards` (a funcao pura), e o gate de ponta a ponta.
-  { re: /^\.agent\/scripts\/lib\/estrutura-workflow\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  // A estrutura do gate (#382) e os passos que saltam por uma variavel (#353): o dono no `test-guards` (a funcao
+  // pura), e o gate de ponta a ponta.
+  { re: /^\.agent\/scripts\/lib\/(?:estrutura-workflow|saltos-variavel)\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // Os modos da varredura (#317): as formas de YAML leem-se pela estrutura, no `tests-estrutura-workflow.mjs` (#382).
   { re: /^\.agent\/scripts\/lib\/gate-modos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.

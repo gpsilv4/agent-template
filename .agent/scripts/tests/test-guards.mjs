@@ -31,7 +31,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // entry point segura com symlinks, #373), e o `tests-regex-runner.mjs` prende as regex do runner e do caminho de uma
 // suite de `lib/passo-paralelo.mjs`, `lib/surface-patterns.mjs` e `lib/medida-upgrade.mjs` umas as outras (#374a). O
 // `tests-commit-msg-tesoura.mjs` exercita a tesoura do `.githooks/lib/commit-msg.mjs` com commits verdadeiros (#399), e o
-// `tests-estrutura-workflow.mjs` os defeitos de estrutura do gate, `lib/estrutura-workflow.mjs` (o dono na varredura, #382).
+// `tests-estrutura-workflow.mjs` os defeitos de estrutura do gate, `lib/estrutura-workflow.mjs` (o dono na varredura, #382), e o
+// `tests-saltos-variavel.mjs` os passos que saltam por uma variavel, `lib/saltos-variavel.mjs` (o dono na varredura, #353).
 // Fica escrito porque o mapa de suites exige que a suite
 // **fale** do modulo que verifica, e a descoberta, sendo automatica, nao o nomeia em lado nenhum.
 import { fileURLToPath } from "url";

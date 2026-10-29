@@ -461,6 +461,21 @@ encontra-o. Sem o teste, o primeiro PR que toque em `.agent/scripts/` depois do 
 `INCOMPLETA` na varredura do CI, a nomear a linha. A §2b nao o mostra antes, porque a bateria
 dela nao corre a varredura (minutos).
 
+## Porque um passo que salta por uma variavel literal passa a avisar (#353)
+
+Os passos da app do `ci.yml` saltam no shell quando o `TEM_APP` diz que nao ha app (`case "$TEM_APP" in ...
+false) ... exit 0`). Um valor que deixe de vir de um output — `TEM_APP: 'false'`, uma expressao que da
+sempre o mesmo, ou o `env:` passado do passo para o job — desligava o passo sem marca nenhuma. O gate do
+`check-test-surface` (`lib/saltos-variavel.mjs`) passa a contar, por job e chave, os passos cujo valor
+efetivo nao e uma referencia exacta (`${{ steps.x.outputs.y }}`) nem o literal `true`, e avisa quando ha
+mais agora do que na base.
+
+**O que isto pede a um derivado:** nada, se os seus passos leem o valor de um output. Um idioma legitimo com
+um literal (`env: TARGET: staging` + `case "$TARGET"` num deploy) avisa no PR que o acrescenta; a saida e o
+trailer `Test-Surface: .github/workflows/<ficheiro> — <porque>`, como nos outros sinais do gate. O trailer
+aceita o ficheiro inteiro: um escrito para outra mudanca no mesmo commit tambem aceita esta. Fica de fora:
+editar o `case` em vez do `env:` (#411), o `$GITHUB_ENV` (#362), e os workflows que nao correm testes.
+
 ## Porque os registos do harness passam a contar na superficie (#359)
 
 A `CONTAGENS` do template ganhou uma entrada, `registos, assercoes e linhas de casos

@@ -16,6 +16,9 @@
  *    do #285, medido no codigo). Um passo NOVO nao avisa: so alarga a rede. O passo das SUITES EM
  *    PARALELO parte-se numa unidade fixa e numa por suite (#341, `lib/passo-paralelo.mjs`): uma suite
  *    nova DENTRO da cadeia do runner e uma unidade nova, e nao avisa.
+ *  - um passo (da maquinaria ou NAO) que salta por uma variavel lida num `case`, cujo valor efetivo deixou de
+ *    decidir (um literal que salta, uma expressao constante, o `env:` passado para o job), avisa — por
+ *    `(job, chave)`, e tambem num passo NOVO: e a excecao ao "so alarga a rede" (#353, `lib/saltos-variavel.mjs`).
  * Reconhecer so as formas que estreitam era o jogo que o issue diz nao funcionar (`TP8`).
  *
  * Como o `Guard Tests` e obrigatorio, um aviso destes tem SAIDA, e so esta: o trailer
@@ -32,6 +35,7 @@
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */
 import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas } from "./estrutura-workflow.mjs";
+import { saltosNovos } from "./saltos-variavel.mjs";
 import { partePasso, unidadesDoParalelo } from "./passo-paralelo.mjs";
 
 const linhasDe = (texto) => texto.split(/\r\n|\r|\n/).map(semComentario);
@@ -308,6 +312,8 @@ export function verificaGate({ f, antes, origem, antesOrigem, agora, para, conta
   // Uma suite que ficou FORA da cadeia do runner (#341): o aviso acima diz "o passo mudou"; este diz porque.
   // Pelo `passo` e nao pela `chave`: senao uma suite ja fora da cadeia na base voltava a cada mudanca de cabecalho.
   for (const v of ud) if (v.aviso && !ua.some((u) => u.passo === v.passo)) sinais.push(v.aviso);
+  // Um passo que salta por uma variavel cujo valor deixou de vir de um output (#353, `lib/saltos-variavel.mjs`).
+  sinais.push(...saltosNovos(antes, depois));
   sinais.splice(0, sinais.length, ...new Set(sinais)); // dois passos iguais perdidos davam a mesma linha duas vezes
   if (sinais.length === 0) return estrutura.length > 0;
   let motivo = null;
