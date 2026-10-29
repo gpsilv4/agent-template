@@ -4,7 +4,7 @@
  *
  * Saiu do `superficie-gate.mjs` quando ele chegou as 494 linhas (o Guard 17 reprova acima de 500), sem mudar
  * comportamento: as linhas vieram tal e qual. O gate importa daqui o que partilha (o `semComentario`, o `indent`,
- * a `MAQUINARIA`, o `idDe`, os `agregadoresDe` e os `defeitosNovos`); este modulo nao importa o gate (sem ciclo).
+ * a `MAQUINARIA`, o `idDe`, os `agregadoresDe`, os `defeitosNovos` e as `colisoesNovas`); este modulo nao importa o gate (sem ciclo).
  * Cada defeito sai por `defeito(`, o sinal do par em `lib/pares.mjs` (#382); o dono na varredura e o
  * `tests/tests-estrutura-workflow.mjs`, no `test-guards`, onde cada sitio morre em milissegundos.
  */
@@ -55,10 +55,19 @@ function needsDe(job) {
 function nomeLiteral(cru, id) {
   const linha = cru.find((l) => /^[ \t]*name[ \t]*:/.test(l));
   if (!linha) return id;
-  const v = linha.replace(/^[ \t]*name[ \t]*:[ \t]*/, "");
+  // A ancora (`&n`) e a tag `!!str` nao fazem parte do valor (#355): o YAML le `&n Guard Tests` como `Guard Tests`.
+  const v = linha.replace(/^[ \t]*name[ \t]*:[ \t]*/, "").replace(/^&\S+[ \t]+/, "").replace(/^!!str[ \t]+/, "");
   const aspas = /^(["'])(.*?)\1/.exec(v);
-  const nome = aspas ? aspas[2] : v.replace(/(^|[ \t])#.*$/, "").trim();
-  return !nome || /\$\{\{|^[|>*&]/.test(nome) ? null : nome;
+  let nome = aspas ? aspas[2] : v.replace(/(^|[ \t])#.*$/, "").trim();
+  // Os escapes entre aspas duplas (`"Guard\x20Tests"`) leem-se como o YAML os le; um que nao se le e nao literal.
+  if (aspas?.[1] === '"' && nome.includes("\\")) {
+    try {
+      nome = JSON.parse(`"${nome.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1")}"`);
+    } catch {
+      return null;
+    }
+  }
+  return !nome || /\$\{\{|^[|>*&!]/.test(nome) ? null : nome;
 }
 
 /** Os jobs de um workflow: `{ id, ls, cru }` (as linhas sem comentarios, e as cruas, alinhadas). */
@@ -197,6 +206,98 @@ export function defeitosDeEstrutura(texto) {
   }
   return out;
 }
+
+/** Um workflow SO reutilizavel (#355): a unica chave do `on:` e `workflow_call` — `on: workflow_call`,
+ *  `on: [workflow_call]`, ou o bloco (com `inputs:` aninhados). Os checks dele chamam-se `chamador / job`, e
+ *  nunca tem o nome nu. FALHA FECHADA: um `on:` que nao se le (um alias, uma forma desconhecida) e um
+ *  workflow normal, e os nomes dele contam. */
+function soReutilizavel(texto) {
+  const ls = texto.split(/\r\n|\r|\n/).map(semComentario);
+  const i = ls.findIndex((l) => /^(?:on|"on"|'on'|true)[ \t]*:/.test(l));
+  if (i < 0) return false;
+  const valor = ls[i].replace(/^[^:]*:[ \t]*/, "").trim();
+  const so = (xs) => xs.length === 1 && xs[0] === "workflow_call";
+  if (valor.startsWith("[")) return /^\[[^\]]*\]$/.test(valor) && so(valor.slice(1, -1).split(",").map((x) => x.trim().replace(/^["']|["']$/g, "")));
+  if (valor) return valor === "workflow_call";
+  const fim = ls.findIndex((l, k) => k > i && /^\S/.test(l));
+  const corpo = ls.slice(i + 1, fim < 0 ? ls.length : fim).filter((l) => l.trim());
+  if (corpo.length === 0) return false;
+  const ind = Math.min(...corpo.map(indent));
+  const chaves = corpo.filter((l) => indent(l) === ind).map((l) => /^[ \t]*["']?([\w-]+)["']?[ \t]*:/.exec(l)?.[1] ?? null);
+  return !chaves.includes(null) && so(chaves);
+}
+
+/** O nome do CHECK de um job, ou `null` quando o check nao tem o nome nu (#355): um job de matriz (o GitHub
+ *  acrescenta os valores, `Nome (a, b)`), um job que chama um reutilizavel (`chamador / job`), ou um nome que
+ *  nao e literal. Comparado com `trim()` e sem distinguir maiusculas: nao medi como o GitHub compara o nome
+ *  exigido, e assim falha para o lado de avisar. */
+function nomeDeCheck(j) {
+  const chaves = chavesDoJob(j.ls);
+  if (chaves.some(({ l }) => /^[ \t]*uses[ \t]*:/.test(l))) return null;
+  // O `matrix:` DENTRO do bloco do `strategy:` (ou no flow da propria linha): um `matrix:` num `env:` ou num
+  // `with:` nao reparte nada, e lido como matriz calava o nome (leitura adversarial do #355).
+  const s = chaves.find(({ l }) => /^[ \t]*strategy[ \t]*:/.test(l));
+  if (s && /\bmatrix[ \t]*:/.test(s.l)) return null;
+  for (const l of s ? j.ls.slice(s.k + 1) : []) {
+    if (!l.trim()) continue;
+    if (indent(l) <= indent(s.l)) break;
+    if (/^[ \t]*matrix[ \t]*:/.test(l)) return null;
+  }
+  return nomeLiteral(j.cru, j.id);
+}
+
+/** Os checks de um workflow, `[{ id, nome, portao }]`; nenhum se ele for so reutilizavel. */
+function checksDe(texto) {
+  if (!texto || soReutilizavel(texto)) return [];
+  const jobs = jobsDe(texto);
+  const { vigiados, agregadores } = agregadoresDe(jobs);
+  return jobs.map((j) => ({ id: j.id, nome: nomeDeCheck(j), portao: vigiados.has(j.id) || agregadores.has(j.id) })).filter((c) => c.nome !== null);
+}
+
+/**
+ * O mesmo nome de check ENTRE workflows (#355): um job noutro ficheiro com o nome de um portao (`name: Guard
+ * Tests` + `echo ok`) reporta um check verde com esse nome, e uma protecao que o exija da-se por satisfeita.
+ * Defeito quando um dos dois e portao NO SEU workflow (maquinaria ou agregador): duas colisoes entre jobs
+ * alheios (`Detect Project` em dois ficheiros, num derivado) sao idioma legitimo. Devolve um `Map` do NOME de
+ * check (a chave: sem ids nem caminhos, para mudar um id ou renomear o outro ficheiro nao fazer renascer uma
+ * colisao antiga) para as mensagens — todas, uma por par de jobs.
+ * LIMITES (como dentro de um ficheiro): o nome nao literal (`name: ${{ 'Guard Tests' }}`), um escape que nao se
+ * le, e o escalar partido por varias linhas (`name: Guard` + `Tests` na seguinte, que se le `Guard`); a chave
+ * entre aspas (`"name": X`) e o job em flow (`fake: { name: X }`), que se leem pelo id; os checks de nome
+ * COMPOSTO (o de um portao reutilizavel, `chamador / job`, e o de um de matriz, `Nome (a, b)`), que nunca se
+ * constroem; um passo que publique um commit status (`context:`) ou um check run pela API — inalcancavel por
+ * analise estatica. E CONTA A MAIS (sem saida, como os outros defeitos de estrutura): um workflow que nunca
+ * corre sobre o SHA de um PR (`on: push` so para o `main`, `on: release`) — excluir por gatilho abria outra
+ * forma de evasao.
+ * @param {string | null} texto  o workflow tocado
+ * @param {{ f: string, texto: string | null }[]} outros  os outros workflows da raiz
+ */
+export function colisoesEntreWorkflows(texto, outros) {
+  const meus = checksDe(texto);
+  const out = new Map();
+  const defeito = (nome, m) => out.set(nome, [...(out.get(nome) ?? []), m]);
+  const chaveDoNome = (n) => n.trim().toLowerCase();
+  for (const o of outros) {
+    for (const c of checksDe(o.texto)) {
+      for (const j of meus.filter((x) => chaveDoNome(x.nome) === chaveDoNome(c.nome) && (x.portao || c.portao))) {
+        defeito(chaveDoNome(j.nome), `o job \`${j.id}\`${j.portao ? " (portao)" : ""} tem o mesmo nome de check, \`${j.nome.trim()}\`, que o job \`${c.id}\`${c.portao ? " (portao)" : ""} de \`${o.f}\` — uma protecao que o exija pode dar-se por satisfeita com o primeiro a acabar`);
+      }
+    }
+  }
+  return out;
+}
+
+/** So as colisoes que o PR introduziu, por nome de check: o ANTES contra os outros na BASE, o depois contra os
+ *  outros AGORA. Com os de agora dos dois lados, um PR que pusesse a maquinaria nos DOIS jobs de um nome que ja
+ *  se repetia (sem portao) via a colisao ja no "antes", e calava-a (leitura adversarial do #355). Os da base
+ *  podem vir por uma funcao, chamada SO se o depois tiver colisoes: le-los sao processos `git`, e no caso de
+ *  todos os PRs (nenhuma colisao) nao sao precisos (medido: ~85 ms -> ~15 ms por workflow tocado). */
+export const colisoesNovas = (antes, outrosAntes, depois, outros) => {
+  const novas = colisoesEntreWorkflows(depois, outros);
+  if (novas.size === 0) return [];
+  const ja = colisoesEntreWorkflows(antes, typeof outrosAntes === "function" ? outrosAntes() : outrosAntes);
+  return [...novas].filter(([k]) => !ja.has(k)).flatMap(([, ms]) => ms);
+};
 
 /** So o que o PR INTRODUZIU (leitura independente do #308): um defeito que ja existia antes nao e deste
  *  PR, e sem saida pelo trailer deixava vermelho cada PR que tocasse no ficheiro — um do Dependabot a

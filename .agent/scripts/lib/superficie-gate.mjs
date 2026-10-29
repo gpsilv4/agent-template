@@ -31,7 +31,7 @@
  * de shell sao o #295; um clone raso (`fetch-depth` curto) pode por em `base..HEAD` commits que nao
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */
-import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos } from "./estrutura-workflow.mjs";
+import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas } from "./estrutura-workflow.mjs";
 import { partePasso, unidadesDoParalelo } from "./passo-paralelo.mjs";
 
 const linhasDe = (texto) => texto.split(/\r\n|\r|\n/).map(semComentario);
@@ -229,21 +229,54 @@ const WORKFLOW_DA_RAIZ = /^\.github\/workflows\/[^/]+\.ya?ml$/i;
  *  algures na linha: `npm i -D @playwright/test` nao corre testes. A lista esta no `CONTRIBUTING.md`. */
 const RUNNER = /^(?![ \t]*#)[^\n]*(?:\b(?:npm|pnpm|yarn|bun)(?:[ \t]+run)?[ \t]+test(?![\w/-])|\b(?:npm|pnpm|yarn)[ \t]+run[ \t]+test:|\bnpx[ \t]+(?:vitest|jest|playwright[ \t]+test|cypress[ \t]+run|mocha)\b|\bpytest\b|\bpython3?[ \t]+-m[ \t]+(?:pytest|unittest)\b|\b(?:go|cargo|dotnet|make)[ \t]+test\b|\bnode[ \t]+--test\b)/m;
 
+/** Os workflows da raiz AGORA (rastreados e por rastrear) e na BASE, lidos uma vez por `git` (#355): o
+ *  `verificaGate` corre por ficheiro, e listar a cada um seria pagar por todos. Os da base so a pedido (o
+ *  `colisoesNovas` so os pede quando ha colisoes agora). O `ls-files` desce as subpastas, que o GitHub nao
+ *  corre: filtra-se pelo `WORKFLOW_DA_RAIZ`. Um apagado le-se `null`, e nao tem checks. */
+const _workflows = new WeakMap();
+function workflowsDe(git, ler, base) {
+  if (!_workflows.has(git)) {
+    const raiz = (s) => [...new Set(s.split("\n").filter((x) => WORKFLOW_DA_RAIZ.test(x)))];
+    let daBase = null;
+    _workflows.set(git, {
+      agora: raiz(git(["ls-files", "--cached", "--others", "--exclude-standard", "--", ".github/workflows"])).map((f) => ({ f, texto: ler(f) })),
+      base: () => (daBase ??= raiz(git(["ls-tree", "--name-only", base, "--", ".github/workflows/"])).map((f) => ({ f, texto: git(["show", `${base}:${f}`]) }))),
+    });
+  }
+  return _workflows.get(git);
+}
+
 /**
  * Avisa quando um workflow que CORRE TESTES muda o `on:`, o `env:`/`defaults:` de topo, ou um
  * passo da maquinaria. Com o trailer no ultimo commit que mexe no ficheiro, passa a nota.
  *
- * @param {{f: string, antes: string, agora: string, para?: string, contavel: boolean, base: string,
+ * @param {{f: string, antes: string, agora: string, para?: string, origem?: string, antesOrigem?: string,
+ *          contavel: boolean, base: string,
  *          git: (args: string[]) => string, ler: (rel: string) => string|null,
  *          warn: (m: string) => void, note: (m: string) => void}} o
  * @returns {boolean} `true` se avisou (quem chama nao diz "sem marcas" a seguir)
  */
-export function verificaGate({ f, antes, agora, para, contavel, base, git, ler, warn, note }) {
+export function verificaGate({ f, antes, origem, antesOrigem, agora, para, contavel, base, git, ler, warn, note }) {
   // Os defeitos de estrutura (#308) primeiro, e em QUALQUER workflow da raiz que mudou — tambem num
   // novo: um `needs:` partido invalida-o inteiro, corra testes ou nao. So os que o PR introduziu.
   // So na entrada do proprio ficheiro: numa renomeacao, o destino entra por si — correr aqui tambem
-  // dizia cada defeito duas vezes (leitura independente do #308).
-  const estrutura = WORKFLOW_DA_RAIZ.test(f) && para === undefined ? defeitosNovos(antes, agora) : [];
+  // dizia cada defeito duas vezes (leitura independente do #308). O destino de uma renomeacao compara com a
+  // ORIGEM (#355: com a base vazia, cada defeito que ja tinha contava como novo) — so se ela ja era da raiz:
+  // vinda de uma subpasta, o GitHub nao a corria, e os defeitos dela entram agora (as duas leituras do #355).
+  const antesE = origem !== undefined && WORKFLOW_DA_RAIZ.test(origem) ? antesOrigem : antes;
+  const estrutura = [];
+  if (WORKFLOW_DA_RAIZ.test(f) && para === undefined) {
+    estrutura.push(...defeitosNovos(antesE, agora));
+    // O mesmo nome de check noutro workflow (#355): o antes contra os outros na base, o agora contra os de agora.
+    // FALHA FECHADA: sem as listas, avisa — a colisao ficava por ver, e calada passava por ausente.
+    try {
+      const fora = (ws) => ws.filter((w) => w.f !== f);
+      const ws = workflowsDe(git, ler, base);
+      estrutura.push(...colisoesNovas(antesE, () => fora(ws.base()), agora, fora(ws.agora)));
+    } catch (err) {
+      estrutura.push(`nao consegui listar ou ler os outros workflows (${err instanceof Error ? err.message.split("\n")[0] : String(err)}) — um job noutro ficheiro com o nome de check de um portao ficava por ver`);
+    }
+  }
   for (const d of estrutura) warn(`${f}: ${d}`);
   // Um workflow novo so alarga a rede (`antes` vazio); um apagado ja avisa pela contagem que desce.
   if (!WORKFLOW_DA_RAIZ.test(f) || !antes || !(contavel || RUNNER.test(antes))) return estrutura.length > 0;

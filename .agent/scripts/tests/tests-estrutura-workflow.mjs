@@ -11,7 +11,7 @@
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
-import { defeitosDeEstrutura } from "../lib/estrutura-workflow.mjs";
+import { defeitosDeEstrutura, colisoesEntreWorkflows, colisoesNovas } from "../lib/estrutura-workflow.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 
@@ -117,4 +117,56 @@ export function registar() {
     ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    name: a\n    runs-on: x\n").length === 0 ? [] : ["uma colisao sem maquinaria avisou"]),
     ...(defeitosDeEstrutura("jobs:\n  a:\n    runs-on: x\n  b:\n    needs: a\n    runs-on: x\n").length === 0 ? [] : ["um workflow certo deu defeitos"]),
   ]);
+  // O mesmo nome de check ENTRE workflows (#355): o `texto` tocado contra um outro (`ci.yml`). Uma linha por caso,
+  // com o numero de colisoes esperado num objeto no fim (a forma que a superficie conta, #359).
+  {
+    const portao = (nome, on = "push") => `on: ${on}\njobs:\n  guard:\n    name: ${nome}\n    runs-on: y\n    steps:\n      - run: node .agent/scripts/tests/test-guards.mjs\n`;
+    const falso = (corpo, on = "push") => `on: ${on}\njobs:\n  fake:\n${corpo}    runs-on: y\n    steps:\n      - run: echo ok\n`;
+    const N = "    name: Guard Tests\n";
+    const BLOCO = "\n  workflow_call:\n    inputs:\n      x:\n        type: string\n";
+    for (const [nome, texto, outro, { n }] of [
+      ["um job com o nome do portao noutro workflow colide", falso(N), portao("Guard Tests"), { n: 1 }],
+      ["com outro nome, nao (controlo)", falso("    name: Outra\n"), portao("Guard Tests"), { n: 0 }],
+      ["dois jobs sem maquinaria com o mesmo nome nao colidem (o `Detect Project` de um derivado)", falso("    name: Detect Project\n"), falso("    name: Detect Project\n"), { n: 0 }],
+      ["um job sem `name:` cujo id e o nome do portao colide", "on: push\njobs:\n  guard-tests:\n    runs-on: y\n", portao("guard-tests"), { n: 1 }],
+      ["outra caixa e espacos colidem (falha para o lado de avisar)", falso('    name: "guard TESTS "\n'), portao("Guard Tests"), { n: 1 }],
+      ["um nome nao literal nao colide", falso("    name: ${{ 'Guard Tests' }}\n"), portao("Guard Tests"), { n: 0 }],
+      ["um job de matriz nao tem o nome nu: nao colide", falso(N + "    strategy:\n      matrix:\n        os: [a]\n"), portao("Guard Tests"), { n: 0 }],
+      ["um job que chama um reutilizavel nao tem o nome nu: nao colide", "on: push\njobs:\n  fake:\n    name: Guard Tests\n    uses: ./.github/workflows/x.yml\n", portao("Guard Tests"), { n: 0 }],
+      ["o outro so `workflow_call` nao colide", falso(N), portao("Guard Tests", "workflow_call"), { n: 0 }],
+      ["o outro so `[workflow_call]` nao colide", falso(N), portao("Guard Tests", "[workflow_call]"), { n: 0 }],
+      ["o outro so `workflow_call` em bloco, com `inputs:`, nao colide", falso(N), portao("Guard Tests", BLOCO), { n: 0 }],
+      ["o tocado so `workflow_call` nao colide", falso(N, "workflow_call"), portao("Guard Tests"), { n: 0 }],
+      ["`workflow_call` com outro gatilho colide", falso(N), portao("Guard Tests", "[push, workflow_call]"), { n: 1 }],
+      ["`workflow_call` em bloco com outro gatilho colide", falso(N), portao("Guard Tests", BLOCO + "  push:\n"), { n: 1 }],
+      ["um `on:` ilegivel conta (falha fechada)", falso(N), portao("Guard Tests", "*gatilhos"), { n: 1 }],
+      ["sem `on:` conta (falha fechada)", falso(N), portao("Guard Tests").replace("on: push\n", ""), { n: 1 }],
+      ["um `on:` vazio conta (falha fechada)", falso(N), portao("Guard Tests", ""), { n: 1 }],
+      ["`strategy:` sem `matrix:` (um `matrix:` num `env:`) tem o nome nu: colide", falso(N + "    strategy:\n      fail-fast: false\n    env:\n      matrix: x\n"), portao("Guard Tests"), { n: 1 }],
+      ["a matriz em flow no `strategy:` nao colide", falso(N + "    strategy: { matrix: { os: [a] } }\n"), portao("Guard Tests"), { n: 0 }],
+      ["o nome com uma ancora (`&n`) le-se como o YAML: colide", falso("    name: &n Guard Tests\n"), portao("Guard Tests"), { n: 1 }],
+      ["o nome com a tag `!!str` colide", falso("    name: !!str Guard Tests\n"), portao("Guard Tests"), { n: 1 }],
+      ["o nome com um escape entre aspas duplas colide", falso('    name: "Guard\\x20Tests"\n'), portao("Guard Tests"), { n: 1 }],
+      ["um bloco `on:` com uma chave ilegivel conta (falha fechada)", falso(N), portao("Guard Tests", BLOCO + "  <<: *x\n"), { n: 1 }],
+      ["`[workflow_call,` partido por linhas, com outro gatilho, colide", falso(N), portao("Guard Tests", "[workflow_call,\n    push]"), { n: 1 }],
+      ["o tocado e o portao, e o outro tem o nome: colide (o lado do `ci.yml`)", portao("Deploy"), falso("    name: Deploy\n"), { n: 1 }],
+    ]) {
+      const c = colisoesEntreWorkflows(texto, [{ f: ".github/workflows/ci.yml", texto: outro }]);
+      registarResultado(`estrutura: entre workflows — ${nome} (#355)`, c.size === n ? [] : [`esperava ${n} colisao(oes), deu ${c.size}: ${JSON.stringify([...c.values()])}`]);
+    }
+    const outros = [{ f: ".github/workflows/ci.yml", texto: portao("Guard Tests") }];
+    const ms = colisoesEntreWorkflows(falso(N), [...outros, { f: ".github/workflows/d.yml", texto: portao("Guard Tests") }]).get("guard tests") ?? [];
+    // Os dois lados mudam no MESMO PR (a leitura adversarial): o `Build` repetido, sem portao na base, passa a
+    // ter maquinaria nos dois. O antes contra os outros da BASE ve-o como novo.
+    const build = (q) => portao("Build").replace("node .agent/scripts/tests/test-guards.mjs", q);
+    const baseB = [{ f: ".github/workflows/deploy.yml", texto: build("echo ok") }], agoraB = [{ f: ".github/workflows/deploy.yml", texto: portao("Build") }];
+    const outroId = (x) => x.replace("  fake:", "  falso:");
+    registarResultado("estrutura: entre workflows — as mensagens, e so os novos contam (#355)", [
+      ...(ms.length === 2 && ms[0].includes("o job `fake` tem o mesmo nome de check, `Guard Tests`, que o job `guard` (portao) de `.github/workflows/ci.yml`") && ms[1].includes("de `.github/workflows/d.yml`") ? [] : [`dois ficheiros com o portao: ${JSON.stringify(ms)}`]),
+      ...(colisoesNovas(falso("    name: Outra\n"), outros, falso(N), outros).length === 1 ? [] : ["a colisao introduzida nao contou como nova"]),
+      ...(colisoesNovas(falso(N), outros, falso(N), outros).length === 0 ? [] : ["uma colisao que ja existia contou como nova"]),
+      ...(colisoesNovas(build("echo ok"), baseB, portao("Build"), agoraB).length === 1 ? [] : ["os dois lados a ganhar a maquinaria no mesmo PR passaram calados"]),
+      ...(colisoesNovas(falso(N), outros, outroId(falso(N)), outros).length === 0 ? [] : ["mudar o id do job fez renascer uma colisao antiga"]),
+    ]);
+  }
 }

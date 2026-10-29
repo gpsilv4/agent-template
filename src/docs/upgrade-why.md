@@ -507,6 +507,7 @@ tem quem o diga (medidos, com teste — duas leituras independentes do #308; as 
 | `sweep` trazido sem o `guard-gate` (a varredura fica fora do check exigido) | `check-test-surface`: "sem um agregador que leia `needs.sweep.result`" |
 | `guard-gate` trazido sem o `sweep` (`needs:` partido: o GitHub rejeita o workflow inteiro) | `check-test-surface` |
 | o `guard-tests` e o `guard-gate` com o mesmo nome (dois `Guard Tests`) | `check-test-surface` |
+| (#355) um job NOUTRO workflow da raiz com o nome de check de um portao (um `Guard Tests` antigo deixado noutro ficheiro, ou um `echo ok` com esse nome) | `check-test-surface`: "tem o mesmo nome de check, ... que o job ... de `<ficheiro>`" — so se o PR o introduzir |
 | o `guard-gate` mudado (o `case`, o `always()`, o `needs:`) | `check-test-surface`: um agregador e uma unidade da maquinaria (com saida pelo trailer) |
 | `sweep` sem shards, com o template em shards | 2b: "reparte a varredura completa em shards ... trazer JUNTOS" |
 | (C2, #347) o `if:` do plano no `sweep` sem o shell do portao novo: cada PR sem maquinaria fica vermelho (o portao antigo le o `sweep` saltado como "nao mediu") | 2b: "o template so arranca os shards ... quando o plano da base diz"; o vermelho e do proprio portao — fechado |
@@ -521,7 +522,10 @@ tem quem o diga (medidos, com teste — duas leituras independentes do #308; as 
 Os defeitos de estrutura (as linhas do `check-test-surface` sem trailer) so se dizem quando o PR
 os INTRODUZ: um defeito que ja existia deixava vermelho cada PR que tocasse no workflow — os do
 Dependabot incluidos, que nao escrevem trailer. E so contam nomes repetidos que envolvam a
-maquinaria: `name: Deploy` em staging e prod e idioma legitimo. Um derivado com um `name:` proprio
+maquinaria: `name: Deploy` em staging e prod e idioma legitimo. Desde o #355 vale tambem ENTRE
+workflows da raiz (um `Detect Project` em dois ficheiros, sem portao, fica calado); os workflows so
+`workflow_call`, os jobs de matriz e os que chamam um reutilizavel ficam de fora, porque o check deles
+nao tem o nome nu. Um derivado com um `name:` proprio
 no `guard-tests` (o que a sua protecao exige) passa-o ao `guard-gate` — a regra da §2 diz "herda".
 Agregador e quem LE `needs.<X>.result` de um job com maquinaria, e nao quem so depende dele: um
 `deploy` a jusante das suites nao decide gate nenhum (duas leituras independentes do #308).

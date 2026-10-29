@@ -375,7 +375,7 @@ if (tocados.length === 0) {
     // RECOLHER agora, DECIDIR depois. A decisao por ficheiro nao pode ser tomada aqui porque
     // depende de um numero que so existe depois de ler a superficie toda: o TOTAL. Ver o
     // bloco de veredicto abaixo.
-    medidos.push({ f, antes, antesMarcas, agora, config, conta });
+    medidos.push({ f, antes, antesMarcas, origem, agora, config, conta });
   }
 
   // --- Totais da superficie: distinguir o que se PERDEU do que se MOVEU -------------
@@ -406,7 +406,7 @@ if (tocados.length === 0) {
     return [c.msg, c.zero ? a > 0 && d === 0 : d < a];
   }));
 
-  for (const { f, antes, antesMarcas, agora, config, conta, migrado, para } of medidos) {
+  for (const { f, antes, antesMarcas, origem, agora, config, conta, migrado, para } of medidos) {
     // As MARCAS nao se aplicam ao ficheiro que as DEFINE. Nele, cada entrada e uma definicao e
     // nao uma diretiva: um `xit` ali nao desativa nada, nao ha testes naquele ficheiro. E nao
     // e uma hipotese — os padroes com alternacao casam-se a si mesmos (ver a nota em
@@ -465,7 +465,7 @@ if (tocados.length === 0) {
     // "confirmar" a cada edicao de CI treina quem o le a ignora-lo.
     const contavel = CONTAGENS.some((c) => conta(antes, c.re, c.cru) > 0);
     // O gate (#285): o `on:` e os passos da maquinaria de um workflow, em `lib/superficie-gate.mjs`.
-    const gateAvisou = verificaGate({ f, antes, agora, para, contavel, base, git, ler: (r) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : null), warn, note });
+    const gateAvisou = verificaGate({ f, antes, origem, antesOrigem: antesMarcas, agora, para, contavel, base, git, ler: (r) => (existsSync(join(ROOT, r)) ? readFileSync(join(ROOT, r), "utf8") : null), warn, note });
     if (notas.length) {
       warn(`${f}: ${notas.join("; ")} desde ${base}`);
     } else if (movidas.length) {
