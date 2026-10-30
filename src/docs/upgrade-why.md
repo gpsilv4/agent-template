@@ -461,6 +461,25 @@ encontra-o. Sem o teste, o primeiro PR que toque em `.agent/scripts/` depois do 
 `INCOMPLETA` na varredura do CI, a nomear a linha. A §2b nao o mostra antes, porque a bateria
 dela nao corre a varredura (minutos).
 
+## Porque um passo novo antes das suites passa a avisar (#362)
+
+O gate do `check-test-surface` so via os passos da maquinaria que se PERDIAM; um passo novo "so alargava a
+rede". Mas um passo novo ANTES das suites desliga-as sem lhes tocar: `printf 'process.exit(0)' >
+.agent/scripts/tests/test-guards.mjs`, ou `BASH_ENV=./x.sh` no `$GITHUB_ENV`. O `lib/passos-novos.mjs`
+avisa de cada passo novo (ou cujo `run:` mudou), num job que ja existia, antes do ultimo passo da maquinaria
+que ja existia, que nao seja so leitura: por lista do que e permitido (`echo`, `ls`, `cat`, `git status`/`log`,
+`set -e`, um `node` de um verificador, `actions/checkout`, `actions/setup-*`).
+
+**O que isto pede a um derivado:** um passo novo de preparacao antes das suites — `npm ci`, `pip install`,
+`cp .env.example .env` — avisa uma vez, e a saida e o trailer `Test-Surface: .github/workflows/<ficheiro> —
+<porque>`. Tambem avisam um passo novo da maquinaria com `env:` ou `$(...)`, uma action fora da lista antes das
+suites, e um comando permitido partido por `\` (`git log \` + `--oneline`: cada linha e um comando). Um
+`/upgrade` que traga do template um passo novo antes das suites avisa no PR do upgrade. Medido no historico
+(67 commits que mexem em workflows, no template e nos derivados): fora dos que o gate ja fazia avisar, so um
+pedia o trailer com a estrutura atual das suites. Fica de fora (escrito no modulo): o codigo da maquinaria que o
+PR muda corre antes das suites, como as proprias suites ja o correm; um job novo; os passos depois das suites;
+o `@ref` de um `uses:`.
+
 ## Porque um passo que salta por uma variavel literal passa a avisar (#353)
 
 Os passos da app do `ci.yml` saltam no shell quando o `TEM_APP` diz que nao ha app (`case "$TEM_APP" in ...

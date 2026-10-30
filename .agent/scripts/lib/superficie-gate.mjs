@@ -19,6 +19,9 @@
  *  - um passo (da maquinaria ou NAO) que salta por uma variavel lida num `case`, cujo valor efetivo deixou de
  *    decidir (um literal que salta, uma expressao constante, o `env:` passado para o job), avisa — por
  *    `(job, chave)`, e tambem num passo NOVO: e a excecao ao "so alarga a rede" (#353, `lib/saltos-variavel.mjs`).
+ *  - um passo NOVO antes do ultimo passo da maquinaria, num job que ja existia, que nao seja so leitura (escreve,
+ *    redireciona, corre codigo que o PR acrescentou, usa uma action fora da lista), avisa — a segunda excecao
+ *    (#362, `lib/passos-novos.mjs`).
  * Reconhecer so as formas que estreitam era o jogo que o issue diz nao funcionar (`TP8`).
  *
  * Como o `Guard Tests` e obrigatorio, um aviso destes tem SAIDA, e so esta: o trailer
@@ -34,12 +37,12 @@
  * de shell sao o #295; um clone raso (`fetch-depth` curto) pode por em `base..HEAD` commits que nao
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */
-import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas } from "./estrutura-workflow.mjs";
+import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas, limpas, normalizaPasso } from "./estrutura-workflow.mjs";
 import { saltosNovos } from "./saltos-variavel.mjs";
+import { passosNovos } from "./passos-novos.mjs";
 import { partePasso, unidadesDoParalelo } from "./passo-paralelo.mjs";
 
 const linhasDe = (texto) => texto.split(/\r\n|\r|\n/).map(semComentario);
-const limpas = (ls) => ls.map((l) => l.trim()).filter(Boolean);
 
 /** Um bloco de topo (chave na coluna 0 ate a proxima), normalizado: sem comentarios, espacos
  *  finais nem linhas vazias. `null` quando nao existe. */
@@ -60,35 +63,6 @@ function blocoDeTopo(texto, chave) {
  * @returns {string | null} `null` quando o ficheiro nao tem `on:` de coluna 0
  */
 export const blocoOn = (texto) => blocoDeTopo(texto, /^(?:on|"on"|'on'|true)[ \t]*:/);
-
-/**
- * Um passo normalizado para o que ele FAZ: sem o `- `, sem indentacao, sem comentarios. O `run:`
- * guarda o TIPO de escalar — `|` (literal: uma linha, um comando) e diferente de `>` e do escalar
- * simples em varias linhas, que JUNTAM as linhas numa so: trocar `|` por `>` no passo da varredura
- * fazia de tudo o que vem depois de um `#` um comentario de shell, e o passo ficava verde sem varrer
- * (segunda leitura do #285, medido no `ci.yml`). So com UMA linha de conteudo as formas sao a mesma:
- * `run: x` e `run: |` + `x` (medido: um teste do #279 apanhou o alarme). As aspas de `run: "x"` saem.
- */
-function normalizaPasso(ls) {
-  const out = [];
-  for (let i = 0; i < ls.length; i++) {
-    const l = i === 0 ? ls[0].replace(/^([ \t]*)-[ \t]*/, "$1  ") : ls[i];
-    const m = /^([ \t]*)run[ \t]*:[ \t]*(.*)$/.exec(l);
-    if (!m) {
-      if (l.trim()) out.push(l.trim());
-      continue;
-    }
-    // O corpo do `run:`: as linhas seguintes MAIS indentadas que a chave (e as vazias pelo meio).
-    let j = i + 1;
-    while (j < ls.length && (!ls[j].trim() || indent(ls[j]) > m[1].length)) j++;
-    const corpo = limpas(ls.slice(i + 1, j));
-    const ind = /^[|>]/.test(m[2]) ? m[2][0] : "plano";
-    const conteudo = ind === "plano" ? [m[2].replace(/^(["'])(.*)\1$/, "$2"), ...corpo].filter(Boolean) : corpo;
-    out.push(conteudo.length <= 1 ? "run:|" : `run:${ind}`, ...conteudo);
-    i = j - 1;
-  }
-  return out.join("\n");
-}
 
 /** As chaves do cabecalho de um job que NAO desligam o gate em silencio: um `timeout-minutes`, um
  *  `runs-on` ou um `permissions` errados fazem o job FALHAR ou ficar pendente — e um required check
@@ -233,6 +207,29 @@ const WORKFLOW_DA_RAIZ = /^\.github\/workflows\/[^/]+\.ya?ml$/i;
  *  algures na linha: `npm i -D @playwright/test` nao corre testes. A lista esta no `CONTRIBUTING.md`. */
 const RUNNER = /^(?![ \t]*#)[^\n]*(?:\b(?:npm|pnpm|yarn|bun)(?:[ \t]+run)?[ \t]+test(?![\w/-])|\b(?:npm|pnpm|yarn)[ \t]+run[ \t]+test:|\bnpx[ \t]+(?:vitest|jest|playwright[ \t]+test|cypress[ \t]+run|mocha)\b|\bpytest\b|\bpython3?[ \t]+-m[ \t]+(?:pytest|unittest)\b|\b(?:go|cargo|dotnet|make)[ \t]+test\b|\bnode[ \t]+--test\b)/m;
 
+/** O que o PR fez aos caminhos (#362), lido uma vez por `git` contra a ARVORE DE TRABALHO (`git diff <base>`, e os por
+ *  rastrear): corrido em local antes do commit, um ficheiro mudado e por commitar tem de contar como mudado. */
+const _diffs = new WeakMap();
+function contextoDoPR(git, base) {
+  if (!_diffs.has(git)) {
+    const mudados = new Set(), ligacoes = new Set(), naBase = new Map();
+    for (const l of git(["diff", "--raw", "--no-renames", base]).split("\n")) {
+      const m = /^:(\d+) (\d+) \S+ \S+ \S+\t(.+)$/.exec(l);
+      if (!m) continue;
+      mudados.add(m[3]);
+      if (m[1] === "120000" || m[2] === "120000") ligacoes.add(m[3]);
+    }
+    for (const f of git(["ls-files", "--others", "--exclude-standard"]).split("\n").filter(Boolean)) mudados.add(f);
+    const existe = (c) => {
+      // Um BLOB na base (uma pasta tambem aparece no `ls-tree`, e `node <pasta>` corre o `index.js` do PR).
+      if (!naBase.has(c)) naBase.set(c, /^\d+ blob /.test(git(["ls-tree", base, "--", c]).trim()));
+      return naBase.get(c);
+    };
+    _diffs.set(git, { naBase: existe, mudado: (c) => mudados.has(c), ligacao: (c) => ligacoes.has(c) });
+  }
+  return _diffs.get(git);
+}
+
 /** Os workflows da raiz AGORA (rastreados e por rastrear) e na BASE, lidos uma vez por `git` (#355): o
  *  `verificaGate` corre por ficheiro, e listar a cada um seria pagar por todos. Os da base so a pedido (o
  *  `colisoesNovas` so os pede quando ha colisoes agora). O `ls-files` desce as subpastas, que o GitHub nao
@@ -314,6 +311,12 @@ export function verificaGate({ f, antes, origem, antesOrigem, agora, para, conta
   for (const v of ud) if (v.aviso && !ua.some((u) => u.passo === v.passo)) sinais.push(v.aviso);
   // Um passo que salta por uma variavel cujo valor deixou de vir de um output (#353, `lib/saltos-variavel.mjs`).
   sinais.push(...saltosNovos(antes, depois));
+  // Um passo NOVO antes das suites que nao e so leitura (#362, `lib/passos-novos.mjs`). FALHA FECHADA: sem o diff, avisa.
+  try {
+    sinais.push(...passosNovos(antes, depois, contextoDoPR(git, base)));
+  } catch (err) {
+    sinais.push(`nao consegui ler o que o PR mudou (${err instanceof Error ? err.message.split("\n")[0] : String(err)}) — um passo novo antes das suites ficava por ver`);
+  }
   sinais.splice(0, sinais.length, ...new Set(sinais)); // dois passos iguais perdidos davam a mesma linha duas vezes
   if (sinais.length === 0) return estrutura.length > 0;
   let motivo = null;

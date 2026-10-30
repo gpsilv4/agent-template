@@ -70,8 +70,9 @@ function nomeLiteral(cru, id) {
   return !nome || /\$\{\{|^[|>*&!]/.test(nome) ? null : nome;
 }
 
-/** Os jobs de um workflow: `{ id, ls, cru }` (as linhas sem comentarios, e as cruas, alinhadas). */
-function jobsDe(texto) {
+/** Os jobs de um workflow: `{ id, ls, cru, todas }` — as linhas sem comentarios; as cruas so de primeiro nivel (para o
+ *  `nomeLiteral`); e TODAS as cruas, alinhadas com o `ls` (para quem le o corpo de um `run:` como a shell, #362). */
+export function jobsDe(texto) {
   if (!texto) return [];
   const crus = texto.split(/\r\n|\r|\n/);
   const ls = crus.map(semComentario);
@@ -91,12 +92,69 @@ function jobsDe(texto) {
     }
   }
   // So as chaves do PROPRIO job contam para o nome (um `- name:` de passo, ou um `name:` em `with:`,
-  // nao): o `cru` fica reduzido as linhas de primeiro nivel.
+  // nao): o `cru` fica reduzido as linhas de primeiro nivel. O `todas` guarda-as inteiras.
   for (const j of jobs) {
     const nivel = new Set(chavesDoJob(j.ls).map(({ k }) => k));
+    j.todas = j.cru;
     j.cru = j.cru.filter((_, k) => nivel.has(k));
   }
   return jobs;
+}
+
+/** Os passos de um job (as suas linhas `ls`, e as cruas `cru` alinhadas): `[{ ls, cru }]`, cada um a comecar na linha
+ *  do `-`; `null` com `steps:` em flow (quem le decide a falha fechada). Os passos acabam na primeira linha a coluna
+ *  de `steps:` (ou menos) que nao seja um `-`. Saiu do `lib/saltos-variavel.mjs` (#362): um parser de passos. */
+export function passosDe(ls, cru = ls) {
+  const iSteps = ls.findIndex((l) => /^[ \t]*steps[ \t]*:/.test(l));
+  if (iSteps < 0) return [];
+  if (/^[ \t]*steps[ \t]*:[ \t]*\S/.test(ls[iSteps])) return null;
+  const sInd = indent(ls[iSteps]);
+  let fim = iSteps + 1;
+  while (fim < ls.length && (!ls[fim].trim() || indent(ls[fim]) > sInd || /^[ \t]*-/.test(ls[fim]))) fim++;
+  const ne = ls.slice(iSteps + 1, fim).filter((l) => l.trim());
+  if (ne.length === 0) return [];
+  const ind = Math.min(...ne.map(indent));
+  const passos = [];
+  for (let k = iSteps + 1; k < fim; k++) {
+    if (ls[k].trim() && indent(ls[k]) === ind && /^[ \t]*-/.test(ls[k])) passos.push({ ls: [ls[k]], cru: [cru[k]] });
+    else if (passos.length) {
+      passos.at(-1).ls.push(ls[k]);
+      passos.at(-1).cru.push(cru[k]);
+    }
+  }
+  return passos;
+}
+
+export const limpas = (ls) => ls.map((l) => l.trim()).filter(Boolean);
+
+/**
+ * Um passo normalizado para o que ele FAZ: sem o `- `, sem indentacao, sem comentarios. O `run:`
+ * guarda o TIPO de escalar — `|` (literal: uma linha, um comando) e diferente de `>` e do escalar
+ * simples em varias linhas, que JUNTAM as linhas numa so: trocar `|` por `>` no passo da varredura
+ * fazia de tudo o que vem depois de um `#` um comentario de shell, e o passo ficava verde sem varrer
+ * (segunda leitura do #285, medido no `ci.yml`). So com UMA linha de conteudo as formas sao a mesma:
+ * `run: x` e `run: |` + `x` (medido: um teste do #279 apanhou o alarme). As aspas de `run: "x"` saem.
+ * Saiu do `superficie-gate.mjs` (#362): o gate e o `passos-novos.mjs` comparam passos pela mesma forma.
+ */
+export function normalizaPasso(ls) {
+  const out = [];
+  for (let i = 0; i < ls.length; i++) {
+    const l = i === 0 ? ls[0].replace(/^([ \t]*)-[ \t]*/, "$1  ") : ls[i];
+    const m = /^([ \t]*)run[ \t]*:[ \t]*(.*)$/.exec(l);
+    if (!m) {
+      if (l.trim()) out.push(l.trim());
+      continue;
+    }
+    // O corpo do `run:`: as linhas seguintes MAIS indentadas que a chave (e as vazias pelo meio).
+    let j = i + 1;
+    while (j < ls.length && (!ls[j].trim() || indent(ls[j]) > m[1].length)) j++;
+    const corpo = limpas(ls.slice(i + 1, j));
+    const ind = /^[|>]/.test(m[2]) ? m[2][0] : "plano";
+    const conteudo = ind === "plano" ? [m[2].replace(/^(["'])(.*)\1$/, "$2"), ...corpo].filter(Boolean) : corpo;
+    out.push(conteudo.length <= 1 ? "run:|" : `run:${ind}`, ...conteudo);
+    i = j - 1;
+  }
+  return out.join("\n");
 }
 
 /** A varredura de mutacao: o comando, pelo NOME do ficheiro — a suite dela (`test-mutation-sweep.mjs`)

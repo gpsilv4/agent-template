@@ -455,6 +455,13 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Os passos novos antes das suites (#362): cada `novo(` e um passo que pode desligar as suites antes de correrem.
+    alvo: ".agent/scripts/lib/passos-novos.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$]|function )novo\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // A adocao num projeto existente (#288). Os sitios de recusa sao os `throw`: cada um impede
     // escrever num sitio errado (o proprio template, um projeto ja adotado, um ficheiro que
     // apareceu entretanto). Desligar um deixa a copia seguir em frente sobre o que nao devia.

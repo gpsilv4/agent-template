@@ -19,7 +19,7 @@
  * LIMITES (escritos): editar o `case` em vez do `env:` (`true|false) exit 0;;`, #411); outras formas de ler a
  * variavel (`[[ $K == x ]]`, `test`, `case "x$K"`, um script externo, `switch ($env:K)`); as indireccoes que um
  * caminho de contexto esconde (`${{ matrix.x }}`, um output que escreve `false`, `vars.X`, `secrets.X`); o
- * `$GITHUB_ENV` de um passo anterior (#362) e a chave que nenhum `env:` define (e uma variavel da shell; no
+ * `$GITHUB_ENV` de um passo anterior (um passo NOVO que o escreva antes das suites avisa pelo `lib/passos-novos.mjs`, #362) e a chave que nenhum `env:` define (e uma variavel da shell; no
  * template, tirar o `env:` faz o `*)` do `case` reprovar); um `case` partido de forma que a variavel e o `in`
  * fiquem fora do passo, e um ` #` numa string antes dele na mesma linha (o `semComentario` corta-a); de suspeito
  * para suspeito fica calado; trocar um suspeito por outro no mesmo `(job, chave)` fica calado; renomear o id do
@@ -29,7 +29,7 @@
  * Cada aviso sai por `suspeito(`, o sinal do par em `lib/pares.mjs`; o dono na varredura e o
  * `tests/tests-saltos-variavel.mjs`, no `test-guards`.
  */
-import { semComentario, indent, idDe } from "./estrutura-workflow.mjs";
+import { semComentario, indent, idDe, jobsDe, passosDe } from "./estrutura-workflow.mjs";
 
 /** Le uma variavel num `case` — `case "$K"`, `case $K`, `case "${K}"`, `case "${K:-x}"`, `case "${K,,}"` — com
  *  quebras de linha pelo meio. O nome vem no grupo 1 (com chavetas) ou no 2 (sem). */
@@ -131,25 +131,6 @@ function envDoNivel(ls, ind) {
 
 const valorDe = (env, k) => (env === ILEGIVEL ? ILEGIVEL : env.get(k));
 
-/** Os passos de um job (cada um uma lista de linhas, a primeira com o `-`), ou `null` com `steps:` em flow. */
-function passosDe(job) {
-  const iSteps = job.findIndex((l) => /^[ \t]*steps[ \t]*:/.test(l));
-  if (iSteps < 0) return [];
-  if (/^[ \t]*steps[ \t]*:[ \t]*\S/.test(job[iSteps])) return null;
-  const sInd = indent(job[iSteps]);
-  const ls = [];
-  for (let k = iSteps + 1; k < job.length && (!job[k].trim() || indent(job[k]) > sInd || /^[ \t]*-/.test(job[k])); k++) ls.push(job[k]);
-  const ne = ls.filter((l) => l.trim());
-  if (ne.length === 0) return [];
-  const ind = Math.min(...ne.map(indent));
-  const passos = [];
-  for (const l of ls) {
-    if (l.trim() && indent(l) === ind && /^[ \t]*-/.test(l)) passos.push([l]);
-    else if (passos.length) passos.at(-1).push(l);
-  }
-  return passos;
-}
-
 /**
  * As unidades `(job, chave)` de um workflow, com o numero de passos SUSPEITOS de cada uma: os que leem a chave num
  * `case` e cujo valor efetivo nao e seguro. Um job com `steps:` em flow conta como um suspeito por chave lida
@@ -162,18 +143,8 @@ export function saltosPorVariavel(texto) {
   if (!texto) return out;
   const ls = texto.split(/\r\n|\r|\n/).map(semComentario);
   const doWorkflow = envDoNivel(ls, 0);
-  const iJobs = ls.findIndex((l) => /^jobs[ \t]*:/.test(l));
-  if (iJobs < 0) return out;
-  const fim = ls.findIndex((l, j) => j > iJobs && /^[^\s#]/.test(l));
-  const corpo = ls.slice(iJobs + 1, fim < 0 ? ls.length : fim);
-  const ne = corpo.filter((l) => l.trim());
-  if (ne.length === 0) return out;
-  const jInd = Math.min(...ne.map(indent));
-  const jobs = [];
-  for (const l of corpo) {
-    if (l.trim() && indent(l) === jInd) jobs.push([l]);
-    else if (jobs.length) jobs.at(-1).push(l);
-  }
+  // Os jobs e os passos pelo parser comum (`lib/estrutura-workflow.mjs`, #362).
+  const jobs = jobsDe(texto).map((j) => j.ls);
   const soma = (job, chave, v) => {
     const k = `${job}\u0000${chave}`;
     const u = out.get(k) ?? { job, chave, n: 0, valores: [] };
@@ -185,7 +156,7 @@ export function saltosPorVariavel(texto) {
     const id = idDe(job[0]);
     const corpoJob = job.slice(1).filter((l) => l.trim());
     const doJob = corpoJob.length ? envDoNivel(job, Math.min(...corpoJob.map(indent))) : new Map();
-    const passos = passosDe(job);
+    const passos = passosDe(job)?.map((p) => p.ls) ?? null;
     if (passos === null) {
       for (const m of job.join("\n").matchAll(CASE)) soma(id, m[1] ?? m[2], ILEGIVEL);
       continue;
