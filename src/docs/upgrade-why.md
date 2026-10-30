@@ -535,8 +535,9 @@ cada commit do PR e sobre o **titulo** do PR, que num squash e a 1.a linha do co
 - **O `ci.yml` a copiar a mao** (na 2b): o passo "Mensagens de commit" inteiro, com o **nome novo**
   ("— Conventional Commits e titulo do PR, sem atribuicao a IA"), o `env:` (`COMMIT_MSG_FINAL: "1"`,
   `PR_TITULO: ${{ github.event.pull_request.title }}`) e o bloco do titulo no fim do `run:`; e
-  `COMMIT_MSG_FINAL: "1"` no `env:` do portao `Guard Tests`. Sem a linha do portao, os testes dele
-  (`tests-portao-ci.mjs`) reprovam; sem o passo novo, os do prefixo dizem `SKIP` pelo nome.
+  `COMMIT_MSG_FINAL: "1"` no `env:` do portao `Guard Tests`. A 2b do `/upgrade` da a nota enquanto
+  faltar algum; ate la, os testes dizem `SKIP` com o nome (os do portao, sem a linha; os do prefixo,
+  sem o passo com o nome novo), e o hook verifica os commits mas nao o titulo.
 - **Um bot de dependencias sem prefixo** (um `dependabot.yml` do projeto sem `commit-message.prefix`,
   que escreve `Bump x from 1 to 2`, ou o Renovate, `Update dependency x`) passa a pôr cada PR dele
   vermelho: configurar o prefixo (`chore`, como o `dependabot.yml` do template).

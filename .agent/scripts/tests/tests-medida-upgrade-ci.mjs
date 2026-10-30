@@ -105,6 +105,13 @@ export function registar() {
   registarResultado("2b CI: `detect`/`unit-tests` aninhados (nao sao jobs), nao (#347)", nenhuma(notas({ ciAqui: "jobs:\n  x:\n    detect:\n    unit-tests:\n" })));
   registarResultado("2b CI: os jobs curtos nos dois lados, nao (#347)", nenhuma(notas({ ciAqui: "jobs:\n  detect:\n  unit-tests:\n", ciLa: "jobs:\n  detect:\n" })));
 
+  // O TITULO do PR e a mensagem final (#394): "ja tem" = o `PR_TITULO` E os dois `COMMIT_MSG_FINAL` (passo e portao).
+  const TITULO = "          COMMIT_MSG_FINAL: \"1\"\n          PR_TITULO: ${{ github.event.pull_request.title }}\n";
+  const FINAL = "          COMMIT_MSG_FINAL: \"1\"\n";
+  registarResultado("2b CI: o titulo do PR so no template da a nota (#394)", so(notas({ ciLa: TITULO + FINAL }), "verifica o TITULO do PR"));
+  registarResultado("2b CI: o titulo do PR nos dois lados, nao (#394)", nenhuma(notas({ ciLa: TITULO + FINAL, ciAqui: TITULO + FINAL })));
+  registarResultado("2b CI: o passo novo sem o `COMMIT_MSG_FINAL` do portao (a meias) da a nota (#394)", so(notas({ ciLa: TITULO + FINAL, ciAqui: TITULO }), "verifica o TITULO do PR"));
+
   // A ORDEM, que era a de antes de sair do `medida-upgrade.mjs`.
   const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: "jobs:\n  detect:\n  unit-tests:\n" });
   const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", "passos de UM job"];

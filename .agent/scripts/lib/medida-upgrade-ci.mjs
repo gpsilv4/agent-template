@@ -72,6 +72,17 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
   const saltaMerge = (t) => /^[ \t]+if:.*committer\.username != 'web-flow'/m.test(t) && /"\$COMMITTER" = web-flow/.test(t);
   if (saltaMerge(ciLa) && !saltaMerge(ciAqui))
     note("o template salta o `Code Quality` e o `Guard Suites` no push de um merge num repo privado (#347) — OPCIONAL (so minutos); trazer JUNTOS os dois `if:` de job e o shell do portao `Guard Tests` que recalcula o salto e corre o `commit-msg` (os `if:` sem esse shell poem o push vermelho). O shell do portao de hoje traz TAMBEM o plano da varredura (C2, a nota dele): adotam-se os dois, ou copia-se o shell sem o bloco do plano (o `if [ \"$EVENTO\" = pull_request ]` antes do `varredura-shards`) — senao cada PR fica vermelho. O `Secret Scan` NAO salta (#372): um commit pela UI web no `main` tem o mesmo committer, e nunca era varrido");
+  // O TITULO do PR e a mensagem FINAL (#394): o hook novo verifica o prefixo, mas o `ci.yml` e do projeto. "Ja tem" = o
+  // `PR_TITULO` do evento E tantos `COMMIT_MSG_FINAL: "1"` como o template (o passo e o portao); a meias, a nota.
+  const titulo = (t) => /^[ \t]*PR_TITULO:[ \t]*\$\{\{[ \t]*github\.event\.pull_request\.title[ \t]*\}\}/m.test(t);
+  const finais = (t) => t.match(/^[ \t]*COMMIT_MSG_FINAL:[ \t]*"1"/gm)?.length ?? 0;
+  if (titulo(ciLa) && (!titulo(ciAqui) || finais(ciAqui) < finais(ciLa)))
+    note(
+      "o template verifica o TITULO do PR (num squash, a 1.a linha do commit no `main`) e le a mensagem final no CI (#394), e o deste projeto nao — " +
+        "trazer JUNTOS o passo `Mensagens de commit` (o nome novo, o `env:` com `COMMIT_MSG_FINAL` e `PR_TITULO`, e o bloco do titulo no fim do `run:`) " +
+        "e o `COMMIT_MSG_FINAL: \"1\"` no `env:` do portao `Guard Tests`; o commit leva o trailer `Test-Surface: .github/workflows/ci.yml — <porque>`. " +
+        "Sem eles o hook verifica os commits, mas um titulo `Update foo` so reprova no push para o `main`, ja imutavel"
+    );
   if (curtos(ciAqui) >= 2 && curtos(ciLa) === 0)
     note("o template corre a app (detect, testes unitarios, audit) como passos de UM job, `Code Quality` (#347), e o deste projeto em jobs separados — OPCIONAL (so minutos: num repo privado cada job e cobrado arredondado ao minuto); ao juntar, a maquinaria fica FORA desse job, e os checks `Detect Project`/`Unit Tests`/`Security Audit` saem dos obrigatorios");
 }
