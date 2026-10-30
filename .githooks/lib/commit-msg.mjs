@@ -9,6 +9,9 @@
  * IA)" desde sempre, e um agente escreveu-o na mesma. Uma mensagem de commit e **imutavel**
  * depois de mergeada: e a categoria de erro onde a prosa custa mais e corrige menos.
  *
+ * Verifica tambem os NOMES PROIBIDOS (#375) e o PREFIXO Conventional Commits do assunto (#394): o `core-rules.md`
+ * dizia que este hook o verificava, e nao verificava. As duas libs vivem em `.agent/scripts/lib/`.
+ *
  * PORQUE UM HOOK DO GIT, E NAO UM DO CLAUDE CODE: um `PreToolUse` inspecciona a linha de
  * comando, logo ve `git commit -m "..."` e **nao** ve `git commit -F ficheiro` sem abrir o
  * ficheiro — e foi exactamente por `-F` que a regra foi violada. Este hook recebe a mensagem
@@ -62,6 +65,15 @@ try {
   nomes = await import(pathToFileURL(join(RAIZ, ".agent/scripts/lib/nomes-proibidos.mjs")).href);
 } catch (err) {
   erroDaLib = err;
+}
+
+/** O PREFIXO Conventional Commits (#394), pela mesma razao e da mesma forma: a lib vive em `.agent/scripts/lib/`. */
+let prefixo;
+let erroDoPrefixo;
+try {
+  prefixo = await import(pathToFileURL(join(RAIZ, ".agent/scripts/lib/prefixo-commit.mjs")).href);
+} catch (err) {
+  erroDoPrefixo = err;
 }
 
 /** Recusa o commit: imprime e sai `!= 0`. Existe como FUNCAO e nao como `console.error` +
@@ -220,8 +232,51 @@ function verificaNomes(linhas) {
 }
 
 /**
+ * O PREFIXO do assunto (#394): `type(scope): descricao`, com o type da tabela `### Types` do `CONTRIBUTING.md` do
+ * repo do commit. O assunto e a 1.a linha nao vazia. Com o git a correr o hook, saltam-se os comentarios (com o
+ * editor o git apaga-os; com `-m`/`-F` guarda-os, e o hook nao sabe qual). Com `COMMIT_MSG_FINAL=1` (o CI, que le o
+ * `%B` ou o titulo do PR) a mensagem e a final, e conta a 1.a linha nao vazia, comentario ou nao.
+ * @param {{ texto: string }[]} acima  todas as linhas acima do diff
+ * @param {{ texto: string }[]} linhas  as mesmas, sem os comentarios
+ */
+function verificaPrefixo(acima, linhas) {
+  if (!prefixo) {
+    recusar("COMMIT RECUSADO — nao consegui carregar a verificacao do prefixo Conventional Commits.", [
+      `\`.agent/scripts/lib/prefixo-commit.mjs\`: ${erroDoPrefixo instanceof Error ? erroDoPrefixo.message : String(erroDoPrefixo)}`,
+      "Um projeto anterior a v0.62.0: o `/upgrade` traz a lib (o `.agent/scripts/` copia-se sozinho).",
+    ]);
+  }
+  const t = prefixo.carregaTipos(REPO);
+  if (t.estado === "sem-linhas" || t.estado === "ilegivel") {
+    recusar(`COMMIT RECUSADO — nao consegui ler a tabela \`${prefixo.CABECALHO}\` do CONTRIBUTING.md.`, [
+      t.estado === "ilegivel" ? `CONTRIBUTING.md: ${t.erro}` : `A seccao \`${prefixo.CABECALHO}\` existe e nenhuma linha tem a forma | \`type\` | ... |.`,
+      "E dela que vem a lista de types. Corrigir a tabela; nunca com --no-verify.",
+    ]);
+  }
+  // Sem tabela passa so pela forma, mas DIZ-O (o mesmo do interruptor dos nomes).
+  if (t.estado !== "ok") console.error(`  commit-msg: sem a tabela \`${prefixo.CABECALHO}\` no CONTRIBUTING.md: so a forma \`type(scope): descricao\`.`);
+  const tipos = t.estado === "ok" ? t.tipos : null;
+  const final = process.env.COMMIT_MSG_FINAL === "1";
+  const assunto = (final ? acima : linhas).find((l) => l.texto.trim() !== "")?.texto;
+  // Com o git, so comentarios e a desistencia (esvaziar a mensagem no editor): e o git que aborta, e diz porque. Uma
+  // mensagem vazia que ele aceite (`--allow-empty-message`) fica sem verificacao local; no CI (`final`) recusa.
+  if (assunto === undefined && !final) return;
+  const razao = prefixo.razaoDoPrefixo(assunto, tipos);
+  if (razao === undefined) return;
+  // `Assunto:` a frente, e nao espacos: no log do CI, uma linha que comece por `::` (um titulo de PR) era um comando do runner.
+  recusar("COMMIT RECUSADO — o assunto nao segue o Conventional Commits.", [
+    `Assunto: ${assunto ?? "(vazio)"}`,
+    `Porque: ${razao}.`,
+    tipos ? `Os types (\`${prefixo.CABECALHO}\` do CONTRIBUTING.md): ${tipos.join(", ")}.` : "Sem a tabela de types, qualquer palavra em minusculas serve de type.",
+    "Exemplo: feat(dashboard): add monthly export",
+    "Um type novo e uma linha nessa tabela. Nunca com --no-verify.",
+  ]);
+}
+
+/**
  * Corre o hook sobre o ficheiro da mensagem que o git passa (`$1`). Sai `0` se a mensagem esta
- * limpa; recusa (sai `1`) se atribui o trabalho a uma IA, ou se nao a consegue ler.
+ * limpa; recusa (sai `1`) se nomeia um nome proibido, se o assunto nao segue o Conventional Commits (#394), se
+ * atribui o trabalho a uma IA, ou se nao a consegue ler.
  * @param {string | undefined} caminho
  */
 export function correr(caminho) {
@@ -266,6 +321,7 @@ export function correr(caminho) {
   // so limpa espacos (`--cleanup=whitespace`), e uma linha `#339 ...` FICA na mensagem. Um nome num comentario
   // que o git apagaria (o branch no texto de estado) tambem recusa: falha fechado.
   verificaNomes(acima);
+  verificaPrefixo(acima, linhas);
 
   const achados = [];
   for (const { texto: linha, n } of linhas) {

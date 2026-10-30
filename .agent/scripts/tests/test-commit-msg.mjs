@@ -27,7 +27,8 @@ const HOOK = join(ROOT, ".githooks/commit-msg");
 // variavel e com uma `HOME` que nao existe — uma pasta que este repo nao tem. Com a variavel apontada para um
 // ficheiro em falta ja nao seria "sem lista", e sim `ilegivel`. Os casos dos nomes, mais abaixo, montam a sua.
 const semVariavel = (env) => Object.fromEntries(Object.entries(env).filter(([k]) => k !== VARIAVEL));
-const SEM_LISTA = { ...semVariavel(process.env), HOME: join(ROOT, ".agent/scripts/tests/nao-existe") };
+// E sem o modo do CI (#394) de quem corre: herdado, mudava o assunto que o hook le.
+const SEM_LISTA = { ...semVariavel(process.env), HOME: join(ROOT, ".agent/scripts/tests/nao-existe"), COMMIT_MSG_FINAL: "" };
 // O git das fixtures sem o `GIT_DIR`/`GIT_WORK_TREE`/`GIT_INDEX_FILE`/`GIT_CONFIG*` de quem corre (`TP3`): dentro de um
 // hook ou de um `rebase -x`, um `git -C <tmp> config --local` escrevia no repo de `GIT_DIR` — no clone real.
 const semGit = (env) => Object.fromEntries(Object.entries(env).filter(([k]) => !/^GIT_/.test(k)));
@@ -363,6 +364,7 @@ const HOOKS = join(ROOT, ".githooks");
 commitComHooks("o git chama o ponteiro, que recusa uma atribuicao a IA", () => HOOKS,
   "fix: x\n\nCo-Authored-By: Claude <a@b>\n", true);
 commitComHooks("o git chama o ponteiro, que aceita uma mensagem limpa", () => HOOKS, "fix: x\n", false);
+commitComHooks("o git chama o ponteiro, que recusa um assunto sem o prefixo Conventional Commits (#394)", () => HOOKS, "update stuff\n", true, "Conventional Commits");
 commitComHooks("sem o `lib/`, o ponteiro FALHA e o commit nao passa (falha fechada)", (dir) => {
   const h = join(dir, "hooks-sem-lib");
   mkdirSync(h);
@@ -376,22 +378,26 @@ commitComHooks("sem o `lib/`, o ponteiro FALHA e o commit nao passa (falha fecha
 // pelo seu proprio sitio, logo uma lista "dentro do repo" fica dentro da fixture, nunca deste repo. Os nomes
 // sao inventados. A recusa cita linhas, e o nome nunca aparece nela (`naoInclui`). `onde: "omissao"` corre sem a
 // variavel e com uma HOME vazia (o "sem lista" real); `desligado` liga o interruptor LOCAL do repo da fixture.
-function testNomes(nome, { msg, lista, onde = "fora", semLib = false, desligado = false, comentario, hooksNoutro = false }, expect) {
+// O PREFIXO (#394) corre na mesma fixture: `contributing` e o `CONTRIBUTING.md` do repo do commit, `final` o modo do CI.
+function testNomes(nome, { msg, lista, onde = "fora", semLib = false, semPrefixo = false, contributing, final = false, desligado = false, comentario, hooksNoutro = false }, expect) {
   const dir = mkdtempSync(join(tmpdir(), "commit-msg-test-"));
   try {
     const raiz = join(dir, "repo");
     // `hooksNoutro`: o `core.hooksPath` aponta para os hooks de OUTRO clone — o commit e no `raiz`, o hook vive fora.
     const base = hooksNoutro ? join(dir, "outro") : raiz;
     mkdirSync(raiz, { recursive: true });
-    for (const rel of [".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", ...(semLib ? [] : [".agent/scripts/lib/nomes-proibidos.mjs"])]) {
+    const libs = [...(semLib ? [] : [".agent/scripts/lib/nomes-proibidos.mjs"]), ...(semPrefixo ? [] : [".agent/scripts/lib/prefixo-commit.mjs"])];
+    for (const rel of [".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", ...libs]) {
       mkdirSync(dirname(join(base, rel)), { recursive: true });
       copyFileSync(join(ROOT, rel), join(base, rel));
     }
+    if (contributing === null) mkdirSync(join(raiz, "CONTRIBUTING.md"));
+    else if (contributing !== undefined) writeFileSync(join(raiz, "CONTRIBUTING.md"), contributing);
     const caminho = onde === "dentro" ? join(raiz, "lista") : join(dir, "lista");
     if (onde === "pasta") mkdirSync(caminho);
     else if (lista !== undefined) writeFileSync(caminho, lista);
     writeFileSync(join(dir, "MSG"), msg);
-    const isolado = { ...semGit(process.env), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" };
+    const isolado = { ...semGit(process.env), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", COMMIT_MSG_FINAL: final ? "1" : "" };
     if (desligado || comentario) {
       const git = (...a) => execFileSync("git", ["-C", raiz, ...a], { stdio: "ignore", env: isolado });
       git("init", "-q");
@@ -450,6 +456,29 @@ testNomes("nomes: uma lista ilegivel (uma pasta) recusa", { msg: "fix: x\n", ond
 testNomes("nomes: uma lista DENTRO do repo recusa", { msg: "fix: x\n", lista: LISTA, onde: "dentro" }, { code: 1, includes: ["DENTRO do repo"] });
 testNomes("nomes: sem a lib da lista (um derivado antigo) recusa com a razao, nao rebenta", { msg: "fix: x\n", lista: LISTA, semLib: true },
   { code: 1, includes: ["nao consegui carregar a lista", "/upgrade"] });
+
+// --- O PREFIXO Conventional Commits (#394), pelo hook. A tabela pura e o passo do CI: `tests-commit-msg-prefixo.mjs`.
+const TABELA = "# C\n\n### Types\n\n| Type | When |\n|------|------|\n| `feat` | x |\n| `fix` | x |\n| `build` | x |\n\n## Outra\n\n| `wip` | x |\n";
+const PREFIXO = "nao segue o Conventional Commits";
+testNomes("prefixo: `update stuff` recusa, e a recusa diz porque e da um exemplo (#394)", { msg: "update stuff\n", onde: "omissao" },
+  { code: 1, includes: [PREFIXO, "Assunto: update stuff", "nao tem a forma", "Exemplo: feat(dashboard)"] });
+testNomes("prefixo: sem tabela passa pela forma, e DI-LO (#394)", { msg: "qualquer: x\n", onde: "omissao" }, { code: 0, includes: ["sem a tabela `### Types`"] });
+testNomes("prefixo: um type acrescentado a tabela do projeto passa (#394)", { msg: "build: x\n", onde: "omissao", contributing: TABELA }, { code: 0, naoInclui: ["sem a tabela"] });
+testNomes("prefixo: um type fora da tabela (so noutra seccao) recusa, e lista os types (#394)", { msg: "wip: x\n", onde: "omissao", contributing: TABELA },
+  { code: 1, includes: ["`wip` nao esta na tabela", "feat, fix, build"] });
+testNomes("prefixo: a tabela em CRLF le-se (#394)", { msg: "build: x\n", onde: "omissao", contributing: TABELA.replace(/\n/g, "\r\n") }, { code: 0, naoInclui: ["sem a tabela"] });
+testNomes("prefixo: os NOMES vem antes, e a recusa do prefixo nao imprime um nome proibido (#394)", { msg: "update projeto-secreto\n", lista: LISTA },
+  { code: 1, includes: ["nomeia um nome da lista"], naoInclui: ["projeto-secreto", "Conventional Commits"] });
+testNomes("prefixo: so comentarios (a desistencia no editor) passa calado, e o git aborta (#394)", { msg: "# nada\n", onde: "omissao" }, { code: 0, naoInclui: ["RECUSADO"] });
+testNomes("prefixo: a tabela sem nenhuma linha de type recusa (nao consegui ler) (#394)", { msg: "feat: x\n", onde: "omissao", contributing: "### Types\n\n| Type | Q |\n|---|---|\nnenhuma\n" },
+  { code: 1, includes: ["nao consegui ler a tabela"] });
+testNomes("prefixo: um `CONTRIBUTING.md` ilegivel (uma pasta) recusa (#394)", { msg: "feat: x\n", onde: "omissao", contributing: null }, { code: 1, includes: ["nao consegui ler a tabela"] });
+testNomes("prefixo: com o git, uma linha `#` no topo e um comentario e o assunto e a seguinte (#394)", { msg: "#394 update\nfeat: x\n", onde: "omissao" }, { code: 0 });
+testNomes("prefixo: no modo do CI (`COMMIT_MSG_FINAL`) a linha `#` e o assunto, e recusa (#394)", { msg: "#394 update\nfeat: x\n", onde: "omissao", final: true },
+  { code: 1, includes: [PREFIXO, "#394 update"] });
+testNomes("prefixo: o comentario segue o `core.commentChar` do repo (`;`) (#394)", { msg: "; um comentario\nfeat: x\n", onde: "omissao", comentario: ";" }, { code: 0 });
+testNomes("prefixo: sem a lib do prefixo (um derivado antigo) recusa com a razao, nao rebenta (#394)", { msg: "feat: x\n", onde: "omissao", semPrefixo: true },
+  { code: 1, includes: ["prefixo-commit.mjs", "/upgrade"] });
 
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);

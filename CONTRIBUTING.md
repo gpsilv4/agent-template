@@ -85,6 +85,12 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 | `chore` | Maintenance (deps, configs, CI) |
 | `ci` | CI/CD pipeline changes |
 
+The `.githooks/commit-msg` hook reads this table, and CI runs it on every commit of a PR and on the
+PR title (the first line of a squash): a subject without `type(scope): description`, or with a type
+not listed here, is refused. To use a new type, add a row (keep the `| Type |` header). Messages git
+and GitHub write themselves (`Merge ...`, `Revert "..."`, `fixup! ...`, `Apply suggestions from code
+review`) pass; the web editor's default `Update <file>` does not — type the message there.
+
 ### Examples
 
 ```bash

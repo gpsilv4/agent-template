@@ -58,7 +58,12 @@ const ENV_DO_PORTAO = [
   "EVENTO: ${{ github.event_name }}",
   "SUITES: ${{ needs.guard-tests.result }}",
   "VARREDURA: ${{ needs.sweep.result }}",
+  // A mensagem do merge e a final (#394): sem isto, um `#394 update` no topo era saltado como comentario.
+  'COMMIT_MSG_FINAL: "1"',
 ];
+/** Os valores LITERAIS do `env:` do passo (`X: "v"`), dados ao shell como o runner os da: um tirado do `ci.yml` tem de
+ *  mudar o que o shell faz, e nao so o caso que le o `env:`. */
+export const literaisDoEnv = (env) => Object.fromEntries(env.map((l) => /^(\w+): "([^"]*)"$/.exec(l)).filter(Boolean).map((m) => [m[1], m[2]]));
 /** O ramo do salto (#347, PR B). Um derivado que trouxe os scripts pelo `/upgrade` sem adotar o salto (e
  *  OPCIONAL) tem o portao antigo: ai nao ha nada a testar, e o teste diz SKIP em vez de reprovar. */
 const RAMO_DO_SALTO = /if \[ "\$SUITES" = skipped \]; then/;
@@ -75,6 +80,8 @@ const SALTO = "saltaram fora do push de um merge num privado";
 const CASOS = [
   { nome: "o push de um merge num privado, com a mensagem limpa, passa", env: MERGE, msg: LIMPA, verde: true },
   { nome: "o push de um merge num privado com atribuicao a IA reprova", env: MERGE, msg: COM_IA, verde: false, diz: ["COMMIT RECUSADO"] },
+  // O `-F` sem editor guarda a linha `#`: no `main` ela e o assunto (#394).
+  { nome: "o push de um merge num privado com o assunto `#394 update` reprova (#394)", env: MERGE, msg: "#394 update\n\nfix(x): y\n", verde: false, diz: ["nao segue o Conventional Commits"], final: true },
   // So o evento muda: sem isto, apagar a condicao do evento passava (o `COMMITTER` vazio ja reprovava).
   { nome: "suites saltadas num PR reprovam", env: { ...MERGE, EVENTO: "pull_request" }, msg: LIMPA, verde: false, diz: [SALTO, "(pull_request,"] },
   { nome: "suites saltadas num repo publico reprovam", env: { ...MERGE, PRIVADO: "false" }, msg: LIMPA, verde: false, diz: [SALTO, "privado=false"] },
@@ -88,17 +95,16 @@ const CASOS = [
   // merge e SEM o C2 esse caso nao corre — so existe em quem copiou o `main`, porque nenhuma tag teve um sem o outro.)
 ];
 
-/** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real — com a lib da lista de
- *  nomes que o `commit-msg` importa (#375), como no checkout do CI, e sem lista (no CI nao ha nenhuma). */
+/** Corre o corpo num repo git descartavel com a `mensagem` no HEAD e o `.githooks/` real — com as libs que o
+ *  `commit-msg` importa (os nomes, #375; o prefixo, #394), como no checkout do CI, e sem lista (no CI nao ha nenhuma). */
 function corre(corpo, env, mensagem) {
   const dir = mkdtempSync(join(tmpdir(), "portao-ci-test-"));
   try {
     const repo = join(dir, "repo");
     mkdirSync(repo);
     cpSync(join(ROOT, ".githooks"), join(repo, ".githooks"), { recursive: true });
-    const lib = ".agent/scripts/lib/nomes-proibidos.mjs";
     mkdirSync(join(repo, ".agent/scripts/lib"), { recursive: true });
-    cpSync(join(ROOT, lib), join(repo, lib));
+    for (const lib of [".agent/scripts/lib/nomes-proibidos.mjs", ".agent/scripts/lib/prefixo-commit.mjs"]) cpSync(join(ROOT, lib), join(repo, lib));
     env = { ...env, HOME: join(dir, "home-sem-lista") };
     const git = gitEm(repo);
     git(["init", "-q"]);
@@ -137,11 +143,18 @@ export function registar() {
   if (passo === null) return;
   const corpo = passo.corpo;
   registarResultado("portao: o shell tem o ramo do salto (#347)", RAMO_DO_SALTO.test(corpo) ? [] : ["o corpo nao tem o `if [ \"$SUITES\" = skipped ]`"]);
-  registarResultado("portao: o `env:` do passo le os campos certos do evento (#347)", ENV_DO_PORTAO.filter((e) => !passo.env.includes(e)).map((e) => `falta \`${e}\` no env: do passo`));
+  // O `COMMIT_MSG_FINAL` (#394) e do `ci.yml` do PROJETO, que o `/upgrade` nao reescreve: num derivado que ainda nao o
+  // trouxe (a nota da 2b manda), SKIP com o nome — e nao FAIL (`TP15`). No template, falta e FAIL.
+  const FINAL = 'COMMIT_MSG_FINAL: "1"';
+  const semFinal = !passo.env.includes(FINAL) && ehDerivado(lerRaiz);
+  if (semFinal) console.log("  SKIP  portao: o `env:` do portao deste projeto nao tem o `COMMIT_MSG_FINAL` (#394, a nota da 2b do `/upgrade`)");
+  registarResultado("portao: o `env:` do passo le os campos certos do evento (#347)",
+    ENV_DO_PORTAO.filter((e) => !passo.env.includes(e) && !(semFinal && e === FINAL)).map((e) => `falta \`${e}\` no env: do passo`));
   // O extractor nao pode devolver um corpo que passa tudo por estar vazio ou cortado.
   registarResultado("portao: o corpo lido e o shell inteiro do passo", /varredura-shards\.mjs/.test(corpo) && /commit-msg/.test(corpo) ? [] : ["o corpo lido nao tem o `varredura-shards` e o `commit-msg`"]);
   for (const c of CASOS) {
-    const r = corre(corpo, c.env, c.msg);
+    if (semFinal && c.final) continue;
+    const r = corre(corpo, { ...literaisDoEnv(passo.env), ...c.env }, c.msg);
     registarResultado(`portao: ${c.nome} (#347)`, [
       ...((r.code === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${r.code}`]),
       ...(c.diz ?? []).filter((t) => !r.out.includes(t)).map((t) => `o vermelho nao foi o esperado: faltou "${t}"`),

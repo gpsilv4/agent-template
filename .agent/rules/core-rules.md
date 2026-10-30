@@ -19,9 +19,9 @@
 
 - **UI/User-facing text**: {{UI_LANGUAGE}}
 - **Codigo/Variaveis** (ficheiros, funcoes, tipos, branches): **Ingles**, sempre.
-- **Mensagens de commit**: o *type* e o *scope* em **ingles** — `feat(dashboard):` — porque e
-  o que as ferramentas leem e o que o `.githooks/commit-msg` e o CI verificam. O **corpo**
-  segue a lingua do projeto.
+- **Mensagens de commit**: o *type* e o *scope* em **ingles** — `feat(dashboard):`. O
+  `.githooks/commit-msg` (e o CI, nos commits e no titulo do PR) verifica a forma e o *type* da
+  tabela do `CONTRIBUTING.md`; o *scope* e regra escrita. O **corpo** segue a lingua do projeto.
 
 > **Uma regra violada a 100% nao e uma regra — e uma licao de que as regras se ignoram.** Por
 > isso so e obrigatorio o que as ferramentas leem e o `.githooks/commit-msg` verifica: o

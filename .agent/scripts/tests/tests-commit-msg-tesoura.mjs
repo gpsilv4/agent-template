@@ -39,7 +39,7 @@ function comRepo(fn) {
   const dir = mkdtempSync(join(tmpdir(), "commit-msg-test-"));
   try {
     const raiz = join(dir, "repo");
-    for (const rel of [".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", ".agent/scripts/lib/nomes-proibidos.mjs"]) {
+    for (const rel of [".githooks/commit-msg", ".githooks/lib/commit-msg.mjs", ".agent/scripts/lib/nomes-proibidos.mjs", ".agent/scripts/lib/prefixo-commit.mjs"]) {
       mkdirSync(dirname(join(raiz, rel)), { recursive: true });
       copyFileSync(join(ROOT, rel), join(raiz, rel));
     }

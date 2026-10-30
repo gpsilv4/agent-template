@@ -123,6 +123,10 @@ export const SUITES = [
   // `guard-textos-publicos` (o `test-hooks`, #375b).
   { re: /^\.agent\/scripts\/lib\/nomes-proibidos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs"), S("test-textos-publicos.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/(check-textos-publicos|tests\/test-textos-publicos)\.mjs$/, verifica: [S("test-textos-publicos.mjs")] },
+  // O PREFIXO Conventional Commits (#394): o `tests-commit-msg-prefixo.mjs` (no `test-guards`) mede-o, e o `commit-msg` le-o.
+  { re: /^\.agent\/scripts\/lib\/prefixo-commit\.mjs$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs")] },
+  // E a tabela `### Types` que ele le (#394): mexer no `CONTRIBUTING.md` pode tirar-lhe a lista de types.
+  { re: /^CONTRIBUTING\.md$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs")] },
   // A estrutura do gate (#382), os passos que saltam por uma variavel (#353) e os passos novos antes das suites
   // (#362): o dono no `test-guards` (a funcao pura), e o gate de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/(?:estrutura-workflow|saltos-variavel|passos-novos)\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
