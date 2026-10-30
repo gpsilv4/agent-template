@@ -1,6 +1,6 @@
 /**
- * Os pares da varredura do que chega a um TEXTO PUBLICO (#375): o `commit-msg`, a lista de nomes proibidos e o
- * comando que varre os textos publicos — {{PROJECT_NAME}}
+ * Os pares da varredura do que chega a um TEXTO PUBLICO (#375): o `commit-msg` (e o prefixo que ele verifica, #394),
+ * a lista de nomes proibidos e o comando que varre os textos publicos — {{PROJECT_NAME}}
  *
  * Saiu do `lib/pares.mjs` quando ele chegou as 511 linhas (o Guard 17), como os dos hooks (#243). O `pares.mjs`
  * junta-os no sitio onde estavam os do `commit-msg`: a varredura corre pela ordem da tabela.
@@ -8,6 +8,15 @@
  * Nao tem sitios de recusa — e uma tabela. O formato de cada entrada esta no `pares.mjs`.
  */
 export const PARES_DOS_TEXTOS_PUBLICOS = [
+  {
+    // O PREFIXO Conventional Commits do `commit-msg` (#394): cada razao sai por `invalido(`, e quem chama le
+    // `undefined` como "passa" — o neutro deixa passar o que devia recusar. Dono barato: o
+    // `tests-commit-msg-prefixo.mjs`, no `test-guards` (a precedencia do `novo(` do `passos-novos`).
+    alvo: ".agent/scripts/lib/prefixo-commit.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$]|function )invalido\(/,
+    neutro: "(() => {})(",
+  },
   {
     // O hook `commit-msg` do git. Nao vive em `.claude/hooks/` porque nao e so-Claude-Code: e
     // o git que o corre, logo vale para qualquer ferramenta e qualquer pessoa. O `sinal` e o

@@ -274,6 +274,25 @@ export function registar() {
     writeF(dir, f, readF(dir, f).replace("- **Nunca**:", "- **Nunca (versao antiga)**:"));
   }, { code: 1, includes: ["AGENTS.md", "Fronteiras"] });
 
+  // O paragrafo "Prosa nao e garantia" (#394): ficava fora da comparacao das Fronteiras. Cada caso afirma a mensagem
+  // NOVA — `["AGENTS.md"]` sozinho era satisfeito pelo aviso das Fronteiras (`TP1`).
+  const PROSA = "> Prosa nao e garantia.";
+  test("G1d: uma palavra mudada no paragrafo \"Prosa nao e garantia\" do AGENTS.md avisa (#394)", (dir) => {
+    writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").replace("A rede tem tres camadas", "A rede tem duas camadas"));
+  }, { code: 1, includes: ["AGENTS.md: o paragrafo \"Prosa nao e garantia\" diverge do CLAUDE.md"] });
+  test("G1d: o AGENTS.md sem o paragrafo \"Prosa nao e garantia\" avisa (#394)", (dir) => {
+    writeF(dir, "AGENTS.md", readF(dir, "AGENTS.md").split("\n").filter((l) => !l.startsWith(PROSA)).join("\n"));
+  }, { code: 1, includes: ["AGENTS.md nao tem o paragrafo \"Prosa nao e garantia\""] });
+  test("G1d: o CLAUDE.md sem o paragrafo da SKIP visivel (#394)", (dir) => {
+    // Os DOIS espelhos, como no G1c: so o CLAUDE.md partia o Guard 2. TROCADO por outro `>`, e nao apagado: as
+    // Fronteiras acabam no primeiro `>`, e sem ele divergiam de todos os ponteiros (um aviso sem relacao).
+    for (const f of ["CLAUDE.md", "GEMINI.md"]) writeF(dir, f, readF(dir, f).split("\n").map((l) => (l.startsWith(PROSA) ? "> Outro paragrafo." : l)).join("\n"));
+  }, { code: 0, includes: ["SKIP  Guard 1d — o CLAUDE.md nao tem o paragrafo"] });
+  // O cursor e o copilot tem OUTRO paragrafo `>` depois das Fronteiras ("Este bloco e uma copia"): nao se comparam.
+  test("G1d: o paragrafo do cursor e do copilot (outro texto) nao avisa (#394)", () => {}, {
+    code: 0, includes: ["AGENTS.md = paragrafo \"Prosa nao e garantia\" igual ao CLAUDE.md"], excludes: ["\"Prosa nao e garantia\" diverge", "nao tem o paragrafo \"Prosa"],
+  });
+
   test("G1b: sem rules de referencia da SKIP visivel", (dir) => {
     // A lista e DERIVADA do disco: escrever os nomes a mao envelhecia no primeiro ficheiro
     // de referencia novo — e foi o que aconteceu com o `anti-patterns-template.md`, que

@@ -516,6 +516,45 @@ e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a f
 `test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
 explica-se no PR.
 
+## Porque o `commit-msg` passa a verificar o prefixo Conventional Commits (#394)
+
+O `core-rules.md` dizia que o `type(scope):` "e o que o `.githooks/commit-msg` e o CI verificam", e
+nada o verificava: `update stuff` passava. O hook passa a recusar um assunto sem a forma
+`type(scope): descricao`, ou com um *type* fora da tabela `### Types` do `CONTRIBUTING.md` do projeto
+(`.agent/scripts/lib/prefixo-commit.mjs`). O passo "Mensagens de commit" do `ci.yml` corre-o sobre
+cada commit do PR e sobre o **titulo** do PR, que num squash e a 1.a linha do commit no `main`.
+
+**O que isto pede a um derivado:**
+- Um *type* que o projeto use e a tabela nao tenha (`build`, `revert`) passa a ser recusado: a
+  saida e acrescentar uma linha a tabela, que e do projeto e o `/upgrade` nao sobrescreve.
+- Sem `CONTRIBUTING.md`, ou sem a seccao `### Types` (um cabecalho traduzido, `### Tipos`, conta
+  como sem seccao), verifica-se so a forma, e o hook di-lo em cada commit. Uma seccao que existe e
+  nao da nenhum type recusa.
+- O `/upgrade` traz a lib pela pasta `.agent/scripts/lib/`; o `.githooks/lib/commit-msg.mjs`
+  aprova-se a parte. Aprovado o hook sem a lib, ele recusa e diz qual falta.
+- **O `ci.yml` a copiar a mao** (na 2b): o passo "Mensagens de commit" inteiro, com o **nome novo**
+  ("— Conventional Commits e titulo do PR, sem atribuicao a IA"), o `env:` (`COMMIT_MSG_FINAL: "1"`,
+  `PR_TITULO: ${{ github.event.pull_request.title }}`) e o bloco do titulo no fim do `run:`; e
+  `COMMIT_MSG_FINAL: "1"` no `env:` do portao `Guard Tests`. Sem a linha do portao, os testes dele
+  (`tests-portao-ci.mjs`) reprovam; sem o passo novo, os do prefixo dizem `SKIP` pelo nome.
+- **Um bot de dependencias sem prefixo** (um `dependabot.yml` do projeto sem `commit-message.prefix`,
+  que escreve `Bump x from 1 to 2`, ou o Renovate, `Update dependency x`) passa a pôr cada PR dele
+  vermelho: configurar o prefixo (`chore`, como o `dependabot.yml` do template).
+- O "Commit suggestion" de uma revisao (`Apply suggestions from code review`) passa; o
+  `Update <ficheiro>` do editor web num branch do PR nao (escreve-se a mensagem no editor).
+- Um commit feito pelo **editor web** direto no `main`, com a mensagem sugerida (`Update
+  README.md`), passa a pôr o push vermelho: o editor deixa escrever a mensagem, e e ai que se
+  escreve `docs(readme): ...`.
+- **Limites aceites:** um titulo de PR editado depois da ultima corrida do CI so se ve no push
+  para o `main` (o `pull_request` sem `types:` nao corre no `edited`, e acrescenta-lo corria o CI
+  a cada edicao do corpo); um `Revert "..."` passa como o git o escreve, mesmo de um commit
+  anterior a regra; localmente, uma linha `#` no topo guardada por um `-m` e lida como comentario
+  (no CI, com `COMMIT_MSG_FINAL=1`, e o assunto).
+
+Medido nos historicos: 0 falhas no template (261 commits sem merges) e 0 nos dois derivados desde
+julho; antes disso, um derivado tinha 35 assuntos sem prefixo (dois deles `build(deps):` do
+Dependabot, de antes de o `dependabot.yml` usar o `chore`), que nenhuma corrida volta a ler.
+
 ## Porque a varredura saiu do `guard-tests` para um job seu (#308)
 
 Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #80 do

@@ -280,7 +280,16 @@ jobs:
       # Uma versao anterior tinha DOIS passos, um por evento, e o gated a `push` contava como
       # enfraquecimento no `check-test-surface` — com razao: um passo que so corre em `push`
       # deixa de correr em PRs. Um passo sem condicao nenhuma cobre mais e conta menos.
-      - name: Mensagens de commit — sem atribuicao a IA
+      # O hook verifica tambem o prefixo Conventional Commits (#394), e por isso o TITULO do PR entra
+      # num PR: num squash de varios commits e ele a 1.a linha do commit no `main`, e so reprovava
+      # depois do merge, ja imutavel. Pelo `env:` e nunca no `run:` (o titulo e texto de quem abre o
+      # PR: interpolado, era shell). `COMMIT_MSG_FINAL`: a mensagem e a final (o `%B`), logo uma
+      # linha `#` no topo e o assunto. Limite: um titulo editado depois da ultima corrida so se ve no
+      # push (o `pull_request` sem `types:` nao corre no `edited`).
+      - name: Mensagens de commit — Conventional Commits e titulo do PR, sem atribuicao a IA
+        env:
+          COMMIT_MSG_FINAL: "1"
+          PR_TITULO: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
           # Commit-RAIZ: um repo acabado de criar do template dispara `push` no commit
@@ -314,6 +323,13 @@ jobs:
           if [ "$n" -eq 0 ]; then
             echo "  Nenhuma mensagem no intervalo $base..HEAD — nao consegui verificar."
             exit 1
+          fi
+          # O titulo FORA do `n`: com ele contado, um intervalo vazio dava `n=1` e o ramo acima
+          # ficava inalcancavel num PR (TP7).
+          if [ "${GITHUB_EVENT_NAME:-}" = pull_request ]; then
+            printf '%s\n' "$PR_TITULO" > "$RUNNER_TEMP/titulo-do-pr"
+            node .githooks/commit-msg "$RUNNER_TEMP/titulo-do-pr" </dev/null
+            echo "  titulo do PR verificado."
           fi
       - name: Test surface — nao enfraquecida desde a base do PR
         if: github.event_name == 'pull_request'
@@ -499,6 +515,8 @@ jobs:
           EVENTO: ${{ github.event_name }}
           PRIVADO: ${{ github.event.repository.private }}
           COMMITTER: ${{ github.event.head_commit.committer.username }}
+          # A mensagem do merge e a final (`%B`): o `commit-msg` le a 1.a linha nao vazia como assunto (#394).
+          COMMIT_MSG_FINAL: "1"
         run: |
           set -eu
           echo "  suites: $SUITES · varredura: $VARREDURA"

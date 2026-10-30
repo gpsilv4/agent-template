@@ -372,11 +372,13 @@ not to* line, so every agent sees it.
                                   the prefixes in `tools:`, hook-enforced), debugger (full Bash)
 
 .githooks/                      <- Versioned git hooks (tool-independent)
-├── commit-msg                 <- Rejects AI attribution, and any name from your forbidden-names
-│                                 list, in commit messages (a pointer to lib/).
+├── commit-msg                 <- Rejects AI attribution, any name from your forbidden-names
+│                                 list, and a subject without the Conventional Commits
+│                                 prefix (types from CONTRIBUTING.md), in commit messages
+│                                 (a pointer to lib/).
 │                                 Enable per clone: git config core.hooksPath .githooks
-│                                 (the CI re-runs the AI-attribution part on every PR;
-│                                 the forbidden-names list only exists locally)
+│                                 (the CI re-runs it on every PR commit and on the PR
+│                                 title; the forbidden-names list only exists locally)
 └── lib/commit-msg.mjs         <- The logic: a hook has no extension, and CodeQL picks files by it.
 
 .gemini/                        <- Native Gemini CLI layer
@@ -427,7 +429,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every PR and push** (†) in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every PR and push** (†) in the `guard-tests` job |
 | Sweep plan | the `Plano da varredura` step: runs the BASE commit's `lib/plano-ci.mjs` on the PR's diff and writes `aplica=true\|false` for the `sweep` job's `if:` — first step of the `guard-tests` job, PR only (#347) |
-| Commit messages | `.githooks/commit-msg` over every commit message in the range (no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
+| Commit messages | `.githooks/commit-msg` over every commit message in the range, and over the PR title in a PR (Conventional Commits prefix, no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
 | Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every PR and push (†) in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |

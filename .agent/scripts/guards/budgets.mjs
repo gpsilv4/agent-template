@@ -317,6 +317,21 @@ export function guardBudgets({ read, warn, note, ok, skip, listDir, ehDerivado }
       if (vistos === 0) skip("Guard 1d — nenhum ponteiro fino presente");
       else corridos++;
     }
+
+    // O paragrafo "Prosa nao e garantia", logo a seguir as Fronteiras, ficava FORA da comparacao acima (que para
+    // no primeiro `>`): a copia do `AGENTS.md` podia divergir sem nada reprovar (#394). Ancorado no TEXTO, e so no
+    // `AGENTS.md`: o `GEMINI.md` ja esta preso inteiro pelo Guard 2, e o cursor e o copilot tem outro paragrafo `>`.
+    const prosaDe = (c) => /^> Prosa nao e garantia\.[^\n]*(?:\n>[^\n]*)*/m.exec(c.replace(/\r\n/g, "\n"))?.[0].trim() ?? null;
+    const prosa = raiz === null ? null : prosaDe(raiz);
+    const agentes = read("AGENTS.md");
+    if (prosa === null) {
+      skip("Guard 1d — o CLAUDE.md nao tem o paragrafo \"Prosa nao e garantia\" para comparar");
+    } else if (agentes !== null) {
+      const copia = prosaDe(agentes);
+      if (copia === null) warn("AGENTS.md nao tem o paragrafo \"Prosa nao e garantia\" que o CLAUDE.md tem");
+      else if (copia !== prosa) warn("AGENTS.md: o paragrafo \"Prosa nao e garantia\" diverge do CLAUDE.md — a copia envelheceu");
+      else ok("AGENTS.md = paragrafo \"Prosa nao e garantia\" igual ao CLAUDE.md");
+    }
   }
 
 
