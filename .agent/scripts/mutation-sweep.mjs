@@ -55,10 +55,11 @@
  * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.
  *
  * O QUE ESTA VARREDURA **NAO** COBRE, e vale saber antes de confiar nela: ela muta **sitios
- * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** —
- * `MARCAS`, `CONTAGENS`, `TEST_GLOBS`, `CONFIG_GLOBS`, `CONFIG_CONTAVEIS` no
- * `check-test-surface.mjs` — nao sao sitios: um padrao que nunca casa nada passa aqui com a
- * suite verde, porque o `warn()` continua a ser disparado por outro padrao da mesma tabela.
+ * de aviso** (as chamadas a `warn`/`fatal`/`negar`). As **entradas de tabelas de padroes** so sao sitios
+ * onde um par as declara como tal (os globs do `check-test-surface.mjs` e do `lib/superficie-contaveis.mjs`, e
+ * as `MARCAS`/`CONTAGENS` do `lib/surface-patterns.mjs`, cada um com o seu par em `lib/pares.mjs`); fora disso,
+ * um padrao que nunca casa nada passa aqui com a suite verde, porque o `warn()` continua a ser disparado por
+ * outro padrao da mesma tabela.
  *
  * Isto nao e teorico. Uma excecao escrita numa dessas entradas esteve **morta desde que foi
  * escrita** (duas falhas empilhadas: um `\s*` a recuar a largura zero, e o `semStrings` a
