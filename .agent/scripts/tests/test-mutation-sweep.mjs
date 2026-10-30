@@ -38,6 +38,7 @@ const listarDirDoRepo = (rel) => {
   }
 };
 import { test, avaliar, registarResultado, resumo } from "./harness/test-sweep-harness.mjs";
+import { casosDoDiff, casosDoList } from "./harness/casos-modos.mjs";
 // O verificador falso, a suite falsa, o `sandbox()` e os contadores vivem no harness: a suite
 // passou as 500 linhas e a catraca do Guard 17 exige dividir antes de acrescentar. O que fica
 // aqui sao as ASSERCOES — que e o que se le quando se quer saber o que esta garantido.
@@ -253,17 +254,8 @@ test("alvo declarado opcional pode faltar sem ser reportado como ausente", { sem
   excludes: ["ALVO AUSENTE", "Cobertura de mutacao completa"],
 });
 
-// --- `--list` nao pode engolir o veredicto (achado da Fase 4) -----------------
-// Os testes cobriam cada flag isolada; a COMBINACAO saia 0 a reportar um problema.
-test("--list com --only sem correspondencia continua a reprovar", {}, ["--list", "--only=nao-existe"], {
-  code: 1,
-  includes: ["nao casa nenhum alvo"],
-});
-
-test("--list com SEM SUITE continua a reprovar", { suite: null }, ["--list"], {
-  code: 1,
-  includes: ["SEM SUITE"],
-});
+// --- `--list` nao pode engolir o veredicto: os casos vivem em `harness/casos-modos.mjs` (#400) ---
+casosDoList(test);
 
 // --- Duas chamadas de aviso na mesma linha (achado da propria varredura) -----
 test("dois avisos na mesma linha reprovam em vez de herdar cobertura",
@@ -372,54 +364,8 @@ test("sinal mencionado num COMENTARIO nao conta como sitio", { sinalEmComentario
 });
 
 
-// --- `--diff`: varrer so o que este branch tocou -----------------------------------
-// E o ESPELHO, nao o portao. Cada caso aqui mede um dos quatro comportamentos que a decisao
-// do `/grill` fixou, e o quarto e o contra-caso sem o qual os outros nao valem nada.
-
-// Sem repo nao ha base, e sem base nao ha medicao. Cair para "varrer tudo" ou para "varrer
-// nada" seria escolher por conta propria o que medir — e uma medicao ausente nao e um OK.
-test("--diff sem baseline resoluvel REPROVA, em vez de escolher por si", {}, ["--diff"], {
-  code: 1,
-  includes: ["SEM BASELINE", "uma medicao ausente nao e um OK"],
-});
-
-// Nada a varrer e resposta LEGITIMA — mas nunca silenciosa. O que nao casou vai para o ecra:
-// se um deles DEVIA levar a um alvo, a lacuna do mapa fica visivel em vez de absorvida.
-test("--diff sem alvos LISTA o que nao casou e sai 0", { comGit: true, alterado: "README-x.md" }, ["--diff"], {
-  code: 0,
-  includes: ["Nada a varrer", "sem regra no mapa: README-x.md", "falta-lhe regra em lib/mapa-suites.mjs"],
-});
-
-// O caso util: um alvo tocado -> varre-se esse.
-test("--diff com um alvo tocado varre esse alvo", { comGit: true, alterado: ".agent/scripts/fake-check.mjs" }, ["--diff", "--list"], {
-  code: 0,
-  includes: ["fake-check.mjs"],
-});
-
-// O CONTRA-CASO, e e ele que faz os outros valerem: **sem flags varre tudo**. O `ci.yml`
-// invoca sem flags, e se o diff passasse a ser o default o portao virava parcial sem ninguem
-// ter decidido isso. Este teste e o que impede essa alteracao de passar despercebida.
-test("SEM flags varre tudo, mesmo num repo com diff", { comGit: true, parSao: true, alterado: ".agent/scripts/fake-check.mjs" }, ["--list"], {
-  code: 0,
-  includes: ["fake-check.mjs", "fake-check-2.mjs"],
-});
-
-// --- A baseline corre uma vez por SUITE, nao por alvo ------------------------
-// Optimizacao que so vale se ACONTECER, e o resultado nao a denuncia: a cobertura sai igual
-// com ou sem ela. O que muda e quantas vezes a suite corre — por isso a fixture tem dois alvos
-// a partilhar UMA suite, e a suite conta as suas proprias corridas num ficheiro.
-//
-// Com dedup: 1 baseline + 2 mutacoes = 3. Sem dedup: 2 baselines + 2 mutacoes = 4. No repo real
-// sao 28 alvos para 10 suites distintas — 18 corridas a medir o que ja tinha sido medido, das
-// quais 10 do `test-guards.mjs` a ~28s cada.
-test("a baseline corre UMA vez por suite partilhada, nao uma por alvo", { contaCorridas: true }, [], {
-  code: 0,
-  includes: ["Cobertura de mutacao completa — 2 sitios medidos"],
-  extra: (dir) => {
-    const n = readFileSync(join(dir, "corridas.log"), "utf8").trim().split("\n").length;
-    return n === 3 ? [] : [`a suite correu ${n} vezes, esperado 3 (1 baseline + 2 mutacoes)`];
-  },
-});
+// --- `--diff` e a baseline uma vez por suite: os casos vivem em `harness/casos-modos.mjs` (#400) ---
+casosDoDiff(test);
 
 // --- O proprio harness (achado da varredura de mutacao) ----------------------
 // A varredura mediu **0 de 4** sitios do `test-sweep-harness.mjs`: desligar qualquer uma das

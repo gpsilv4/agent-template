@@ -253,10 +253,12 @@ not to* line, so every agent sees it.
     │   ├── agentes.mjs         <- Reads the `tools:` of `.claude/agents/*` (Guard 11 + the subagent hook)
     │   ├── permissoes.mjs      <- Guard 11's probes for deny/ask, and the deny/ask a project lacks (2b)
     │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
+    │   ├── superficie-contaveis.mjs <- What the test surface measures by COUNT (workflows, PARES, verifiers, hooks) (#400)
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     │   ├── pares-hooks.mjs     <- ...its entries for .claude/hooks/, joined in the same place
     │   ├── pares-publicos.mjs  <- ...and for the commit-msg and the forbidden names (#375)
+    │   ├── pares-simuladores.mjs <- ...and for the two simulators and their libs (#400)
     │   ├── nomes-proibidos.mjs <- The forbidden-names list, kept OUTSIDE the repo, and how a name matches (#375)
     │   ├── regex-literal.mjs   <- A text as a regex literal: the one source, and the two bound copies (#400)
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)

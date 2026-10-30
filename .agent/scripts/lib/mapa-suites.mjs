@@ -134,7 +134,7 @@ export const SUITES = [
   // Os modos da varredura (#317): as formas de YAML leem-se pela estrutura, no `tests-estrutura-workflow.mjs` (#382).
   { re: /^\.agent\/scripts\/lib\/gate-modos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.
-  { re: /^\.agent\/scripts\/(lib\/superficie-gate|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/superficie-contaveis|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
@@ -145,7 +145,10 @@ export const SUITES = [
   // suite dela e a unica que exercita o contra-caso (o processo vivo que nao se toca).
   { re: /^\.agent\/scripts\/(lib\/tmp-limpo|tests\/test-tmp-limpo)\.mjs$/, verifica: [S("test-tmp-limpo.mjs")] },
   { re: /^\.agent\/scripts\/check-bundle-sizes\.mjs$/, verifica: [S("test-bundle-sizes.mjs")] },
-  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/fixture-ordem\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
+  // Os casos da prosa contra a atribuicao sairam do `test-commit-msg` para o harness (#400): a suite importa-os.
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-commit-msg-prosa\.mjs$/, verifica: [S("test-commit-msg.mjs")] },
+  // Os casos dos modos (`--list`, `--diff`) sairam da suite para o harness (#400): a suite importa-os.
+  { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/(?:fixture-ordem|casos-modos)\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // A fixture da varredura e tambem usada pelo `tests-varredura-shards.mjs`, do `test-guards` (#308).
   { re: /^\.agent\/scripts\/tests\/harness\/test-sweep-harness\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
@@ -162,7 +165,7 @@ export const SUITES = [
   // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
   // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
   // E quem o IMPORTA tambem (#271): o mapa de suites (a ligacao ao `PARES`) e a cobertura da superficie.
-  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks|-publicos)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks|-publicos|-simuladores)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
   // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271); e o `varredura-tempos.mjs`
   // (#374b) alcanca-o o `tests-varredura-shards.mjs`, do mesmo `test-guards`, ao correr o varredor.
   { re: /^\.agent\/scripts\/lib\/varredura-(?:paralela|tempos)\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
