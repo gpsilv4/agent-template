@@ -173,10 +173,14 @@ export function registar() {
       ci(sweep)),
     { code: 0, excludes: [`${MSG}:`] });
 
+  // Com o trailer (#362): o passo `dois` muda ANTES de um passo da maquinaria (o `hook`) e passa a correr so
+  // `node a-check.mjs`, fora da maquinaria — um `run:` mudado e um passo novo, e o gate di-lo. Este caso mede a
+  // CONTAGEM; o trailer tira o aviso do gate, e a assercao sobre a contagem fica igual.
   test("um step com DOIS `node` conta uma vez: tirar o segundo nao desce", (dir) =>
     muda(dir,
       ci(bloco("dois", "node a-check.mjs", "node b-check.mjs"), hook),
-      ci(bloco("dois", "node a-check.mjs"), hook)),
+      ci(bloco("dois", "node a-check.mjs"), hook),
+      "alteracao\n\nTest-Surface: .github/workflows/ci.yml — o caso mede a contagem"),
     { code: 0, excludes: [`${MSG}:`] });
 
   test("o corpo nao atravessa para o step seguinte (indentacao)", (dir) => {
