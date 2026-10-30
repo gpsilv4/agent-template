@@ -91,8 +91,9 @@ export const SUITES = [
   // `FAIL_FAST` dele, de outra arvore: regra propria, para nao ficar de fora (#241).
   { re: /^\.agent\/scripts\/tests\/harness\/relatorio\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado|guard-direto)\.mjs$/, verifica: [S("test-guards.mjs")] },
-  // O repo descartavel do portao (#372) tambem e importado pelo harness da superficie (#379): mexer nele corre as duas.
-  { re: /^\.agent\/scripts\/tests\/harness\/repo-descartavel\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  // O repo descartavel do portao (#372) tambem e importado pelo harness da superficie (#379) e, com o git que traduz, pelo
+  // caso sem git do upgrade (#400): mexer nele corre as tres.
+  { re: /^\.agent\/scripts\/tests\/harness\/repo-descartavel\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-simulate-upgrade.mjs")] },
   // O `lib/alcance.mjs` deriva do git que pastas e ficheiros cada guard tem de varrer, e o
   // `tests-alcance.mjs` (que corre no `test-guards.mjs`) e quem o exercita. Sem esta regra,
   // mexer nele nao gerava obrigacao nenhuma — no modulo cuja unica razao de existir e impedir
@@ -181,7 +182,12 @@ export const SUITES = [
   // verificacao. O `registo.mjs` falha fechado num modulo sem `registar()` e o CI descobre-os
   // todos, logo o custo era so nao haver aviso local — mas duas linhas fecham-no. O entry point
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
-  { re: /^\.agent\/scripts\/(tests\/tests-surface-[\w-]+|lib\/marcas-yaml)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
+  // As marcas e a forma do `PLANO_JOB` (#400): os testes do portao e a nota da 2b (no `test-guards`, e de ponta a ponta no
+  // `test-simulate-upgrade`) leem-na tambem.
+  { re: /^\.agent\/scripts\/lib\/marcas-yaml\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // O escape de um literal (#400): a fonte; as duas copias e a guarda vivem no `tests-regex-literal` (no `test-guards`).
+  { re: /^\.agent\/scripts\/lib\/regex-literal\.mjs$/, verifica: [S("test-guards.mjs"), S("test-codigo-morto.mjs"), S("test-bundle-sizes.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da
@@ -227,6 +233,8 @@ export const SUITES = [
   // A tesoura vive na lib: o `test-guards` descobre o `tests-commit-msg-tesoura.mjs` (os commits verdadeiros, #399).
   { re: /^\.githooks\/lib\/commit-msg\.mjs$/, verifica: [S("test-commit-msg.mjs"), S("test-guards.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
+  // A copia do escape na folha da fronteira (#400) esta presa pelo `tests-regex-literal` (no `test-guards`).
+  { re: /^\.claude\/hooks\/lib\/fronteira-dados\.mjs$/, verifica: [".claude/hooks/tests/test-hooks.mjs", S("test-guards.mjs")] },
   { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
   // Qualquer `.md` na RAIZ de `.agent/` — hoje so o `BOOTSTRAP.md`, e ele e lido por tres

@@ -477,6 +477,10 @@ testNomes("prefixo: com o git, uma linha `#` no topo e um comentario e o assunto
 testNomes("prefixo: no modo do CI (`COMMIT_MSG_FINAL`) a linha `#` e o assunto, e recusa (#394)", { msg: "#394 update\nfeat: x\n", onde: "omissao", final: true },
   { code: 1, includes: [PREFIXO, "#394 update"] });
 testNomes("prefixo: o comentario segue o `core.commentChar` do repo (`;`) (#394)", { msg: "; um comentario\nfeat: x\n", onde: "omissao", comentario: ";" }, { code: 0 });
+// Um METACARACTERE como `core.commentChar` (#400): numa regex sem escape, `^.` fazia de cada linha um comentario e a
+// atribuicao passava. Le-se por `startsWith`: so as linhas que comecam por `.`.
+testNomes("comentario: um `core.commentChar` `.` nao faz de cada linha um comentario (#400)", { msg: ". nota\nfeat: x\n\nCo-Authored-By: Claude <a@b>\n", onde: "omissao", comentario: "." },
+  { code: 1, includes: ["atribui o trabalho a uma ferramenta de IA"] });
 testNomes("prefixo: sem a lib do prefixo (um derivado antigo) recusa com a razao, nao rebenta (#394)", { msg: "feat: x\n", onde: "omissao", semPrefixo: true },
   { code: 1, includes: ["prefixo-commit.mjs", "/upgrade"] });
 

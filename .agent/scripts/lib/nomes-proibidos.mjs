@@ -128,7 +128,9 @@ export const RAZOES = {
   "dentro-do-repo": "a lista de nomes proibidos esta DENTRO do repo — a um `git add` de ficar publica",
 };
 
-/** Uma regex por nome: sem caixa, `-`/` `/`_` equivalentes, e sem casar dentro de uma palavra maior. */
+/** Uma regex por nome: sem caixa, `-`/` `/`_` equivalentes, e sem casar dentro de uma palavra maior. O escape de
+ *  cada parte e o de `lib/regex-literal.mjs`, COPIADO de proposito (#400): este modulo nao importa nada, porque dois
+ *  hooks o carregam por `import()` para recusar com a razao quando falta. O `tests-regex-literal.mjs` prende a copia. */
 export function padroes(nomes) {
   return nomes.map(({ nome, linha }) => {
     const partes = nome.normalize("NFC").split(/[-\s_]+/).filter(Boolean).map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));

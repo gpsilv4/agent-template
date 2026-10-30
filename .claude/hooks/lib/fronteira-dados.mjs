@@ -56,8 +56,9 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
 /** Um caminho como texto LITERAL numa regex: escapa todos os caracteres especiais, e nao so o `.`.
  *  Os caminhos de hoje so tem pontos, mas um caminho futuro com `+`, `(` ou `\` passava a ser um
  *  padrao e a fronteira deixava de casar o que devia (alerta do CodeQL, js/incomplete-sanitization).
- *  E o mesmo escape do `check-codigo-morto.mjs` e do `test-bundle-sizes.mjs`, COPIADO de proposito:
- *  este modulo e a folha da fronteira e nao importa de `.agent/scripts/` (camadas separadas). */
+ *  E a fonte `.agent/scripts/lib/regex-literal.mjs` (#400), COPIADA de proposito: este modulo e a folha da
+ *  fronteira e nao importa de `.agent/scripts/` (camadas separadas; um import que falhasse caia no `catch` do hook,
+ *  que PERMITE). O `tests-regex-literal.mjs` prende a copia ao texto da fonte. */
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** As opcoes GLOBAIS do `git` (antes do verbo) que consomem a palavra seguinte, numa so lista (#397, `TP8`): eram
  *  quatro copias e divergiam. Hoje so o `textos-publicos.mjs` a le; o `fronteira.mjs`, o `verbos-git.mjs` e o

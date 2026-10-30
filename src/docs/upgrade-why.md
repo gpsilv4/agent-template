@@ -556,6 +556,20 @@ Medido nos historicos: 0 falhas no template (261 commits sem merges) e 0 nos doi
 julho; antes disso, um derivado tinha 35 assuntos sem prefixo (dois deles `build(deps):` do
 Dependabot, de antes de o `dependabot.yml` usar o `chore`), que nenhuma corrida volta a ler.
 
+## Porque uma copia do escape de regex num script do projeto passa a reprovar (#400)
+
+O escape de um texto literal numa regex (`.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")`) estava escrito
+cinco vezes. Passou a ter uma fonte, `.agent/scripts/lib/regex-literal.mjs` (`literalEmRegex`), e
+duas copias de proposito, presas a ela. O `tests-regex-literal.mjs` (no `test-guards`) reprova uma
+copia nova em `.agent/scripts`, `.claude/hooks` ou `.githooks`.
+
+**O que isto pede a um derivado:**
+- Um script do projeto nessas pastas com o mesmo escape, letra a letra (e o `escapeRegExp` da
+  MDN, e por isso pode estar colado), passa a reprovar: a saida e importar `literalEmRegex` da lib.
+- A nota da 2b sobre o portao do plano (#347 C2) le a linha `PLANO_JOB:` numa so forma: um
+  comentario no fim conta (precisa de um espaco antes do `#`), e uma cauda que nao e comentario
+  (`}} && y`), que antes passava, da a nota.
+
 ## Porque a varredura saiu do `guard-tests` para um job seu (#308)
 
 Num derivado privado (2 vCPU) o `guard-tests` chegou aos **51 dos 75 min** (PR #80 do

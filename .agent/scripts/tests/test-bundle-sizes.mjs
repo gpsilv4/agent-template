@@ -41,6 +41,7 @@ const failures = [];
 import { join } from "path";
 import { gzipSync } from "zlib";
 import { randomBytes } from "crypto";
+import { literalEmRegex } from "../lib/regex-literal.mjs";
 
 function run(dir, cwd) {
   try {
@@ -72,7 +73,7 @@ function test(name, build, expect) {
     const excludes = [...(expect.excludes ?? []), ...(extra.excludes ?? [])];
     for (const [route, want] of Object.entries(extra.numbers ?? {})) {
       // Escapar: uma rota com `(`, `.` ou `/` (route group) partia o regex.
-      const esc = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const esc = literalEmRegex(route);
       const m = new RegExp(`${esc}\\s+([\\d.]+) kB`).exec(out);
       if (!m) problems.push(`nao encontrei uma linha de medicao para "${route}"`);
       else if (m[1] !== want) problems.push(`${route}: esperado ${want} kB, medido ${m[1]} kB`);

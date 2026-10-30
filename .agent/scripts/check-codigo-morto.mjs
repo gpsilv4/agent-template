@@ -63,6 +63,7 @@
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
+import { literalEmRegex } from "./lib/regex-literal.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -189,7 +190,7 @@ for (const abs of ficheiros.sort()) {
   const codigo = soCodigo(src);
   for (const { nome, linha } of importados(src)) {
     // `> 1` e nao `> 0`: a propria linha de import conta uma vez.
-    const usos = (codigo.match(new RegExp(`\\b${nome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g")) || []).length;
+    const usos = (codigo.match(new RegExp(`\\b${literalEmRegex(nome)}\\b`, "g")) || []).length;
     if (usos <= 1) morto(`${rel}:${linha} — \`${nome}\` importado e nunca usado`);
   }
 }

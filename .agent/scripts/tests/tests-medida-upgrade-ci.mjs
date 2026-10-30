@@ -70,6 +70,10 @@ export function registar() {
   // A forma e a da isencao: um `if:` com uma cauda no projeto nao e "ja adotado" (e e o que o `check-test-surface` reprova).
   registarResultado("2b CI: o `if:` do plano noutra forma no projeto da a nota (#347 C2)", so(notas({ ciLa: C2, ciAqui: IF_PLANO.replace("'true'", "'true' && true") + PORTAO_PLANO }), "forma EXACTA"));
   registarResultado("2b CI: um template sem o portao do plano nao da a nota (#347 C2)", nenhuma(notas({ ciLa: IF_PLANO })));
+  // A forma unica do `PLANO_JOB` (#400): com um comentario e "ja tem"; com uma cauda (`&& y`), que antes contava, nao.
+  registarResultado("2b CI: o portao do plano com um comentario YAML conta como adotado (#400)", nenhuma(notas({ ciLa: C2, ciAqui: IF_PLANO + PORTAO_PLANO.replace("}}\n", "}} # x\n") })));
+  registarResultado("2b CI: o portao do plano com espacos no fim conta como adotado (#400)", nenhuma(notas({ ciLa: C2, ciAqui: IF_PLANO + PORTAO_PLANO.replace("}}\n", "}}  \n") })));
+  registarResultado("2b CI: o portao do plano com uma cauda (`}} && y`) nao conta, e da a nota (#400)", so(notas({ ciLa: C2, ciAqui: IF_PLANO + PORTAO_PLANO.replace("}}\n", "}} && y\n") }), "quando o plano da base diz"));
   {
     const [n = ""] = notas({ ciLa: C2 });
     registarResultado("2b CI: a nota do plano avisa a meia adocao e o `sweep` em `push` (#347 C2, R5/R6)", ["VERMELHO cada PR sem maquinaria", "o shell sem o passo e o `if:`", "varrer tambem em `push`", "forma EXACTA", "TIRAR do passo da varredura o corpo antigo"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
