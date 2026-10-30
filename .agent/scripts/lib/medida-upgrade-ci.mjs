@@ -11,7 +11,7 @@
  * `test-guards`; a varredura corre-o primeiro, e cada `note()` desligada morre em milissegundos); os de ponta
  * a ponta, nas suites da 2b (`tests-medida-2b-config.mjs`, `test-simulate-upgrade.mjs`).
  */
-import { PLANO_DO_SWEEP } from "./marcas-yaml.mjs";
+import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO } from "./marcas-yaml.mjs";
 
 /**
  * @param {object} o
@@ -53,7 +53,7 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
   // O PLANO da varredura (#347, C2): os shards so arrancam quando o plano da base diz que se aplica. "Ja tem" = o `if:`
   // do `sweep` na forma EXACTA (a da isencao, importada: uma terceira copia envelhecia, `TP8`) E o portao a ler o
   // output do job. A meias — so o `if:`, ou so o portao — tambem da a nota: e o caso que fica vermelho.
-  const temPlano = (t) => t.split(/\r?\n/).some((l) => PLANO_DO_SWEEP.test(l)) && /^[ \t]*PLANO_JOB:[ \t]*\$\{\{[ \t]*needs\.guard-tests\.outputs\.aplica[ \t]*\}\}/m.test(t);
+  const temPlano = (t) => t.split(/\r?\n/).some((l) => PLANO_DO_SWEEP.test(l)) && t.split(/\r?\n/).some((l) => PLANO_JOB_DO_PORTAO.test(l));
   if (temPlano(ciLa) && !temPlano(ciAqui))
     note(
       "o template so arranca os shards da varredura quando o plano da base diz que ela se aplica (#347, C2) e o deste projeto nao — OPCIONAL (so minutos: num repo privado cada shard de um PR sem maquinaria e um minuto cobrado); " +

@@ -305,17 +305,18 @@ export function correr(caminho) {
   // comentarios entre a tesoura e ele (o bloco de estado do `commit.cleanup=scissors`) leem-se, como acima dela.
   // Limite: uma tesoura forjada seguida de uma dessas linhas passa (barreira contra o descuido). E as linhas `#` nao
   // contam para a atribuicao, embora com `-m` o git as guarde (ja antes do #399).
-  const c = caracterDeComentario().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const comentario = new RegExp(`^${c}`);
+  // O caractere de comentario le-se por `startsWith`, e nao numa regex (#400): sem escape a manter, e um `.` ou um `*`
+  // no `core.commentChar` nao viram padrao.
+  const c = caracterDeComentario();
   const todas = msg.split(/\r\n|\r|\n/);
   const inicioDoDiff = (i) => {
     let j = i + 1;
-    while (j < todas.length && comentario.test(todas[j])) j++;
+    while (j < todas.length && todas[j].startsWith(c)) j++;
     return todas.slice(j).every((l) => l.trim() === "") || /^(?:diff --(?:git|cc|combined) |Submodule )/.test(todas[j]) ? j : -1;
   };
-  const tesoura = todas.findIndex((l, i) => new RegExp(`^${c} -+ >8 -+$`).test(l) && inicioDoDiff(i) >= 0);
+  const tesoura = todas.findIndex((l, i) => l.startsWith(c) && /^ -+ >8 -+$/.test(l.slice(c.length)) && inicioDoDiff(i) >= 0);
   const acima = (tesoura >= 0 ? todas.slice(0, inicioDoDiff(tesoura)) : todas).map((texto, i) => ({ texto, n: i + 1 }));
-  const linhas = acima.filter(({ texto }) => !new RegExp(`^\\s*${c}`).test(texto));
+  const linhas = acima.filter(({ texto }) => !texto.trimStart().startsWith(c));
 
   // Os NOMES leem TODAS as linhas acima do diff, comentarios incluidos: com `-m`/`-F` e sem editor, o git
   // so limpa espacos (`--cleanup=whitespace`), e uma linha `#339 ...` FICA na mensagem. Um nome num comentario

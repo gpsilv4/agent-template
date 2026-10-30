@@ -43,6 +43,9 @@ function corre(ficheiros) {
       writeFileSync(join(dir, rel), conteudo);
     }
     writeFileSync(join(dir, ".agent/scripts/check-codigo-morto.mjs"), readFileSync(CHECKER, "utf8"));
+    // E a lib que ele importa (#400, o escape de um literal), como no checkout de um projeto.
+    mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
+    writeFileSync(join(dir, ".agent/scripts/lib/regex-literal.mjs"), readFileSync(join(ROOT, ".agent/scripts/lib/regex-literal.mjs"), "utf8"));
     try {
       return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/check-codigo-morto.mjs")], { encoding: "utf8" }) };
     } catch (err) {

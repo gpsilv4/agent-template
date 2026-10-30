@@ -16,13 +16,15 @@
  */
 import { pathToFileURL } from "url";
 import { cpSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "fs";
-import { dirname, join } from "path";
+import { delimiter, dirname, join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { passoDoPortao } from "./tests-portao-ci.mjs";
-import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
+import { PLANO_JOB_DO_PORTAO } from "../lib/marcas-yaml.mjs";
+import { jobsDe, passosDe } from "../lib/estrutura-workflow.mjs";
+import { correCorpo, gitEm, gitQueTraduz, traduzida } from "./harness/repo-descartavel.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -102,6 +104,19 @@ export function fatiaDoJob(ci, id) {
   return prox < 0 ? ci.slice(ini) : ci.slice(ini, ini + 1 + prox);
 }
 
+/** O `actions/checkout` do `guard-gate` traz a base (`fetch-depth: 2`)? `null` se sim, senao a razao. Pelo leitor de
+ *  jobs e passos do gate (#400): uma regex sobre o texto dizia "nao tem" de um SHA com comentario, de outra chave antes,
+ *  de um comentario depois, ou do `name:` antes do `uses:`. Os passos em flow nao se leem, e isso reprova (`TP2`). */
+export function checkoutTrazBase(ci) {
+  const job = jobsDe(ci).find((j) => j.id === "guard-gate");
+  if (!job) return "nao encontrei o job `guard-gate`";
+  const passos = passosDe(job.ls);
+  if (passos === null) return "nao consegui ler os passos do `guard-gate` (em flow)";
+  const checkout = passos.find((p) => p.ls.some((l) => /^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions\/checkout@/.test(l)));
+  if (!checkout) return "o `guard-gate` nao tem o passo do `actions/checkout`";
+  return checkout.ls.some((l) => /^[ \t]*fetch-depth:[ \t]*2[ \t]*$/.test(l)) ? null : "o checkout do `guard-gate` nao tem `fetch-depth: 2`";
+}
+
 /** Cada vermelho afirma-se pela SUA mensagem (#372 A4): so o exit deixava passar um vermelho por outra razao. */
 const DISCORDA = "decidiu o contrario";
 const OUTRO_PLANO = "os shards decidiram por outro plano";
@@ -114,7 +129,7 @@ const SEM_PLANO = "plano: a base nao tem o plano (aplica tudo)";
 const EXPORTA = /^[ \t]*export VARREDURA_PLANO=true\n/m;
 
 /** O portao do C2 reconhece-se pelo output do job no `env:` (o `VARREDURA_PLANO` tambem estava no C1). */
-export const temPortaoC2 = (passo) => passo !== null && passo.env.some((l) => /^PLANO_JOB:[ \t]*\$\{\{[ \t]*needs\.guard-tests\.outputs\.aplica[ \t]*\}\}$/.test(l));
+export const temPortaoC2 = (passo) => passo !== null && passo.env.some((l) => PLANO_JOB_DO_PORTAO.test(l));
 
 export function registar() {
   const lerRaiz = (rel) => leOuNull(join(ROOT, rel));
@@ -130,6 +145,9 @@ export function registar() {
   registarResultado("portao: o discriminador do C2 reprova um `env:` sem o output, ou com outro (controlo)", [
     ...(temPortaoC2({ env: ["VARREDURA: ${{ needs.sweep.result }}"] }) ? ["um portao sem `PLANO_JOB` passou por C2"] : []),
     ...(temPortaoC2({ env: ["PLANO_JOB: ${{ needs.guard-tests.outputs.x }}"] }) ? ["um `PLANO_JOB` de outro output passou"] : []),
+    // A forma unica (#400): um comentario YAML conta; um `#` colado e uma cauda sao outro valor.
+    ...(temPortaoC2({ env: ["PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }} # o plano"] }) ? [] : ["um `PLANO_JOB` com um comentario nao contou"]),
+    ...(temPortaoC2({ env: ["PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }}#x"] }) ? ["um `PLANO_JOB` com um `#` colado (valor, nao comentario) passou"] : []),
   ]);
   if (!temPortaoC2(passo)) return;
   const plano = lerRaiz(PLANO);
@@ -149,7 +167,8 @@ export function registar() {
     // O PR muda o seu proprio plano para "nunca": o portao le o da BASE.
     { nome: "o plano do PR mudado para \"nunca\" nao conta: le-se o da base (vermelho)", env: PR_SALTOU, o: { head: "maquinaria", basePlano: plano, headPlano: PLANO_NUNCA }, verde: false, diz: OUTRO_PLANO },
     { nome: "um plano que responde outra coisa que true/false: vermelho", env: PR, o: { head: "maquinaria", aplicavel: true, basePlano: PLANO_QUE_MENTE }, verde: false, diz: "o plano da base respondeu" },
-    { nome: "um HEAD sem pai: vermelho", env: PR, o: { semPai: true, aplicavel: true, basePlano: plano }, verde: false, diz: "Needed a single revision" },
+    // O texto do git DERIVA-SE (#400, `TP8`): fixo, dependia da lingua e da versao do git.
+    { nome: "um HEAD sem pai: vermelho", env: PR, o: { semPai: true, aplicavel: true, basePlano: plano }, verde: false, dizDoGit: true },
     { nome: "a base sem o plano e os shards mediram: verde, e di-lo", env: PR, o: { head: "docs", aplicavel: true, basePlano: null }, verde: true, tem: SEM_PLANO },
     // A5 da 3.a passagem: o buraco do N2 pelo ramo da base sem plano.
     { nome: "a base sem o plano e os shards todos \"nao aplicavel\": vermelho (A5)", env: PR, o: { head: "docs", aplicavel: false, basePlano: null }, verde: false, diz: DISCORDA, controlo: true },
@@ -162,20 +181,74 @@ export function registar() {
   ];
   // O `fetch-depth: 2` do checkout do portao: tira-lo dava vermelho no CI (o `HEAD^1`), mas nunca aqui (a fixture
   // tem a historia toda) — fica fixado pelo texto (leitura 1 do C1).
-  const gate = fatiaDoJob(ci, "guard-gate");
   // O controlo da fatia: num `ci.yml` sem `simulators` (a forma de um derivado), o `fetch-depth` do job SEGUINTE nao
   // pode contar como o do `guard-gate` — a fatia antiga, ate ao `simulators:`, ia ate ao fim e encontrava-o.
   const sintetico = "jobs:\n  guard-gate:\n    steps:\n      - uses: actions/checkout@v7\n  secret-scan:\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n";
-  registarResultado("portao: a fatia do `guard-gate` acaba no job seguinte, sem `simulators` (#372)", /fetch-depth/.test(fatiaDoJob(sintetico, "guard-gate")) ? ["a fatia apanhou o `fetch-depth` do job seguinte"] : []);
-  registarResultado("portao: o checkout do portao traz a base (`fetch-depth: 2`) (#347)", /- uses: actions\/checkout@\S+\n\s+with:\n\s+fetch-depth: 2\n/.test(gate) ? [] : ["o checkout do `guard-gate` nao tem `fetch-depth: 2`"]);
+  registarResultado("portao: a fatia do `guard-gate` acaba no job seguinte, sem `simulators` (#372)", [
+    ...(/fetch-depth/.test(fatiaDoJob(sintetico, "guard-gate")) ? ["a fatia apanhou o `fetch-depth` do job seguinte"] : []),
+    ...(checkoutTrazBase(sintetico) === null ? ["o leitor do checkout apanhou o `fetch-depth` do job seguinte"] : []),
+  ]);
+  { const p = checkoutTrazBase(ci); registarResultado("portao: o checkout do portao traz a base (`fetch-depth: 2`) (#347)", p === null ? [] : [p]); }
+  // As formas que a regex antiga lia mal (#400): um SHA com comentario (a do Dependabot), outra chave antes, um
+  // comentario depois, e o `name:` antes do `uses:` passam; um checkout sem a base, ou com ela noutro passo, nao.
+  {
+    const job = (passos) => `jobs:\n  guard-gate:\n    steps:\n${passos}  outro:\n    steps:\n      - run: x\n`;
+    const COM = "        with:\n          fetch-depth: 2\n";
+    const passam = {
+      "um SHA com comentario": `      - uses: actions/checkout@0123abcd # v7\n${COM}`,
+      "outra chave antes": "      - uses: actions/checkout@v7\n        with:\n          persist-credentials: false\n          fetch-depth: 2\n",
+      "um comentario depois": "      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2 # a base\n",
+      "o `name:` antes do `uses:`": `      - name: Checkout\n        uses: actions/checkout@v7\n${COM}`,
+    };
+    const reprovam = {
+      "sem `fetch-depth`": "      - uses: actions/checkout@v7\n",
+      "`fetch-depth: 1`": "      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 1\n",
+      "o `fetch-depth: 2` noutro passo": `      - uses: actions/checkout@v7\n      - uses: actions/setup-node@v4\n${COM}`,
+    };
+    // Os passos em flow na linha do `steps:` (a forma que o `passosDe` nao le): reprova, e pela razao certa.
+    const flow = checkoutTrazBase("jobs:\n  guard-gate:\n    steps: [ { uses: actions/checkout@v7, with: { fetch-depth: 2 } } ]\n  outro:\n    steps:\n      - run: x\n");
+    registarResultado("portao: o checkout le-se pelos passos do job: as formas certas passam, as outras reprovam (#400)", [
+      ...Object.entries(passam).filter(([, t]) => checkoutTrazBase(job(t)) !== null).map(([n, t]) => `${n}: ${checkoutTrazBase(job(t))}`),
+      ...Object.entries(reprovam).filter(([, t]) => checkoutTrazBase(job(t)) === null).map(([n]) => `${n} passou`),
+      ...(flow?.includes("em flow") ? [] : [`os passos em flow: ${flow ?? "passaram"}`]),
+    ]);
+  }
   const veredicto = (r, c) => [
     ...((r.code === 0) === c.verde ? [] : [`esperava ${c.verde ? "verde" : "vermelho"}, saiu ${r.code}: ${r.out.trim().split("\n").slice(-2).join(" | ")}`]),
     ...(c.tem && !r.out.includes(c.tem) ? [`faltou a linha "${c.tem}"`] : []),
     ...(c.sem && r.out.includes(c.sem) ? [`nao devia ter "${c.sem}"`] : []),
     ...(c.diz && !r.out.includes(c.diz) ? [`o vermelho nao foi o esperado: faltou "${c.diz}"`] : []),
   ];
+  // O que o git DIZ, perguntado ao mesmo git: o comando lido do corpo (se o portao passar a outra forma, reprova aqui
+  // a dize-lo, e nao continua a perguntar pela antiga), corrido no mesmo repo e com o mesmo `env`. Tem de falhar e
+  // dizer alguma coisa: uma linha vazia estava contida em qualquer saida (`TP2`).
+  const doGit = (c) => {
+    const cmd = /\bgit rev-parse --verify HEAD\^1(?=\))/.exec(passo.corpo)?.[0];
+    if (!cmd) return { erro: "nao encontrei o `git rev-parse --verify HEAD^1` no corpo do portao" };
+    const r = corre(cmd, c.env, c.o);
+    const linha = r.out.trim().split("\n")[0] ?? "";
+    return r.code !== 0 && linha.trim() !== "" ? { linha } : { erro: `o comando derivado saiu ${r.code}, a dizer "${linha}"` };
+  };
   for (const c of casos) {
-    registarResultado(`portao: ${c.nome} (#347)`, veredicto(corre(passo.corpo, c.env, c.o), c));
+    const d = c.dizDoGit ? doGit(c) : null;
+    registarResultado(`portao: ${c.nome} (#347)`, [...(d?.erro ? [d.erro] : []), ...veredicto(corre(passo.corpo, c.env, c.o), d?.linha ? { ...c, diz: d.linha } : c)]);
+    // O CONTROLO da lingua (#400): com um git que traduz, o texto derivado continua a casar, e o antigo (fixo) nao.
+    if (c.dizDoGit) {
+      const pasta = mkdtempSync(join(tmpdir(), "portao-sombra-test-"));
+      try {
+        const falso = gitQueTraduz(pasta);
+        const env = { ...c.env, PATH: `${falso}${delimiter}${process.env.PATH}` };
+        const t = falso === null ? { erro: "nao encontrei o git no PATH para o falso o chamar" } : doGit({ ...c, env });
+        const r = corre(passo.corpo, env, c.o);
+        registarResultado("portao: com um git que traduz, o texto derivado casa e o literal antigo nao (controlo, #400)", [
+          ...(t.erro ? [t.erro] : []),
+          ...(t.linha && r.code !== 0 && r.out.includes(t.linha) ? [] : ["o vermelho nao trouxe a frase do git traduzido"]),
+          ...(t.linha && traduzida(t.linha) ? [] : [`o git falso nao traduziu ("${t.linha ?? ""}"): o controlo nao mede nada`]),
+        ]);
+      } finally {
+        rmSync(pasta, { recursive: true, force: true });
+      }
+    }
     // Os CONTROLOS medidos: sem o `export VARREDURA_PLANO=true`, os relatorios "nao aplicavel" passavam (o N2 e o
     // A5 provam a linha); sem o `--no-renames`, a renomeacao para fora da maquinaria dava `false` e outro plano.
     if (c.controlo) {

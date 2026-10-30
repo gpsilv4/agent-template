@@ -63,6 +63,13 @@ const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*
 const MERGE_PRIVADO = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*\|\|[ \t]*!github\.event\.repository\.private[ \t]*\|\|[ \t]*github\.event\.head_commit\.committer\.username[ \t]*!=[ \t]*'web-flow'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
 /** Exportado para a nota da 2b (`medida-upgrade-ci.mjs`) ler a MESMA forma, e nao uma copia (`TP8`). */
 export const PLANO_DO_SWEEP = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*&&[ \t]*needs\.guard-tests\.outputs\.aplica[ \t]*==[ \t]*'true'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
+/** O portao do C2 a ler um output do `guard-tests` (#347): a linha `PLANO_JOB:` do `env:`, numa so forma (#400; estava
+ *  escrita tres vezes, uma sem ancora no fim e outra como texto exato). O `#` so e comentario depois de um espaco
+ *  (`${{ x }}#a` e valor, como no `estrutura-workflow.mjs`); espacos no fim, sim. Com `m`: le-se num `ci.yml` inteiro
+ *  (a nota da 2b) ou numa linha do `env:` (os testes). `output` e o nome do output, um identificador. */
+export const planoJobDe = (output) =>
+  new RegExp(String.raw`^[ \t]*PLANO_JOB:[ \t]*\$\{\{[ \t]*needs\.guard-tests\.outputs\.${output}[ \t]*\}\}(?:[ \t]+#.*|[ \t]*)$`, "m");
+export const PLANO_JOB_DO_PORTAO = planoJobDe("aplica");
 /** A linha com o `if:` trocado pela `marca`, se a forma for EXACTAMENTE `re`; senao `null`. */
 const isenta = (linha, re, marca) => (re.test(linha) ? linha.replace(re, marca) : null);
 function isencoesDeJob(t, ficheiro) {

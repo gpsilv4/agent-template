@@ -37,6 +37,9 @@ export function razaoDoNome(rel) {
   return null;
 }
 
+/** A pergunta, exportada para o teste a repetir e derivar o que o git diz (#400), em vez de fixar a frase. */
+export const PERGUNTA_AO_GIT = ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"];
+
 /** Pergunta ao git, em `root`, o que ele ignora. Devolve `{ razao }` — uma funcao
  *  `rel -> razao | null` — ou `{ erro }` quando o `git` falha, com a primeira linha do que ele
  *  disse. Nunca uma funcao que deixa passar tudo: "nao ignora nada" e "nao consegui perguntar"
@@ -47,7 +50,7 @@ export function razaoDoNome(rel) {
 export function foraDoTemplate(root) {
   let saida;
   try {
-    saida = execFileSync("git", ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"], {
+    saida = execFileSync("git", PERGUNTA_AO_GIT, {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],

@@ -12,11 +12,16 @@
  */
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
-import { join } from "path";
-import { pathToFileURL } from "url";
+import { delimiter, dirname, join } from "path";
+import { fileURLToPath, pathToFileURL } from "url";
+import { execFileSync } from "child_process";
 import { cenario, limpa, test } from "./harness/test-upgrade-harness.mjs";
+import { gitQueTraduz, traduzida } from "./harness/repo-descartavel.mjs";
 import { aplicaUpgradeMecanico } from "../lib/upgrade-mecanico.mjs";
-import { razaoDoNome } from "../lib/fora-do-template.mjs";
+import { PERGUNTA_AO_GIT, razaoDoNome } from "../lib/fora-do-template.mjs";
+
+/** O motor do upgrade, que o caso sem git corre num `node` a parte (com o `PATH` dele). */
+const UPGRADE = join(dirname(fileURLToPath(import.meta.url)), "..", "lib", "upgrade-mecanico.mjs");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -137,39 +142,10 @@ export function registar() {
   // Sem resposta do git nao se sabe o que e do template. Seguir com "nada ignorado" e o `TP2`,
   // e aqui teria a consequencia de copiar exactamente o que este filtro existe para travar.
   // Um `.git` que aponta para lado nenhum faz o git falhar SEM subir a um repo pai.
-  test("git que nao responde REPROVA em vez de copiar tudo", () => {
-    const base = mkdtempSync(join(tmpdir(), "sim-up-semgit-"));
-    try {
-      const root = join(base, "tpl");
-      const dir = join(base, "cons");
-      mkdirSync(root);
-      mkdirSync(dir);
-      writeFileSync(join(root, ".git"), "gitdir: /nao/existe\n");
-      try {
-        aplicaUpgradeMecanico({
-          dir,
-          root,
-          tag: "v1.0.0",
-          substituto: "Consumidor",
-          fatal: (m) => {
-            throw new Error(`__fatal__: ${m}`);
-          },
-        });
-        return ["devia ter reprovado"];
-      } catch (err) {
-        if (!err.message.startsWith("__fatal__")) return [`rebentou por outra razao: ${err.message}`];
-        if (!err.message.includes("o que o template ignora")) return [`razao errada: ${err.message}`];
-        // A razao do GIT vai junto: "dubious ownership" num mount e "nao e um repo" pedem
-        // correccoes diferentes, e so ele sabe qual e. A frase depende da versao do git: ate a 2.55
-        // "not a git repository"; na 2.56 (a correccao do diagnostico de um `.git` invalido,
-        // `READ_GITFILE_ERR_NOT_A_REPO` no `setup.c`) "gitfile does not point to a valid repository".
-        // Medido no CI do #393: os runners com o git 2.56 reprovavam este caso, os com o 2.55 nao.
-        return /not a git repository|nao e um repositorio|gitfile does not point to a valid repository/i.test(err.message) ? [] : [`sem a razao do git: ${err.message}`];
-      }
-    } finally {
-      rmSync(base, { recursive: true, force: true });
-    }
-  });
+  test("git que nao responde REPROVA em vez de copiar tudo", () => semGit(null));
+  // O CONTROLO da lingua (#400): com um git que traduz a frente no `PATH` dos processos filhos (o upgrade corre num
+  // `node` a parte), a frase derivada continua a casar, e prova-se que veio traduzida.
+  test("git que nao responde, num git que traduz: a frase derivada casa, a fixa nao (controlo, #400)", () => semGit("traduz"));
 
   // Um nome em NFD (o que o macOS grava muitas vezes) contra a lista do git, que vem em NFC
   // com `core.precomposeunicode`. Sem normalizar os dois lados, o ignorado passava.
@@ -193,4 +169,74 @@ export function registar() {
       ...nao.filter((f) => razaoDoNome(f) !== null).map((f) => `${f} nao devia ser recusado`),
     ];
   });
+}
+
+/**
+ * Um `.git` que aponta para lado nenhum faz o git falhar SEM subir a um repo pai. A razao do GIT vai junto na recusa:
+ * "dubious ownership" num mount e "nao e um repo" pedem correccoes diferentes, e so ele sabe qual e. A frase DERIVA-SE
+ * (#400, `TP8`): a mesma pergunta (`PERGUNTA_AO_GIT`), na mesma pasta e com o mesmo ambiente. Fixa, dependia da
+ * versao (o git 2.56 mudou-a, medido no CI do #393) e da lingua.
+ * @param {"traduz" | null} modo
+ */
+function semGit(modo) {
+  const base = mkdtempSync(join(tmpdir(), "sim-up-semgit-"));
+  try {
+    const root = join(base, "tpl");
+    const dir = join(base, "cons");
+    mkdirSync(root);
+    mkdirSync(dir);
+    writeFileSync(join(root, ".git"), "gitdir: /nao/existe\n");
+    // No controlo, o `PATH` com o git falso vai so para os processos FILHOS: o upgrade corre num `node` a parte, porque
+    // escrever no `process.env` de uma suite e estado global (o Guard 19 reprova-o). O caso normal corre aqui.
+    const falso = modo === "traduz" ? gitQueTraduz(base) : undefined;
+    if (falso === null) return ["nao encontrei o git no PATH para o falso o chamar"];
+    const env = { ...process.env, ...(falso ? { PATH: `${falso}${delimiter}${process.env.PATH}` } : {}) };
+    let disse = "";
+    try {
+      execFileSync("git", PERGUNTA_AO_GIT, { cwd: root, env, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (err) {
+      disse = String(err?.stderr ?? "").trim().split("\n")[0];
+    }
+    // A pergunta tem de FALHAR e dizer alguma coisa: uma frase vazia estava contida em qualquer mensagem (`TP2`).
+    if (disse === "") return ["a pergunta ao git nao falhou, ou nao disse nada: o caso nao mede a razao"];
+    if (modo === "traduz" && !traduzida(disse)) return [`o git falso nao traduziu ("${disse}"): o controlo nao mede nada`];
+    const r = falso ? aplicaNumFilho(dir, root, env) : aplicaAqui(dir, root);
+    if (r.passou) return ["devia ter reprovado"];
+    if (!r.msg.startsWith("__fatal__")) return [`rebentou por outra razao: ${r.msg}`];
+    if (!r.msg.includes("o que o template ignora")) return [`razao errada: ${r.msg}`];
+    return r.msg.includes(disse) ? [] : [`sem a razao do git ("${disse}"): ${r.msg}`];
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+}
+
+/** O upgrade neste processo: `{ passou }` ou `{ msg }` da recusa. */
+function aplicaAqui(dir, root) {
+  try {
+    aplicaUpgradeMecanico({
+      dir,
+      root,
+      tag: "v1.0.0",
+      substituto: "Consumidor",
+      fatal: (m) => {
+        throw new Error(`__fatal__: ${m}`);
+      },
+    });
+    return { passou: true };
+  } catch (err) {
+    return { msg: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** O mesmo num `node` filho, com o `env` dado (o `PATH` do git falso): devolve o mesmo `{ passou }` ou `{ msg }`. */
+function aplicaNumFilho(dir, root, env) {
+  const filho = [
+    `const { aplicaUpgradeMecanico } = await import(${JSON.stringify(pathToFileURL(UPGRADE).href)});`,
+    "const [dir, root] = process.argv.slice(1);",
+    "try {",
+    '  aplicaUpgradeMecanico({ dir, root, tag: "v1.0.0", substituto: "Consumidor", fatal: (m) => { throw new Error(`__fatal__: ${m}`); } });',
+    "  console.log(JSON.stringify({ passou: true }));",
+    "} catch (err) { console.log(JSON.stringify({ msg: err.message })); }",
+  ].join("\n");
+  return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", filho, dir, root], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim().split("\n").pop());
 }

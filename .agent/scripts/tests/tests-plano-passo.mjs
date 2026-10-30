@@ -23,6 +23,7 @@ import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { passoDoCi, passoDoPortao } from "./tests-portao-ci.mjs";
 import { fatiaDoJob, temPortaoC2 } from "./tests-portao-sombra.mjs";
+import { planoJobDe } from "../lib/marcas-yaml.mjs";
 import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -108,7 +109,8 @@ export function ligacaoDosOutputs(ci) {
   const problemas = [];
   if (!passo?.env.includes(`id: ${id}`)) problemas.push(`o passo do plano nao tem \`id: ${id}\` (o que o \`outputs:\` le)`);
   if (!new RegExp(String.raw`^echo "${y}=[^"]*" >> "\$GITHUB_OUTPUT"$`, "m").test(passo?.corpo ?? "")) problemas.push(`o passo do plano nao escreve \`${y}=\` no \`$GITHUB_OUTPUT\``);
-  if (!passoDoPortao(ci)?.env.includes(`PLANO_JOB: \${{ needs.guard-tests.outputs.${x} }}`)) problemas.push(`o \`env:\` do portao nao le \`needs.guard-tests.outputs.${x}\``);
+  // A forma do `PLANO_JOB` e a de `marcas-yaml` (#400), com o output que o `if:` le: um comentario no fim conta.
+  if (!passoDoPortao(ci)?.env.some((l) => planoJobDe(x).test(l))) problemas.push(`o \`env:\` do portao nao le \`needs.guard-tests.outputs.${x}\``);
   return problemas;
 }
 
@@ -192,5 +194,11 @@ export function registar() {
   ]) {
     const m = ci.replace(de, para);
     registarResultado(`plano: ${nome} reprova (controlo, A5)`, m !== ci && ligacaoDosOutputs(m).length > 0 ? [] : [`o controlo ${m === ci ? "nao mudou o ci.yml" : "passou"}`]);
+  }
+  // A forma unica (#400): um comentario YAML depois do `PLANO_JOB` continua ligado; o leitor era um texto exato.
+  {
+    const de = "PLANO_JOB: ${{ needs.guard-tests.outputs.aplica }}";
+    const m = ci.replace(de, `${de} # o plano`);
+    registarResultado("plano: o `PLANO_JOB` com um comentario YAML continua ligado (#400)", m !== ci && ligacaoDosOutputs(m).length === 0 ? [] : [`${m === ci ? "nao mudou o ci.yml" : ligacaoDosOutputs(m).join("; ")}`]);
   }
 }
