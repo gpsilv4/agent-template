@@ -5,6 +5,10 @@
  * Saiu do `superficie-gate.mjs` quando ele chegou as 494 linhas (o Guard 17 reprova acima de 500), sem mudar
  * comportamento: as linhas vieram tal e qual. O gate importa daqui o que partilha (o `semComentario`, o `indent`,
  * a `MAQUINARIA`, o `idDe`, os `agregadoresDe`, os `defeitosNovos` e as `colisoesNovas`); este modulo nao importa o gate (sem ciclo).
+ * Tem tambem o leitor de jobs e passos (`jobsDe`, `passosDe`, #362), que o `saltos-variavel.mjs` e o `passos-novos.mjs`
+ * usam; o gate parte os jobs e os passos com o seu proprio agrupamento, e daqui so usa o `normalizaPasso` e o `limpas`
+ * (o `passos-novos.mjs` tem a sua `identidade`). E as colisoes de nomes de check entre workflows
+ * (`colisoesEntreWorkflows`, #355).
  * Cada defeito sai por `defeito(`, o sinal do par em `lib/pares.mjs` (#382); o dono na varredura e o
  * `tests/tests-estrutura-workflow.mjs`, no `test-guards`, onde cada sitio morre em milissegundos.
  */
@@ -134,7 +138,7 @@ export const limpas = (ls) => ls.map((l) => l.trim()).filter(Boolean);
  * fazia de tudo o que vem depois de um `#` um comentario de shell, e o passo ficava verde sem varrer
  * (segunda leitura do #285, medido no `ci.yml`). So com UMA linha de conteudo as formas sao a mesma:
  * `run: x` e `run: |` + `x` (medido: um teste do #279 apanhou o alarme). As aspas de `run: "x"` saem.
- * Saiu do `superficie-gate.mjs` (#362): o gate e o `passos-novos.mjs` comparam passos pela mesma forma.
+ * Saiu do `superficie-gate.mjs` (#362), que o usa; o `passos-novos.mjs` compara passos pela sua `identidade`.
  */
 export function normalizaPasso(ls) {
   const out = [];

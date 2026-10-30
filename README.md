@@ -260,6 +260,7 @@ not to* line, so every agent sees it.
     │   ├── pares-publicos.mjs  <- ...and for the commit-msg and the forbidden names (#375)
     │   ├── pares-simuladores.mjs <- ...and for the two simulators and their libs (#400)
     │   ├── nomes-proibidos.mjs <- The forbidden-names list, kept OUTSIDE the repo, and how a name matches (#375)
+    │   ├── prefixo-commit.mjs  <- The Conventional Commits prefix the commit-msg checks, types from CONTRIBUTING.md (#394)
     │   ├── regex-literal.mjs   <- A text as a regex literal: the one source, and the two bound copies (#400)
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
@@ -272,7 +273,9 @@ not to* line, so every agent sees it.
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
     │   ├── superficie-gate.mjs <- The CI gate in the test surface: `on:`/`env:`/`defaults:`, machinery steps, the `Test-Surface:` trailer (#285)
-    │   ├── estrutura-workflow.mjs <- The CI gate's structure: jobs, `needs:`, aggregators, shape defects (#374b)
+    │   ├── estrutura-workflow.mjs <- The CI gate's structure: a job/step reader (used by the two below), `needs:`, aggregators, shape defects, cross-workflow check names (#374b, #355, #362)
+    │   ├── saltos-variavel.mjs <- A step that skips on a `case` variable whose value stopped deciding (#353)
+    │   ├── passos-novos.mjs    <- A new step before the suites that is not read-only (#362)
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command
     │   ├── upgrade-mecanico.mjs   <- The /upgrade's mechanical engine (writes over a consumer)
     │   ├── upgrade-categorias.mjs <- ...and its data: what is copied, the project's constants, what moved
@@ -305,7 +308,9 @@ not to* line, so every agent sees it.
             ├── guard-direto.mjs          <- Runs one guard module directly, without the full checker
             ├── fixture-ordem.mjs         <- Fixtures for the owner-first ordering
             ├── relatorio.mjs             <- PASS/FAIL counters and the fail-fast mode, one source
-            ├── repo-descartavel.mjs      <- The throwaway git repo the CI gate's real shell runs in
+            ├── repo-descartavel.mjs      <- The throwaway git repo the CI gate's real shell runs in, and a git that translates (#400)
+            ├── casos-modos.mjs           <- The sweep suite's `--list`/`--diff` cases, called in place (#400)
+            ├── casos-commit-msg-prosa.mjs <- The commit-msg suite's prose-vs-attribution cases, called in place (#400)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -433,7 +438,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every PR and push** (†) in the `guard-tests` job |
 | Sweep plan | the `Plano da varredura` step: runs the BASE commit's `lib/plano-ci.mjs` on the PR's diff and writes `aplica=true\|false` for the `sweep` job's `if:` — first step of the `guard-tests` job, PR only (#347) |
 | Commit messages | `.githooks/commit-msg` over every commit message in the range, and over the PR title in a PR (Conventional Commits prefix, no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
-| Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
+| Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps, a new step before the suites that is not read-only (#362), or a step that skips on a literal `case` variable (#353) passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every PR and push (†) in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |

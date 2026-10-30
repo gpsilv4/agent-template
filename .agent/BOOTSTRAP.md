@@ -638,10 +638,12 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   > Fora do Claude Code (Gemini, Cursor, Copilot, Codex) **perde-se o automatismo, nao a
   > verificacao**: os mesmos criterios estao nos guards de `.agent/scripts/`, que so precisam de
   > `node`, e o CI corre-os para todos.
-- **`.githooks/commit-msg`** (independente da tool): recusa atribuicao a IA na mensagem de
-  commit. E versionado mas **nao esta ativo num clone novo** — cada programador liga-o uma vez
-  com `git config core.hooksPath .githooks`. Por esta linha no `/setup` (ja la esta) e no
-  README do projeto; o CI re-corre a mesma verificacao em cada PR, logo vale de qualquer forma.
+- **`.githooks/commit-msg`** (independente da tool): recusa atribuicao a IA, um nome da lista de
+  nomes proibidos (#375) e um assunto sem o prefixo Conventional Commits da tabela `### Types` do
+  `CONTRIBUTING.md` (#394). E versionado mas **nao esta ativo num clone novo** — cada programador
+  liga-o uma vez com `git config core.hooksPath .githooks`. Por esta linha no `/setup` (ja la esta)
+  e no README do projeto; o CI corre o mesmo hook em cada commit do PR e no titulo dele (sem a lista,
+  que so existe localmente), logo vale de qualquer forma.
 - **Servidores MCP**: o template **nao traz nenhum**, e isso e deliberado — um `.mcp.json`
   versionado e um convite a guardar tokens no repo. Antes de adicionar um, ler
   **`.agent/rules/mcp-policy.md`** (quando compensa, e o que nunca pode la estar); os **Guard 16** verificam-no. Adicionar um servidor MCP e "perguntar primeiro", como uma dependencia.

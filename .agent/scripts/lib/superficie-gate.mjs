@@ -33,7 +33,9 @@
  * LIMITES ASSUMIDOS, escritos para nao serem descobertos: sem parser de YAML (os scripts nao tem
  * dependencias), logo um `on:` ou um passo montados por ancoras/aliases (`<<: *base`, `- *gate`) e
  * um job reutilizavel (`uses: ./.github/workflows/x.yml`) nao se leem; uma linha NOVA que neutraliza
- * noutro passo (um `git checkout` da base, um `ref:` no `actions/checkout`) nao e vista — as formas
+ * noutro passo (um `git checkout` da base, um `ref:` no `actions/checkout`) so e vista antes do ultimo passo da
+ * maquinaria, num job que ja existia e a corre (o `lib/passos-novos.mjs`, #362): nos jobs sem maquinaria (os testes
+ * da app no `quality`), depois dela, ou num job novo, nao — as formas
  * de shell sao o #295; um clone raso (`fetch-depth` curto) pode por em `base..HEAD` commits que nao
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
  */

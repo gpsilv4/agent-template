@@ -47,8 +47,14 @@ and every person, agents included. A human co-author is fine.
 `pytest`, `python -m unittest`, `go|cargo|dotnet|make test`, `node --test`), changing the top-level `on:`, `env:` or
 `defaults:`, or changing or removing a STEP that mentions `.agent/scripts/`, `.claude/hooks/` or
 `.githooks/` (or the job it runs in: its `if:`, `needs:`, `env:`...), fails the
-`check-test-surface` step — it changes the gate without touching a test (#285). Adding a new
-step does not, and neither does adding a suite line to the parallel suites step, inside the
+`check-test-surface` step — it changes the gate without touching a test (#285). So do two more
+changes that switch the suites off without touching them: a new step BEFORE the last machinery
+step, in a job that already existed, that is not read-only — `npm ci`, `cp .env.example .env`, a
+`$(...)`, an `env:`, an action other than `actions/checkout`/`actions/setup-*` (#362) — and a step
+that skips on a `case` variable whose value stopped coming from an output, when the `case` arm it
+hits exits without an error (`TEM_APP: 'false'` with `false) exit 0;;`, #353 — wherever the step
+is). Any other new step AFTER the suites, or a read-only one before them (`echo`, `ls`, `git status`,
+running an existing verifier), does not; neither does adding a suite line to the parallel suites step, inside the
 chain that starts at the runner (#341); removing one, or touching the runner, does. When the change is deliberate, add a trailer to the LAST commit of the PR that
 touches that file, with the file and the reason (`—`, `--` or ` - ` as the separator):
 

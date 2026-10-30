@@ -485,15 +485,20 @@ o `@ref` de um `uses:`.
 Os passos da app do `ci.yml` saltam no shell quando o `TEM_APP` diz que nao ha app (`case "$TEM_APP" in ...
 false) ... exit 0`). Um valor que deixe de vir de um output — `TEM_APP: 'false'`, uma expressao que da
 sempre o mesmo, ou o `env:` passado do passo para o job — desligava o passo sem marca nenhuma. O gate do
-`check-test-surface` (`lib/saltos-variavel.mjs`) passa a contar, por job e chave, os passos cujo valor
-efetivo nao e uma referencia exacta (`${{ steps.x.outputs.y }}`) nem o literal `true`, e avisa quando ha
-mais agora do que na base.
+`check-test-surface` (`lib/saltos-variavel.mjs`) passa a contar, por job e chave, os passos SUSPEITOS, e
+avisa quando ha mais agora do que na base. Suspeito: um literal cujo ramo do `case` que o apanha sai sem erro
+(o passo salta: `TEM_APP: 'false'` com `false) ... exit 0`; o mesmo `true` do template cai no `true) ;;` e
+corre), uma expressao sem referencias ou com um literal que vence (`${{ x && 'false' }}`), a chave
+reatribuida no proprio `run`, e o que nao se le. Seguro: uma referencia (`${{ steps.x.outputs.y }}`), uma
+comparacao, `!x`, `x || 'padrao'`.
 
-**O que isto pede a um derivado:** nada, se os seus passos leem o valor de um output. Um idioma legitimo com
-um literal (`env: TARGET: staging` + `case "$TARGET"` num deploy) avisa no PR que o acrescenta; a saida e o
-trailer `Test-Surface: .github/workflows/<ficheiro> — <porque>`, como nos outros sinais do gate. O trailer
+**O que isto pede a um derivado:** nada, se os seus passos leem o valor de um output. Um literal cujo ramo
+faz o trabalho fica calado: o idioma do deploy (`env: TARGET: staging` + `case "$TARGET" in staging)
+./deploy.sh;;`) e seguro (o caso em `tests-saltos-variavel.mjs`). Avisa um literal cujo ramo sai sem erro; a
+saida e o trailer `Test-Surface: .github/workflows/<ficheiro> — <porque>`, como nos outros sinais do gate. O trailer
 aceita o ficheiro inteiro: um escrito para outra mudanca no mesmo commit tambem aceita esta. Fica de fora:
-editar o `case` em vez do `env:` (#411), o `$GITHUB_ENV` (#362), e os workflows que nao correm testes.
+editar o `case` em vez do `env:` (#411), o `$GITHUB_ENV` escrito por um passo que ja existia ou fora das
+suites (um passo NOVO que o escreva antes delas avisa pelo #362), e os workflows que nao correm testes.
 
 ## Porque os registos do harness passam a contar na superficie (#359)
 
@@ -540,7 +545,8 @@ cada commit do PR e sobre o **titulo** do PR, que num squash e a 1.a linha do co
   sem o passo com o nome novo), e o hook verifica os commits mas nao o titulo.
 - **Um bot de dependencias sem prefixo** (um `dependabot.yml` do projeto sem `commit-message.prefix`,
   que escreve `Bump x from 1 to 2`, ou o Renovate, `Update dependency x`) passa a pôr cada PR dele
-  vermelho: configurar o prefixo (`chore`, como o `dependabot.yml` do template).
+  vermelho: configurar o prefixo com um type da tabela (o `dependabot.yml` do template usa `chore` no `npm` e
+  `ci` nas actions).
 - O "Commit suggestion" de uma revisao (`Apply suggestions from code review`) passa; o
   `Update <ficheiro>` do editor web num branch do PR nao (escreve-se a mensagem no editor).
 - Um commit feito pelo **editor web** direto no `main`, com a mensagem sugerida (`Update
@@ -699,6 +705,21 @@ pasta da fronteira que e symlink (`.githooks` -> `.husky`) e as colisoes de um a
 o que a arvore de trabalho ja tem igual ao staging conta como aplicado (a 2b corrida outra vez na §3
 nao o repete); e os `.claude/agents/` intactos saem no mesmo bloco. Os achados baixos ficaram no #317.
 
+
+## Porque um comando que publica noutro repo arma mesmo num repo desligado (#399)
+
+Um repo privado pode DESLIGAR a lista de nomes proibidos (o interruptor, na seccao seguinte): os nomes sao
+legitimos dentro dele. Mas um comando corrido de la que publique NOUTRO repo levava-os para fora. Por isso o hook
+`guard-textos-publicos` (`.claude/hooks/lib/textos-publicos.mjs`, o `alvoExterno`) arma na mesma, num repo
+desligado, quando o comando publica noutro sitio: `-R`/`--repo`, um `GH_REPO=` em qualquer comando do texto, um
+`gh api` fora de `repos/{owner}/{repo}`, um `graphql` com `mutation`, um gist, um `repo create`, um `repo edit
+<repo>`, um URL no lugar do issue/PR, `git -C` e `cd`.
+
+**O que isto pede a um derivado:** nada, se nunca publica fora do proprio repo. Um URL do **proprio** repo no
+lugar do numero (`gh pr comment https://.../<repo>/pull/N`) tambem arma: e um falso positivo aceite, e a saida e
+usar o numero. Fica por ver (escrito no modulo): o `gh repo set-default`, um `GH_REPO` ja exportado, o
+`--hostname`/`GH_HOST`, as rotas deste repo que criam outro (`/generate`, `/forks`), e um `graphql -F query=@f`
+com o `f` escrito no mesmo comando.
 
 ## O contrato da lista de nomes proibidos (#375)
 

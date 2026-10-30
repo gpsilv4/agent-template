@@ -6,7 +6,7 @@
  * Um valor LITERAL (`TEM_APP: 'false'`), uma expressao que da sempre o mesmo (`${{ x && 'false' }}`) ou o `env:`
  * passado do passo para o job desligam o passo sem nenhuma marca e sem nenhuma contagem que desca. O gate
  * (`superficie-gate.mjs`, `verificaGate`) chama `saltosNovos` e poe o que sair nos seus `sinais`, com o trailer
- * `Test-Surface:` como saida — o idioma do deploy (`TARGET: staging` + `case "$TARGET"`) e legitimo.
+ * `Test-Surface:` como saida. O idioma do deploy (`TARGET: staging` + um ramo do `case` que faz o deploy) nao avisa.
  *
  * A UNIDADE e `(job, chave)`, e conta-se o NUMERO de passos suspeitos dela: avisa quando ha mais agora do que na
  * base. Renomear ou reordenar passos fica calado; um passo novo, ou um nome repetido, com um valor suspeito, avisa.
