@@ -51,7 +51,7 @@ project, on any plan:
 
 - **Gitleaks** (`ci.yml`, `secret-scan` job) — the replacement for secret scanning (`SECURITY.md` § Secret Scanning)
 - **Dependabot** alerts, and the weekly version updates from `.github/dependabot.yml`. Those wait a **7-day `cooldown`** (#377): a compromised version is usually pulled within hours or days, and with auto-merge on it would otherwise be merged in the next weekly run. Security updates don't wait (the `cooldown` only applies to version updates, per GitHub's Dependabot options reference); the cost is that, with the run on Mondays, the other updates arrive 7 to 13 days later
-- The **guards** (`.agent/scripts/`), the **`commit-msg`** hook (`.githooks/`; its AI-attribution part is checked again in CI)
+- The **guards** (`.agent/scripts/`), the **`commit-msg`** hook (`.githooks/`; CI runs it again on every PR commit and on the PR title — the Conventional Commits prefix and the AI attribution; the forbidden-names list exists only locally)
 - Without branch protection, CI is an **informative traffic light**: never merge with red checks
 
 ## Reading and enabling them from the terminal

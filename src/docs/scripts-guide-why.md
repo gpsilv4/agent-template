@@ -191,7 +191,8 @@ app). Passa a 2 (o portao e o `Secret Scan`, #372), como na tabela acima.
 **O portao (`Guard Tests`) nao confia no `if:`.** Corre sempre (`always()`), e no seu shell aceita as suites
 `skipped` so com as tres condicoes recalculadas (nao e um PR, `private == true`, committer `web-flow`) e a
 varredura tambem saltada. Ai corre o `.githooks/commit-msg` sobre a mensagem do merge — e a atribuicao a IA
-continua a ser apanhada no `main`, que de outro modo ninguem lia. Qualquer outro `skipped` reprova: um `if:`
+e o prefixo Conventional Commits (#394, com o `COMMIT_MSG_FINAL`) continuam a ser apanhados no `main`, que de
+outro modo ninguem lia. Qualquer outro `skipped` reprova: um `if:`
 alargado num PR futuro avisa uma vez no `check-test-surface` (sai pelo trailer) e, depois disso, o portao
 reprova cada push que ele deixasse de verificar. O shell real e testado em `tests-portao-ci.mjs`.
 
@@ -552,7 +553,8 @@ para nao ser descoberto:
   (`npm test && cat <<EOF` com `chave: valor` na linha seguinte le-se como chave YAML).
 - **Shell**: `trap 'exit 0' EXIT`; `npm test &` + `wait` (sem pid devolve 0); `timeout N`, `VAR=x`,
   `(` ou `{` entre o `if` e o runner; uma linha NOVA que neutraliza noutro passo (`git checkout` da
-  base, `ref:` no `actions/checkout`).
+  base, `ref:` no `actions/checkout`) nos jobs sem maquinaria, depois dela ou num job novo (antes do
+  ultimo passo da maquinaria, num job que ja existia, avisa desde o #362).
 - **Selecao de testes**: um caminho posicional (`vitest run src/um`, `pytest tests/um.py::t`); o
   `--project` do Playwright, fora de proposito — `--project=${{ inputs.project || 'chromium' }}` e
   idioma corrente.

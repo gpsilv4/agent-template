@@ -17,7 +17,7 @@
  *    reabria a fuga: `ls \` + `# x` + `node -e ...` — a shell corre o `node -e`); sem `${{`, `$(`, `` ` ``, `<`,
  *    `>`, nem um prefixo `X=y`; os separadores (`;`, `&&`, `||`, `&`, `|`) partem os comandos, e CADA um tem de
  *    estar na lista: `echo`, `printf`, `ls`, `cat`, `pwd`, `true`, `which`, `printenv`; `env` sem argumentos;
- *    `set` so com o que endurece (`-e`, `-u`, `-x`, `-o pipefail`);
+ *    `set` com opcoes (`-e`, `-o pipefail`, e tambem `+e`: cada `run:` tem a sua shell, logo nao chega as suites);
  *    `node`/`npm` `-v`/`--version`; `git status|log|show|diff|rev-parse|describe` sem `--output`/`--ext-diff`/
  *    `--exec-path`; e `[exec] node <caminho da maquinaria> [args]`, ancorado, sem `..`, sem opcoes antes, num passo
  *    sem `working-directory:` — se o ficheiro existia na base e nao mudou, ou, novo ou mudado, se tiver a forma de um

@@ -1,5 +1,6 @@
 /**
- * Hook `commit-msg`: nenhuma mensagem de commit atribui codigo a uma IA — {{PROJECT_NAME}}
+ * Hook `commit-msg`: nenhuma mensagem atribui codigo a uma IA, nomeia um nome proibido, ou foge ao prefixo
+ * Conventional Commits — {{PROJECT_NAME}}
  *
  * A LOGICA do hook. O ficheiro do evento (`.githooks/commit-msg`) e so um ponteiro que a importa:
  * o git exige o nome exato do evento, sem extensao, e o CodeQL escolhe os ficheiros PELA extensao
