@@ -79,6 +79,22 @@ const CONTAGENS = [
   // `, {` numa linha: 10,9 s -> 2 ms); e a mensagem do inverso para no `?` (50 mil `?[""`: 14,9 s -> 2 ms). Os dois
   // ultimos nao mudam nenhuma contagem do repo (683 = 683, ficheiro a ficheiro).
   { re: /(?<!function\s+)\bregistarResultado\s*\(|\?\s*\[\]\s*:\s*\[\s*""|\?\s*\[\s*""[^\]\n?]*\]\s*:\s*\[\]|^[ \t]*\{[ \t]*nome[ \t]*:|^[ \t]*\[[ \t]*""(?=[^\n]*,[ \t]*\{)[^\n]*\}[ \t]*\],?[ \t]*(?:\/\/.*)?$/m, msg: "registos, assercoes e linhas de casos (registarResultado)" },
+  // As CHAMADAS dos modulos de casos (#419): o #400 (b) moveu blocos de casos de duas suites para `tests/harness/casos-*.mjs`,
+  // que a suite chama no sitio (`casosDaProsa(test);`). Apagar a chamada (e o import) tirava os casos sem nenhuma
+  // contagem descer: a suite nao perdia nenhum `test(`, e o modulo ficava. Conta cada chamada `casosX(test)`.
+  // A DEFINICAO nao conta: `function casosX(test)` pelo lookbehind (o do #359), e qualquer forma seguida de `{` (um
+  // metodo `casosX(test) {`, um `function* casosX(test) {`) pelo `(?!\s*\{)` no fim. Contada, uma definicao vazia
+  // acrescentada escondia uma chamada apagada, e renomear o parametro de uma dava um alarme falso. O `\b` A FRENTE: com ele o lookbehind so se tenta num
+  // inicio de palavra, e `meuscasosX(test)` nao conta (o teste de tempo prende-o). Sem `cru` (de proposito, ao contrario
+  // de entradas vizinhas): conta-se com as strings apagadas, logo as fixtures `'casosX(test);'` dos testes nao contam.
+  // Medido: 0 ocorrencias nos dois derivados (todo o historico); no template, so as 3 chamadas do #400 (b).
+  // Limites (escritos): NAO se ve um modulo `casos-*` novo sem chamada nenhuma, a chamada movida para um ficheiro que
+  // nao corre (da NOTE: "movido" nao e "corre"), uma chamada mantida e tornada inutil (`return;` no topo, uma
+  // closure que nunca corre), nem a chamada dentro de um comentario de bloco em varias linhas (o `semComentarios` so
+  // apaga as linhas que COMECAM por `//`, `*` ou `/*`: limite de todas as `CONTAGENS`). AVISA num refactor legitimo, sem
+  // saida por trailer: renomear sem o prefixo `casos`, um alias (`casosDaProsa(t)`), um import de namespace
+  // (`casos.prosa(test)`), um argumento a mais (`casosDaProsa(test, opcoes)`) e um espaco antes do `(` — explica-se no PR.
+  { re: /\b(?<!function\s+)casos[A-Z]\w*\(\s*test\s*\)(?!\s*\{)/, msg: "chamadas de modulos de casos (casos*(test))" },
   // A2: a "configuracao do runner" deste repo conta-se assim.
   // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
