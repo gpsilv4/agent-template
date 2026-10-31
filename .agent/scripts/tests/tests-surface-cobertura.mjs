@@ -125,6 +125,65 @@ export function registar() {
     });
   }
 
+  // --- As chamadas dos modulos de casos (#419) ---------------------------------------
+  // Atras da guarda pela mensagem (a entrada e do projeto, como a do #359). Os casos sao linhas `[rotulo, ..., { de, para }]`.
+  {
+    const MSG = "chamadas de modulos de casos (casos*(test))";
+    const A = "casosDaProsa(test);\n", B = "casosDoDiff(test);\n";
+    // A definicao com um tipo (TS) e a que so o lookbehind exclui: o `)` e seguido de `:`, nao de `{`.
+    const DEF = "export function casosDaProsa(test): void {}\n";
+    seAContagemExistir(MSG, "cobertura (modulos de casos)", () => {
+      for (const [nome, antes, depois, { de, para }] of [
+        ["apagar uma chamada desce", A + B, B, { de: 2, para: 1 }],
+        ["a definicao nao conta (o lookbehind)", DEF + A + B, DEF + B, { de: 2, para: 1 }],
+        ["uma definicao em forma de metodo nao conta (o `{` a seguir)", "const c = { casosNovo(test) {} };\n" + A, "const c = { casosNovo(test) {} };\n", { de: 1, para: 0 }],
+        ["uma definicao vazia acrescentada nao esconde a chamada apagada", A, DEF, { de: 1, para: 0 }],
+        ["`casos` a meio de um identificador nao conta (o `\\b`)", "meuscasosX(test);\n" + A, "meuscasosX(test);\n", { de: 1, para: 0 }],
+        ["acrescentar fica calado", A, A + B, { de: 1, para: 2 }],
+      ]) {
+        test(`cobertura (modulos de casos): ${nome}`, (dir) => muda(dir, "tests/a.test.js", antes, depois),
+          para < de ? { code: 1, includes: [`${MSG}: ${de} -> ${para}`] } : { code: 0, excludes: [`${MSG}:`] });
+      }
+      // As tres chamadas REAIS, cada uma apagada da sua suite (o caso que o #400 (b) deixou sem rede). O `n` conta-se
+      // com a regex da TABELA (e nao uma copia), sobre o texto sem as linhas de comentario: uma fixture numa string do
+      // ficheiro real daria um vermelho falso aqui (na direccao segura), e e por isso que o caso o diz.
+      const regex = new RegExp(CONTAGENS.find((c) => c.msg === MSG).re.source, "g");
+      for (const [suite, chamada] of [["test-commit-msg.mjs", "casosDaProsa(test);"], ["test-mutation-sweep.mjs", "casosDoList(test);"], ["test-mutation-sweep.mjs", "casosDoDiff(test);"]]) {
+        const real = readFileSync(join(ROOT, ".agent/scripts/tests", suite), "utf8");
+        const n = (real.split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l)).join("\n").match(regex) || []).length;
+        test(`cobertura (modulos de casos): apagar \`${chamada}\` do ${suite} real avisa`, (dir) =>
+          muda(dir, `tests/${suite}`, real, real.split("\n").filter((l) => l.trim() !== chamada).join("\n")),
+        { code: 1, includes: [`${MSG}: ${n} -> ${n - 1}`] });
+      }
+      test("cobertura (modulos de casos): mover uma chamada para outro ficheiro fica calado", (dir) => {
+        mkdirSync(join(dir, "tests"), { recursive: true });
+        writeFileSync(join(dir, "tests/a.test.js"), A + B);
+        writeFileSync(join(dir, "tests/b.test.js"), "");
+        commit(dir, "antes");
+        const ref = git(dir, ["rev-parse", "HEAD"]);
+        writeFileSync(join(dir, "tests/a.test.js"), B);
+        writeFileSync(join(dir, "tests/b.test.js"), A);
+        commit(dir, "depois");
+        return ref;
+      }, { code: 0, includes: [`${MSG}: 2 -> 1 — o total da superficie NAO desceu (movido, nao perdido)`] });
+      // O custo, num processo filho com `timeout`: uma palavra longa de `casosA` repetido e uma corrida longa de espacos.
+      // Cada uma tambem SEM o `(test)` no fim: e a entrada que FALHA que obriga a recuar (com o `(test)`, ate uma regex
+      // exponencial casava a primeira; o controlo com `(?:\w|\w)*` ficou verde — medido).
+      const re = CONTAGENS.find((c) => c.msg === MSG).re;
+      const codigo = `
+        const g = new RegExp(${JSON.stringify(re.source)}, ${JSON.stringify(re.flags + "g")});
+        const longa = "casosA".repeat(30000);
+        for (const t of [longa + "(test)", longa, longa + "(", " ".repeat(20000) + "casosX(test)", "function" + " ".repeat(20000) + "casosX(test)", "function" + " ".repeat(20000) + "casosX"]) t.match(g);`;
+      let problemas = [];
+      try {
+        execFileSync(process.execPath, ["-e", codigo], { timeout: 5000, stdio: "ignore" });
+      } catch (err) {
+        problemas = [err.signal ? `nao terminou em 5 s (${err.signal}) — backtracking?` : `rebentou: ${err.message}`];
+      }
+      registarResultado("cobertura (modulos de casos): uma palavra de `casosA` repetido e espacos longos medem-se em < 5 s", problemas, "");
+    });
+  }
+
   // --- Marcas que so uma entrada apanha --------------------------------------------
   test("cobertura: `test.concurrent.skip` acrescentado e detetado", (dir) =>
     muda(dir, "tests/a.test.js", 'test.concurrent("a", () => {});\n', 'test.concurrent.skip("a", () => {});\n'),

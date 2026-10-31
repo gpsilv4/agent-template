@@ -521,6 +521,21 @@ e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a f
 `test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
 explica-se no PR.
 
+## Porque as chamadas dos modulos de casos passam a contar na superficie (#419)
+
+O #400 (b) moveu blocos de casos de duas suites para modulos em `tests/harness/casos-*.mjs`, que a suite chama no
+sitio (`casosDaProsa(test);`). Apagar a chamada tirava os casos sem nenhuma contagem descer. A `CONTAGENS` ganhou
+uma entrada, `chamadas de modulos de casos (casos*(test))`, que conta cada chamada `casosX(test)` (a definicao
+`function casosX(test)` nao conta).
+
+**O que isto pede a um derivado:** o mesmo que a entrada do #359. Se a `CONTAGENS` dele ficou igual a do template,
+o `/upgrade` traz a entrada. Se ele a **mudou**, o upgrade preserva a dele e a entrada nova nao chega: copia-se a mao
+do `surface-patterns.mjs` do template (como qualquer constante, na 2b). Ate la, os casos desta (no
+`tests-surface-cobertura.mjs`) dizem `SKIP` com o nome da entrada; quem adaptar a regex muda-lhe tambem a mensagem.
+Uma CHAMADA `casosX(test)` nas suites da app passa a contar: apaga-la avisa, sem saida por trailer (medido: 0 nos
+dois derivados, em todo o historico). Os limites (o que nao se ve, e o que avisa num refactor legitimo) estao no
+comentario da entrada, em `lib/surface-patterns.mjs`.
+
 ## Porque o `commit-msg` passa a verificar o prefixo Conventional Commits (#394)
 
 O `core-rules.md` dizia que o `type(scope):` "e o que o `.githooks/commit-msg` e o CI verificam", e
