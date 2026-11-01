@@ -38,8 +38,12 @@
  * da app no `quality`), depois dela, ou num job novo, nao — as formas
  * de shell sao o #295; um clone raso (`fetch-depth` curto) pode por em `base..HEAD` commits que nao
  * sao do PR; e o trailer le-se dos COMMITS, logo uma alteracao ainda por commitar avisa sempre.
+ * O NOME de check de um portao compara-se direto (#420, `nomesMudados`), num workflow que corre testes; nao se ve
+ * mudar por uma ancora (`name: *n`) definida no `env:` de OUTRO job ou num passo sem maquinaria, por uma expressao
+ * cujo valor muda fora do diff (`${{ vars.X }}`, `${{ needs.x.outputs.n }}`), nem um check publicado pela API. E os
+ * jobs que nao sao portao (`Secret Scan`, `Code Quality`, `Analyze`) nao sao vigiados de todo.
  */
-import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas, limpas, normalizaPasso } from "./estrutura-workflow.mjs";
+import { semComentario, indent, MAQUINARIA, idDe, agregadoresDe, defeitosNovos, colisoesNovas, limpas, normalizaPasso, checksPorId, checksDe, chaveDoNome } from "./estrutura-workflow.mjs";
 import { saltosNovos } from "./saltos-variavel.mjs";
 import { passosNovos } from "./passos-novos.mjs";
 import { partePasso, unidadesDoParalelo } from "./passo-paralelo.mjs";
@@ -70,7 +74,8 @@ export const blocoOn = (texto) => blocoDeTopo(texto, /^(?:on|"on"|'on'|true)[ \t
  *  `runs-on` ou um `permissions` errados fazem o job FALHAR ou ficar pendente — e um required check
  *  pendente bloqueia o merge. Medido no historico: o `timeout-minutes` subido duas vezes arrastava
  *  todos os passos do job para o aviso. Lista do que se IGNORA, de proposito: uma chave que nao
- *  esteja aqui continua vigiada (falha fechada, `TP6`). */
+ *  esteja aqui continua vigiada (falha fechada, `TP6`). O `name:` e o nome do CHECK que uma protecao exige: nao
+ *  conta aqui porque se compara a parte, inteiro e com as linhas de continuacao (`nomesMudados`, #420). */
 const CABECALHO_INOFENSIVO = /^(?:timeout-minutes|runs-on|name|permissions|outputs|concurrency|environment)[ \t]*:/;
 
 /** O cabecalho de um job sem as chaves inofensivas (e o que esta aninhado nelas). */
@@ -250,6 +255,44 @@ function workflowsDe(git, ler, base) {
 }
 
 /**
+ * O NOME de check de cada job PORTAO da base (com maquinaria, ou agregador) que mudou (#420): uma protecao exige-o pelo
+ * nome, e renomear o portao e dar o nome antigo a um job `run: true` satisfazia-a sem aviso. Compara-se o check que o
+ * GitHub mostra (`checksPorId`): um nome literal pelo valor (as aspas e um `#` entre aspas nao contam), um que nao se le
+ * (expressao, matriz, continuacao) pelo bloco do `name:`. Avisa tambem o portao que saiu do workflow, ou que deixou de
+ * ser portao (o id dado ao job falso). Diz quem tem agora o nome antigo, neste ou noutro workflow da raiz: com o
+ * trailer, o NOTE continua a mostra-lo. Sem a lista dos outros workflows so se cala essa parte; o aviso fica.
+ */
+function nomesMudados({ f, para, antes, depois, git, ler, base }) {
+  const [ca, cd] = [checksPorId(antes), checksPorId(depois)];
+  const mostra = (c) => (c.nome !== null ? `\`${c.nome}\`` : `(nao literal ou de matriz: \`${(c.bloco ?? "").replace(/\s+/g, " ").trim()}\`)`);
+  const herdeiros = (id, nome) => {
+    if (nome === null) return "";
+    let fora = [];
+    try {
+      fora = workflowsDe(git, ler, base).agora.filter((w) => w.f !== f && w.f !== para);
+    } catch {
+      fora = [];
+    }
+    const igual = (c) => chaveDoNome(c.nome) === chaveDoNome(nome);
+    const quem = [
+      ...checksDe(depois).filter((c) => c.id !== id && igual(c)).map((c) => `\`${c.id}\` deste ficheiro`),
+      ...fora.flatMap((w) => checksDe(w.texto).filter(igual).map((c) => `\`${c.id}\` de \`${w.f}\``)),
+    ];
+    return quem.length ? ` — e \`${nome}\` e agora o nome do job ${quem.join(", ")}` : "";
+  };
+  const out = [];
+  for (const [id, a] of ca) {
+    if (!a.portao) continue;
+    const d = cd.get(id);
+    if (!d) out.push(`o job portao \`${id}\` (check ${mostra(a)}) saiu deste workflow — a protecao exige checks pelo nome${herdeiros(id, a.nome)}`);
+    else if (a.nome !== d.nome || (a.nome === null && a.bloco !== d.bloco)) {
+      out.push(`o nome de check do job portao \`${id}\` mudou de ${mostra(a)} para ${mostra(d)} — a protecao exige checks pelo nome${herdeiros(id, a.nome)}`);
+    } else if (!d.portao) out.push(`o job \`${id}\` deixou de ser portao e continua a dar o check ${mostra(d)} — a protecao exige checks pelo nome`);
+  }
+  return out;
+}
+
+/**
  * Avisa quando um workflow que CORRE TESTES muda o `on:`, o `env:`/`defaults:` de topo, ou um
  * passo da maquinaria. Com o trailer no ultimo commit que mexe no ficheiro, passa a nota.
  *
@@ -308,6 +351,7 @@ export function verificaGate({ f, antes, origem, antesOrigem, agora, para, conta
     else sinais.push(`passo da maquinaria mudou ou saiu: ${u.rotulo}`);
   }
   for (const job of cabecalhos) sinais.push(`o cabecalho do job \`${job.replace(/:$/, "")}\` mudou (if:/needs:/env:/continue-on-error:...)`);
+  sinais.push(...nomesMudados({ f, para, antes, depois, git, ler, base }));
   // Uma suite que ficou FORA da cadeia do runner (#341): o aviso acima diz "o passo mudou"; este diz porque.
   // Pelo `passo` e nao pela `chave`: senao uma suite ja fora da cadeia na base voltava a cada mudanca de cabecalho.
   for (const v of ud) if (v.aviso && !ua.some((u) => u.passo === v.passo)) sinais.push(v.aviso);

@@ -59,19 +59,28 @@ function needsDe(job) {
 function nomeLiteral(cru, id) {
   const linha = cru.find((l) => /^[ \t]*name[ \t]*:/.test(l));
   if (!linha) return id;
-  // A ancora (`&n`) e a tag `!!str` nao fazem parte do valor (#355): o YAML le `&n Guard Tests` como `Guard Tests`.
-  const v = linha.replace(/^[ \t]*name[ \t]*:[ \t]*/, "").replace(/^&\S+[ \t]+/, "").replace(/^!!str[ \t]+/, "");
-  const aspas = /^(["'])(.*?)\1/.exec(v);
-  let nome = aspas ? aspas[2] : v.replace(/(^|[ \t])#.*$/, "").trim();
-  // Os escapes entre aspas duplas (`"Guard\x20Tests"`) leem-se como o YAML os le; um que nao se le e nao literal.
-  if (aspas?.[1] === '"' && nome.includes("\\")) {
+  // A ancora (`&n`) e as tags (`!!str`, `!`, `!<...>`) nao fazem parte do valor, em qualquer ordem (#355, #420): o YAML
+  // le `!!str &n Guard Tests` como `Guard Tests`.
+  let v = linha.replace(/^[ \t]*name[ \t]*:[ \t]*/, "");
+  for (let m = /^(?:&\S+|!\S*)[ \t]+/.exec(v); m; m = /^(?:&\S+|!\S*)[ \t]+/.exec(v)) v = v.slice(m[0].length);
+  // As aspas fecham onde o YAML as fecha (#420): `''` e uma plica dentro das simples, e `\"` uma aspa dentro das
+  // duplas. Fechar na primeira lia `'Guard Tests'' (agg)'` como `Guard Tests`, e o rename do portao passava calado.
+  const simples = /^'((?:[^']|'')*)'(?!')/.exec(v);
+  const duplas = /^"((?:[^"\\]|\\.)*)"/.exec(v);
+  if (!simples && !duplas && /^["']/.test(v)) return null; // aspas que nao fecham: nao se le
+  const lido = (n) => (!n || /\$\{\{/.test(n) ? null : n); // entre aspas, `${{ }}` continua a ser uma expressao
+  if (simples) return lido(simples[1].replace(/''/g, "'"));
+  // Os escapes entre aspas duplas (`"Guard\x20Tests"`) leem-se como o YAML os le, com `\\` consumido primeiro (senao
+  // `\\x41` lia-se `A`); um que nao se le e nao literal.
+  if (duplas) {
     try {
-      nome = JSON.parse(`"${nome.replace(/\\x([0-9a-fA-F]{2})/g, "\\u00$1")}"`);
+      return lido(JSON.parse(`"${duplas[1].replace(/\\(\\|x([0-9a-fA-F]{2}))/g, (_, e, h) => (h ? `\\u00${h}` : "\\\\"))}"`));
     } catch {
       return null;
     }
   }
-  return !nome || /\$\{\{|^[|>*&!]/.test(nome) ? null : nome;
+  const nome = v.replace(/(^|[ \t])#.*$/, "").trim();
+  return /^[|>*&!]/.test(nome) ? null : lido(nome);
 }
 
 /** Os jobs de um workflow: `{ id, ls, cru, todas }` — as linhas sem comentarios; as cruas so de primeiro nivel (para o
@@ -308,8 +317,36 @@ function nomeDeCheck(j) {
   return nomeLiteral(j.cru, j.id);
 }
 
+/**
+ * O check de CADA job, por id (#420): `{ nome, bloco, portao }`. O `nome` e o de `nomeDeCheck`, e `null` tambem
+ * quando o `name:` continua nas linhas seguintes (`name: Guard Tests` + `(agg)` mais indentado, ou um `>-`): o YAML
+ * junta-as, e a primeira linha sozinha mentia (as duas leituras do #420). O `bloco` e o `name:` com essas linhas, sem
+ * comentarios, para comparar um nome que nao e literal.
+ */
+export function checksPorId(texto) {
+  const jobs = jobsDe(texto);
+  const { vigiados, agregadores } = agregadoresDe(jobs);
+  return new Map(jobs.map((j) => {
+    const linha = j.cru.find((l) => /^[ \t]*name[ \t]*:/.test(l));
+    const i = linha === undefined ? -1 : j.todas.indexOf(linha);
+    const resto = i < 0 ? [] : j.todas.slice(i + 1);
+    const fim = resto.findIndex((l) => semComentario(l).trim() && indent(l) <= indent(linha));
+    // O bloco e CRU (so sem espacos no fim): num `>-` ou entre aspas um `#` e texto, e a indentacao relativa de um `|`
+    // conta (a quarta leitura do #420). Mudar so um comentario num nome que nao se le avisa: falha fechada. As linhas
+    // em branco DENTRO do nome contam (o YAML le-as como `\n`); so as do fim saem.
+    const ate = fim < 0 ? resto : resto.slice(0, fim);
+    while (ate.length && !ate.at(-1).trim()) ate.pop();
+    const continua = ate.some((l) => semComentario(l).trim());
+    const bloco = i < 0 ? null : [linha, ...ate].map((l) => l.trimEnd()).join("\n");
+    return [j.id, { nome: continua ? null : nomeDeCheck(j), bloco, portao: vigiados.has(j.id) || agregadores.has(j.id) }];
+  }));
+}
+
+/** A chave de comparacao de um nome de check: sem espacos nas pontas e sem distinguir maiusculas (ver `nomeDeCheck`). */
+export const chaveDoNome = (n) => n.trim().toLowerCase();
+
 /** Os checks de um workflow, `[{ id, nome, portao }]`; nenhum se ele for so reutilizavel. */
-function checksDe(texto) {
+export function checksDe(texto) {
   if (!texto || soReutilizavel(texto)) return [];
   const jobs = jobsDe(texto);
   const { vigiados, agregadores } = agregadoresDe(jobs);
@@ -338,7 +375,6 @@ export function colisoesEntreWorkflows(texto, outros) {
   const meus = checksDe(texto);
   const out = new Map();
   const defeito = (nome, m) => out.set(nome, [...(out.get(nome) ?? []), m]);
-  const chaveDoNome = (n) => n.trim().toLowerCase();
   for (const o of outros) {
     for (const c of checksDe(o.texto)) {
       for (const j of meus.filter((x) => chaveDoNome(x.nome) === chaveDoNome(c.nome) && (x.portao || c.portao))) {
