@@ -19,6 +19,7 @@ import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
 import { VARIAVEL } from "../lib/nomes-proibidos.mjs";
+import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/marcas-yaml.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -178,6 +179,32 @@ export function registar() {
     ...(problemasDoSecretScan(sint("")).length === 0 ? [] : ["o `secret-scan` limpo reprovou"]),
     ...(problemasDoSecretScan(sint("    if: github.event_name == 'pull_request' || github.event.head_commit.committer.username != 'web-flow'\n")).length > 0 ? [] : ["o `if:` do salto passou"]),
     ...(problemasDoSecretScan("jobs:\n  outro:\n    runs-on: x\n").length > 0 ? [] : ["um ci.yml sem o `secret-scan` passou"]),
+  ]);
+
+  // O `concurrency:` de topo (#427): um grupo por commit num push, e o cancelamento so num PR (`problemasDaConcurrency`).
+  // No template reprova; num derivado com o bloco noutra forma, SKIP (a 2b da a nota, `TP15`); sem bloco, nada se
+  // agrupa nem se cancela, e passa.
+  const bloco = concurrencyDeTopo(ci);
+  const c = bloco === null ? ["o ci.yml nao tem o `concurrency:` de topo"] : problemasDaConcurrency(bloco);
+  if (c.length && ehDerivado(lerRaiz)) {
+    if (bloco !== null) console.log(`  SKIP  portao: ${c[0]} — num derivado, a nota da 2b do \`/upgrade\` (#427)`);
+    registarResultado("portao: o `concurrency:` num derivado, nada a medir (#427)", []);
+  } else {
+    registarResultado("portao: o `concurrency:` da um grupo a cada push e so cancela num PR (#427)", c);
+  }
+  const conc = (g, v) => `on: push\nconcurrency:\n  group: ${g}\n  cancel-in-progress: ${v}\njobs:\n  x:\n    runs-on: y\n`;
+  const SHA = "ci-${{ github.event.pull_request.number || github.sha }}";
+  const PR = "${{ github.event_name == 'pull_request' }}";
+  const reprova = (t) => { const b = concurrencyDeTopo(t); return b === null || problemasDaConcurrency(b).length > 0; };
+  registarResultado("portao: so o grupo por commit com o cancelamento so nos PRs passa (controlo, #427)", [
+    ...(reprova(conc(SHA, PR)) ? ["a forma do template reprovou"] : []),
+    ...(reprova(conc(SHA, `"${PR}"`)) ? ["o valor entre aspas reprovou"] : []),
+    ...(reprova(conc(SHA, "true")) ? [] : ["`cancel-in-progress: true` passou"]),
+    ...(reprova(conc(SHA, "true # x")) ? [] : ["`true` com um comentario passou"]),
+    ...(reprova(conc(SHA, "false")) ? [] : ["`false` (sem o cancelamento nos PRs) passou"]),
+    ...(reprova(conc("ci-${{ github.ref }}", PR)) ? [] : ["o grupo do ref (o run pendente cancelado num burst) passou"]),
+    ...(reprova("on: push\njobs:\n  x:\n    runs-on: y\n") ? [] : ["um ci.yml sem `concurrency:` passou"]),
+    ...(reprova(`on: push\njobs:\n  x:\n    concurrency:\n      group: ${SHA}\n      cancel-in-progress: ${PR}\n    runs-on: y\n`) ? [] : ["um `concurrency:` so de JOB passou como o de topo"]),
   ]);
 }
 

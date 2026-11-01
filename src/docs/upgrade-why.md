@@ -521,6 +521,22 @@ e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a f
 `test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
 explica-se no PR.
 
+## Porque o CI so cancela um run em curso num PR (#427)
+
+O `concurrency:` do `ci.yml` tinha `cancel-in-progress: true` para todos os eventos. Num PR e o que poupa minutos: um
+push novo cancela o run antigo do mesmo PR. Mas dois pushes seguidos no `main` tambem se cancelavam, e o primeiro
+commit ficava sem `Secret Scan` e sem portao. Num derivado privado aconteceu 2 vezes num mes, em 96 pushes.
+
+Trocar so o `cancel-in-progress` nao chegava (a leitura independente do #427): o GitHub cancela o run PENDENTE de um
+grupo mesmo com `false`, e com o grupo do ref, num burst de tres pushes, o do meio ficava sem verificacao. Agora sao
+as duas linhas: num push, um grupo por commit (`github.sha`); e `cancel-in-progress: ${{ github.event_name ==
+'pull_request' }}`. Num PR, o grupo continua a ser o numero do PR.
+
+**O que isto pede a um derivado:** o `concurrency:` e do projeto, e o `/upgrade` nao o reescreve. A 2b da a nota a
+um projeto cujo bloco de TOPO nao tem as duas linhas (`true`, ou `false` com o grupo do ref): trocam-se a mao. Ate
+la, o `tests-portao-ci.mjs` diz `SKIP` com a razao. Um projeto sem `concurrency:` de topo nao agrupa nem cancela
+nada, e nao recebe nota; um `concurrency:` de JOB (um `deploy`) nao conta.
+
 ## Porque o nome de check de um portao passa a contar (#420)
 
 Uma protecao (o ruleset do `main`) exige checks pelo NOME, e a deste repo exige `Guard Tests`. O `name:` de um

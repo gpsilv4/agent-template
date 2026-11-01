@@ -15,8 +15,12 @@ on:
 concurrency:
   # `pull_request.number` e nao `head.ref`: dois PRs de FORKS diferentes com o mesmo nome de
   # branch (`patch-1`, `main`) partilhavam grupo e cancelavam-se um ao outro — DoS trivial.
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Num push, um grupo por COMMIT (`github.sha`, #427): o GitHub cancela o run PENDENTE de um grupo mesmo com
+  # `cancel-in-progress: false`, e com o grupo do ref, num burst de pushes no `main`, um commit ficava sem
+  # `Secret Scan` e sem portao (medido num derivado). Num PR, o grupo continua a ser o do PR.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  # So num PR (#427): um push novo cancela o run antigo do MESMO PR, que e o que poupa minutos.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least privilege: no job here writes to the repo.
 permissions:
