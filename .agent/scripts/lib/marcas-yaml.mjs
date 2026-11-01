@@ -32,8 +32,9 @@ export const paraMarcas = (f, t) =>
     : t;
 
 /**
- * As TRES isencoes da marca do `if:` que so valem como `if:` de PRIMEIRO NIVEL de um job — a mesma forma num
- * passo continua a contar. Cada uma so na forma EXACTA (aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma
+ * As isencoes da marca do `if:`: TRES que so valem como `if:` de PRIMEIRO NIVEL de um job (a mesma forma num passo
+ * continua a contar), e uma QUARTA so num PASSO do job da app do `ci.yml` — o `if: ${{ !cancelled() }}` (#428), que so
+ * faz o passo correr tambem depois de uma falha; noutro job (um `deploy`) ou como `if:` do job, conta (a licao abaixo). Cada uma so na forma EXACTA (aspas, `${{ }}`, um comentario; nenhuma cauda, nenhuma
  * continuacao na linha seguinte). O `if:` passa a `@@if-...@@:`, que a marca nao le.
  *  - O `if: always()` de um AGREGADOR (#308): sem ele, uma dependencia vermelha SALTAVA o agregador — e um
  *    check saltado conta como passado para a protecao. So num job que LE o resultado de outro
@@ -58,6 +59,17 @@ export const paraMarcas = (f, t) =>
  */
 const JOBS_DO_MERGE = new Set(["quality", "guard-tests"]);
 const JOBS_DO_PLANO = new Set(["sweep"]);
+/** O job da app (#428): o unico onde o `if: ${{ !cancelled() }}` de um PASSO nao conta. */
+const JOBS_DA_APP = new Set(["quality"]);
+/** As verificacoes desse job, pelo `name:` (#428): so elas. Um passo de deploy ou de publicacao metido no `quality`
+ *  correria com os testes vermelhos, e conta (a leitura independente do #428). */
+export const VERIFICACOES_DA_APP = ["TypeScript", "Lint", "Build", "Unit Tests", "Audit"];
+/** O `if: ${{ !cancelled() }}` de um PASSO (#428), na forma EXATA: `${{ !cancelled() }}` com as duas chavetas, ou entre
+ *  aspas (com ou sem elas); um comentario so depois de um espaco; nenhuma cauda. O default de um passo e `success()`; o
+ *  `!cancelled()` corre tambem depois de uma falha, nunca menos. Exportado para a nota da 2b ler a MESMA forma (`TP8`). */
+export const NAO_CANCELADO = /^([ \t]*)(-[ \t]+)?["']?if["']?([ \t]*:[ \t]*)(?:(["'])(?:\$\{\{[ \t]*!cancelled\(\)[ \t]*\}\}|!cancelled\(\))\4|\$\{\{[ \t]*!cancelled\(\)[ \t]*\}\})(?:[ \t]+#.*|[ \t]*)$/;
+/** O nome de um passo, se a linha e a chave `name:` dele (com o `- ` do item ou sem), sem aspas. */
+const nomeDoPasso = (l) => /^[ \t]*(?:-[ \t]+)?["']?name["']?[ \t]*:[ \t]*(["']?)(.*?)\1[ \t]*(?:#.*)?$/.exec(l)?.[2] ?? null;
 const CI_DO_MERGE = /(^|\/)\.github\/workflows\/ci\.ya?ml$/;
 const SEMPRE = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?always\(\)[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
 const MERGE_PRIVADO = /^([ \t]*)["']?if["']?([ \t]*:[ \t]*)(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*\|\|[ \t]*!github\.event\.repository\.private[ \t]*\|\|[ \t]*github\.event\.head_commit\.committer\.username[ \t]*!=[ \t]*'web-flow'[ \t]*(?:\}\})?[ \t]*\3[ \t]*(?:#.*)?$/;
@@ -109,6 +121,30 @@ function isencoesDeJob(t, ficheiro) {
     const doPlano = CI_DO_MERGE.test(ficheiro) && JOBS_DO_PLANO.has(id);
     const naoVazias = bloco.filter((l) => l.trim() && !/^[ \t]*#/.test(l));
     const kInd = naoVazias.length ? Math.min(...naoVazias.map(ind)) : -1;
+    // O `!cancelled()` de um PASSO (#428): so no job da app do `ci.yml`, so nas verificacoes (pelo `name:`), e so ao
+    // nivel das chaves de um passo (o `- ` do item, ou a indentacao das chaves a seguir a ele). O `if:` do proprio job, a
+    // mesma forma noutro passo, noutro job ou noutro workflow (um `deploy` que correria com os testes vermelhos, a licao
+    // do #308), continuam a contar.
+    const s = CI_DO_MERGE.test(ficheiro) && JOBS_DA_APP.has(id) ? ls.findIndex((l, k) => k > i && k < f && ind(l) === kInd && /^[ \t]*steps[ \t]*:[ \t]*$/.test(l)) : -1;
+    const primeiro = s < 0 ? undefined : ls.slice(s + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));
+    const item = primeiro !== undefined && /^[ \t]*-[ \t]/.test(primeiro) ? ind(primeiro) : -1;
+    // As linhas de cada passo (do seu `- ` ate ao seguinte), para saber o nome dele antes de ler o `if:`.
+    const doPasso = (k) => {
+      let a = k;
+      while (a > s + 1 && !(ind(ls[a]) === item && /^[ \t]*-[ \t]/.test(ls[a]))) a--;
+      let b = a + 1;
+      while (b < f && !(ind(ls[b]) === item && /^[ \t]*-[ \t]/.test(ls[b]))) b++;
+      return ls.slice(a, b).filter((l) => ind(l) === item || ind(l) === item + 2);
+    };
+    for (let k = s + 1; item >= 0 && k < f; k++) {
+      const doItem = ind(ls[k]) === item && /^[ \t]*-[ \t]/.test(ls[k]);
+      if (!doItem && ind(ls[k]) !== item + 2) continue;
+      const prox = ls.slice(k + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));
+      if (prox !== undefined && ind(prox) > item + 2) continue; // uma continuacao muda a condicao
+      if (!NAO_CANCELADO.test(ls[k]) || !doPasso(k).map(nomeDoPasso).some((n) => VERIFICACOES_DA_APP.includes(n))) continue;
+      const isento = isenta(ls[k], NAO_CANCELADO, "$1$2@@if-nao-cancelado@@$3!cancelled()");
+      if (isento) ls[k] = isento;
+    }
     for (let k = i + 1; k < f; k++) {
       if (ind(ls[k]) !== kInd) continue;
       const prox = ls.slice(k + 1, f).find((l) => l.trim() && !/^[ \t]*#/.test(l));

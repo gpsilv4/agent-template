@@ -29,10 +29,10 @@ permissions:
 jobs:
   # A APP num so job (#347): o `detect`, o `quality`, o `unit-tests` e o `security-audit` eram 4 jobs, e num repo
   # privado cada job e cobrado ARREDONDADO ao minuto — medido em outubro, 5 dos 8 jobs de um PR duravam menos de
-  # 1 min e pagavam 1. Ficam os mesmos passos, pela mesma ordem, num job so. O preco, dito: um passo vermelho
-  # para os seguintes (um erro do `tsc` ja nao deixa correr os testes unitarios nem o audit, que antes tinham
-  # jobs proprios), e os testes correm sobre a arvore depois do `build`. O PR fica vermelho na mesma; perde-se
-  # sinal por corrida, nao cobertura.
+  # 1 min e pagavam 1. Ficam os mesmos passos, pela mesma ordem, num job so. O preco que o #347 disse — um passo
+  # vermelho parava os seguintes — desfez-se no #428: as verificacoes levam `if: ${{ !cancelled() }}` e correm todas
+  # numa corrida vermelha (o job fica vermelho na mesma). Os testes continuam a correr sobre a arvore depois do
+  # `build`: com o `build` vermelho, correm sobre uma arvore parcial (ruido, nunca um falso verde).
   #
   # SEPARADO da maquinaria (`guard-tests`) de proposito: as suites sao codigo do PR, e no mesmo job podiam
   # escrever em `$GITHUB_PATH` um `tsc` falso e a app ficava verde sem correr (2.a auditoria da Fase 0 do #347).
@@ -54,9 +54,15 @@ jobs:
 
       # Era o job `detect`. Corre DEPOIS do checkout: o `hashFiles` ao nivel do job corre antes dele e falha.
       # Os passos da app leem a resposta e saltam NO SHELL, a falhar fechado: um valor que nao seja `true` nem
-      # `false` reprova (o `if:` de job que havia em cada um dos tres saiu, e nenhum `if:` entrou).
+      # `false` reprova (o `if:` de job que havia em cada um dos tres saiu). O unico `if:` de passo e o
+      # `${{ !cancelled() }}` das verificacoes (#428), isento do medidor da superficie SO neste job e nessa forma exata.
       # A linha `case "$TEM_APP"` e o `env: TEM_APP` repetem-se, iguais, nos cinco passos da app: o YAML nao os
-      # partilha sem um `if:` (que o medidor da superficie conta como salto) ou um script a parte. Mudar um = mudar os cinco.
+      # partilha sem um `if:` (que o medidor conta como salto) ou um script a parte. Mudar um = mudar os cinco.
+      # E nas verificacoes, o `case "$INSTALOU"` (#428): com o `Install` vermelho, o `!cancelled()` corria-as sem
+      # `node_modules` (e o `npx tsc` ia buscar ao npm um pacote que nao esta fixado); saltam, e o job ja esta vermelho.
+      # Le o `conclusion`, e nao o `outcome`: com um `continue-on-error` no `Install` sao diferentes, e as verificacoes
+      # tem de correr (e reprovar). Falha FECHADA: um valor que nao e de um passo que correu (o vazio de um `id:` mudado)
+      # reprova, como o `case "$TEM_APP"` (a leitura independente do #428).
       - name: Projeto
         id: check
         run: |
@@ -98,6 +104,7 @@ jobs:
       # `package-lock.json` — o caso por defeito — levava os passos da app vermelhos com uma
       # mensagem que nao aponta para a causa. A mensagem de erro aqui aponta.
       - name: Install
+        id: install
         env:
           TEM_APP: ${{ steps.check.outputs.has_pkg }}
         run: |
@@ -113,23 +120,32 @@ jobs:
       # `Projeto` only proves package.json exists; these guards prove the specific
       # toolchain exists before running it. Remove a guard once your stack is fixed.
       - name: TypeScript
+        if: ${{ !cancelled() }}
         env:
           TEM_APP: ${{ steps.check.outputs.has_pkg }}
+          INSTALOU: ${{ steps.install.conclusion }}
         run: |
+          case "$INSTALOU" in success) ;; failure|skipped|cancelled) echo "Um passo anterior nao passou (Install: $INSTALOU) — salta; o job ja esta vermelho por ele"; exit 0;; *) echo "::error::INSTALOU='$INSTALOU': o passo Install nao tem id: install"; exit 1;; esac
           case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if [ -f tsconfig.json ]; then npx tsc --noEmit; else echo "No tsconfig.json — skipping typecheck"; fi
 
       - name: Lint
+        if: ${{ !cancelled() }}
         env:
           TEM_APP: ${{ steps.check.outputs.has_pkg }}
+          INSTALOU: ${{ steps.install.conclusion }}
         run: |
+          case "$INSTALOU" in success) ;; failure|skipped|cancelled) echo "Um passo anterior nao passou (Install: $INSTALOU) — salta; o job ja esta vermelho por ele"; exit 0;; *) echo "::error::INSTALOU='$INSTALOU': o passo Install nao tem id: install"; exit 1;; esac
           case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.lint?0:1)"; then npm run lint; else echo "No 'lint' script — skipping"; fi
 
       - name: Build
+        if: ${{ !cancelled() }}
         env:
           TEM_APP: ${{ steps.check.outputs.has_pkg }}
+          INSTALOU: ${{ steps.install.conclusion }}
         run: |
+          case "$INSTALOU" in success) ;; failure|skipped|cancelled) echo "Um passo anterior nao passou (Install: $INSTALOU) — salta; o job ja esta vermelho por ele"; exit 0;; *) echo "::error::INSTALOU='$INSTALOU': o passo Install nao tem id: install"; exit 1;; esac
           case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.build?0:1)"; then npm run build; else echo "No 'build' script — skipping"; fi
 
@@ -141,9 +157,12 @@ jobs:
       # app, e eles sao maquinaria. Vivem no job `guard-tests`, que corre com ou sem `package.json` (o unico salto e o do `if:` abaixo, #347).
 
       - name: Unit Tests
+        if: ${{ !cancelled() }}
         env:
           TEM_APP: ${{ steps.check.outputs.has_pkg }}
+          INSTALOU: ${{ steps.install.conclusion }}
         run: |
+          case "$INSTALOU" in success) ;; failure|skipped|cancelled) echo "Um passo anterior nao passou (Install: $INSTALOU) — salta; o job ja esta vermelho por ele"; exit 0;; *) echo "::error::INSTALOU='$INSTALOU': o passo Install nao tem id: install"; exit 1;; esac
           case "$TEM_APP" in true) ;; false) echo "Sem package.json — salta"; exit 0;; *) echo "::error::TEM_APP='$TEM_APP': o passo Projeto nao decidiu"; exit 1;; esac
           if node -e "process.exit(require('./package.json').scripts?.['test:unit']?0:1)"; then npm run test:unit; else echo "No 'test:unit' script — skipping"; fi
 
@@ -155,6 +174,7 @@ jobs:
       # `continue-on-error` num passo que so audita (`marcas-yaml.mjs`, `AUDIT`). Sem app, o `npm audit` falha
       # sem lockfile e o erro e tolerado — uma anotacao no passo, e o job verde.
       - name: Audit
+        if: ${{ !cancelled() }}
         continue-on-error: true
         run: npm audit --audit-level=high
 

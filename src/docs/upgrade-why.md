@@ -521,6 +521,28 @@ e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a f
 `test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
 explica-se no PR.
 
+## Porque as verificacoes da app correm todas numa corrida vermelha (#428)
+
+Desde o #347 a app corre num so job (`Code Quality`), e o preco dito era este: um passo vermelho parava os seguintes.
+Um erro do `tsc` escondia os testes e o audit, e via-se um problema por corrida (num privado, cada corrida e cobrada).
+Agora as cinco verificacoes (TypeScript, Lint, Build, Unit Tests e Audit) levam `if: ${{ !cancelled() }}`: correm
+todas, e o job fica vermelho na mesma. Medido num derivado: um `tsc` e um teste partidos no mesmo commit deram as
+duas falhas na mesma corrida.
+
+Duas pecas vem junto:
+- **O gate do `Install`.** Com o `!cancelled()`, as verificacoes correriam precisamente quando o `Install` falhou: sem
+  `node_modules`, e o `npx tsc` ia buscar ao npm um pacote que nao esta fixado. O `Install` tem `id: install`, e cada
+  verificacao le `INSTALOU: ${{ steps.install.outcome }}` num `case` e sai calada (o job ja esta vermelho por ele). O
+  `Audit` so le o lockfile, e nao precisa dele.
+- **A isencao no medidor da superficie.** Um `if:` num passo e uma marca, e nenhum trailer a aceita. A forma exata e
+  isenta, mas so nos passos do job `quality` do `ci.yml` (`lib/marcas-yaml.mjs`, `NAO_CANCELADO`). A mesma forma
+  noutro job (um `deploy`), noutro workflow, ou como `if:` do job, conta: e a licao do #308.
+
+**O que isto pede a um derivado:** nada; e OPCIONAL (so minutos). O `ci.yml` e do projeto, e a 2b da a nota a quem
+nao o tem, ou o tem a meias: trazer JUNTOS o `if:`, o `id: install` e o `case "$INSTALOU"`. Ate la, o
+`tests-portao-ci.mjs` diz `SKIP` com a razao. Outra forma do `if:` (uma cauda, um `&&`, `! cancelled()`) e uma marca
+que reprova.
+
 ## Porque o CI so cancela um run em curso num PR (#427)
 
 O `concurrency:` do `ci.yml` tinha `cancel-in-progress: true` para todos os eventos. Num PR e o que poupa minutos: um

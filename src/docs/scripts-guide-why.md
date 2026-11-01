@@ -260,7 +260,10 @@ passa a decidir:
   deixa uma linha vazia, que o plano recusa — vermelho em cada PR que lhe toque, e um admin tira-o por push direto.
 - **o `if:` do `sweep` e uma marca** do `check-test-surface`, e nenhum trailer a aceita. Tem uma isencao, so na
   forma exacta e so no job `sweep` do `ci.yml` (`lib/marcas-yaml.mjs`), pela mesma razao das outras duas: o portao
-  recalcula a decisao. As tres isencoes tem par na varredura (`isenta(`), medidas pela primeira vez neste PR.
+  recalcula a decisao. As tres isencoes tem par na varredura (`isenta(`), medidas pela primeira vez neste PR. A
+  quarta (#428), o `if: ${{ !cancelled() }}` de um PASSO, so no job `quality` do `ci.yml`, tem o mesmo par: o default
+  de um passo e `success()`, e o `!cancelled()` so o faz correr tambem depois de uma falha. Num `deploy` correria com
+  os testes vermelhos, por isso noutro job, noutro workflow, ou como `if:` do job, a mesma forma conta.
 
 **O que fica de fora:** um derivado que tirou o `if:` do `sweep` para varrer tambem em `push` deixa de o fazer se
 adotar o C2 (o plano e so de PR) — a nota da 2b avisa-o. E um derivado que traga o `if:` sem o portao novo fica

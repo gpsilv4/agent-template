@@ -133,6 +133,26 @@ export function registar() {
     nenhuma(notas({ ciLa: NOVO, ciAqui: `${NOVO}  deploy:\n    concurrency:\n      group: deploy\n      cancel-in-progress: true\n` })));
   registarResultado("2b CI: um template sem a forma nova nao da a nota (#427)", nenhuma(notas({ ciLa: VELHO, ciAqui: VELHO })));
 
+  // As verificacoes da app numa corrida vermelha (#428): passo a passo, pelo nome. Cada passo e "nao" (sem nada), "if"
+  // (o `if:` sem o gate do `Install`) ou "ok" (o `if:` e o gate); `null` tira o passo.
+  const passo = (nome, e) => (e === null ? "" : `      - name: ${nome}\n${e !== "nao" ? "        if: ${{ !cancelled() }}\n" : ""}${e === "ok" ? "        env:\n          INSTALOU: ${{ steps.install.conclusion }}\n" : ""}        run: npm test\n`);
+  const qual = (a, b) => `jobs:\n  quality:\n    steps:\n${passo("Lint", a)}${passo("Build", b)}`;
+  const NC = "corre todas as verificacoes do `Code Quality`";
+  registarResultado("2b CI: o `!cancelled()` so no template da a nota (#428)", so(notas({ ciLa: qual("ok", "ok"), ciAqui: qual("nao", "nao") }), NC));
+  registarResultado("2b CI: o `!cancelled()` a meias no projeto da a nota (#428)", so(notas({ ciLa: qual("ok", "ok"), ciAqui: qual("ok", "nao") }), NC));
+  registarResultado("2b CI: o `if:` sem o gate do `Install` da a nota (a adocao a meias perigosa, #428)", so(notas({ ciLa: qual("ok", "ok"), ciAqui: qual("if", "if") }), "sem o gate do `Install`: Lint, Build"));
+  registarResultado("2b CI: o `!cancelled()` e o gate em todas, nos dois lados, nao (#428)", nenhuma(notas({ ciLa: qual("ok", "ok"), ciAqui: qual("ok", "ok") })));
+  registarResultado("2b CI: um passo que o projeto tirou nao e \"a meias\" (#428)", nenhuma(notas({ ciLa: qual("ok", "ok"), ciAqui: qual("ok", null) })));
+  registarResultado("2b CI: um projeto sem o job `quality`, ou um template sem a forma, nao (#428)", [
+    ...nenhuma(notas({ ciLa: qual("ok", "ok"), ciAqui: "jobs:\n  build:\n" })),
+    ...nenhuma(notas({ ciLa: qual("nao", "nao"), ciAqui: qual("nao", "nao") })),
+  ]);
+  {
+    const [n = ""] = notas({ ciLa: qual("ok", "ok"), ciAqui: qual("nao", "nao") });
+    registarResultado("2b CI: a nota do `!cancelled()` manda trazer o gate do `Install` e diz a forma exacta (#428)",
+      ["`id: install`", "`case \"$INSTALOU\"`", "forma EXACTA", "OPCIONAL"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
+  }
+
   // A ORDEM, que era a de antes de sair do `medida-upgrade.mjs`.
   const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: NOVO + SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: `${VELHO}  detect:\n  unit-tests:\n` });
   const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", COM, "passos de UM job"];
