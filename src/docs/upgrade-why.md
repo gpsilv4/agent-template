@@ -521,6 +521,47 @@ e as linhas de tabela com um objeto no fim (`["soma", 1, { esperado: 2 }],`, a f
 `test.each`) contam tambem nas suites da app. Apagar uma delas passa a avisar, sem saida por trailer:
 explica-se no PR.
 
+## Porque o nome de check de um portao passa a contar (#420)
+
+Uma protecao (o ruleset do `main`) exige checks pelo NOME, e a deste repo exige `Guard Tests`. O `name:` de um
+job esta entre as chaves do cabecalho que o gate ignora, ao lado do `timeout-minutes`, e nada mais o comparava.
+Um PR podia por isso renomear o portao (`Guard Tests` -> `Guard Tests (agg)`) e dar o nome antigo a um job novo
+com `run: true`, e nada avisava: o job falso nao colidia com ninguem (#355) e nao era portao. O ruleset ficava
+satisfeito com ele, e o portao verdadeiro podia estar vermelho.
+
+Agora, num workflow que corre testes, o nome de check de cada job PORTAO da base (com maquinaria, ou agregador)
+compara-se com o do mesmo id no PR (`nomesMudados`, `lib/superficie-gate.mjs`):
+- um nome literal compara-se pelo valor, lido como o YAML o le (as aspas, um `#` entre aspas, e os escapes `''`
+  e `\"` nao enganam);
+- um que nao se le (uma expressao, uma matriz, um `name:` partido por linhas ou em bloco `>-`) compara-se pelo
+  bloco inteiro do `name:`;
+- o portao que saiu do workflow (o id mudado, ou apagado) avisa, e o id que ficou num job que ja nao e portao
+  tambem.
+
+O aviso diz o nome antigo e o novo, e quem tem agora o antigo, neste ou noutro workflow da raiz. A saida e o
+trailer `Test-Surface:`. Com ele, a nota continua a mostrar o job que herdou o nome, quando o nome dele se le.
+
+**O que isto pede a um derivado:**
+- Renomear o check de um job com maquinaria, ou de um agregador, passa a pedir o trailer. No template aconteceu
+  duas vezes desde julho: o #316 (`Guard Tests` -> `Guard Suites`, com o `guard-gate` novo a herdar o
+  `Guard Tests`) e o #328 (o nome da matriz da varredura).
+- Um derivado com o CI anterior a v0.58.0 (as suites ainda com o nome `Guard Tests`) ve este aviso no PR que adota
+  o CI do template: e o padrao do #316, e o caso de teste com o mesmo nome prova-o. Um derivado que ja tem os
+  nomes atuais (`Guard Suites`, `Guard Tests`) nao o ve.
+- Um `name:` com expressao (`Mutation sweep (${{ matrix.modo }} ...)`) conta a cada mudanca da expressao.
+
+**Limites aceites, escritos no `superficie-gate.mjs`:**
+- O gate continua a vigiar so a maquinaria (#285). `Secret Scan`, `Code Quality` e `Analyze` nao sao portoes, e
+  um `run: true` neles ja passava calado antes deste ticket. O rename nao abre nada que editar o job nao abra ja.
+- So num workflow que corre testes (#285): o portao de um workflow que nao os corre fica fora, como antes.
+- Nao se veem (a lista nao e fechada): um `name: *ancora` com a ancora definida fora do que o gate compara (o
+  `env:` de outro job, um passo sem maquinaria, uma chave inofensiva do proprio portao como o `concurrency:`, ou uma
+  chave de topo que nao e `on:`/`env:`/`defaults:`); uma expressao cujo valor muda fora do diff (`${{ vars.X }}`,
+  `${{ needs.x.outputs.n }}`); um commit status ou check run publicado pela API; e o check composto de um portao num
+  workflow reutilizavel (`chamador / job`, ja limite do #355): o job chamador nao cita a maquinaria e nao e portao.
+- O herdeiro so se nomeia quando o nome dele e literal: um job falso com `name: ${{ 'Guard Tests' }}` nao aparece
+  como herdeiro, mas o rename do portao avisa na mesma.
+
 ## Porque as chamadas dos modulos de casos passam a contar na superficie (#419)
 
 O #400 (b) moveu blocos de casos de duas suites para modulos em `tests/harness/casos-*.mjs`, que a suite chama no

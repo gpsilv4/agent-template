@@ -46,7 +46,8 @@ and every person, agents included. A human co-author is fine.
 (a `node ...test` step, or `npm|pnpm|yarn|bun test`, `npm run test:*`, `npx vitest|jest|playwright test|cypress run|mocha`,
 `pytest`, `python -m unittest`, `go|cargo|dotnet|make test`, `node --test`), changing the top-level `on:`, `env:` or
 `defaults:`, or changing or removing a STEP that mentions `.agent/scripts/`, `.claude/hooks/` or
-`.githooks/` (or the job it runs in: its `if:`, `needs:`, `env:`...), fails the
+`.githooks/` (or the job it runs in: its `if:`, `needs:`, `env:`, and its `name:` — the check name a ruleset
+requires, #420), fails the
 `check-test-surface` step — it changes the gate without touching a test (#285). So do two more
 changes that switch the suites off without touching them: a new step BEFORE the last machinery
 step, in a job that already existed, that is not read-only — `npm ci`, `cp .env.example .env`, a
