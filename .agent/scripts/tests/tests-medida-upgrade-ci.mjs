@@ -116,8 +116,25 @@ export function registar() {
   registarResultado("2b CI: o titulo do PR nos dois lados, nao (#394)", nenhuma(notas({ ciLa: TITULO + FINAL, ciAqui: TITULO + FINAL })));
   registarResultado("2b CI: o passo novo sem o `COMMIT_MSG_FINAL` do portao (a meias) da a nota (#394)", so(notas({ ciLa: TITULO + FINAL, ciAqui: TITULO }), "verifica o TITULO do PR"));
 
+  // O `concurrency:` de TOPO (#427): um grupo por commit num push, e o cancelamento so num PR. So o bloco de topo conta.
+  const conc = (g, v) => `on: push\nconcurrency:\n  group: ${g}\n  cancel-in-progress: ${v}\njobs:\n`;
+  const NOVO = conc("ci-${{ github.event.pull_request.number || github.sha }}", "${{ github.event_name == 'pull_request' }}");
+  const VELHO = conc("ci-${{ github.event.pull_request.number || github.ref }}", "true");
+  const COM = "o `concurrency:` do template da a cada push o seu grupo";
+  registarResultado("2b CI: o projeto com o grupo do ref e `true` da a nota, com as duas razoes (#427)", [
+    ...so(notas({ ciLa: NOVO, ciAqui: VELHO }), COM),
+    ...["`github.sha`", "nao e so dos PRs"].filter((t) => !(notas({ ciLa: NOVO, ciAqui: VELHO })[0] ?? "").includes(t)).map((t) => `a nota nao diz "${t}"`),
+  ]);
+  registarResultado("2b CI: `true` com um comentario YAML tambem da a nota (#427)", so(notas({ ciLa: NOVO, ciAqui: VELHO.replace("true\n", "true # x\n") }), COM));
+  registarResultado("2b CI: `false` com o grupo do ref da a nota (o pendente cancelado num burst) (#427)", so(notas({ ciLa: NOVO, ciAqui: VELHO.replace("true\n", "false\n") }), COM));
+  registarResultado("2b CI: a forma do template nos dois lados, nao (#427)", nenhuma(notas({ ciLa: NOVO, ciAqui: NOVO })));
+  registarResultado("2b CI: um projeto sem `concurrency:` de topo, nao (#427)", nenhuma(notas({ ciLa: NOVO, ciAqui: "on: push\njobs:\n" })));
+  registarResultado("2b CI: um `true` num `concurrency:` de JOB, com o topo certo, nao (#427)",
+    nenhuma(notas({ ciLa: NOVO, ciAqui: `${NOVO}  deploy:\n    concurrency:\n      group: deploy\n      cancel-in-progress: true\n` })));
+  registarResultado("2b CI: um template sem a forma nova nao da a nota (#427)", nenhuma(notas({ ciLa: VELHO, ciAqui: VELHO })));
+
   // A ORDEM, que era a de antes de sair do `medida-upgrade.mjs`.
-  const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: "jobs:\n  detect:\n  unit-tests:\n" });
-  const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", "passos de UM job"];
-  registarResultado("2b CI: as seis notas saem pela ordem de sempre (#347)", todas.length === 6 && ordem.every((t, i) => todas[i].includes(t)) ? [] : [`sairam: ${JSON.stringify(todas.map((n) => n.slice(0, 40)))}`]);
+  const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: NOVO + SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: `${VELHO}  detect:\n  unit-tests:\n` });
+  const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", COM, "passos de UM job"];
+  registarResultado("2b CI: as sete notas saem pela ordem de sempre (#347, #427)", todas.length === 7 && ordem.every((t, i) => todas[i].includes(t)) ? [] : [`sairam: ${JSON.stringify(todas.map((n) => n.slice(0, 40)))}`]);
 }

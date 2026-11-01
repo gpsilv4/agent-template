@@ -11,7 +11,7 @@
  * `test-guards`; a varredura corre-o primeiro, e cada `note()` desligada morre em milissegundos); os de ponta
  * a ponta, nas suites da 2b (`tests-medida-2b-config.mjs`, `test-simulate-upgrade.mjs`).
  */
-import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO } from "./marcas-yaml.mjs";
+import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO, concurrencyDeTopo, problemasDaConcurrency } from "./marcas-yaml.mjs";
 
 /**
  * @param {object} o
@@ -82,6 +82,16 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
         "trazer JUNTOS o passo `Mensagens de commit` (o nome novo, o `env:` com `COMMIT_MSG_FINAL` e `PR_TITULO`, e o bloco do titulo no fim do `run:`) " +
         "e o `COMMIT_MSG_FINAL: \"1\"` no `env:` do portao `Guard Tests`; o commit leva o trailer `Test-Surface: .github/workflows/ci.yml — <porque>`. " +
         "Sem eles o hook verifica os commits, mas um titulo `Update foo` so reprova no push para o `main`, ja imutavel"
+    );
+  // O `concurrency:` de TOPO (#427): e do projeto, e o `/upgrade` nao o reescreve. Le-se so o bloco de topo (o de um job,
+  // um `deploy` com `cancel-in-progress: true`, e legitimo). Sem bloco nada se agrupa nem se cancela: nao ha nota.
+  const blocoAqui = concurrencyDeTopo(ciAqui);
+  const blocoLa = concurrencyDeTopo(ciLa);
+  const faltam = blocoAqui === null ? [] : problemasDaConcurrency(blocoAqui);
+  if (blocoLa !== null && problemasDaConcurrency(blocoLa).length === 0 && faltam.length)
+    note(
+      "o `concurrency:` do template da a cada push o seu grupo (`github.sha`) e so cancela num PR (`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, #427), e o deste projeto nao — " +
+        `trocar as duas linhas: ${faltam.join("; ")}`
     );
   if (curtos(ciAqui) >= 2 && curtos(ciLa) === 0)
     note("o template corre a app (detect, testes unitarios, audit) como passos de UM job, `Code Quality` (#347), e o deste projeto em jobs separados — OPCIONAL (so minutos: num repo privado cada job e cobrado arredondado ao minuto); ao juntar, a maquinaria fica FORA desse job, e os checks `Detect Project`/`Unit Tests`/`Security Audit` saem dos obrigatorios");
