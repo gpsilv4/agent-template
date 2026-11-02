@@ -156,6 +156,7 @@ gh pr create --title "<tipo(scope): descricao>" \
 #    Contar antes de esperar: com zero checks o `--watch` sai 0 e o gate passa vazio.
 n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0)
 [ "${n:-0}" -gt 0 ] && gh pr checks --watch || { echo "GATE: CI ainda nao arrancou"; exit 1; }
+# A base e o `main`? Um PR empilhado (base noutro branch) nao corre o CI e mergeia no branch de baixo (#431).
 gh pr merge --squash         # (ou merge pela UI do GitHub)
 # -> Deploy automatico para producao
 

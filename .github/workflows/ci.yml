@@ -266,6 +266,7 @@ jobs:
             node .agent/scripts/tests/test-commit-msg.mjs \
             node .agent/scripts/tests/test-bundle-sizes.mjs \
             node .agent/scripts/tests/test-backlog.mjs \
+            node .agent/scripts/tests/test-backlog-corrige.mjs \
             node .agent/scripts/tests/test-baseline-superficie.mjs \
             node .agent/scripts/tests/test-registo.mjs \
             node .agent/scripts/tests/test-mapa-suites.mjs \

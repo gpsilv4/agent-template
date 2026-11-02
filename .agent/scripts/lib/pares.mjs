@@ -401,6 +401,10 @@ const PARES_DO_TEMPLATE = [
     sinal: /(?<![\w.$])warn\(/,
     neutro: "(() => {})(",
   },
+  // O calculo do backlog saiu do checker (#431): os avisos vivem agora aqui, e a suite do checker mata-os.
+  { alvo: ".agent/scripts/lib/backlog-calculo.mjs", suite: ".agent/scripts/tests/test-backlog.mjs", sinal: /(?<![\w.$])warn\(/, neutro: "(() => {})(" },
+  // As recusas do `--corrigir` (#431): desligada uma, ele escrevia com um aviso que nao e uma contagem.
+  { alvo: ".agent/scripts/lib/backlog-corrige.mjs", suite: ".agent/scripts/tests/test-backlog-corrige.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },
   {
     // Este ficheiro. Estava isento por omissao — e reprova quem nao tem suite, o que fazia
     // dele o unico verificador sem medida no repo. Muta uma COPIA, logo varrer-se a si

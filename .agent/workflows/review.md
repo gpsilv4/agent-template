@@ -44,6 +44,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
   erro "no pull requests found"). **Contar os checks antes de os esperar** — com zero checks
   o `gh pr checks --watch` sai `0` e o gate passa sem nada ter sido verificado:
   `n=$(gh pr checks --json state --jq 'length' 2>/dev/null || echo 0); [ "${n:-0}" -gt 0 ] && gh pr checks --watch || echo "sem PR/checks ainda"`
+  Zero checks num PR que existe: a base e o `main`? Um PR empilhado nao corre o CI (`backlog-method.md`, #431).
   Antes de haver PR, os equivalentes locais sao o `tsc`/`lint`/testes desta checklist
 - Se CI falhou, corrigir antes de pedir review/merge
 - **Security Audit** (o passo `Audit` do `Code Quality`): corre com `continue-on-error` por defeito, logo fica **sempre verde**.

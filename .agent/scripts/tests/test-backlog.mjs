@@ -15,6 +15,9 @@
  * proposito, logo os 11 sitios de aviso sao todos inalcancaveis no estado real. Sem
  * fixture nao havia nada para testar.
  *
+ * Desde o #431 o calculo vive em `lib/backlog-calculo.mjs` (o checker so le, imprime e sai): estes casos medem-no
+ * pelo CLI, sem mudar uma linha. O `--corrigir` tem a sua suite, `test-backlog-corrige.mjs`.
+ *
  * Sem dependencias e sem package.json, como os outros scripts de `.agent/scripts/`.
  *
  *   node .agent/scripts/tests/test-backlog.mjs

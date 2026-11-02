@@ -82,3 +82,9 @@ o caso que o `/debug` e o `/refactor` mandam registar):
 - Propor criacao de item no backlog com ID, descricao, esforco e sprint sugerido
 - Aguardar aprovacao antes de adicionar
 
+
+**Atualizar um PR antigo, ou um empilhado (git e backlog, #431):**
+- `git fetch`; mudar a base do PR para o `main` **primeiro** (um PR empilhado, com a base noutro branch, nao corre o CI: `ci.yml` so em `pull_request` para o `main`); depois `git merge origin/main` (nunca rebase com force push, que esta negado); depois push. Cada passo de git com aprovacao.
+- Se o push ja foi feito antes de mudar a base, o CI nao corre: fechar e reabrir o PR, ou um novo push. O mesmo quando o GitHub muda a base sozinho, ao apagar o branch do PR pai.
+- Conflitos: resolver so os blocos em conflito, nunca `--theirs`/`--ours` no ficheiro inteiro (apaga as linhas do proprio PR). No `decisions.md` ficam as duas entradas, a mais recente em cima.
+- Depois de qualquer merge, **sempre** `node .agent/scripts/check-backlog.mjs`: o git junta linhas das tabelas SEM conflito e deixa o Total errado. **Primeiro** conferir as tabelas de items contra os dois pais (`git diff HEAD^1 -- .agent/context/backlog.md` e o mesmo contra `HEAD^2`): uma linha perdida so se ve ai, e o Total antigo e a unica prova dela. **So depois** `--corrigir` (so os derivados; com outro aviso nao escreve nada) — corrigir antes iguala o Total as tabelas truncadas e apaga essa prova.
