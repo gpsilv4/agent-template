@@ -192,6 +192,55 @@ export function registar() {
   } else {
     registarResultado("portao: o `concurrency:` da um grupo a cada push e so cancela num PR (#427)", c);
   }
+  // As verificacoes da app correm TODAS numa corrida vermelha (#428): o `!cancelled()` nas cinco, o `id: install`, e o
+  // `case "$INSTALOU"` nas quatro que precisam do `node_modules`. No template reprova; num derivado sem isto, SKIP (`TP15`).
+  const q = problemasDoNaoCancelado(ci);
+  if (q.length && ehDerivado(lerRaiz)) {
+    console.log(`  SKIP  portao: ${q[0]} — num derivado, a nota da 2b do \`/upgrade\` (#428, opcional)`);
+    registarResultado("portao: as verificacoes da app num derivado, nada a medir (#428)", []);
+  } else {
+    registarResultado("portao: as verificacoes da app correm todas numa corrida vermelha, e saltam sem o `Install` (#428)", q);
+    // O shell do `TypeScript` corrido como o runner: com o `Install` vermelho sai 0 sem chamar o `npx`; com ele verde, chama.
+    const ts = passoDoCi(ci, "TypeScript");
+    if (ts !== null) {
+      const dir = mkdtempSync(join(tmpdir(), "portao-ci-test-"));
+      try {
+        mkdirSync(join(dir, "bin"));
+        writeFileSync(join(dir, "bin", "npx"), `#!/bin/sh\ntouch "${join(dir, "chamado")}"\nexit 7\n`, { mode: 0o755 });
+        writeFileSync(join(dir, "tsconfig.json"), "{}\n");
+        const corre = (instalou) => correCorpo(ts.corpo, { cwd: dir, runnerTemp: dir, env: { INSTALOU: instalou, TEM_APP: "true", PATH: `${join(dir, "bin")}:${process.env.PATH}` } });
+        const sem = corre("failure");
+        const saltado = corre("skipped");
+        const vazio = corre("");
+        const semChamou = leOuNull(join(dir, "chamado")) !== null;
+        const com = corre("success");
+        registarResultado("portao: o `TypeScript` com o `Install` vermelho sai 0 sem chamar o `npx`, com o valor vazio reprova, e com ele verde chama-o (#428)", [
+          ...(sem.code === 0 && saltado.code === 0 && !semChamou ? [] : [`com INSTALOU=failure/skipped: exit ${sem.code}/${saltado.code}, npx chamado: ${semChamou}`]),
+          ...(vazio.code === 1 && vazio.out.includes("::error::INSTALOU=''") ? [] : [`com INSTALOU vazio (um \`id:\` mudado): exit ${vazio.code}, esperava 1 com o erro`]),
+          ...(com.code === 7 && leOuNull(join(dir, "chamado")) !== null ? [] : [`com INSTALOU=success: exit ${com.code} (esperava o 7 do npx falso)`]),
+        ]);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  }
+  const qs = (checks) => `jobs:\n  quality:\n    steps:\n      - name: Install\n        id: install\n        run: npm ci\n${checks}`;
+  const GATE = '          case "$INSTALOU" in success) ;; failure|skipped|cancelled) echo s; exit 0;; *) echo "::error::x"; exit 1;; esac\n';
+  const chk = (nome, comIf = true, comGate = true) => `      - name: ${nome}\n${comIf ? "        if: ${{ !cancelled() }}\n" : ""}        env:\n${comGate ? "          INSTALOU: ${{ steps.install.conclusion }}\n" : ""}        run: |\n${comGate ? GATE : ""}          npx tsc\n`;
+  const AUDIT = "      - name: Audit\n        if: ${{ !cancelled() }}\n        run: npm audit\n";
+  const todos = (f) => ["TypeScript", "Lint", "Build", "Unit Tests"].map(f).join("") + AUDIT;
+  registarResultado("portao: as verificacoes sem o `if:`, sem o gate do `Install`, ou o `Install` sem `id:`, reprovam (controlo, #428)", [
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n)))).length === 0 ? [] : [`a forma do template reprovou: ${problemasDoNaoCancelado(qs(todos((n) => chk(n))))[0]}`]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n, n !== "Lint")))).length > 0 ? [] : ["o `Lint` sem o `if:` passou"]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n, true, n !== "Build")))).length > 0 ? [] : ["o `Build` sem o gate do `Install` passou"]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n))).replace("        id: install\n", "")).length > 0 ? [] : ["o `Install` sem `id:` passou"]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n))).replace(AUDIT, "      - name: Audit\n        run: npm audit\n")).length > 0 ? [] : ["o `Audit` sem o `if:` passou"]),
+    // A leitura independente do #428: o gate que falha ABERTO (`*) exit 0`), o `outcome` no lugar do `conclusion`, e o
+    // `case` DEPOIS do comando, passavam.
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n))).split(GATE).join('          case "$INSTALOU" in success) ;; *) exit 0;; esac\n')).length > 0 ? [] : ["o gate que falha aberto passou"]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n))).split("steps.install.conclusion").join("steps.install.outcome")).length > 0 ? [] : ["o gate a ler o `outcome` passou"]),
+    ...(problemasDoNaoCancelado(qs(todos((n) => chk(n))).split(`${GATE}          npx tsc\n`).join(`          npx tsc\n${GATE}`)).length > 0 ? [] : ["o gate depois do comando passou"]),
+  ]);
   const conc = (g, v) => `on: push\nconcurrency:\n  group: ${g}\n  cancel-in-progress: ${v}\njobs:\n  x:\n    runs-on: y\n`;
   const SHA = "ci-${{ github.event.pull_request.number || github.sha }}";
   const PR = "${{ github.event_name == 'pull_request' }}";
@@ -206,6 +255,40 @@ export function registar() {
     ...(reprova("on: push\njobs:\n  x:\n    runs-on: y\n") ? [] : ["um ci.yml sem `concurrency:` passou"]),
     ...(reprova(`on: push\njobs:\n  x:\n    concurrency:\n      group: ${SHA}\n      cancel-in-progress: ${PR}\n    runs-on: y\n`) ? [] : ["um `concurrency:` so de JOB passou como o de topo"]),
   ]);
+}
+
+/** As chaves de um passo `- name: <nome>` do `ci.yml`, sem indentacao, ate ao passo seguinte; `null` se nao existir. */
+function chavesDoPasso(ci, nome) {
+  const ls = ci.split(/\r?\n/);
+  const i = ls.indexOf(`      - name: ${nome}`);
+  if (i < 0) return null;
+  const fim = ls.findIndex((l, j) => j > i && l.trim() && !/^        /.test(l));
+  return ls.slice(i + 1, fim < 0 ? ls.length : fim).map((l) => l.trim());
+}
+
+/** Os problemas das verificacoes da app no `ci.yml` (#428): o `!cancelled()` nas cinco, o `id: install`, e o gate do
+ *  `Install` (o `env:` e o `case`) nas quatro que precisam do `node_modules`. */
+export function problemasDoNaoCancelado(ci) {
+  const out = [];
+  const IF = "if: ${{ !cancelled() }}";
+  const install = chavesDoPasso(ci, "Install");
+  if (install === null || !install.includes("id: install")) out.push("o passo `Install` nao tem `id: install`");
+  for (const nome of ["TypeScript", "Lint", "Build", "Unit Tests", "Audit"]) {
+    const ks = chavesDoPasso(ci, nome);
+    if (ks === null) {
+      out.push(`o passo \`${nome}\` nao existe`);
+      continue;
+    }
+    if (!ks.includes(IF)) out.push(`o passo \`${nome}\` nao tem \`${IF}\`: uma falha antes dele esconde-o`);
+    if (nome === "Audit") continue;
+    // O gate e a PRIMEIRA linha do corpo (antes do comando), le o `conclusion`, e falha FECHADO (`*) ... exit 1`).
+    const primeira = passoDoCi(ci, nome)?.corpo.split("\n").find((l) => l.trim()) ?? "";
+    const fechado = /^case "\$INSTALOU" in success\) ;; failure\|skipped\|cancelled\) .*exit 0;; \*\) .*exit 1;; esac$/.test(primeira);
+    if (!ks.includes("INSTALOU: ${{ steps.install.conclusion }}") || !fechado) {
+      out.push(`o passo \`${nome}\` nao abre com o gate do \`Install\` (o \`env: INSTALOU\` do \`conclusion\`, e o \`case\` que falha fechado): correria sem \`node_modules\`, ou saltava em silencio`);
+    }
+  }
+  return out;
 }
 
 /** Os problemas do job `secret-scan` do `ci.yml` (#372 A1): tem de existir, e nao pode ter o `if:` do salto do merge. */

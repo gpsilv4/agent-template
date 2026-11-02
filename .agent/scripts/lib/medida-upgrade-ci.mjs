@@ -11,7 +11,8 @@
  * `test-guards`; a varredura corre-o primeiro, e cada `note()` desligada morre em milissegundos); os de ponta
  * a ponta, nas suites da 2b (`tests-medida-2b-config.mjs`, `test-simulate-upgrade.mjs`).
  */
-import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO, concurrencyDeTopo, problemasDaConcurrency } from "./marcas-yaml.mjs";
+import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO, NAO_CANCELADO, VERIFICACOES_DA_APP, concurrencyDeTopo, problemasDaConcurrency } from "./marcas-yaml.mjs";
+import { jobsDe, passosDe } from "./estrutura-workflow.mjs";
 
 /**
  * @param {object} o
@@ -92,6 +93,32 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
     note(
       "o `concurrency:` do template da a cada push o seu grupo (`github.sha`) e so cancela num PR (`cancel-in-progress: ${{ github.event_name == 'pull_request' }}`, #427), e o deste projeto nao — " +
         `trocar as duas linhas: ${faltam.join("; ")}`
+    );
+  // As verificacoes da app correm TODAS numa corrida vermelha (#428): passo a passo, pelo nome (o leitor de jobs e passos
+  // do `estrutura-workflow.mjs`), so as que o template tem e o projeto tambem (um passo tirado nao e "a meias"). Nota a
+  // quem tem uma sem o `if:`, ou o `if:` sem o gate do `Install` (corria sem `node_modules`: a adocao a meias perigosa).
+  const verificacoes = (t) => {
+    const q = jobsDe(t).find((j) => j.id === "quality");
+    const ps = q ? passosDe(q.ls, q.todas) : null;
+    if (!ps) return null;
+    const m = new Map();
+    for (const p of ps) {
+      const nome = p.cru.map((l) => /^[ \t]*(?:-[ \t]+)?name[ \t]*:[ \t]*["']?(.*?)["']?[ \t]*$/.exec(l)?.[1]).find(Boolean);
+      if (VERIFICACOES_DA_APP.includes(nome)) m.set(nome, { comIf: p.cru.some((l) => NAO_CANCELADO.test(l)), comGate: p.cru.some((l) => /steps\.install\.conclusion/.test(l)) });
+    }
+    return m;
+  };
+  const vLa = verificacoes(ciLa);
+  const vAqui = verificacoes(ciAqui);
+  const doTemplate = [...(vLa ?? new Map())].filter(([, v]) => v.comIf).map(([n]) => n);
+  const semIf = doTemplate.filter((n) => vAqui?.has(n) && !vAqui.get(n).comIf);
+  const semGate = doTemplate.filter((n) => n !== "Audit" && vAqui?.get(n)?.comIf && !vAqui.get(n).comGate);
+  if (semIf.length || semGate.length)
+    note(
+      "o template corre todas as verificacoes do `Code Quality` numa corrida vermelha (`if: ${{ !cancelled() }}` em cada uma, #428), e o deste projeto nao " +
+        `(${[semIf.length ? `sem o \`if:\`: ${semIf.join(", ")}` : "", semGate.length ? `com o \`if:\` e sem o gate do \`Install\`: ${semGate.join(", ")}` : ""].filter(Boolean).join("; ")}) — ` +
+        "OPCIONAL (so minutos: ves todas as falhas numa corrida); trazer JUNTOS o `if:`, o `id: install` no `Install` e o `case \"$INSTALOU\"` em cada verificacao (sem ele, com o `Install` vermelho, as verificacoes correm sem `node_modules`). " +
+        "So a forma EXACTA, e so nestas verificacoes do job `quality` do `ci.yml`, nao conta para o `check-test-surface`: outra forma e uma marca de enfraquecimento que reprova sem trailer que a aceite"
     );
   if (curtos(ciAqui) >= 2 && curtos(ciLa) === 0)
     note("o template corre a app (detect, testes unitarios, audit) como passos de UM job, `Code Quality` (#347), e o deste projeto em jobs separados — OPCIONAL (so minutos: num repo privado cada job e cobrado arredondado ao minuto); ao juntar, a maquinaria fica FORA desse job, e os checks `Detect Project`/`Unit Tests`/`Security Audit` saem dos obrigatorios");
