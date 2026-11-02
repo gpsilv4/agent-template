@@ -413,6 +413,7 @@ src/docs/
 ├── sync-docs-why.md            <- Why the pre-commit checklist has the points it has
 ├── github-security.md         <- GitHub security settings: public vs. private, read/enable with `gh api`
 ├── upgrade-why.md              <- Why /upgrade decides by category, and what it measured
+├── upgrade-derivados-privados.md <- /upgrade in a PRIVATE repo: CI minutes, and the notes a derived project needed
 └── CHANGELOG.md                <- Changelog template
 ```
 
