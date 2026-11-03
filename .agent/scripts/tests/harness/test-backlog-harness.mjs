@@ -14,6 +14,8 @@ import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
+/** As libs do checker e do `--corrigir` (#431), copiadas para a sandbox. */
+const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs"];
 
 // --- A fixture valida -------------------------------------------------------
 // Contas que ela codifica (o checker tem de chegar exatamente a estas):
@@ -98,9 +100,11 @@ const ARCHIVE_OK = `# Backlog Archive
 function sandbox() {
   const dir = mkdtempSync(join(tmpdir(), "backlog-test-"));
   mkdirSync(join(dir, ".agent/context"), { recursive: true });
-  mkdirSync(join(dir, ".agent/scripts"), { recursive: true });
+  mkdirSync(join(dir, ".agent/scripts/lib"), { recursive: true });
   // O checker ancora em <script>/../.. — copiado para ca, ROOT passa a ser o sandbox.
   copyFileSync(CHECKER, join(dir, ".agent/scripts/check-backlog.mjs"));
+  // As libs que ele importa (#431): sem elas, cada caso rebentava num erro de import e nao no defeito que testa.
+  for (const lib of LIBS) copyFileSync(join(ROOT, ".agent/scripts/lib", lib), join(dir, ".agent/scripts/lib", lib));
   writeFileSync(join(dir, ".agent/context/backlog.md"), ACTIVE_OK);
   writeFileSync(join(dir, ".agent/context/backlog-archive.md"), ARCHIVE_OK);
   return dir;
@@ -110,9 +114,10 @@ const f = (dir, p) => join(dir, p);
 const readF = (dir, p) => readFileSync(f(dir, p), "utf8");
 const writeF = (dir, p, c) => writeFileSync(f(dir, p), c);
 
-function run(dir, cwd) {
+/** Corre o checker na sandbox; `args` sao os argumentos (o `--corrigir`, #431). */
+function run(dir, cwd, args = []) {
   try {
-    const out = execFileSync("node", [f(dir, ".agent/scripts/check-backlog.mjs")], {
+    const out = execFileSync("node", [f(dir, ".agent/scripts/check-backlog.mjs"), ...args], {
       cwd: cwd ?? dir,
       encoding: "utf8",
       stdio: "pipe",

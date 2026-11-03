@@ -29,9 +29,12 @@ const S = (n) => (/^tests?-/.test(n) ? `.agent/scripts/tests/${/harness\.mjs$/.t
 export const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
-  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs")], only: "check-backlog" },
-  // O harness dele (#191): decide o veredicto dos testes, e a fixture e o que eles medem.
-  { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs")] },
+  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
+  // O harness dele (#191): decide o veredicto dos testes, e a fixture e o que eles medem. Serve tambem o `--corrigir` (#431).
+  { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")] },
+  // O calculo e a reescrita do backlog sairam do checker (#431): as duas suites, e ANTES da regra geral de `lib/`
+  // (que so corria o `test-registo`).
+  { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
@@ -218,9 +221,9 @@ export const SUITES = [
   // E os dois, com o `lib/derivado.mjs`, servem tambem o `tests-settings-sondas.mjs` (#301), que
   // decide "template ou derivado" pela mesma regra do resto da maquinaria.
   // ...e o `harness/test-surface-harness.mjs` e o `tests-surface-blocos.mjs` (#308), pela mesma razao; no `test-guards`,
-  // tambem o `tests-estrutura-workflow.mjs` (#382).
-  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  // tambem o `tests-estrutura-workflow.mjs` (#382). E o `test-backlog-corrige` (#431), que le o backlog real do template.
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
