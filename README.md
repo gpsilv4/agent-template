@@ -209,7 +209,7 @@ not to* line, so every agent sees it.
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   ├── backlog-review.md       <- /backlog-review — Review the existing backlog against the code
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/                    <- 10 entry points at the root: what you INVOKE
+└── scripts/                    <- 11 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
@@ -219,6 +219,8 @@ not to* line, so every agent sees it.
     ├── adotar-template.mjs     <- Brings the template into an EXISTING project: copies only what
     │                              is missing, writes .agent/adocao.json (copied + collisions)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
+    ├── minutos-ci.mjs          <- CI minutes per run, billed (each job rounded up) vs real, step times,
+    │                              the PR median vs 120 s; fails loud, never a false 0 (#429)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │
@@ -414,6 +416,7 @@ src/docs/
 ├── github-security.md         <- GitHub security settings: public vs. private, read/enable with `gh api`
 ├── upgrade-why.md              <- Why /upgrade decides by category, and what it measured
 ├── upgrade-derivados-privados.md <- /upgrade in a PRIVATE repo: CI minutes, and the notes a derived project needed
+├── exemplos/ci-sem-maquinaria.yml <- A one-job CI for a derived project WITHOUT the machinery (not run here)
 └── CHANGELOG.md                <- Changelog template
 ```
 
@@ -447,6 +450,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
+| CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (both in the `guard-tests` job, #429) |
 | Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan and the Claude Code hook (`guard-textos-publicos`, once a session) say so. In a PRIVATE repo where the names are legitimate, the USER can switch it off for that repo (`src/docs/upgrade-why.md`, never an agent; #375) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
 

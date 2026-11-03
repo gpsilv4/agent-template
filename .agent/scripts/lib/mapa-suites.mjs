@@ -35,6 +35,11 @@ export const SUITES = [
   // O calculo e a reescrita do backlog sairam do checker (#431): as duas suites, e ANTES da regra geral de `lib/`
   // (que so corria o `test-registo`).
   { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
+  // Os minutos de CI (#429): a CLI e as contas puras dela. A CLI tem par na varredura (as recusas).
+  { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs")], only: "minutos-ci" },
+  { re: /^\.agent\/scripts\/lib\/minutos-calculo\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
+  // O exemplo de CI de um derivado sem a maquinaria (#429): nenhum gate o le, e esta suite e a unica protecao dele.
+  { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
@@ -133,6 +138,8 @@ export const SUITES = [
   { re: /^CONTRIBUTING\.md$/, verifica: [S("test-guards.mjs"), S("test-commit-msg.mjs")] },
   // A estrutura do gate (#382), os passos que saltam por uma variavel (#353) e os passos novos antes das suites
   // (#362): o dono no `test-guards` (a funcao pura), e o gate de ponta a ponta.
+  // O `estrutura-workflow` le tambem os passos do exemplo de CI (#429): a primeira regra que casa ganha.
+  { re: /^\.agent\/scripts\/lib\/estrutura-workflow\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-ci-exemplo.mjs")] },
   { re: /^\.agent\/scripts\/lib\/(?:estrutura-workflow|saltos-variavel|passos-novos)\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // Os modos da varredura (#317): as formas de YAML leem-se pela estrutura, no `tests-estrutura-workflow.mjs` (#382).
   { re: /^\.agent\/scripts\/lib\/gate-modos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
@@ -190,8 +197,8 @@ export const SUITES = [
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
   { re: /^\.agent\/scripts\/tests\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // As marcas e a forma do `PLANO_JOB` (#400): os testes do portao e a nota da 2b (no `test-guards`, e de ponta a ponta no
-  // `test-simulate-upgrade`) leem-na tambem.
-  { re: /^\.agent\/scripts\/lib\/marcas-yaml\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // `test-simulate-upgrade`) leem-na tambem; o `minutos-ci` usa o `repoDoOrigin` dele.
+  { re: /^\.agent\/scripts\/lib\/marcas-yaml\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs"), S("test-minutos-ci.mjs")] },
   // O escape de um literal (#400): a fonte; as duas copias e a guarda vivem no `tests-regex-literal` (no `test-guards`).
   { re: /^\.agent\/scripts\/lib\/regex-literal\.mjs$/, verifica: [S("test-guards.mjs"), S("test-codigo-morto.mjs"), S("test-bundle-sizes.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
@@ -221,9 +228,9 @@ export const SUITES = [
   // E os dois, com o `lib/derivado.mjs`, servem tambem o `tests-settings-sondas.mjs` (#301), que
   // decide "template ou derivado" pela mesma regra do resto da maquinaria.
   // ...e o `harness/test-surface-harness.mjs` e o `tests-surface-blocos.mjs` (#308), pela mesma razao; no `test-guards`,
-  // tambem o `tests-estrutura-workflow.mjs` (#382). E o `test-backlog-corrige` (#431), que le o backlog real do template.
-  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs")] },
+  // tambem o `tests-estrutura-workflow.mjs` (#382). E o `test-backlog-corrige` (#431), que le o backlog real do template, e o `test-ci-exemplo` (#429).
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },

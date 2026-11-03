@@ -396,6 +396,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Os minutos de CI (#429): nao e um `check-*` (a descoberta nao o ve), mas TEM sitios de recusa — e cada um e o que
+    // impede um total falso (sem gh, nao-JSON, uma lista cortada, mais de 1000 runs, sem repo, argumentos errados).
+    // Desligado, o script seguia e imprimia "0 min". A suite afirma cada recusa pela SUA mensagem.
+    alvo: ".agent/scripts/minutos-ci.mjs",
+    suite: ".agent/scripts/tests/test-minutos-ci.mjs",
+    sinal: /(?<![\w.$]|function )fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/check-backlog.mjs",
     suite: ".agent/scripts/tests/test-backlog.mjs",
     sinal: /(?<![\w.$])warn\(/,
