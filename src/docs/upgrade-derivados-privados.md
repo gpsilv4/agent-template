@@ -50,20 +50,58 @@ O hook `guard-textos-publicos` le o texto antes de o comando correr:
 - Criar o ficheiro e publica-lo **no mesmo comando** e recusado: o hook le o ficheiro antes de ele existir. Escrever
   primeiro (a ferramenta de edicao), publicar num comando a parte.
 
-## 6. Os minutos: medir, e duas regras para os manter
+## 6. Os minutos: medir, e tres regras para os manter
 
 Os minutos cobrados sao a soma dos jobs, cada um arredondado ao minuto acima: um job de 8 s paga 1 min, e um de 121 s
-paga 3. Medir antes do upgrade e depois, com a mesma tabela (a API `actions/runs/{id}/jobs`, paginada; `gh run list -L
-N` corta em silencio), e a duracao POR PASSO, que e o que encontra o passo lento. Os jobs do proprio Dependabot
-(`event: dynamic`) sao gratis e ficam de fora. O script e o do #429.
+paga 3. Ha dois numeros, e respondem a perguntas diferentes:
+- **Cobrado (arredondado)**: o que a quota gratis ve. A quota (2000 min/mes) e partilhada por TODOS os repos privados
+  da conta; os minutos de um repo publico nao contam.
+- **Real (efetivo)**: os segundos que o runner gastou. A razao entre os dois e o imposto do arredondamento: num
+  derivado, ~2x no CI antigo de 5 jobs, e ainda ~2x com um job de 65-87 s. Menos jobs, e jobs mais curtos, baixam-no.
 
-Duas regras que um derivado privado copia para as suas `process-rules` (o template nao as impoe: num repo publico nao
+**Por repo, por run** (o script do #429, com a API `actions/runs/{id}/jobs` paginada; `gh run list -L N` corta em
+silencio):
+
+```bash
+node .agent/scripts/minutos-ci.mjs --desde 2026-11-01 --app TypeScript   # o mes, e a mediana dos PRs de app
+node .agent/scripts/minutos-ci.mjs --run <id> --passos                   # um run, passo a passo: o passo lento
+```
+
+A mediana e a do **job mais longo** de cada run (e um job que passa ou nao dos 120 s, nao a soma). O `--app "<passo>"`
+e um passo que so corre nos PRs de app (sem ele, a mediana conta tambem os de docs e os outros workflows, e o script
+di-lo). Os runs do proprio Dependabot (`event: dynamic`) **tambem se pagam** num privado (medido contra a faturacao:
+sem eles a soma nao batia), e entram na soma contados a parte; os PRs dele correm o CI do projeto e contam tambem.
+Um run ainda em curso fica fora da soma, listado.
+
+**Pela conta inteira** (todos os repos, o que a faturacao conta), a mao — pede o scope `user` ao `gh`
+(`gh auth refresh -h github.com -s user`):
+
+```bash
+gh api "/users/<utilizador>/settings/billing/usage/summary?year=AAAA&month=M"   # o total do mes
+gh api "/users/<utilizador>/settings/billing/usage?year=AAAA&month=M"           # por repo (somar o `quantity`)
+```
+
+Medir **5 PRs antes e 5 depois** de cada mudanca de CI, pelo id do run, e escrever os dois numeros. O exemplo de CI
+de um job, para um derivado sem a maquinaria, esta em `src/docs/exemplos/ci-sem-maquinaria.yml` (a cache da
+`node_modules` vai la como passo opcional, com as condicoes dela). Esse exemplo **nao reverifica a app no push**: e
+uma troca de minutos, nao uma equivalencia. Dois PRs verdes contra o mesmo `main` podem parti-lo juntos, e num
+privado sem GitHub Pro nao ha "Require branches to be up to date": atualizar o PR com o `main` antes do merge quando
+outro entrou entretanto.
+
+Tres regras que um derivado privado copia para as suas `process-rules` (o template nao as impoe: num repo publico nao
 pagam nada). Medidas num derivado, a 1 e 2 nov:
+- **Iterar no localhost.** Enquanto quem pediu testa e pede ajustes, o agente corrige e verifica localmente (tsc,
+  lint, testes, guards), sem push nem PR. O push e o PR so com o ticket fechado, e o push corre antes as mesmas
+  verificacoes que o CI correria, para o PR passar a primeira. Um push para um **Preview** so quando o teste pede um
+  servidor real: num telemovel, a CSP de producao, ou um servico que bloqueia IPs de datacenter. Os commits locais
+  continuam, cada um com a sua aprovacao; so o push espera. Porque: cada push num PR corre o CI (~2 min num PR de
+  app), e iterar com pushes multiplica-o pelo numero de ajustes.
 - **Um push por PR,** quando o trabalho esta pronto e as verificacoes locais passaram: cada push num PR corre o CI
-  outra vez. Excecoes: um preview para testar num dispositivo, o controlo negativo de uma mudanca de CI, juntar o
-  `main` a um PR antigo. Depois da regra, 7 de 8 PRs correram uma so vez.
-- **Se a mediana dos PRs de app passar de 120 s, procurar o passo lento** antes de acrescentar testes ao mesmo job. O
-  caso medido: o `Install` subiu de 16 s para 71 s porque o push do `main` nao instalava e nunca guardava a cache do
-  npm (e a chave mudava a cada PR, com a versao da app no lockfile); a correcao (a impressao digital das dependencias
-  sem a versao, gravada so no `main` quando falta) devolveu-o a 16 s e o PR a 2 min. Com a mediana a ~117 s, a margem e
-  de ~5 %: o passo seguinte a ver e o audit de dev ou o build.
+  outra vez. Excecoes: um Preview (pelas razoes acima), o controlo negativo de uma mudanca de CI, juntar o `main` a
+  um PR antigo. Depois da regra, 7 de 8 PRs correram uma so vez.
+- **Se a mediana dos PRs de app passar de 120 s, procurar o passo lento** (`--passos`) antes de acrescentar testes ao
+  mesmo job: um job de 61-120 s paga 2 min, um de 121 s paga 3. O caso medido: o `Install` subiu de 16 s para 71 s
+  porque o push do `main` nao instalava e nunca guardava a cache do npm (e a chave mudava a cada PR, com a versao da
+  app no lockfile); a correcao (a impressao digital das dependencias sem a versao, gravada so no `main` quando falta)
+  devolveu-o a 16 s e o PR a 2 min. Depois, o build sem repetir o tsc e a `node_modules` em cache levaram a mediana a
+  70 s.

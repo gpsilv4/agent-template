@@ -1,0 +1,260 @@
+# Um CI de UM job para um projeto derivado SEM a maquinaria do template (#429)
+#
+# NAO corre aqui: vive fora de `.github/workflows/` de proposito. Copia-se para o `.github/workflows/ci.yml` do
+# projeto e adapta-se o que esta marcado `# ADAPTAR`. E npm/Node porque e o unico caso medido (um derivado privado,
+# 1-2 nov 2026): um PR mais o push do seu merge passou de ~15 min cobrados para ~3. O porque de cada escolha esta em
+# `src/docs/upgrade-derivados-privados.md` e nos comentarios do #429. A suite `test-ci-exemplo.mjs` prende cada uma.
+#
+# O GitHub cobra um repo privado POR JOB, arredondado ao minuto acima: por isso UM job. Cada verificacao tem
+# `!cancelled()`, para uma falha (o tsc) nao esconder as outras (os testes). A instalacao nao o tem, e as verificacoes
+# da app so correm com ela bem-sucedida (`steps.install.conclusion == 'success'`): sem `node_modules`, o `npx tsc` ia
+# buscar ao registo um pacote que nao esta fixado (o defeito que o #428 corrigiu no CI do template). Nunca `paths-ignore` no `on:`: um check que
+# nao corre fica pendente se um dia for obrigatorio. O alcance decide-se num passo, com `if:`.
+
+name: CI
+
+# Exatamente estes dois eventos: o passo `scope` recusa qualquer outro (`*) exit 1`).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# So os PRs se cancelam. Um push no `main` agrupa-se pelo SEU commit: o GitHub guarda 1 run pendente por grupo e
+# cancela o anterior mesmo com `cancel-in-progress: false`, e num burst de merges o do meio ficava sem gitleaks (#427).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: CI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # O gitleaks lista os commits do PR pela API. As permissions de um job SUBSTITUEM as do topo.
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # O historico inteiro: as mensagens de commit e o gitleaks leem o intervalo todo do PR ou do push.
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A app foi tocada? Num PR o checkout e o merge ref: `HEAD^1` e a base, e `HEAD^1..HEAD` sao as mudancas do PR.
+      # Num push a app NAO se reverifica (`app=false`, escrito SEMPRE: uma saida vazia nunca chega a um `if:`). E uma
+      # troca de minutos, nao uma equivalencia: dois PRs verdes contra o mesmo `main` podem parti-lo juntos depois dos
+      # dois merges, e num privado sem GitHub Pro nao ha "Require branches to be up to date". ATUALIZAR o PR com o
+      # `main` antes do merge quando outro entrou entretanto.
+      # Falha fechada: sem `HEAD^1`, ou com o `git diff` a falhar, verifica tudo.
+      - name: Alcance — a app foi tocada?
+        id: scope
+        env:
+          EVENTO: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          case "$EVENTO" in
+            push) echo "app=false" >> "$GITHUB_OUTPUT"; echo "  push: mensagens e gitleaks."; exit 0 ;;
+            pull_request) ;;
+            *) echo "  evento inesperado: $EVENTO"; exit 1 ;;
+          esac
+          if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; echo "  sem base: verifica tudo."; exit 0
+          fi
+          # ADAPTAR: os caminhos da app.
+          APP='^(src/|tests/|public/|package(-lock)?\.json$|tsconfig\.json$|eslint\.config\.|vitest\.config\.|\.nvmrc$|\.github/workflows/)'
+          # `--no-renames`: uma renomeacao mostra os DOIS caminhos (mover um ficheiro da app para `docs/` toca a app).
+          # `-z`: os nomes chegam sem aspas nem escapes, mesmo com espacos, acentos ou uma quebra de linha.
+          tocados="$RUNNER_TEMP/tocados-pelo-pr"
+          if ! git diff --name-only --no-renames -z "$base" HEAD > "$tocados"; then
+            echo "app=true" >> "$GITHUB_OUTPUT"; echo "  o git diff falhou: verifica tudo."; exit 0
+          fi
+          app=false
+          while IFS= read -r -d '' f; do
+            if [[ "$f" =~ $APP ]]; then app=true; break; fi
+          done < "$tocados"
+          echo "app=$app" >> "$GITHUB_OUTPUT"
+          echo "  app=$app"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # A impressao digital das dependencias: o `package-lock.json` SEM a versao da app. Cada PR sobe a versao, e com o
+      # hash do ficheiro inteiro a cache nunca acertava (Install de 16 s para 71 s, medido). A `node_modules` leva o ABI
+      # do Node que o `setup-node` INSTALOU (e nao o texto do `.nvmrc`: um `lts/*` ou um `22` muda de versao sem mudar
+      # de texto, e os binarios nativos de uma `node_modules` restaurada deixavam de carregar).
+      - name: Dependencias — a impressao digital
+        id: deps
+        run: |
+          set -euo pipefail
+          deps_fp() { jq -S 'del(.version) | del(.packages[""].version)' | sha256sum | cut -c1-16; }
+          fp="$(deps_fp < package-lock.json)"
+          echo "npm_key=npm-deps-$RUNNER_OS-$RUNNER_ARCH-$fp" >> "$GITHUB_OUTPUT"
+          echo "nm_key=node-modules-$RUNNER_OS-$RUNNER_ARCH-abi$(node -p process.versions.modules)-$fp" >> "$GITHUB_OUTPUT"
+          if base="$(git rev-parse --verify --quiet HEAD^1)" && [ "$(git show "$base:package-lock.json" 2>/dev/null | deps_fp)" = "$fp" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- CACHE inicio ---
+      # A cache do npm (as descargas). Num PR: a chave exata, ou a mais recente do `main` pelo prefixo; os PRs NUNCA
+      # gravam. Num push: so se PROCURA (`lookup-only`); falta → instala e grava, uma vez por conjunto de dependencias.
+      # (As caches do `setup-node` nao servem: so partilham entre PRs o que o `main` grava, e com outra chave.)
+      - name: Cache do npm (restaurar)
+        id: npmcache
+        if: steps.scope.outputs.app == 'true' || github.event_name == 'push'
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.npm
+          key: ${{ steps.deps.outputs.npm_key }}
+          restore-keys: npm-deps-${{ runner.os }}-${{ runner.arch }}-
+          lookup-only: ${{ github.event_name == 'push' }}
+
+      # Cada `!=` sobre a saida de um passo repete o `if:` desse passo: um passo SALTADO deixa a saida vazia, e
+      # `'' != 'true'` e verdadeiro (o defeito que um derivado mediu: um `npm ci` em cada push).
+      - name: Install
+        id: install
+        if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && (github.event_name == 'pull_request' || steps.npmcache.outputs.cache-hit != 'true')
+        run: npm ci
+
+      - name: Cache do npm (gravar, so no main)
+        if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && github.event_name == 'push' && steps.npmcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.npm
+          key: ${{ steps.deps.outputs.npm_key }}
+      # --- CACHE fim ---
+
+      # --- OPCIONAL T80 inicio: a `node_modules` pronta. Substitui o bloco CACHE acima (descomentar estes passos e
+      # apagar aquele) e, nas verificacoes da app, trocar `steps.install.conclusion == 'success'` por
+      # `(steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true')`: com a pasta restaurada o
+      # Install e saltado de proposito. Mediu-se num derivado: a mediana de um PR de app de 97 s para 70 s, nenhum acima de 120 s.
+      # Antes de o adotar, listar os scripts de instalacao, que NAO correm sobre uma pasta restaurada:
+      #   npm query ":attr(scripts, [postinstall])"; npm query ":attr(scripts, [install])"; npm query ":attr(scripts, [preinstall])"
+      # e os `install`/`prepare`/`postinstall` do proprio `package.json`. Um binario por plataforma pede o sistema e a
+      # arquitetura na chave (`$RUNNER_OS`, `$RUNNER_ARCH`, ja la estao). A chave e EXATA: sem `restore-keys`.
+      # - name: Cache da node_modules (restaurar)
+      #   id: nmcache
+      #   if: steps.scope.outputs.app == 'true' || github.event_name == 'push'
+      #   uses: actions/cache/restore@v6
+      #   with:
+      #     path: node_modules
+      #     key: ${{ steps.deps.outputs.nm_key }}
+      #     lookup-only: ${{ github.event_name == 'push' }}
+      #
+      # - name: Cache do npm (restaurar)
+      #   id: npmcache
+      #   if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && steps.nmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/restore@v6
+      #   with:
+      #     path: ~/.npm
+      #     key: ${{ steps.deps.outputs.npm_key }}
+      #     restore-keys: npm-deps-${{ runner.os }}-${{ runner.arch }}-
+      #
+      # - name: Install
+      #   id: install
+      #   if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && steps.nmcache.outputs.cache-hit != 'true'
+      #   run: npm ci
+      #
+      # - name: Cache do npm (gravar, so no main)
+      #   if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && github.event_name == 'push' && steps.nmcache.outputs.cache-hit != 'true' && steps.npmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/save@v6
+      #   with:
+      #     path: ~/.npm
+      #     key: ${{ steps.deps.outputs.npm_key }}
+      #
+      # - name: Cache da node_modules (gravar, so no main)
+      #   if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && github.event_name == 'push' && steps.nmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/save@v6
+      #   with:
+      #     path: node_modules
+      #     key: ${{ steps.deps.outputs.nm_key }}
+      # --- OPCIONAL T80 fim ---
+
+      - name: TypeScript
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' }}
+        run: npx tsc --noEmit # ADAPTAR
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' }}
+        run: npm run lint # ADAPTAR
+
+      - name: Build
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' }}
+        # OPCIONAL (so Next.js): o build sem repetir a verificacao de tipos que o passo TypeScript ja fez (~12 s por
+        # PR). O `next.config` le `typescript.ignoreBuildErrors` desta variavel, que SO o CI define: o deploy verifica.
+        # env:
+        #   CI_SKIP_BUILD_TYPECHECK: "1"
+        run: npm run build # ADAPTAR
+
+      - name: Unit Tests
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' }}
+        run: npm run test:unit # ADAPTAR
+
+      # O gate e o das dependencias de PRODUCAO. O de dev e informativo, e so quando as dependencias mudam (variava de
+      # 2 a 30 s com a rede do registo; os alertas de dev chegam tambem pelo Dependabot).
+      - name: Audit (producao)
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' }}
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit (dev, informativo)
+        if: ${{ !cancelled() && steps.scope.outputs.app == 'true' && steps.install.conclusion == 'success' && steps.deps.outputs.changed == 'true' }}
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      # O que o derivado traz do template, e so precisa de `node`: corre em todos os PRs, tambem nos de docs.
+      - name: Backlog Check
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: node .agent/scripts/check-backlog.mjs
+
+      - name: Hooks
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: node .claude/hooks/tests/test-hooks.mjs
+
+      # Sempre, tambem no push: o hook local so corre em quem fez `git config core.hooksPath .githooks`. Num PR, os
+      # commits do PR sem os de merge (o `Merge <sha> into <sha>` do GitHub nao tem prefixo) e o titulo, que e a 1.a
+      # linha do squash; num push, `before..HEAD`.
+      - name: Mensagens de commit
+        if: ${{ !cancelled() }}
+        env:
+          EVENTO: ${{ github.event_name }}
+          ANTES: ${{ github.event.before }}
+          COMMIT_MSG_FINAL: "1"
+          PR_TITULO: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENTO" = "push" ] && [ -n "$ANTES" ] && ! [[ "$ANTES" =~ ^0+$ ]] && git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
+            intervalo="$ANTES..HEAD"
+          elif base="$(git rev-parse --verify --quiet HEAD^1)"; then
+            intervalo="$base..HEAD"
+          else
+            echo "  HEAD e um commit-raiz: nao ha intervalo a verificar."; exit 0
+          fi
+          n=0
+          while IFS= read -r -d '' msg; do
+            printf '%s' "$msg" > "$RUNNER_TEMP/commit-msg-$n"
+            node .githooks/commit-msg "$RUNNER_TEMP/commit-msg-$n" </dev/null
+            n=$((n + 1))
+          done < <(git log --no-merges --format='%B%x00' "$intervalo")
+          # Zero mensagens num intervalo valido e "nao consegui verificar", nao "limpo".
+          if [ "$n" -eq 0 ]; then echo "  nenhuma mensagem em $intervalo."; exit 1; fi
+          echo "  $n mensagem(ns) verificada(s) em $intervalo."
+          if [ "$EVENTO" = "pull_request" ]; then
+            printf '%s\n' "$PR_TITULO" > "$RUNNER_TEMP/titulo-do-pr"
+            node .githooks/commit-msg "$RUNNER_TEMP/titulo-do-pr" </dev/null
+          fi
+
+      - name: Gitleaks
+        if: ${{ !cancelled() }}
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Num repo de ORGANIZACAO a acao exige esta licenca (gratis, em gitleaks.io); sem ela o job fica vermelho em
+          # todas as corridas. Numa conta pessoal o secret nao existe, o valor e vazio e a acao corre na mesma.
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

@@ -148,6 +148,10 @@ export const PREFIXOS_DE_TESTE = [
   //
   // Composto, como os irmaos: `fail-fast-` sozinho ainda e generico para uma pasta em `tmpdir`.
   "fail-fast-test-",
+  // Do `test-ci-exemplo.mjs` (#429): o passo `scope` do exemplo de CI corre num repo git de fixture.
+  "ci-exemplo-test-",
+  // Do `test-minutos-ci.mjs` (#429): o `gh` falso e as paginas de JSON que ele serve.
+  "minutos-ci-test-",
   "backlog-test-",
   "t-limpo-",
   "sim-test-",
