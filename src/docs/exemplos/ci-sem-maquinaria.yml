@@ -32,6 +32,31 @@ permissions:
 jobs:
   ci:
     name: CI
+    # O push do MERGE de um PR num privado nao corre (#439): repetia as mensagens e o gitleaks que o PR ja correu
+    # sobre os mesmos commits, e custava 1 min de 3 por PR (medido num derivado). Um push direto corre tudo. Um job
+    # saltado nao se cobra. A condicao depende do metodo de merge do repo: ADAPTAR (uma das duas formas).
+    # Em BLOCO (`>-`), sempre: numa linha simples, o ` #` de `'Merge pull request #'` comeca um comentario YAML e
+    # corta a condicao em silencio (medido num derivado; a suite reprova-o).
+    # Os riscos, aceites: a mensagem final do merge (editavel na caixa de merge) deixa de ser lida; um PR mergeado
+    # vermelho deixa a APP por verificar ate ao PR seguinte, e as mensagens e o gitleaks desse PR nunca (o PR seguinte
+    # so le os seus commits); um PR cujo ultimo commit diga `[skip ci]` (ou `[no ci]`, `skip-checks: true`) nao corre,
+    # e entra sem nenhuma verificacao; uma mensagem (ou um committer) forjada num push direto salta. O porque esta no
+    # `src/docs/upgrade-derivados-privados.md` §6.
+    # - FORMA mensagem (ativa): repo de merge commits ("Create a merge commit"). Salta so a mensagem que o GitHub
+    #   escreve. Falha para o lado seguro: um squash, um rebase ou um commit pela UI web tem outra mensagem, e corre.
+    # - VARIANTE squash: repo so de squash, pelo committer `web-flow` (o `ci.yml` do template, #347). Para a usar,
+    #   apagar o bloco FORMA e descomentar os blocos VARIANTE (este e o do passo das mensagens, que passa a verificar
+    #   a descricao do PR). Salta tambem um commit pela UI web no `main`, sem o varrer (#372).
+    # --- FORMA mensagem inicio ---
+    if: >-
+      github.event_name == 'pull_request' || !github.event.repository.private ||
+      !startsWith(github.event.head_commit.message, 'Merge pull request #')
+    # --- FORMA mensagem fim ---
+    # --- VARIANTE squash inicio ---
+    # if: >-
+    #   github.event_name == 'pull_request' || !github.event.repository.private ||
+    #   github.event.head_commit.committer.username != 'web-flow'
+    # --- VARIANTE squash fim ---
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # O gitleaks lista os commits do PR pela API. As permissions de um job SUBSTITUEM as do topo.
@@ -101,6 +126,30 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
+          # O `.nvmrc` muda a chave da `node_modules` (o ABI) sem tocar no lockfile (#439).
+          if base="$(git rev-parse --verify --quiet HEAD^1)" && [ "$(git show "$base:.nvmrc" 2>/dev/null)" = "$(cat .nvmrc 2>/dev/null)" ]; then
+            echo "nvmrc_changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "nvmrc_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Quem grava a cache depois de um merge e o `cache.yml` (o exemplo `cache-sem-maquinaria.yml`), e so quando a
+      # mensagem do merge tem `(deps` — o titulo do PR vai nela, num merge commit e num squash. Sem esta regra, um PR que
+      # acrescente uma dependencia sem `(deps` no titulo deixava a cache nova para o `schedule` (ate 7 dias de PRs a
+      # instalar do zero). Custo aceite: esse PR leva o scope `deps` em vez do da sua area. O `(deps` casa tambem o
+      # `deps-dev` do Dependabot (com `include: scope`; sem ele, ADAPTAR a MARCA, aqui e no `cache.yml`).
+      - name: Dependencias — o titulo diz (deps
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && (steps.deps.outputs.changed == 'true' || steps.deps.outputs.nvmrc_changed == 'true') }}
+        env:
+          PR_TITULO: ${{ github.event.pull_request.title }}
+          MARCA: "(deps" # ADAPTAR: o mesmo texto do `contains` do `if:` do `cache.yml`
+        run: |
+          set -euo pipefail
+          shopt -s nocasematch
+          case "$PR_TITULO" in
+            *"$MARCA"*) echo "  as dependencias mudaram, e o titulo tem $MARCA: o cache.yml grava depois do merge." ;;
+            *) echo "::error::as dependencias (ou o .nvmrc) mudaram e o titulo do PR nao tem $MARCA: sem isso, a cache nova so nasce no schedule do cache.yml. Depois de editar o titulo, um re-run le o titulo antigo: um push novo (ou fechar e reabrir o PR)."; exit 1 ;;
+          esac
 
       # --- CACHE inicio ---
       # A cache do npm (as descargas). Num PR: a chave exata, ou a mais recente do `main` pelo prefixo; os PRs NUNCA
@@ -227,6 +276,10 @@ jobs:
           ANTES: ${{ github.event.before }}
           COMMIT_MSG_FINAL: "1"
           PR_TITULO: ${{ github.event.pull_request.title }}
+          # --- VARIANTE squash inicio ---
+          # PR_CORPO: ${{ github.event.pull_request.body }}
+          # PR_AUTOR: ${{ github.event.pull_request.user.login }}
+          # --- VARIANTE squash fim ---
         run: |
           set -euo pipefail
           if [ "$EVENTO" = "push" ] && [ -n "$ANTES" ] && ! [[ "$ANTES" =~ ^0+$ ]] && git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
@@ -248,6 +301,16 @@ jobs:
           if [ "$EVENTO" = "pull_request" ]; then
             printf '%s\n' "$PR_TITULO" > "$RUNNER_TEMP/titulo-do-pr"
             node .githooks/commit-msg "$RUNNER_TEMP/titulo-do-pr" </dev/null
+            # Na VARIANTE squash, com a opcao de squash "Pull request title and description": a descricao do PR e o
+            # corpo do squash, e o push que o lia ja nao corre. O Dependabot fica de fora: o corpo dele traz as release
+            # notes do pacote a montante. Uma descricao editada depois do CI nao se reverifica.
+            # --- VARIANTE squash inicio ---
+            # if [ -n "${PR_CORPO:-}" ] && [ "${PR_AUTOR:-}" != "dependabot[bot]" ]; then
+            #   printf '%s\n\n%s\n' "$PR_TITULO" "$PR_CORPO" > "$RUNNER_TEMP/descricao-do-pr"
+            #   node .githooks/commit-msg "$RUNNER_TEMP/descricao-do-pr" </dev/null
+            #   echo "  descricao do PR verificada."
+            # fi
+            # --- VARIANTE squash fim ---
           fi
 
       - name: Gitleaks

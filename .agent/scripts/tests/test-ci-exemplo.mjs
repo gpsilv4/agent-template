@@ -10,8 +10,13 @@
  *      resto (`!=`, `!`, `== ''`, `contains`, os operandos trocados, `['k']`) repete o `if:` de X e nao corre depois de
  *      uma falha que X nao corre (uma LISTA DO QUE SE PERMITE, `TP6`);
  *   2. as mesmas propriedades no bloco OPCIONAL T80 descomentado, que e onde um derivado publicou a armadilha;
- *   3. o shell do passo `scope`, corrido com `bash -e` num repo git de fixture (como o `tests-plano-passo.mjs`).
- * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma.
+ *   3. o shell do passo `scope`, corrido com `bash -e` num repo git de fixture (como o `tests-plano-passo.mjs`);
+ *   4. o SALTO do push do merge num privado (#439): o `if:` de job em bloco, numa das duas formas (pela mensagem, a
+ *      ativa; pelo committer, a VARIANTE squash), com a tabela de verdade de cada uma; o ` #` que corta um `if:`
+ *      numa linha simples; a descricao do PR (so na variante) e o `(deps` no titulo, com o shell corrido;
+ *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`).
+ * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma. Os leitores
+ * vivem em `harness/expressoes-ci.mjs`.
  *
  * Num derivado sem o exemplo, SKIP; no template e exigido (`TP15`).
  *
@@ -21,13 +26,15 @@ import { spawnSync } from "child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { jobsDe, passosDe, indent } from "../lib/estrutura-workflow.mjs";
 import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/marcas-yaml.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
+import { avalia, comSquash, comT80, conjuntos, cortesDosIf, depoisDeFalha, eventos, passosDoExemplo, problemasDeSaidas, semExteriores } from "./harness/expressoes-ci.mjs";
+import { casosDoCache, IF_SQUASH, problemasDoSalto, tabelaDoSalto } from "./harness/casos-salto-cache.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const EXEMPLO = "src/docs/exemplos/ci-sem-maquinaria.yml";
+const CACHE = "src/docs/exemplos/cache-sem-maquinaria.yml";
 const ler = (p) => leOuNull(join(ROOT, p));
 
 let passed = 0;
@@ -49,116 +56,7 @@ function caso(nome, fn) {
   }
 }
 
-// --- As expressoes de um `if:` ---
-
-/** O `if:` sem `${{ }}` e com os espacos colapsados. */
-const normaliza = (e) => e.trim().replace(/^\$\{\{([\s\S]*)\}\}$/, "$1").replace(/\s+/g, " ").trim();
-
-/** O indice do `)` que fecha o `(` em `i`, fora de aspas; -1 se nao fecha. */
-function fecho(s, i) {
-  let fundo = 0;
-  let aspa = null;
-  for (let k = i; k < s.length; k++) {
-    if (aspa) {
-      if (s[k] === aspa) aspa = null;
-    } else if (s[k] === "'" || s[k] === '"') aspa = s[k];
-    else if (s[k] === "(") fundo++;
-    else if (s[k] === ")" && --fundo === 0) return k;
-  }
-  return -1;
-}
-
-/** Um par de parenteses exteriores sai so quando o `(` do inicio fecha no ULTIMO caracter (`(a) || (b)` fica). */
-function semExteriores(c) {
-  let s = c.trim();
-  while (s.startsWith("(") && fecho(s, 0) === s.length - 1) s = s.slice(1, -1).trim();
-  return s;
-}
-
-/** Partir `s` no operador `op` (`&&` ou `||`) a profundidade 0, fora de aspas. */
-function parteNoTopo(s, op) {
-  const out = [];
-  let fundo = 0;
-  let aspa = null;
-  let ini = 0;
-  for (let k = 0; k < s.length; k++) {
-    const ch = s[k];
-    if (aspa) {
-      if (ch === aspa) aspa = null;
-    } else if (ch === "'" || ch === '"') aspa = ch;
-    else if (ch === "(") fundo++;
-    else if (ch === ")") fundo--;
-    else if (fundo === 0 && s.startsWith(op, k)) {
-      out.push(s.slice(ini, k));
-      ini = k + 2;
-      k++;
-    }
-  }
-  out.push(s.slice(ini));
-  return out.map(semExteriores).filter(Boolean);
-}
-/** Os conjuntos de topo: os `&&` a profundidade 0. */
-const conjuntos = (expr) => parteNoTopo(normaliza(expr), "&&");
-
-// A forma LIVRE de um conjunto: um `==` com um literal NAO vazio sobre a saida ou a conclusao de um passo (saltado, a
-// saida e `''` e a conclusao `'skipped'`: as duas tornam a forma falsa), ou um `||` feito so de formas livres.
-const ATOMO_LIVRE = /^steps\.[\w-]+\.(?:outputs\.[\w-]+|conclusion|outcome) == '[^']+'$/;
-const livre = (c) => parteNoTopo(c, "||").every((a) => ATOMO_LIVRE.test(a));
-const REFS = /steps\.([\w-]+)\.(?:outputs|conclusion|outcome)\b/g;
-// O que a regra nao ve, e por isso se recusa: os passos lidos por indice, ou inteiros.
-const OPACO = /\bsteps\s*\[|\bsteps\.[\w-]+\s*\[|toJSON\s*\(\s*steps\b/;
-/** As funcoes que deixam um passo correr depois de uma falha (os nomes nao distinguem maiusculas no GitHub). */
-const DEPOIS_DE_FALHA = /(!\s*cancelled|\balways|\bfailure)\s*\(\s*\)/gi;
-const depoisDeFalha = (e) => new Set([...(e ?? "").matchAll(DEPOIS_DE_FALHA)].map((m) => m[0].replace(/\s+/g, "").toLowerCase()));
-
-// --- Os passos ---
-
-/** As chaves de um passo: `{ name, id, if, uses, run, with: {k: v}, ls, cru }`. */
-function chavesDe(passo) {
-  const p = { with: {}, ls: passo.ls, cru: passo.cru };
-  const primeira = passo.ls[0].replace(/^([ \t]*)-[ \t]*/, (_, a) => `${a}  `);
-  const linhas = [primeira, ...passo.ls.slice(1)];
-  const kInd = indent(primeira);
-  let emWith = false;
-  for (let i = 0; i < linhas.length; i++) {
-    const l = linhas[i];
-    if (!l.trim()) continue;
-    const m = /^[ \t]*["']?([\w-]+)["']?[ \t]*:[ \t]*(.*)$/.exec(l);
-    if (!m) continue;
-    if (indent(l) === kInd) {
-      emWith = m[1] === "with";
-      if (m[1] !== "with") p[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
-      if (m[1] === "run") p.runIdx = i;
-    } else if (emWith && indent(l) > kInd) p.with[m[1]] = m[2].replace(/^(["'])(.*)\1$/, "$2");
-  }
-  // O corpo cru do `run: |`: as linhas seguintes mais indentadas que a chave, sem a indentacao comum.
-  if (p.runIdx !== undefined && /^[|>]/.test(p.run)) {
-    const corpo = [];
-    for (let j = p.runIdx + 1; j < passo.cru.length && (!passo.cru[j].trim() || indent(passo.cru[j]) > kInd); j++) corpo.push(passo.cru[j]);
-    const ne = corpo.filter((l) => l.trim());
-    const min = ne.length ? Math.min(...ne.map(indent)) : 0;
-    p.corpo = corpo.map((l) => l.slice(min)).join("\n");
-  }
-  return p;
-}
-
-function passosDoExemplo(texto) {
-  const jobs = jobsDe(texto);
-  if (jobs.length !== 1) return { jobs, passos: [] };
-  return { jobs, passos: (passosDe(jobs[0].ls, jobs[0].todas) ?? []).map(chavesDe) };
-}
-
-/** Os eventos do `on:` de topo. */
-function eventos(texto) {
-  const ls = texto.split("\n");
-  const i = ls.findIndex((l) => /^["']?on["']?[ \t]*:/.test(l));
-  if (i < 0) return [];
-  const fim = ls.findIndex((l, j) => j > i && /^[^\s#]/.test(l));
-  const filhos = ls.slice(i + 1, fim < 0 ? ls.length : fim).filter((l) => l.trim() && !/^[ \t]*#/.test(l));
-  if (!filhos.length) return [];
-  const ind = Math.min(...filhos.map(indent));
-  return filhos.filter((l) => indent(l) === ind).map((l) => l.trim().replace(/[ \t]*:.*$/, ""));
-}
+// --- A receita (os leitores estao no `harness/expressoes-ci.mjs`) ---
 
 const ehInstall = (p) => /^npm ci\b/.test((p.run ?? "").trim());
 // Um COMANDO (o inicio de uma linha), e nao uma palavra: o passo `deps` escreve `npm-deps-…` numa chave.
@@ -176,10 +74,19 @@ function problemas(texto) {
   if (ev !== "pull_request,push") out.push(`o \`on:\` tem de ser exatamente pull_request e push (tem: ${ev || "nada"}) — o \`scope\` recusa os outros`);
   if (texto.split("\n").some((l) => /^[ \t]*[^#\s].*\bpaths-ignore\b/.test(l) || /^[ \t]*paths-ignore\b/.test(l))) out.push("um `paths-ignore`: um check que nao corre fica pendente se for obrigatorio");
   for (const p of problemasDaConcurrency(concurrencyDeTopo(texto) ?? "")) out.push(`concurrency: ${p}`);
+  out.push(...cortesDosIf(texto));
   const { jobs, passos } = passosDoExemplo(texto);
   if (jobs.length !== 1) {
     out.push(`tem de haver UM job (ha ${jobs.length}): cada job e cobrado arredondado ao minuto`);
     return out;
+  }
+  out.push(...problemasDoSalto(jobs[0]));
+  // O `(deps` no titulo quando as dependencias mudam (#439): o `cache.yml` so grava com ele na mensagem do merge.
+  const marca = passos.find((p) => p.env.MARCA !== undefined);
+  if (!marca) out.push("falta o passo que exige `(deps` no titulo quando as dependencias mudam (o `cache.yml` le-o)");
+  else {
+    if (!conjuntos(marca.if ?? "").includes("github.event_name == 'pull_request'")) out.push("o passo do `(deps` so corre num PR");
+    if (!/steps\.deps\.outputs\.changed == 'true'/.test(marca.if ?? "") || !/steps\.deps\.outputs\.nvmrc_changed == 'true'/.test(marca.if ?? "")) out.push("o passo do `(deps` corre quando as dependencias OU o `.nvmrc` mudam");
   }
   const porId = new Map(passos.filter((p) => p.id).map((p) => [p.id, p]));
   const checkout = passos.find((p) => /^actions\/checkout@/.test(p.uses ?? ""));
@@ -202,7 +109,6 @@ function problemas(texto) {
     }
     if ((ehMensagens(p) || ehGitleaks(p)) && /\bgithub\.event_name\b/.test(p.if ?? "")) out.push(`${nome}: corre em todos os eventos (tambem no push)`);
     if (ehGitleaks(p) && !/^[ \t]+GITLEAKS_LICENSE:[ \t]*\$\{\{[ \t]*secrets\.GITLEAKS_LICENSE[ \t]*\}\}/m.test(p.ls.join("\n"))) out.push(`${nome}: passa o \`GITLEAKS_LICENSE\` (a acao exige-o numa organizacao)`);
-    if (OPACO.test(p.if ?? "")) out.push(`${nome}: le os passos por uma forma que a regra nao ve (\`steps[...]\`, \`toJSON(steps)\`)`);
     if (/^actions\/cache@/.test(p.uses ?? "")) out.push(`${nome}: \`actions/cache\` grava tambem num PR — usar \`restore\` e \`save\` separados`);
     if (/^actions\/cache\/save@/.test(p.uses ?? "") && !cs.includes("github.event_name == 'push'")) out.push(`${nome}: so o push do \`main\` grava uma cache (os PRs nunca)`);
     if (/^actions\/cache\/restore@/.test(p.uses ?? "") && p.with.path === "node_modules") {
@@ -214,46 +120,17 @@ function problemas(texto) {
       if (!lookups.some((x) => /github\.event_name == 'push'/.test(porId.get(x)?.with["lookup-only"] ?? ""))) out.push(`${nome}: num push so instala depois de um \`lookup-only\` que falhou`);
     }
     if (ehMensagens(p) && !/git log --no-merges/.test(p.corpo ?? "")) out.push("as mensagens leem com `git log --no-merges`");
-    if (ehMensagens(p) && !/PR_TITULO/.test(p.corpo ?? "")) out.push("as mensagens verificam tambem o titulo do PR");
-    // A saida de um passo saltado: a regra (o porque no cabecalho).
-    for (const c of cs) {
-      const refs = [...c.matchAll(REFS)].map((m) => m[1]);
-      for (const x of refs) if (!porId.has(x)) out.push(`${nome}: le a saida de \`${x}\`, que nao e o \`id\` de passo nenhum`);
-      if (!refs.length || livre(c)) continue;
-      for (const x of new Set(refs)) {
-        const X = porId.get(x);
-        if (!X) continue;
-        const emFalta = conjuntos(X.if ?? "").filter((cx) => !cs.includes(cx));
-        if (emFalta.length) out.push(`${nome}: \`${c}\` le a saida de \`${x}\` sem repetir o \`if:\` dele (${emFalta.join(" ; ")}) — saltado, a saida e vazia`);
-        const a = depoisDeFalha(p.if);
-        const b = depoisDeFalha(X.if);
-        if ([...a].some((f) => !b.has(f))) out.push(`${nome}: corre depois de uma falha (${[...a].join(", ")}) e \`${x}\` nao — a saida dele fica vazia`);
-      }
-    }
+    // Uma linha de shell ATIVA (a variante squash cita o titulo num comentario).
+    if (ehMensagens(p) && !/^[ \t]*printf '%s\\n' "\$PR_TITULO" >/m.test(p.corpo ?? "")) out.push("as mensagens verificam tambem o titulo do PR");
   }
+  out.push(...problemasDeSaidas(passos));
   if (!/process\.versions\.modules/.test(porId.get("deps")?.corpo ?? "")) out.push("a chave da node_modules leva o ABI do Node instalado (`process.versions.modules`), nao o texto do `.nvmrc`");
   if (!passos.some(ehMensagens)) out.push("falta o passo das mensagens de commit (`node .githooks/commit-msg`)");
   if (!passos.some(ehGitleaks)) out.push("falta o passo do gitleaks (`gitleaks/gitleaks-action@`)");
+  if (!/nvmrc_changed=/.test(porId.get("deps")?.corpo ?? "")) out.push("o passo `deps` escreve tambem `nvmrc_changed` (o `.nvmrc` muda a chave da node_modules)");
   if (!/node-modules-\$RUNNER_OS-\$RUNNER_ARCH-/.test(porId.get("deps")?.corpo ?? "")) out.push("a chave da node_modules leva `$RUNNER_OS` e `$RUNNER_ARCH` (um binario por plataforma)");
   out.push(...problemasDaTabela(passos, porId.has("nmcache")));
   return out;
-}
-
-/** O valor de um `if:` num cenario (`ctx`: o valor de cada `steps.X…`/`github.event_name`; o que falta e `''`, como
- *  no GitHub). `!cancelled()`, `always()` e `success()` sao verdadeiros (nenhum cancelamento); `failure()` falso.
- *  `null` quando a expressao tem algo que isto nao avalia (`contains`, `fromJSON`…): e um problema, nao um "passa". */
-function avalia(expr, ctx) {
-  if (!expr) return true;
-  const js = normaliza(expr)
-    .replace(/\bsteps\.[\w-]+\.(?:outputs\.[\w-]+|conclusion|outcome)|\bgithub\.event_name/g, (v) => `v(${JSON.stringify(v)})`)
-    .replace(/!\s*cancelled\s*\(\s*\)|\balways\s*\(\s*\)|\bsuccess\s*\(\s*\)/gi, "true")
-    .replace(/\bfailure\s*\(\s*\)/gi, "false");
-  if (/[a-z]\w*\s*\(/i.test(js.replace(/v\("[^"]*"\)/g, ""))) return null;
-  try {
-    return Boolean(new Function("v", `return (${js});`)((k) => ctx[k] ?? ""));
-  } catch {
-    return null;
-  }
 }
 
 /** A tabela de verdade do Install e das verificacoes da app, nos caminhos reais de um PR e de um push. */
@@ -296,57 +173,47 @@ function problemasDaTabela(passos, comT80) {
   return out;
 }
 
-/** O exemplo com o bloco CACHE trocado pelo bloco OPCIONAL T80 descomentado. */
-function comT80(texto) {
-  const ls = texto.split("\n");
-  const at = (re) => ls.findIndex((l) => re.test(l));
-  const [ci, cf, ti, tf] = [at(/# --- CACHE inicio ---/), at(/# --- CACHE fim ---/), at(/# --- OPCIONAL T80 inicio/), at(/# --- OPCIONAL T80 fim ---/)];
-  if ([ci, cf, ti, tf].some((k) => k < 0) || !(ci < cf && cf < ti && ti < tf)) return null;
-  const p0 = ls.findIndex((l, k) => k > ti && k < tf && /^[ \t]*# - name:/.test(l));
-  if (p0 < 0) return null;
-  const t80 = ls.slice(p0, tf).map((l) => l.replace(/^([ \t]*)# ?/, "$1").replace(/^[ \t]+$/, ""));
-  // A segunda edicao que o comentario do T80 pede: nas verificacoes, a pasta da cache vale como instalacao.
-  return [...ls.slice(0, ci), ...t80, ...ls.slice(cf + 1, ti), ...ls.slice(tf + 1)].join("\n")
-    .replaceAll("steps.install.conclusion == 'success'", "(steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true')");
-}
-
-// --- O passo `scope`, corrido ---
+// --- O shell de um passo, corrido ---
 
 function git(cwd, ...args) {
   const r = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" });
   if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout;
 }
-/** Um repo cujo HEAD e um merge (o merge ref de um PR): `HEAD^1` a base, e o ramo com `muda(dir)`. */
-function repoDePR(raiz, muda) {
+/** Um repo cujo HEAD e um merge (o merge ref de um PR): `HEAD^1` a base, e o ramo com `muda(dir)`. `base(dir)` corre
+ *  antes do primeiro commit. */
+function repoDePR(raiz, muda, base = () => {}) {
   const dir = join(raiz, "repo");
   mkdirSync(join(dir, "src"), { recursive: true });
   mkdirSync(join(dir, "docs"), { recursive: true });
   writeFileSync(join(dir, "src", "a.ts"), "a\n");
   writeFileSync(join(dir, "docs", "d.md"), "d\n");
+  base(dir);
   git(dir, "init", "-q", "-b", "main");
   git(dir, "add", "-A");
   git(dir, "commit", "-q", "-m", "base");
   git(dir, "checkout", "-q", "-b", "pr");
   muda(dir);
   git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "pr");
+  git(dir, "commit", "-q", "--allow-empty", "-m", "pr");
   git(dir, "checkout", "-q", "main");
   git(dir, "merge", "-q", "--no-ff", "-m", "merge", "pr");
   return dir;
 }
-/** Corre o corpo do `scope` como o runner: `bash -e`, com `GITHUB_OUTPUT` e `RUNNER_TEMP`. */
-function correScope(corpo, dir, raiz, evento, path = process.env.PATH) {
-  const script = join(raiz, "scope.sh");
+/** Corre o corpo de um passo como o runner: `bash -e`, com `GITHUB_OUTPUT`, `RUNNER_TEMP` e o `env` do passo.
+ *  Devolve as saidas escritas no `GITHUB_OUTPUT` (`{ k: v }`). */
+function correPasso(corpo, dir, raiz, env, path = process.env.PATH) {
+  const script = join(raiz, "passo.sh");
   writeFileSync(script, corpo);
   const out = join(raiz, "output");
   writeFileSync(out, "");
   const temp = join(raiz, "runner-temp");
   mkdirSync(temp, { recursive: true });
-  const r = spawnSync("bash", ["-e", script], { cwd: dir, encoding: "utf8", env: { ...process.env, PATH: path, EVENTO: evento, GITHUB_OUTPUT: out, RUNNER_TEMP: temp } });
-  const app = /^app=(.*)$/m.exec(readFileSync(out, "utf8"))?.[1] ?? null;
-  return { status: r.status, app, saida: `${r.stdout}${r.stderr}` };
+  const r = spawnSync("bash", ["-e", script], { cwd: dir, encoding: "utf8", env: { ...process.env, PATH: path, GITHUB_OUTPUT: out, RUNNER_TEMP: temp, ...env } });
+  const saidas = Object.fromEntries([...readFileSync(out, "utf8").matchAll(/^([\w-]+)=(.*)$/gm)].map((m) => [m[1], m[2]]));
+  return { status: r.status, saidas, saida: `${r.stdout}${r.stderr}` };
 }
+/** Um diretorio temporario (o prefixo esta no `lib/tmp-limpo.mjs`), apagado no fim. */
 function comRepo(fn) {
   const raiz = mkdtempSync(join(tmpdir(), "ci-exemplo-test-"));
   try {
@@ -354,6 +221,14 @@ function comRepo(fn) {
   } finally {
     rmSync(raiz, { recursive: true, force: true });
   }
+}
+
+// --- O passo `scope`, corrido ---
+
+/** O `scope` como o runner o corre, com o `EVENTO` do `env:` dele. */
+function correScope(corpo, dir, raiz, evento, path = process.env.PATH) {
+  const r = correPasso(corpo, dir, raiz, { EVENTO: evento }, path);
+  return { status: r.status, app: r.saidas.app ?? null, saida: r.saida };
 }
 
 // --- Os casos ---
@@ -383,6 +258,7 @@ caso("normalizacao: so sai um par de parenteses exteriores que fecha no ultimo c
 });
 
 // Os controlos: o exemplo mutado de UMA forma tem de dar o problema dessa forma. `base: "t80"` muta a variante T80.
+const SALTO = "if: >-\n      github.event_name == 'pull_request' || !github.event.repository.private ||\n      !startsWith(github.event.head_commit.message, 'Merge pull request #')";
 const INSTALL_IF = "if: (steps.scope.outputs.app == 'true' || github.event_name == 'push') && (github.event_name == 'pull_request' || steps.npmcache.outputs.cache-hit != 'true')";
 const MUTACOES = [
   { nome: "um segundo job", de: "    steps:\n      - uses: actions/checkout@", para: "    steps:\n      - run: true\n  outro:\n    runs-on: ubuntu-24.04\n    steps:\n      - uses: actions/checkout@", espera: "UM job" },
@@ -431,6 +307,14 @@ const MUTACOES = [
   { base: "t80", nome: "T80: a forma do #402 na gravacao do npm", de: "&& github.event_name == 'push' && steps.nmcache.outputs.cache-hit != 'true' && steps.npmcache.outputs.cache-hit != 'true'", para: "&& github.event_name == 'push' && steps.npmcache.outputs.cache-hit != 'true'", espera: "sem repetir o `if:`" },
   { base: "t80", nome: "T80: as verificacoes sem a node_modules da cache como instalacao", de: "&& (steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true') }}\n        run: npx tsc", para: "&& steps.install.conclusion == 'success' }}\n        run: npx tsc", espera: "nao corre num PR de app com a node_modules" },
   { base: "t80", nome: "T80: a node_modules sem `lookup-only` no push", de: "key: ${{ steps.deps.outputs.nm_key }}\n          lookup-only: ${{ github.event_name == 'push' }}", para: "key: ${{ steps.deps.outputs.nm_key }}", espera: "`lookup-only`" },
+  // O salto do push do merge (#439).
+  { nome: "o `if:` do job numa linha simples (o ` #` corta-o)", de: SALTO, para: "if: github.event_name == 'pull_request' || !github.event.repository.private || !startsWith(github.event.head_commit.message, 'Merge pull request #')", espera: "um ` #` corta o `if:`" },
+  { nome: "sem o `if:` do job", de: `    ${SALTO}\n`, para: "", espera: "o job nao tem `if:`" },
+  { nome: "a mensagem sem o ` #`", de: "'Merge pull request #')", para: "'Merge pull request')", espera: "nenhuma das duas formas" },
+  { nome: "o `||` trocado por `&&`", de: "github.event_name == 'pull_request' || !github.event.repository.private ||\n      !startsWith", para: "github.event_name == 'pull_request' && !github.event.repository.private ||\n      !startsWith", espera: "nenhuma das duas formas" },
+  { nome: "o passo do `(deps` sem o `.nvmrc`", de: " || steps.deps.outputs.nvmrc_changed == 'true')", para: ")", espera: "OU o `.nvmrc`" },
+  { nome: "o passo do `(deps` tambem no push", de: "!cancelled() && github.event_name == 'pull_request' && (steps.deps", para: "!cancelled() && (steps.deps", espera: "so corre num PR" },
+  { nome: "o `deps` sem o `nvmrc_changed`", todos: true, de: "nvmrc_changed=", para: "nvmrc_mudou=", espera: "escreve tambem `nvmrc_changed`" },
 ];
 for (const m of MUTACOES) {
   caso(`controlo: ${m.nome}`, () => {
@@ -484,6 +368,111 @@ caso("scope: um evento desconhecido sai != 0 (e nao escreve app)", () => comRepo
   const r = correScope(scopeCorpo ?? "", dir, raiz, "workflow_dispatch");
   return r.status !== 0 && r.app === null ? [] : [`saiu ${r.status}, app=${r.app}`];
 }));
+
+// --- O salto do push do merge (#439) ---
+
+const SQUASH = comSquash(texto);
+caso("a VARIANTE squash, descomentada no lugar da FORMA mensagem, cumpre a receita", () => {
+  if (SQUASH === null) return ["nao encontrei os marcadores FORMA mensagem / VARIANTE squash"];
+  const ps = problemas(SQUASH);
+  return /committer\.username != 'web-flow'/.test(SQUASH) ? ps : [...ps, "a variante nao trouxe o `if:` pelo committer"];
+});
+caso("salto: controlo: uma forma que salta o push direto reprova a tabela", () =>
+  tabelaDoSalto("github.event_name == 'pull_request'", 2).some((p) => p.includes("salta em um push direto")) ? [] : ["a tabela nao apanhou o push direto saltado"]);
+caso("salto: a forma pelo committer tem a sua tabela (o squash salta, o push direto corre)", () => tabelaDoSalto(IF_SQUASH, 3));
+
+caso("o ` #`: o detetor reprova o corte, um `${{` por fechar e um `!` no inicio, e nao um bloco nem um `run:`", () => {
+  const p = [];
+  const ve = (t, quer) => {
+    const r = cortesDosIf(t);
+    if ((r.length > 0) !== quer) p.push(`${quer ? "passou" : "reprovou"}: ${JSON.stringify(t)} -> ${r.join(" | ") || "nada"}`);
+  };
+  ve("    if: github.event_name == 'push' || !startsWith(github.event.head_commit.message, 'Merge pull request #')\n", true);
+  ve("    if: >-\n      !startsWith(github.event.head_commit.message, 'Merge pull request #')\n", false);
+  ve("      - if: ${{ !cancelled() && x\n", true);
+  ve("    if: !cancelled()\n", true);
+  ve("        run: echo a # um comentario de shell\n", false);
+  ve("    if: github.event_name == 'push' # um comentario a seguir\n", false);
+  // Um escalar simples em duas linhas: o YAML junta-as, e o ` #` da segunda corta-o.
+  ve("      - name: x\n        if: github.event_name == 'push' ||\n          !startsWith(github.event.head_commit.message, 'Merge pull request #')\n        run: true\n", true);
+  ve("      - name: x\n        if: github.event_name == 'push' ||\n          github.event_name == 'schedule'\n        run: true\n", false);
+  return p;
+});
+
+// O shell das mensagens, com um `node` falso que regista o que le e reprova o texto `IA-NAO`.
+const VALORES = (corpo, autor) => ({ "github.event_name": "pull_request", "github.event.before": "", "github.event.pull_request.title": "feat(app): uma coisa", "github.event.pull_request.body": corpo, "github.event.pull_request.user.login": autor });
+/** O `env:` de um passo, com cada `${{ x }}` lido de `valores`. */
+const envDe = (p, valores) => Object.fromEntries(Object.entries(p.env).map(([k, v]) => [k, /^\$\{\{\s*(.+?)\s*\}\}$/.test(v) ? valores[/^\$\{\{\s*(.+?)\s*\}\}$/.exec(v)[1]] ?? "" : v]));
+function mensagens(base, corpo, autor) {
+  const p = passosDoExemplo(base).passos.find(ehMensagens);
+  if (!p) return { status: -1, chamadas: 0, saida: "sem o passo das mensagens" };
+  return comRepo((raiz) => {
+    const dir = repoDePR(raiz, (d) => writeFileSync(join(d, "src", "a.ts"), "a2\n"));
+    const bin = join(raiz, "bin");
+    mkdirSync(bin);
+    const log = join(raiz, "chamadas");
+    writeFileSync(log, "");
+    writeFileSync(join(bin, "node"), `#!/bin/sh\necho . >> "${log}"\nif grep -q IA-NAO "$2"; then exit 1; fi\nexit 0\n`);
+    chmodSync(join(bin, "node"), 0o755);
+    const r = correPasso(p.corpo, dir, raiz, envDe(p, VALORES(corpo, autor)), `${bin}:${process.env.PATH}`);
+    return { status: r.status, chamadas: spawnSync("wc", ["-l", log], { encoding: "utf8" }).stdout.trim().split(/\s+/)[0], saida: r.saida.trim() };
+  });
+}
+const CASOS_DESCRICAO = [
+  ["squash: uma atribuicao na descricao reprova", () => SQUASH, "uma descricao\nIA-NAO", "uma-pessoa", (r) => r.status !== 0],
+  ["squash: uma descricao limpa verifica-se (commit, titulo, descricao)", () => SQUASH, "uma descricao", "uma-pessoa", (r) => r.status === 0 && r.chamadas === "3"],
+  ["squash: sem descricao, so o titulo", () => SQUASH, "", "uma-pessoa", (r) => r.status === 0 && r.chamadas === "2"],
+  ["squash: o Dependabot fica de fora (o corpo traz texto a montante)", () => SQUASH, "notas\nIA-NAO", "dependabot[bot]", (r) => r.status === 0 && r.chamadas === "2"],
+  ["mensagem: a forma ativa nao le a descricao (o merge commit leva o titulo)", () => texto, "IA-NAO", "uma-pessoa", (r) => r.status === 0 && r.chamadas === "2"],
+  ["controlo: sem o `PR_CORPO` no `env:`, a atribuicao passava", () => SQUASH?.replace(/^[ \t]*PR_CORPO:.*\n/m, ""), "IA-NAO", "uma-pessoa", (r) => r.status === 0],
+];
+for (const [nome, base, corpo, autor, ok] of CASOS_DESCRICAO) {
+  caso(`descricao do PR: ${nome}`, () => {
+    if (!base()) return ["sem a variante squash"];
+    const r = mensagens(base(), corpo, autor);
+    return ok(r) ? [] : [`saiu ${r.status}, ${r.chamadas} chamada(s) ao commit-msg: ${r.saida}`];
+  });
+}
+
+// O passo do `(deps`, depois do `deps` corrido num repo de fixture (o lockfile e o `.nvmrc` na base).
+const LOCK = (versao, extra = {}) => `${JSON.stringify({ name: "a", version: versao, lockfileVersion: 3, packages: { "": { name: "a", version: versao }, ...extra } }, null, 2)}\n`;
+function titulo(base, muda, tit) {
+  const passos = passosDoExemplo(base).passos;
+  const deps = passos.find((p) => p.id === "deps");
+  const passo = passos.find((p) => p.env.MARCA !== undefined);
+  if (!deps || !passo) return "sem os passos";
+  return comRepo((raiz) => {
+    const dir = repoDePR(raiz, muda, (d) => {
+      writeFileSync(join(d, "package-lock.json"), LOCK("1.0.0"));
+      writeFileSync(join(d, ".nvmrc"), "22\n");
+    });
+    const d = correPasso(deps.corpo, dir, raiz, { RUNNER_OS: "Linux", RUNNER_ARCH: "X64" });
+    if (d.status !== 0) return `o deps rebentou: ${d.saida}`;
+    const ctx = { "github.event_name": "pull_request", "steps.deps.outputs.changed": d.saidas.changed, "steps.deps.outputs.nvmrc_changed": d.saidas.nvmrc_changed };
+    const corre = avalia(passo.if, ctx);
+    if (corre === null) return "nao avalia o `if:`";
+    if (!corre) return "passa";
+    return correPasso(passo.corpo, dir, raiz, { ...envDe(passo, { "github.event.pull_request.title": tit }), PR_TITULO: tit }).status === 0 ? "passa" : "reprova";
+  });
+}
+const DEP = (d) => writeFileSync(join(d, "package-lock.json"), LOCK("1.0.0", { "node_modules/x": { version: "2.0.0" } }));
+const CASOS_DEPS = [
+  ["uma dependencia nova sem `(deps` reprova", texto, DEP, "feat(app): usa o x", "reprova"],
+  ["com `chore(deps):` passa", texto, DEP, "chore(deps): bump x", "passa"],
+  ["com `chore(deps-dev):` passa (o Dependabot)", texto, DEP, "chore(deps-dev): bump x", "passa"],
+  ["so a versao subida passa sem `(deps`", texto, (d) => writeFileSync(join(d, "package-lock.json"), LOCK("1.1.0")), "feat(app): uma coisa", "passa"],
+  ["o `.nvmrc` mudado sem `(deps` reprova", texto, (d) => writeFileSync(join(d, ".nvmrc"), "24\n"), "chore(node): 24", "reprova"],
+  ["controlo: o `if:` sem o `nvmrc_changed` deixava o `.nvmrc` passar", texto.replace(" || steps.deps.outputs.nvmrc_changed == 'true')", ")"), (d) => writeFileSync(join(d, ".nvmrc"), "24\n"), "chore(node): 24", "passa"],
+];
+for (const [nome, base, muda, tit, quer] of CASOS_DEPS) {
+  caso(`(deps: ${nome}`, () => {
+    const r = titulo(base, muda, tit);
+    return r === quer ? [] : [`deu ${r} (esperava ${quer})`];
+  });
+}
+
+// --- O `cache.yml` (os casos estao no `harness/casos-salto-cache.mjs`) ---
+casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);

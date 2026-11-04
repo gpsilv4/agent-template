@@ -88,6 +88,16 @@ uma troca de minutos, nao uma equivalencia. Dois PRs verdes contra o mesmo `main
 privado sem GitHub Pro nao ha "Require branches to be up to date": atualizar o PR com o `main` antes do merge quando
 outro entrou entretanto.
 
+**O push do merge nao corre num privado** (#439): repetia as mensagens e o gitleaks que o PR ja correu sobre os
+mesmos commits, e era 1 min de 3 por PR. Um push direto corre tudo. A condicao depende do metodo de merge (as duas
+formas e o porque estao no exemplo e no `src/docs/upgrade-parcial.md` §4). Quem grava a cache depois de um merge passa
+a ser o `src/docs/exemplos/cache-sem-maquinaria.yml`: num merge com `(deps` na mensagem, e toda a semana a restaurar,
+para o GitHub nao a apagar aos 7 dias sem uso. Os riscos, aceites e escritos no exemplo: a mensagem final do merge
+deixa de ser lida; um PR mergeado vermelho deixa a app por verificar ate ao PR seguinte, e as mensagens e o gitleaks
+desse PR nunca; um PR cujo ultimo commit diga `[skip ci]` nao corre, e entra sem nenhuma verificacao; uma mensagem (ou, na
+variante, um committer) forjada num push direto salta, e na variante um commit pela UI web no `main` salta sem
+gitleaks; num repo de rebase, ou com um `.nvmrc` de `lts/*`, a cache nova so nasce no `schedule`.
+
 Tres regras que um derivado privado copia para as suas `process-rules` (o template nao as impoe: num repo publico nao
 pagam nada). Medidas num derivado, a 1 e 2 nov:
 - **Iterar no localhost.** Enquanto quem pediu testa e pede ajustes, o agente corrige e verifica localmente (tsc,
@@ -102,6 +112,6 @@ pagam nada). Medidas num derivado, a 1 e 2 nov:
 - **Se a mediana dos PRs de app passar de 120 s, procurar o passo lento** (`--passos`) antes de acrescentar testes ao
   mesmo job: um job de 61-120 s paga 2 min, um de 121 s paga 3. O caso medido: o `Install` subiu de 16 s para 71 s
   porque o push do `main` nao instalava e nunca guardava a cache do npm (e a chave mudava a cada PR, com a versao da
-  app no lockfile); a correcao (a impressao digital das dependencias sem a versao, gravada so no `main` quando falta)
-  devolveu-o a 16 s e o PR a 2 min. Depois, o build sem repetir o tsc e a `node_modules` em cache levaram a mediana a
+  app no lockfile); a correcao (a impressao digital das dependencias sem a versao, gravada so no `main` quando falta:
+  entao pelo push do merge, hoje pelo `cache.yml`, #439) devolveu-o a 16 s e o PR a 2 min. Depois, o build sem repetir o tsc e a `node_modules` em cache levaram a mediana a
   70 s.

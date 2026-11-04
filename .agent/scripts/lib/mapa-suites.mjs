@@ -48,7 +48,9 @@ export const SUITES = [
   // O §4 e corrido pela suite, e o §1 tambem (a extracao do SHA).
   { re: /^\.agent\/workflows\/upgrade\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O exemplo de CI de um derivado sem a maquinaria (#429): nenhum gate o le, e esta suite e a unica protecao dele.
-  { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O par do `cache.yml` (#439) e os leitores e casos que sairam da suite pelo tamanho, tambem.
+  { re: /^src\/docs\/exemplos\/(?:ci|cache)-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/(?:expressoes-ci|casos-salto-cache)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.

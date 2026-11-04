@@ -418,6 +418,7 @@ src/docs/
 ├── upgrade-derivados-privados.md <- /upgrade in a PRIVATE repo: CI minutes, and the notes a derived project needed
 ├── upgrade-parcial.md          <- The PARTIAL /upgrade: a derived project without the machinery (what comes, in what order)
 ├── exemplos/ci-sem-maquinaria.yml <- A one-job CI for a derived project WITHOUT the machinery (not run here)
+├── exemplos/cache-sem-maquinaria.yml <- Its pair: saves the dependency cache, since the merge push no longer runs
 └── CHANGELOG.md                <- Changelog template
 ```
 
