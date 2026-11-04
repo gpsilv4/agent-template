@@ -2,14 +2,10 @@
  * Os leitores dos exemplos de CI de um derivado sem a maquinaria (`src/docs/exemplos/`, #429 e #439) — {{PROJECT_NAME}}
  *
  * Sairam do `test-ci-exemplo.mjs` quando ele chegou as ~500 linhas (#439): as expressoes de um `if:`, as chaves de um
- * passo, os eventos, o avaliador de uma tabela de verdade, as variantes comentadas, e as fixtures git onde o shell de
- * um passo corre. NAO e uma suite nem um modulo descoberto (`tests-*.mjs`): e um ajudante que a suite e o
+ * passo, os eventos, o avaliador de uma tabela de verdade, e as variantes comentadas. As fixtures git (com o seu
+ * `throw`) ficam na suite: um harness com recusas e um verificador, e a varredura exigia-lhe um par. NAO e uma suite nem um modulo descoberto (`tests-*.mjs`): e um ajudante que a suite e o
  * `harness/casos-salto-cache.mjs` importam. Sem sitios de recusa: so le.
  */
-import { spawnSync } from "child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { tmpdir } from "os";
-import { join } from "path";
 import { jobsDe, passosDe, indent, semComentario } from "../../lib/estrutura-workflow.mjs";
 
 // --- As expressoes de um `if:` ---
@@ -272,54 +268,4 @@ export function comSquash(texto) {
     else if (estado !== "fora") out.push(l);
   }
   return estado === null ? out.join("\n") : null;
-}
-
-// --- O shell de um passo, corrido ---
-
-export function git(cwd, ...args) {
-  const r = spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", ...args], { cwd, encoding: "utf8" });
-  if (r.status !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
-  return r.stdout;
-}
-/** Um repo cujo HEAD e um merge (o merge ref de um PR): `HEAD^1` a base, e o ramo com `muda(dir)`. `base(dir)` corre
- *  antes do primeiro commit. */
-export function repoDePR(raiz, muda, base = () => {}) {
-  const dir = join(raiz, "repo");
-  mkdirSync(join(dir, "src"), { recursive: true });
-  mkdirSync(join(dir, "docs"), { recursive: true });
-  writeFileSync(join(dir, "src", "a.ts"), "a\n");
-  writeFileSync(join(dir, "docs", "d.md"), "d\n");
-  base(dir);
-  git(dir, "init", "-q", "-b", "main");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "base");
-  git(dir, "checkout", "-q", "-b", "pr");
-  muda(dir);
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "--allow-empty", "-m", "pr");
-  git(dir, "checkout", "-q", "main");
-  git(dir, "merge", "-q", "--no-ff", "-m", "merge", "pr");
-  return dir;
-}
-/** Corre o corpo de um passo como o runner: `bash -e`, com `GITHUB_OUTPUT`, `RUNNER_TEMP` e o `env` do passo.
- *  Devolve as saidas escritas no `GITHUB_OUTPUT` (`{ k: v }`). */
-export function correPasso(corpo, dir, raiz, env, path = process.env.PATH) {
-  const script = join(raiz, "passo.sh");
-  writeFileSync(script, corpo);
-  const out = join(raiz, "output");
-  writeFileSync(out, "");
-  const temp = join(raiz, "runner-temp");
-  mkdirSync(temp, { recursive: true });
-  const r = spawnSync("bash", ["-e", script], { cwd: dir, encoding: "utf8", env: { ...process.env, PATH: path, GITHUB_OUTPUT: out, RUNNER_TEMP: temp, ...env } });
-  const saidas = Object.fromEntries([...readFileSync(out, "utf8").matchAll(/^([\w-]+)=(.*)$/gm)].map((m) => [m[1], m[2]]));
-  return { status: r.status, saidas, saida: `${r.stdout}${r.stderr}` };
-}
-/** Um diretorio temporario (o prefixo esta no `lib/tmp-limpo.mjs`), apagado no fim. */
-export function comRepo(fn) {
-  const raiz = mkdtempSync(join(tmpdir(), "ci-exemplo-test-"));
-  try {
-    return fn(raiz);
-  } finally {
-    rmSync(raiz, { recursive: true, force: true });
-  }
 }
