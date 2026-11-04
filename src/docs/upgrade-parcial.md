@@ -105,10 +105,17 @@ git log -20 --no-merges --format='%B%x00' | while IFS= read -r -d '' m; do print
 
 ## 4. O CI
 
-O exemplo de um job esta em `src/docs/exemplos/ci-sem-maquinaria.yml`: copia-se para o `.github/workflows/ci.yml` e
-adapta-se o que esta marcado `# ADAPTAR`. O porque de cada escolha esta nos comentarios dele; a suite
-`test-ci-exemplo.mjs` prende-as no template. Dois pontos a decidir no projeto:
+O exemplo de um job esta em `src/docs/exemplos/ci-sem-maquinaria.yml`, e o seu par em
+`src/docs/exemplos/cache-sem-maquinaria.yml`: copiam-se para o `.github/workflows/` (`ci.yml` e `cache.yml`) e
+adapta-se o que esta marcado `# ADAPTAR`. O porque de cada escolha esta nos comentarios deles; a suite
+`test-ci-exemplo.mjs` prende-as no template. Os pontos a decidir no projeto:
 
+- **O metodo de merge do repo decide o salto do push do merge** (#439). Com merge commits, a forma ativa (pela
+  mensagem `Merge pull request #`). So com squash, a VARIANTE (pelo committer `web-flow`, com a descricao do PR
+  verificada no PR, e a opcao de squash "Pull request title and description"). Na duvida, a ativa: num squash nao
+  salta nada, e perde-se so a poupanca.
+- **Um PR que mude as dependencias (ou o `.nvmrc`) leva `(deps` no titulo** (o `ci.yml` reprova-o sem ele): e por essa mensagem que o
+  `cache.yml` grava a cache depois do merge. Sem `include: scope` no `dependabot.yml`, adaptar a marca nos dois.
 - **O push nao reverifica a app.** Dois PRs verdes contra o mesmo `main` podem parti-lo juntos: atualizar o PR com o
   `main` antes do merge quando outro entrou entretanto.
 - **A cache da `node_modules`** (o bloco OPCIONAL T80) so com as condicoes escritas nele, e depois de medir.

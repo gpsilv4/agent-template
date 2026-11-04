@@ -1,0 +1,119 @@
+# A cache das dependencias de um projeto derivado SEM a maquinaria (#439): o par do `ci-sem-maquinaria.yml`
+#
+# NAO corre aqui. Copia-se para o `.github/workflows/cache.yml` do projeto, com o `ci-sem-maquinaria.yml`. A suite
+# `test-ci-exemplo.mjs` prende cada escolha. Porque existe: o `ci.yml` do exemplo salta o push do merge num privado, e
+# era esse push que gravava a cache. Os PRs nao gravam (a cache de um PR so e visivel nesse ref, nao serve aos outros),
+# e o GitHub apaga uma cache que ninguem le ha 7 dias. Sem isto, uma semana sem PRs deixava os seguintes a instalar do
+# zero (o `Install` de 16 s para 71 s, medido num derivado).
+#
+# Corre:
+# - num push ao `main` que toque no `package-lock.json` ou no `.nvmrc`, mas so quando a mensagem tem `(deps`. Cada PR
+#   sobe a versao da app, logo o lockfile muda em todos os merges, e sem o filtro este job correria (1 min) em cada um.
+#   O `ci.yml` do exemplo reprova um PR que mude as dependencias sem `(deps` no titulo, e o titulo vai na mensagem.
+# - toda a semana (`schedule`), a RESTAURAR (sem `lookup-only`): restaurar conta como uso, e e isso que impede a remocao
+#   aos 7 dias. Se a chave faltar, instala e grava.
+# - a mao (`workflow_dispatch`).
+# Riscos, aceites: num repo de rebase, o `head_commit` e o ultimo commit do PR, e pode nao ter `(deps`; um `.nvmrc` com
+# `lts/*` muda o ABI sem mudar o texto. Nos dois, a cache nova so nasce no `schedule` seguinte.
+
+name: Cache
+
+on:
+  push:
+    branches: [main]
+    paths: [package-lock.json, .nvmrc]
+  schedule:
+    - cron: "17 4 * * 1" # segunda, 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    name: Cache
+    # Em BLOCO: o `if:` cita texto, e numa linha simples um ` #` cortava-o (o mesmo do `ci-sem-maquinaria.yml`).
+    if: >-
+      github.event_name != 'push' ||
+      contains(github.event.head_commit.message, '(deps')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      # As MESMAS chaves do passo `deps` do `ci-sem-maquinaria.yml` (a suite reprova se divergirem): a impressao digital
+      # do `package-lock.json` sem a versao da app, e o ABI do Node que o `setup-node` instalou.
+      - name: Dependencias — a impressao digital
+        id: deps
+        run: |
+          set -euo pipefail
+          deps_fp() { jq -S 'del(.version) | del(.packages[""].version)' | sha256sum | cut -c1-16; }
+          fp="$(deps_fp < package-lock.json)"
+          echo "npm_key=npm-deps-$RUNNER_OS-$RUNNER_ARCH-$fp" >> "$GITHUB_OUTPUT"
+          echo "nm_key=node-modules-$RUNNER_OS-$RUNNER_ARCH-abi$(node -p process.versions.modules)-$fp" >> "$GITHUB_OUTPUT"
+
+      # --- CACHE inicio ---
+      - name: Cache do npm (restaurar)
+        id: npmcache
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/.npm
+          key: ${{ steps.deps.outputs.npm_key }}
+
+      - name: Install
+        id: install
+        if: steps.npmcache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache do npm (gravar)
+        if: steps.npmcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.npm
+          key: ${{ steps.deps.outputs.npm_key }}
+      # --- CACHE fim ---
+
+      # --- OPCIONAL T80 inicio: a `node_modules` pronta, com o T80 do `ci-sem-maquinaria.yml`. Substitui o bloco CACHE
+      # acima (descomentar estes passos e apagar aquele): sem ele, ninguem grava a `node_modules` e o T80 nunca acerta.
+      # Com a `node_modules` a acertar, a cache do npm nao se le e o GitHub apaga-a aos 7 dias: a instalacao seguinte
+      # (dependencias novas) vai ao registo uma vez, e grava as duas.
+      # - name: node_modules (restaurar)
+      #   id: nmcache
+      #   uses: actions/cache/restore@v6
+      #   with:
+      #     path: node_modules
+      #     key: ${{ steps.deps.outputs.nm_key }}
+      #
+      # - name: Cache do npm (restaurar)
+      #   id: npmcache
+      #   if: steps.nmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/restore@v6
+      #   with:
+      #     path: ~/.npm
+      #     key: ${{ steps.deps.outputs.npm_key }}
+      #
+      # - name: Install
+      #   id: install
+      #   if: steps.nmcache.outputs.cache-hit != 'true'
+      #   run: npm ci
+      #
+      # - name: Cache do npm (gravar)
+      #   if: steps.nmcache.outputs.cache-hit != 'true' && steps.npmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/save@v6
+      #   with:
+      #     path: ~/.npm
+      #     key: ${{ steps.deps.outputs.npm_key }}
+      #
+      # - name: node_modules (gravar)
+      #   if: steps.nmcache.outputs.cache-hit != 'true'
+      #   uses: actions/cache/save@v6
+      #   with:
+      #     path: node_modules
+      #     key: ${{ steps.deps.outputs.nm_key }}
+      # --- OPCIONAL T80 fim ---
