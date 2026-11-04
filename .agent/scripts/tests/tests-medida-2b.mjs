@@ -20,6 +20,7 @@ import { git, corre, exige, contraProjeto, limpaTmpsDaSuite, test } from "./harn
 // Os casos da configuracao (`settings.json`, jobs do `ci.yml`) vivem a parte; registam-se daqui, no fim,
 // para o `test-simulate-upgrade.mjs` (no limite das 500 linhas) nao ganhar mais uma linha.
 import { registar as registarConfig } from "./tests-medida-2b-config.mjs";
+import { registar as registarModo } from "./tests-medida-2b-modo.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -212,6 +213,10 @@ export function registar() {
     // O SHA e REAL, tirado do template: a recusa da marca vem ANTES desta, logo um sha inventado
     // fazia o teste passar pelo ramo errado — verde a medir outra coisa (`TP1`).
     writeFileSync(join(semGit, ".agent/.template-version"), `commit: ${git(r.tpl, ["rev-parse", "HEAD"]).trim()}\n`);
+    // E o job `guard-tests`: sem ele o projeto e o modo parcial (#429), que recusa ANTES da copia — e o caso passava
+    // pelo ramo errado.
+    mkdirSync(join(semGit, ".github/workflows"), { recursive: true });
+    writeFileSync(join(semGit, ".github/workflows/ci.yml"), "jobs:\n  guard-tests:\n    steps:\n      - run: node .agent/scripts/stub.mjs\n");
     try {
       return exige(corre(r.tpl, [`--projeto=${semGit}`]), {
         codigo: 1,
@@ -225,11 +230,7 @@ export function registar() {
   // As DUAS listas de comandos tem a sua recusa, e as duas sao precisas: derivar zero comandos e
   // indistinguivel de "tudo passou" se ninguem o disser. Um projeto que tenha renomeado o job fica
   // com a medicao a dizer sempre "puramente aditivo".
-  test("projeto sem job `guard-tests` no ci.yml -> REPROVA", () =>
-    exige(contraProjeto({ projeto: { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" } }), {
-      codigo: 1,
-      inclui: ["ci.yml DESTE projeto"],
-    }));
+  // Sem o job do lado do PROJETO e o modo parcial (#429): os casos estao no `tests-medida-2b-modo.mjs`.
 
   test("template sem job `guard-tests` no ci.yml -> REPROVA", () =>
     exige(contraProjeto({ hoje: { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" } }), {
@@ -451,4 +452,5 @@ export function registar() {
     ));
 
   registarConfig();
+  registarModo();
 }

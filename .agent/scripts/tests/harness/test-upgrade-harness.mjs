@@ -118,9 +118,10 @@ export function corre(dir, args = [], sobrepoe = {}, env = undefined) {
  * @param {object} o.hoje    ficheiros do template DEPOIS da tag (o upgrade a medir)
  * @param {object} o.projeto ficheiros a sobrepor no projeto (o estado proprio dele)
  * @param {string|null} o.marca conteudo do `.agent/.template-version`; `null` nao o escreve
+ * @param {string} o.naMarca  linhas a acrescentar a marca por omissao (ex.: `modo: parcial\n`, #429)
  * @param {object} o.ontem   ficheiros do template JA na tag (o projeto herda-os intactos)
  */
-export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {}, tmp } = {}) {
+export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, naMarca = "", base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {}, tmp } = {}) {
   const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
   const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
@@ -149,7 +150,7 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   escreve(proj, projeto);
   rmSync(join(proj, ".agent/BOOTSTRAP.md"), { force: true });
   if (marca !== null) {
-    writeFileSync(join(proj, ".agent/.template-version"), marca ?? `template: ${tpl}\ncommit: ${sha}\ndata: 2026-01-01\n`);
+    writeFileSync(join(proj, ".agent/.template-version"), marca ?? `template: ${tpl}\ncommit: ${sha}\ndata: 2026-01-01\n${naMarca}`);
   }
   git(proj, ["init", "-q", "-b", "main"]);
   git(proj, ["config", "user.email", "t@t"]);

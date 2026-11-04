@@ -405,6 +405,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O MODO do `/upgrade` (#429): nao recusa, DECIDE — como o `eh-main.mjs` e o `marcas-yaml.mjs`. Cada `resultado(` e
+    // uma linha da tabela; o neutro devolve um modo que nao existe, e o caso dessa linha tem de ficar vermelho.
+    alvo: ".agent/scripts/lib/modo-upgrade.mjs",
+    suite: ".agent/scripts/tests/test-modo-upgrade.mjs",
+    sinal: /(?<![\w.$]|function )resultado\(/,
+    neutro: '(() => ({ modo: "?", porque: "" }))(',
+  },
+  {
     alvo: ".agent/scripts/check-backlog.mjs",
     suite: ".agent/scripts/tests/test-backlog.mjs",
     sinal: /(?<![\w.$])warn\(/,

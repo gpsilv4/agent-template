@@ -342,10 +342,11 @@ Apos obter as respostas, a AI deve processar TODOS os ficheiros abaixo:
 # TEMPLATE. Se ja fizeste "Use this template" no GitHub (que nao copia historico nem tags),
 # o HEAD aqui e o do TEU projeto — e por isso que a VERSAO tambem se grava: sem tags, vem do
 # `.agent/TEMPLATE_VERSION`, que viaja com os ficheiros, e o /upgrade resolve-a no clone do
-# template quando o commit gravado nao for de la (Modo A, passo 1).
-printf 'template: %s\ncommit: %s\nversao: %s\ndata: %s\n' \
-  "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
+# template quando o commit gravado nao for de la (Modo A, passo 1). O `commit:` vai PRIMEIRO: o /upgrade
+# le o 1.o hex da marca, e um caminho em `template:` pode ter um (#429).
+printf 'commit: %s\ntemplate: %s\nversao: %s\ndata: %s\n' \
   "$(git rev-parse HEAD 2>/dev/null || echo desconhecido)" \
+  "$(git remote get-url origin 2>/dev/null || echo desconhecido)" \
   "$(git describe --tags --abbrev=0 2>/dev/null || cat .agent/TEMPLATE_VERSION 2>/dev/null || echo desconhecida)" \
   "$(date +%F)" > .agent/.template-version
 ```
@@ -357,7 +358,7 @@ tags sao do PROJETO. Gravar a partir do manifesto, que o script escreveu com os 
 
 ```bash
 node -e 'const fs = require("fs"); const t = JSON.parse(fs.readFileSync(".agent/adocao.json", "utf8")).template;
-fs.writeFileSync(".agent/.template-version", `template: ${t.origem ?? "desconhecido"}\ncommit: ${t.commit}\n` +
+fs.writeFileSync(".agent/.template-version", `commit: ${t.commit}\ntemplate: ${t.origem ?? "desconhecido"}\n` +
   `versao: ${t.versao ?? "desconhecida"}\ndata: ${new Date().toISOString().slice(0, 10)}\n`)'
 ```
 

@@ -152,6 +152,8 @@ export const PREFIXOS_DE_TESTE = [
   "ci-exemplo-test-",
   // Do `test-minutos-ci.mjs` (#429): o `gh` falso e as paginas de JSON que ele serve.
   "minutos-ci-test-",
+  // Do `test-modo-upgrade.mjs` (#429): o template e o projeto de fixture onde o §4 do `upgrade.md` corre.
+  "modo-upgrade-test-",
   "backlog-test-",
   "t-limpo-",
   "sim-test-",
