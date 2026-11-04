@@ -31,6 +31,27 @@ import { agentesDesatualizados } from "./agentes.mjs";
 import { regrasEmFalta } from "./permissoes.mjs";
 import { fronteiraDa2b, validaFronteiraEm } from "./fronteira-upgrade.mjs";
 import { notasDaFormaDoCi } from "./medida-upgrade-ci.mjs";
+import { modoDoProjeto, mensagemDoModo } from "./modo-upgrade.mjs";
+
+/** A fronteira de permissoes (#301, R7B-1): o que o `settings.json` do template tem e o do projeto nao. O motor nao
+ *  toca no `settings.json` (e do projeto), e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
+ *  passou varias rondas sem o `ask` dos hooks. Lista LITERAL, para copiar. Usada pela 2b (as tres listas) e pelo modo
+ *  parcial (#429: so `deny`/`ask`, o `allow` em falta e o da maquinaria que ele nao traz). */
+function notasDasPermissoes({ raiz, template, note, listas }) {
+  const [setAqui, setLa] = [leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json"))];
+  const falta = regrasEmFalta(setAqui, setLa);
+  // Os dois existem e nao se comparam (um nao e JSON valido): dize-lo — "nao comparei" nao e "nao falta
+  // nada" (auditoria do #308). Sem o do projeto e um projeto sem Claude Code: nada a dizer.
+  if (falta === null && setAqui !== null && setLa !== null) note(`nao consegui comparar o \`${listas.join("`/`")}\` com o do template: um dos settings.json nao e JSON valido`);
+  for (const lista of listas) {
+    if (falta?.[lista].length) {
+      // O `allow` em falta nao tira protecao: sem ele, cada verificador da maquinaria pede aprovacao (#317).
+      const qual = lista === "allow" ? " da maquinaria" : "";
+      const como = lista === "allow" ? "nem cobre por um prefixo" : "literalmente";
+      note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s)${qual} que o deste projeto nao tem, ${como}: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
+    }
+  }
+}
 
 /** Os comandos que o consumidor corre, DERIVADOS dos jobs `guard-tests` e `sweep` do `ci.yml` de `raiz` —
  *  e nao escritos a mao. Uma lista a mao mede menos a cada suite nova, em silencio.
@@ -207,9 +228,10 @@ export function novasLinhas(antes, depois) {
  * A versao do template de onde ESTE projeto saiu, lida de `.agent/.template-version`.
  *
  * O campo util e o `commit:` — um SHA, que o `git` do template resolve exactamente como
- * resolve uma tag. O `versao:` so existe quando foi o bootstrap a escrever a marca; o
- * `/upgrade` escreve `template/commit/data`, sem ele. Por isso o `commit` e o primario e o
- * `versao` a alternativa, e nao ao contrario.
+ * resolve uma tag. O `versao:` so existe quando foi o bootstrap a escrever a marca; o §4 do
+ * `/upgrade` reescreve `commit/template/data` e larga-o (mantem o resto, como o `modo:`, #429): ao
+ * lado de um commit novo, um `versao:` velho era a baseline errada. Por isso o `commit` e o
+ * primario e o `versao` a alternativa, e nao ao contrario.
  *
  * `desconhecido` nao e uma versao: e o que o BOOTSTRAP.md manda escrever quando nao conseguiu
  * apurar o SHA, e e exactamente o caso do **Modo B** do `/upgrade` — julgamento, nao mecanica.
@@ -304,6 +326,15 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
         "categoria, com julgamento), e o Modo B nao se mede: mede-se o que e mecanico"
     );
   }
+  // O modo (#429) so se le com uma marca utilizavel: o parcial e uma variante do Modo A. Sai != 0 nos dois casos, porque
+  // um 0 que nao mediu nada era um portao a passar sobre nada.
+  const modo = modoDoProjeto({ marca: leOuNull(join(raiz, ".agent/.template-version")), temGuardTests: comandosDoCI(raiz) !== null });
+  if (modo.modo !== "completo") {
+    // O `deny`/`ask` vem na mesma: e a fronteira, e no parcial so isto o compara (o Guard 11 nao vem, e um `node -e` a
+    // mao que cite o `settings.json` e negado pelo proprio hook). O `allow` em falta e o da maquinaria: nao conta.
+    notasDasPermissoes({ raiz, template, note, listas: ["deny", "ask"] });
+    fatal(mensagemDoModo(modo));
+  }
   // A referencia tem de existir NO TEMPLATE. Sem esta recusa, o motor lia `git show <ref>:x` a
   // falhar em todos os ficheiros, interpretava cada falha como "nao existia na tag" e concluia
   // que o template inteiro e novo — uma lista enorme e completamente errada, sem um unico erro
@@ -381,23 +412,7 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   const [ciAqui, ciLa] = [raiz, template].map((r) => leOuNull(join(r, ".github/workflows/ci.yml")) ?? "");
   notasDaFormaDoCi({ ciAqui, ciLa, guardAqui: textosDosJobs(raiz)?.["guard-tests"] ?? "", guardLa: textosDosJobs(template)?.["guard-tests"] ?? "", repetidos: repetidosPorJob(raiz), sweepAqui: jobsAntes.sweep, note });
 
-  // O MESMO, para a fronteira de permissoes (#301, R7B-1). O motor nao toca no `settings.json` — e
-  // do projeto —, e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
-  // passou varias rondas sem o `ask` dos hooks. Lista LITERAL, para copiar; o que deixa a
-  // fronteira aberta, o Guard 11 novo ja o faz reprovar na lista de baixo.
-  const [setAqui, setLa] = [leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json"))];
-  const falta = regrasEmFalta(setAqui, setLa);
-  // Os dois existem e nao se comparam (um nao e JSON valido): dize-lo — "nao comparei" nao e "nao falta
-  // nada" (auditoria do #308). Sem o do projeto e um projeto sem Claude Code: nada a dizer.
-  if (falta === null && setAqui !== null && setLa !== null) note("nao consegui comparar o `deny`/`ask`/`allow` com o do template: um dos settings.json nao e JSON valido");
-  for (const lista of ["deny", "ask", "allow"]) {
-    if (falta?.[lista].length) {
-      // O `allow` em falta nao tira protecao: sem ele, cada verificador da maquinaria pede aprovacao (#317).
-      const qual = lista === "allow" ? " da maquinaria" : "";
-      const como = lista === "allow" ? "nem cobre por um prefixo" : "literalmente";
-      note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s)${qual} que o deste projeto nao tem, ${como}: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
-    }
-  }
+  notasDasPermissoes({ raiz, template, note, listas: ["deny", "ask", "allow"] });
 
   const naoCorre = [...new Set([...cmdAntes, ...cmdDepois].filter((c) => !correNaBateria(c)))];
   if (naoCorre.length) {

@@ -29,15 +29,24 @@ const S = (n) => (/^tests?-/.test(n) ? `.agent/scripts/tests/${/harness\.mjs$/.t
 export const SUITES = [
   { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
-  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
+  // O `check-backlog`, o `minutos-ci`, os hooks e o `.githooks/` vem no modo parcial (#429): mexer num pode acrescentar
+  // uma dependencia que a lista do `upgrade-parcial.md` nao tem, e e o `test-modo-upgrade` que calcula o fecho.
+  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
   // O harness dele (#191): decide o veredicto dos testes, e a fixture e o que eles medem. Serve tambem o `--corrigir` (#431).
   { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")] },
   // O calculo e a reescrita do backlog sairam do checker (#431): as duas suites, e ANTES da regra geral de `lib/`
   // (que so corria o `test-registo`).
   { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
   // Os minutos de CI (#429): a CLI e as contas puras dela. A CLI tem par na varredura (as recusas).
-  { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs")], only: "minutos-ci" },
+  { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")], only: "minutos-ci" },
   { re: /^\.agent\/scripts\/lib\/minutos-calculo\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
+  // O modo parcial do `/upgrade` (#429): a regra (os casos no `test-modo-upgrade`, a ponta no `test-simulate-upgrade`),
+  // o fecho (o `harness/fecho-parcial.mjs`, do `test-modo-upgrade`) e o doc, cuja ordem e lista a suite verifica.
+  { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs")], only: "modo-upgrade" },
+  { re: /^\.agent\/scripts\/tests\/harness\/fecho-parcial\.mjs$/, verifica: [S("test-modo-upgrade.mjs")] },
+  { re: /^src\/docs\/upgrade-parcial\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
+  // O §4 e corrido pela suite, e o §1 tambem (a extracao do SHA).
+  { re: /^\.agent\/workflows\/upgrade\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O exemplo de CI de um derivado sem a maquinaria (#429): nenhum gate o le, e esta suite e a unica protecao dele.
   { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
@@ -229,8 +238,8 @@ export const SUITES = [
   // decide "template ou derivado" pela mesma regra do resto da maquinaria.
   // ...e o `harness/test-surface-harness.mjs` e o `tests-surface-blocos.mjs` (#308), pela mesma razao; no `test-guards`,
   // tambem o `tests-estrutura-workflow.mjs` (#382). E o `test-backlog-corrige` (#431), que le o backlog real do template, e o `test-ci-exemplo` (#429).
-  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs"), S("test-modo-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs"), S("test-modo-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
@@ -244,11 +253,11 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/ordem-por-alvo\.mjs$/, verifica: [S("test-registo.mjs"), S("test-mutation-sweep.mjs")] },
   { re: /^\.agent\/scripts\/lib\//, verifica: [S("test-registo.mjs")] },
   // A tesoura vive na lib: o `test-guards` descobre o `tests-commit-msg-tesoura.mjs` (os commits verdadeiros, #399).
-  { re: /^\.githooks\/lib\/commit-msg\.mjs$/, verifica: [S("test-commit-msg.mjs"), S("test-guards.mjs")] },
+  { re: /^\.githooks\/lib\/commit-msg\.mjs$/, verifica: [S("test-commit-msg.mjs"), S("test-guards.mjs"), S("test-modo-upgrade.mjs")] },
   { re: /^\.githooks\//, verifica: [S("test-commit-msg.mjs")] },
   // A copia do escape na folha da fronteira (#400) esta presa pelo `tests-regex-literal` (no `test-guards`).
   { re: /^\.claude\/hooks\/lib\/fronteira-dados\.mjs$/, verifica: [".claude/hooks/tests/test-hooks.mjs", S("test-guards.mjs")] },
-  { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs"] },
+  { re: /^\.claude\/hooks\//, verifica: [".claude/hooks/tests/test-hooks.mjs", S("test-modo-upgrade.mjs")] },
   { re: /^\.agent\/(rules|workflows)\//, verifica: [S("check-doc-versions.mjs")] },
   // Qualquer `.md` na RAIZ de `.agent/` — hoje so o `BOOTSTRAP.md`, e ele e lido por tres
   // guards (12, 13 e 15). A regra e por pasta e nao pelo nome do ficheiro de proposito: escrita

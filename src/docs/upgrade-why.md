@@ -834,3 +834,19 @@ avisar:
 A lib (`.agent/scripts/lib/nomes-proibidos.mjs`) chega pelo `.agent/scripts/`, que o `/upgrade` copia sozinho;
 o `commit-msg` que a importa vem pela fronteira (`.githooks/`). Entre os dois passos, um `commit-msg` antigo
 continua a funcionar sem os nomes, e um novo sem a lib recusa com a razao — nunca passa em silencio.
+
+## Porque a marca decide o modo parcial, e o `commit:` vai primeiro (#429)
+
+- **A marca decide; o disco so propoe.** Um derivado sem a maquinaria (sem as suites, a varredura, os simuladores)
+  parece, no disco, igual a um que a perdeu por engano. Ler so o disco transformava um engano numa decisao, e o
+  contrario. Por isso a linha `modo:` do `.agent/.template-version` e a resposta, e o unico sinal do disco e o job
+  `guard-tests` (o mesmo leitor da 2b). Com dois sinais (a pasta `tests/` e o job) havia um estado "indeciso", e as
+  fixtures de hoje caiam nele. A tabela e a ordem estao no `src/docs/upgrade-parcial.md`.
+- **O §4 mantinha so `template`/`commit`/`data`.** Um `modo: parcial` escrito a mao num derivado era apagado no
+  upgrade seguinte. Agora o §4 reescreve esses tres, larga o `versao:` velho (ao lado de um commit novo era a baseline errada) e mantem o resto.
+- **O `commit:` vai primeiro** (no §4 e no BOOTSTRAP). O §1 le o SHA como o 1.o hex da marca. Sem `origin`, o
+  `template:` e o caminho do clone, e um caminho como `.../tpl-abc1234def/` dava `abc1234def` como baseline. A suite
+  `test-modo-upgrade.mjs` corre o §4 nessa fixture e le a marca com a extracao do proprio §1.
+- **O `simulate-upgrade --projeto` explica e sai != 0** num projeto parcial: um 0 que nao mediu nada era um portao a
+  passar sobre nada. Medir de facto o modo parcial e um simulador novo, que so vale a pena com um segundo derivado
+  assim.

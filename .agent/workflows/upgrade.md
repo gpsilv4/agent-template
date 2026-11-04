@@ -19,51 +19,49 @@ Mostrar: o que se traz, o que se ignora, e o diff do que ja existe. Repo **priva
 cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 ```
 
-> **E preciso um clone local do template**: `$TPL` e um **diretorio**, nao uma URL. So com a
-> URL: `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
+> **`$TPL` e um clone local** (um diretorio, nao uma URL): `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
 
-Isto decide o modo.
+Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem `modo:` nem o job `guard-tests`, propoe-se): o
+**modo parcial**, variante do Modo A — `src/docs/upgrade-parcial.md`. No Modo B, esta pergunta vem primeiro.
 
 ### Modo A — com marca (`.agent/.template-version` existe)
 
-O ficheiro traz o commit do template de onde este projeto nasceu (ou da ultima atualizacao).
+A marca traz o commit do template de onde o projeto nasceu, ou da ultima atualizacao.
 
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 SHA=$(grep -oE '\b[0-9a-f]{7,40}\b' .agent/.template-version | head -1)
 # "Use this template": o commit e do PROJETO; resolve-se a versao no clone
-V=$(grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' .agent/.template-version | head -1)
+V=$(sed -n 's/^versao: *\(v[^[:space:]]*\).*/\1/p' .agent/.template-version | head -1)
 git -C "$TPL" cat-file -e "${SHA:-x}^{commit}" 2>/dev/null || SHA=$(git -C "$TPL" rev-parse -q --verify "${V:-x}^{commit}")
-# Sem baseline NAO se faz diff — cai-se no Modo B em vez de comparar contra `HEAD` por acidente.
+# Sem baseline NAO se faz diff: e o Modo B, e nao um diff contra `HEAD` por acidente.
 : "${SHA:?marca ilegivel — usar o Modo B}"
 BR=$(git -C "$TPL" symbolic-ref --short HEAD)
 git -C "$TPL" log --oneline "$SHA".."$BR"          # o que mudou desde entao
 git -C "$TPL" diff --stat "$SHA".."$BR"            # e em que ficheiros
 ```
 
-Trabalhar **so** sobre esses ficheiros. E o modo preciso: nao propoe nada que o projeto ja
-tenha.
+Trabalhar **so** sobre esses ficheiros: o que o projeto tem e o template nao mudou fica de fora.
 
 ### Modo B — sem marca (nao se sabe o ponto de partida)
 
-**Nao fazer diff contra o template.** Sem baseline, o diff marca tudo como novo — incluindo o
-que o projeto ja tem e possivelmente customizou — e a proposta fica inutil ou destrutiva.
+**Nao fazer diff contra o template.** Sem baseline, o diff marca tudo como novo, tambem o que o
+projeto ja tem e customizou: a proposta fica inutil ou destrutiva.
 
-Em vez disso, **detetar capacidades**: por cada coisa que o template tem, verificar se este
-projeto a tem, e so entao propor. Perguntas em vez de diffs:
+Em vez disso, **detetar capacidades**: o que o template tem e este projeto nao, e so entao propor:
 
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 # 1. Que ficheiros o template tem que este projeto nao tem?
 (cd "$TPL" && git ls-files) | while read -r f; do [ -e "$f" ] || echo "AUSENTE: $f"; done
-# 2. Que scripts de verificacao existem em cada lado?
+# 2. Os scripts de cada lado
 ls .agent/scripts/ ; ls "$TPL/.agent/scripts/"
-# 3. Que workflows existem em cada lado?
+# 3. Os workflows de cada lado
 ls .agent/workflows/ ; ls "$TPL/.agent/workflows/"
 ```
 
 O que esta **ausente** e candidato a copia, **menos o que e so do template** (secao 2); na fronteira, pelo utilizador. O que
-existe nos dois vai para a tabela da secao 2 e decide-se por categoria — nunca por overwrite cego.
+existe nos dois decide-se por categoria na tabela da secao 2, nunca por overwrite cego.
 
 ## 2. Decidir por categoria, nao por ficheiro
 
@@ -107,12 +105,12 @@ As classes que a reconhecem (limiar apertado, alcance alargado, verbo negado, ve
 node "$TPL/.agent/scripts/simulate-upgrade.mjs" --projeto="$PWD"
 ```
 
-Corre-se **do clone do template** (`$TPL`, o da secao 1) apontado a este projeto, e nao ao
+Corre-se **do clone do template** (`$TPL`) apontado a este projeto, e nao ao
 contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.md` § "Porque a medicao da 2b corre do lado do TEMPLATE, apontada ao projeto"). Sai: o que **saiu** do template, o que **passa**
 a reprovar aqui (menos o que ja falhava), o que sobra **depois** das adaptacoes mecanicas (a decidir)
 e, por ultimo, a **fronteira**. Fachada `"EsteProjeto"`: editar no staging antes do `cp`.
 
-> Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela).
+> Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela). No parcial tambem recusa (sai != 0).
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
@@ -129,14 +127,11 @@ git add -A && node .agent/scripts/check-test-surface.mjs   # `git add` ANTES: el
 
 E a 2b outra vez: a colocacao dos jobs so se ve depois de mexer no `ci.yml`.
 
-Ler com atencao dois resultados da varredura:
+Na varredura: **`SEM SUITE`** = um verificador deste projeto sem testes (escrever a suite, nao silenciar);
+**`ALVO AUSENTE`** = um verificador renomeado ou removido sem atualizar o `PARES`.
 
-- **`SEM SUITE`** para um verificador deste projeto -> esse guard nao tem testes. Nao
-  silenciar: escrever a suite. Um verificador nao verificado da a aparencia de confianca.
-- **`ALVO AUSENTE`** -> um verificador foi renomeado ou removido sem atualizar o `PARES`.
-
-Correr tambem **de uma subpasta** (`cd src && node ../.agent/scripts/...`): o resultado tem de
-ser identico. E, se alguem no projeto trabalha em Windows, confirmar num clone com CRLF.
+Correr tambem **de uma subpasta** (`cd src && node ../.agent/scripts/...`): o mesmo resultado. Em
+Windows, confirmar num clone com CRLF.
 
 ## 4. Gravar o novo ponto de partida
 
@@ -145,9 +140,9 @@ TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 # O `--verify ...^{commit}` e obrigatorio (porque: `upgrade-why.md` § "Porque o `--verify ...^{commit}` e obrigatorio ao gravar a marca").
 BR=$(git -C "$TPL" symbolic-ref --short HEAD)                # nao assumir `main`
 SHA=$(git -C "$TPL" rev-parse --verify "$BR^{commit}") || { echo "FALHOU: sem commit em $BR"; exit 1; }
-printf 'template: %s\ncommit: %s\ndata: %s\n' \
-  "$(git -C "$TPL" remote get-url origin 2>/dev/null || echo "$TPL")" \
-  "$SHA" "$(date +%F)" > .agent/.template-version
+M=$(grep -vE '^(template|commit|data|versao):' .agent/.template-version 2>/dev/null)  # o resto fica
+printf 'commit: %s\ntemplate: %s\ndata: %s\n%s\n' "$SHA" \
+  "$(git -C "$TPL" remote get-url origin 2>/dev/null || echo "$TPL")" "$(date +%F)" "$M" | grep . > .agent/.template-version
 ```
 
 Sem isto, o proximo `/upgrade` cai no Modo B. So com a fronteira aplicada: senao o proximo ja nao lista o que dela saiu.
