@@ -266,6 +266,9 @@ not to* line, so every agent sees it.
     │   ├── prefixo-commit.mjs  <- The Conventional Commits prefix the commit-msg checks, types from CONTRIBUTING.md (#394)
     │   ├── regex-literal.mjs   <- A text as a regex literal: the one source, and the two bound copies (#400)
     │   ├── mapa-suites.mjs     <- Touched path -> what verifies it (hook + sweep --diff)
+    │   ├── backlog-calculo.mjs <- The backlog counts, pure: one calculation for the checker and --corrigir (#431)
+    │   ├── backlog-corrige.mjs <- --corrigir: rewrites only the derived counters, or nothing (#431)
+    │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── varredura-tempos.mjs   <- ...and its time summary, by target (moved out at 500 lines, #374b)
@@ -286,6 +289,7 @@ not to* line, so every agent sees it.
     │   ├── intacto.mjs         <- "The project did not touch this file", placeholders aside
     │   ├── saida-upgrade.mjs   <- The lists /upgrade shows before approval, one formatter for both modes
     │   ├── medida-upgrade.mjs  <- Section 2b measured from BOTH sides (template and consumer)
+    │   ├── modo-upgrade.mjs    <- Full or partial /upgrade: the mark decides, the guard-tests job proposes (#429)
     │   ├── medida-upgrade-ci.mjs  <- ...and its notes on the SHAPE of ci.yml (each optional CI change, #347)
     │   ├── fronteira-upgrade.mjs  <- The boundary an upgrade changes, staged for the USER to copy (#304)
     │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
@@ -314,6 +318,10 @@ not to* line, so every agent sees it.
             ├── repo-descartavel.mjs      <- The throwaway git repo the CI gate's real shell runs in, and a git that translates (#400)
             ├── casos-modos.mjs           <- The sweep suite's `--list`/`--diff` cases, called in place (#400)
             ├── casos-commit-msg-prosa.mjs <- The commit-msg suite's prose-vs-attribution cases, called in place (#400)
+            ├── fecho-parcial.mjs         <- The import closure of the boundary, against upgrade-parcial.md's list (#429)
+            ├── expressoes-ci.mjs         <- The CI example suite's readers: if: expressions, steps, variants (#439)
+            ├── casos-salto-cache.mjs     <- The merge-push skip and the cache.yml example's cases (#439)
+            ├── casos-dependabot-exemplo.mjs <- The private-repo dependabot.yml example's cases (#440)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -449,12 +457,12 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps, a new step before the suites that is not read-only (#362), or a step that skips on a literal `case` variable (#353) passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every PR and push (†) in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
-| Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns (runs in the `guard-tests` job) |
+| Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns; `node .agent/scripts/tests/test-backlog-corrige.mjs` — `--corrigir` rewrites only the derived counters, and nothing when another warning is present (#431) (both in the `guard-tests` job) |
 | Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks**, decided by the plan read from the base commit (#347): on a PR without them the shards are `skipped`, never started, and the gate recomputes the plan. Its own `sweep` job, in parallel: the full sweep split into 2 shards (the `Guard Tests` gate checks every shard reported) and `--skips`; run locally after touching a `check-*.mjs` |
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
-| CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (both in the `guard-tests` job, #429) |
+| CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (#429); the merge-push skip, the `(deps`/`,deps` step and the PR-description check run in fixtures, the `cache-sem-maquinaria.yml` example (#439) and the private `dependabot-privado.yml` (#440) (both in the `guard-tests` job) |
 | Partial Upgrade Tests | `node .agent/scripts/tests/test-modo-upgrade.mjs` — the mode rule (mark decides, the `guard-tests` job proposes), `/upgrade` §4 run for real (the mark keeps `modo:` and drops the stale `versao:`, and §1 reads the new SHA), the order of `upgrade-parcial.md`, and its "what comes" list against the import closure of the hooks, `commit-msg`, `check-backlog` and `minutos-ci` (in the `guard-tests` job, #429) |
 | Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan and the Claude Code hook (`guard-textos-publicos`, once a session) say so. In a PRIVATE repo where the names are legitimate, the USER can switch it off for that repo (`src/docs/upgrade-why.md`, never an agent; #375) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
@@ -514,7 +522,7 @@ Branch protection rules (require status checks, block force push) require **GitH
 > **Note**: the `Code Quality` job checks for `package.json` **after checkout** (its `Projeto` step), and its app steps skip on the bare template.
 >
 > **Three consequences of one job (#347), written down:**
-> - **A red step stops the next ones.** A `tsc` error means the unit tests and the audit do not run in that run. They used to run in jobs of their own. The PR is red either way; the signal per run is smaller.
+> - **A red check does not hide the others (#428).** The five app checks run with `!cancelled()`, so a `tsc` error still lets the unit tests and the audit run in the same run. If `Install` fails, they skip (no `node_modules`; the job is already red).
 > - **In a PRIVATE repo, the push of a PR merge skips `Code Quality` and `Guard Suites`** (#347): the PR already ran them on the same code. `Guard Tests` still runs, re-checks that it really is a merge push (`web-flow`, private, not a PR) and checks the merge message with `.githooks/commit-msg`. `Secret Scan` does **not** skip (#372): a web-UI commit straight to `main` has the same committer, and would never be scanned. Limits: a PR merged red, a web-UI commit straight to `main`, or a forged committer also skip the other two — see `src/docs/scripts-guide-why.md`. Public repos run everything on push, as before.
 > - **On the bare template the `Audit` step shows a tolerated X on every run.** `npm audit` fails without a lockfile, and `continue-on-error` keeps the job green. Guarding it would take a new `if:`, which the surface checker counts. (An earlier version of this note described `hashFiles('package.json')` — `ci.yml` rejects that explicitly, because job-level `hashFiles` runs *before* checkout and is unreliable.)
 

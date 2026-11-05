@@ -52,7 +52,8 @@ export const SUITES = [
   { re: /^src\/docs\/exemplos\/(?:(?:ci|cache)-sem-maquinaria|dependabot-privado)\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/(?:expressoes-ci|casos-salto-cache|casos-dependabot-exemplo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O `dependabot-privado.yml` tem de ser o do template com duas diferencas: mexer no do template corre a suite (#440).
-  { re: /^\.github\/dependabot\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O Guard 13 tambem le o `dependabot.yml` (os placeholders): mexer nele pede os dois.
+  { re: /^\.github\/dependabot\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("check-doc-versions.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
@@ -153,7 +154,7 @@ export const SUITES = [
   // (#362): o dono no `test-guards` (a funcao pura), e o gate de ponta a ponta.
   // O `estrutura-workflow` le tambem os passos do exemplo de CI (#429): a primeira regra que casa ganha.
   { re: /^\.agent\/scripts\/lib\/estrutura-workflow\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-ci-exemplo.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/(?:estrutura-workflow|saltos-variavel|passos-novos)\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/(?:saltos-variavel|passos-novos)\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // Os modos da varredura (#317): as formas de YAML leem-se pela estrutura, no `tests-estrutura-workflow.mjs` (#382).
   { re: /^\.agent\/scripts\/lib\/gate-modos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs")] },
   // O gate do `check-test-surface` (#285): o trigger e as linhas da maquinaria de um workflow.

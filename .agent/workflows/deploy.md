@@ -31,7 +31,8 @@ Producao (main branch + {{BACKEND}} PROD)
   "Ao concluir um sprint") e aprovado, antes de seguir.
 - [ ] **A quota de CI, se a conta tem repos privados** (#442): `node .agent/scripts/minutos-ci.mjs --quota` (`--limite
   3000` no Pro). Uma linha `QUOTA: AVISO` ou `QUOTA: ESGOTADA` -> parar e perguntar. Uma recusa (sem o scope `user`, ou
-  um erro da API): dizer a mensagem e seguir, porque e uma medicao. Sem `.agent/scripts/`, saltar.
+  um erro da API): dizer a mensagem e seguir, porque e uma medicao. Sem `.agent/scripts/`, saltar. A saida nomeia os
+  repos privados da conta: nunca a copiar para um texto versionado ou publico.
 
 ---
 

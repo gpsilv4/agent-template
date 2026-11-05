@@ -44,7 +44,7 @@ O audit do CI do template (`npm audit --audit-level=high`) cobre dev e producao,
   fica semanal.
 - **Um alerta sem versao compativel continua a tentar, e paga:** num derivado, o update de seguranca de um pacote so de
   dev falhou 6 vezes em 5 dias (17 min). **Nao confirmado** que dispensar o alerta no GitHub pare as tentativas (a
-  documentacao do GitHub nao o diz): medir dispensando-o, e vendo se os runs `dynamic` param numa semana (#442).
+  documentacao do GitHub nao o diz): medir num derivado, dispensando-o e vendo se os runs `dynamic` param numa semana.
 
 ## 5. Publicar um texto escrito num ficheiro
 
@@ -86,7 +86,17 @@ di-lo). Os runs do proprio Dependabot (`event: dynamic`) **tambem se pagam** num
 sem eles a soma nao batia), e entram na soma contados a parte; os PRs dele correm o CI do projeto e contam tambem.
 Um run ainda em curso fica fora da soma, listado.
 
-**Pela conta inteira** (a quota, #442) — pede o scope `user` ao `gh` (`gh auth refresh -h github.com -s user`):
+**Pela conta inteira** (a quota, #442) — pede o scope `user` ao `gh` (`gh auth refresh -h github.com -s user`). O
+`user` da tambem escrita no perfil, e fica no token de todos os `gh` do agente: retira-lo depois de medir
+(`gh auth refresh -h github.com --remove-scopes user`), ou usar um token so para isto (`GH_TOKEN=<token> node …`).
+
+**Dois comandos, duas perguntas:**
+
+| | `minutos-ci.mjs --quota` | `minutos-ci.mjs --desde AAAA-MM-DD --repo dono/repo` |
+|---|---|---|
+| Responde a | Quanto da quota da CONTA ja gastei este mes, e chego ao fim? | Onde e porque gasta UM repo, run a run? |
+| Mostra | cada repo privado; os publicos numa linha; o `TOTAL` contra o limite; a projecao; a linha `QUOTA:` | cada run, os jobs, o cobrado contra o real; `--passos` a duracao de cada passo; a mediana dos PRs contra os 120 s |
+| Quando | no dia a dia, antes de abrir PRs, e no `/deploy` | ao mudar o CI (5 PRs antes e 5 depois), ou a procurar o passo lento |
 
 ```bash
 node .agent/scripts/minutos-ci.mjs --quota                  # o mes corrente: os privados contra os 2000, e a projecao
@@ -97,7 +107,9 @@ A faturacao traz tambem os repos PUBLICOS, e os montantes nao os distinguem (med
 pergunta a visibilidade de cada repo, e soma so os privados (um repo que ja nao existe conta). Uma linha
 `QUOTA: AVISO` (>= 80%, ou a projecao acima do limite) ou `QUOTA: ESGOTADA` e o sinal para abrandar. **O limite de
 gastos:** a 0, o CI para quando a quota acaba (medido a 20 out: os jobs falham em 2 s, nada se cobra); um limite
-pequeno, ou o Pro (3000 min), deixa-o correr. E uma decisao do utilizador, nao do agente.
+pequeno, ou o Pro (3000 min), deixa-o correr. E uma decisao do utilizador, nao do agente. **A saida tem os nomes dos
+repos privados da conta:** e para o terminal ou para o chat, e nunca para um texto versionado ou publico (um commit, o
+`session.md`, um PR, uma release).
 
 Medir **5 PRs antes e 5 depois** de cada mudanca de CI, pelo id do run, e escrever os dois numeros. O exemplo de CI
 de um job, para um derivado sem a maquinaria, esta em `src/docs/exemplos/ci-sem-maquinaria.yml` (a cache da
