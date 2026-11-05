@@ -220,7 +220,8 @@ not to* line, so every agent sees it.
     │                              is missing, writes .agent/adocao.json (copied + collisions)
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     ├── minutos-ci.mjs          <- CI minutes per run, billed (each job rounded up) vs real, step times,
-    │                              the PR median vs 120 s; fails loud, never a false 0 (#429)
+    │                              the PR median vs 120 s; --quota: the account's private repos against the free
+    │                              quota, with a month-end projection (#442); fails loud, never a false 0 (#429)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │

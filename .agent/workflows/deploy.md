@@ -29,6 +29,9 @@ Producao (main branch + {{BACKEND}} PROD)
   **parar aqui** e dize-lo.
 - [ ] **Relatorio de fecho do sprint apresentado** (os 6 pontos de `.agent/rules/backlog-method.md`,
   "Ao concluir um sprint") e aprovado, antes de seguir.
+- [ ] **A quota de CI, se a conta tem repos privados** (#442): `node .agent/scripts/minutos-ci.mjs --quota` (`--limite
+  3000` no Pro). Uma linha `QUOTA: AVISO` ou `QUOTA: ESGOTADA` -> parar e perguntar. Uma recusa (sem o scope `user`, ou
+  um erro da API): dizer a mensagem e seguir, porque e uma medicao. Sem `.agent/scripts/`, saltar.
 
 ---
 

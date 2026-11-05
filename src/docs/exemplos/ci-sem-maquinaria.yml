@@ -134,22 +134,28 @@ jobs:
           fi
 
       # Quem grava a cache depois de um merge e o `cache.yml` (o exemplo `cache-sem-maquinaria.yml`), e so quando a
-      # mensagem do merge tem `(deps` — o titulo do PR vai nela, num merge commit e num squash. Sem esta regra, um PR que
-      # acrescente uma dependencia sem `(deps` no titulo deixava a cache nova para o `schedule` (ate 7 dias de PRs a
-      # instalar do zero). Custo aceite: esse PR leva o scope `deps` em vez do da sua area. O `(deps` casa tambem o
-      # `deps-dev` do Dependabot (com `include: scope`; sem ele, ADAPTAR a MARCA, aqui e no `cache.yml`).
-      - name: Dependencias — o titulo diz (deps
+      # mensagem do merge tem uma das MARCAS — o titulo do PR vai nela, num merge commit e num squash. Sem esta regra, um
+      # PR que acrescente uma dependencia sem a marca no titulo deixava a cache nova para o `schedule` (ate 7 dias de PRs
+      # a instalar do zero). As marcas: `(deps` (casa tambem o `deps-dev` do Dependabot, com `include: scope`) e `,deps`
+      # (um titulo com varios scopes, `feat(reader,deps):`, #442). Custo aceite: esse PR leva o scope `deps`. Falso
+      # positivo aceite: o `contains` do `cache.yml` le a mensagem inteira, o corpo incluido. Sem `include: scope` no
+      # `dependabot.yml`, ADAPTAR as MARCAS, aqui e no `cache.yml`.
+      - name: Dependencias — o titulo diz (deps ou ,deps
         if: ${{ !cancelled() && github.event_name == 'pull_request' && (steps.deps.outputs.changed == 'true' || steps.deps.outputs.nvmrc_changed == 'true') }}
         env:
           PR_TITULO: ${{ github.event.pull_request.title }}
-          MARCA: "(deps" # ADAPTAR: o mesmo texto do `contains` do `if:` do `cache.yml`
+          MARCAS: "(deps ,deps" # ADAPTAR: os mesmos textos dos `contains` do `if:` do `cache.yml`, separados por espacos
         run: |
           set -euo pipefail
           shopt -s nocasematch
-          case "$PR_TITULO" in
-            *"$MARCA"*) echo "  as dependencias mudaram, e o titulo tem $MARCA: o cache.yml grava depois do merge." ;;
-            *) echo "::error::as dependencias (ou o .nvmrc) mudaram e o titulo do PR nao tem $MARCA: sem isso, a cache nova so nasce no schedule do cache.yml. Depois de editar o titulo, um re-run le o titulo antigo: um push novo (ou fechar e reabrir o PR)."; exit 1 ;;
-          esac
+          set -f # as MARCAS partem-se nos espacos, mas nunca se expandem como padroes de ficheiros
+          for marca in $MARCAS; do
+            case "$PR_TITULO" in
+              *"$marca"*) echo "  as dependencias mudaram, e o titulo tem $marca: o cache.yml grava depois do merge."; exit 0 ;;
+            esac
+          done
+          echo "::error::as dependencias (ou o .nvmrc) mudaram e o titulo do PR nao tem nenhuma de: $MARCAS. Sem isso, a cache nova so nasce no schedule do cache.yml. Depois de editar o titulo, um re-run le o titulo antigo: um push novo (ou fechar e reabrir o PR)."
+          exit 1
 
       # --- CACHE inicio ---
       # A cache do npm (as descargas). Num PR: a chave exata, ou a mais recente do `main` pelo prefixo; os PRs NUNCA

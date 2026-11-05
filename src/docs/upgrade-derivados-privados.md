@@ -42,6 +42,9 @@ O audit do CI do template (`npm audit --audit-level=high`) cobre dev e producao,
   num dia, para um PR; 113 min em outubro, num derivado). A troca: os PRs dele ficam desatualizados em silencio, e um
   PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge). O template e publico, nao paga, e o dele
   fica semanal.
+- **Um alerta sem versao compativel continua a tentar, e paga:** num derivado, o update de seguranca de um pacote so de
+  dev falhou 6 vezes em 5 dias (17 min). **Nao confirmado** que dispensar o alerta no GitHub pare as tentativas (a
+  documentacao do GitHub nao o diz): medir dispensando-o, e vendo se os runs `dynamic` param numa semana (#442).
 
 ## 5. Publicar um texto escrito num ficheiro
 
@@ -83,13 +86,18 @@ di-lo). Os runs do proprio Dependabot (`event: dynamic`) **tambem se pagam** num
 sem eles a soma nao batia), e entram na soma contados a parte; os PRs dele correm o CI do projeto e contam tambem.
 Um run ainda em curso fica fora da soma, listado.
 
-**Pela conta inteira** (todos os repos, o que a faturacao conta), a mao — pede o scope `user` ao `gh`
-(`gh auth refresh -h github.com -s user`):
+**Pela conta inteira** (a quota, #442) — pede o scope `user` ao `gh` (`gh auth refresh -h github.com -s user`):
 
 ```bash
-gh api "/users/<utilizador>/settings/billing/usage/summary?year=AAAA&month=M"   # o total do mes
-gh api "/users/<utilizador>/settings/billing/usage?year=AAAA&month=M"           # por repo (somar o `quantity`)
+node .agent/scripts/minutos-ci.mjs --quota                  # o mes corrente: os privados contra os 2000, e a projecao
+node .agent/scripts/minutos-ci.mjs --quota --mes 2026-10    # um mes passado; --limite 3000 no Pro
 ```
+
+A faturacao traz tambem os repos PUBLICOS, e os montantes nao os distinguem (medido a 5 nov 2026): o `--quota`
+pergunta a visibilidade de cada repo, e soma so os privados (um repo que ja nao existe conta). Uma linha
+`QUOTA: AVISO` (>= 80%, ou a projecao acima do limite) ou `QUOTA: ESGOTADA` e o sinal para abrandar. **O limite de
+gastos:** a 0, o CI para quando a quota acaba (medido a 20 out: os jobs falham em 2 s, nada se cobra); um limite
+pequeno, ou o Pro (3000 min), deixa-o correr. E uma decisao do utilizador, nao do agente.
 
 Medir **5 PRs antes e 5 depois** de cada mudanca de CI, pelo id do run, e escrever os dois numeros. O exemplo de CI
 de um job, para um derivado sem a maquinaria, esta em `src/docs/exemplos/ci-sem-maquinaria.yml` (a cache da
@@ -101,7 +109,7 @@ outro entrou entretanto.
 **O push do merge nao corre num privado** (#439): repetia as mensagens e o gitleaks que o PR ja correu sobre os
 mesmos commits, e era 1 min de 3 por PR. Um push direto corre tudo. A condicao depende do metodo de merge (as duas
 formas e o porque estao no exemplo e no `src/docs/upgrade-parcial.md` §4). Quem grava a cache depois de um merge passa
-a ser o `src/docs/exemplos/cache-sem-maquinaria.yml`: num merge com `(deps` na mensagem, e toda a semana a restaurar,
+a ser o `src/docs/exemplos/cache-sem-maquinaria.yml`: num merge com `(deps` ou `,deps` na mensagem, e toda a semana a restaurar,
 para o GitHub nao a apagar aos 7 dias sem uso. Os riscos, aceites e escritos no exemplo: a mensagem final do merge
 deixa de ser lida; um PR mergeado vermelho deixa a app por verificar ate ao PR seguinte, e as mensagens e o gitleaks
 desse PR nunca; um PR cujo ultimo commit diga `[skip ci]` nao corre, e entra sem nenhuma verificacao; uma mensagem (ou, na

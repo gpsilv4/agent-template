@@ -6,7 +6,11 @@
  * arredondamento, e e por isso que menos jobs (e jobs abaixo de 60/120 s) custam menos. Os runs do PROPRIO
  * Dependabot (`event: dynamic`) tambem se pagam num privado (medido contra a faturacao, 3 nov 2026): contam-se a parte.
  *
- * NAO e um entry point. Nao recusa nada (so contas): a suite `test-minutos-ci.mjs` prende cada uma.
+ * E as contas do `--quota` (#442): os minutos dos repos privados da conta no mes, a projecao e o nivel.
+ *
+ * NAO e um entry point. Nao recusa nada (so contas): a suite `test-minutos-ci.mjs` prende cada uma. (Um ficheiro aqui
+ * com uma recusa — um `throw new Error(`, um `warn(` — passava a verificador e a varredura exigia-lhe par: a licao do
+ * #439. As recusas ficam no script, num `fatal(`.)
  */
 
 /** Os segundos entre dois instantes ISO; 0 quando falta um (um job que nao chegou a correr). */
@@ -48,6 +52,60 @@ export const correuOPasso = (jobs, nome) => jobs.some((j) => (j.steps ?? []).som
 
 /** O run e do proprio Dependabot (`dynamic`)? Paga-se; conta-se a parte. */
 export const ehDoDependabot = (run) => run.event === "dynamic";
+
+// --- A quota da CONTA (#442) ---
+// A faturacao (`/users/<login>/settings/billing/usage`) traz um item por dia, repo e SKU, e traz tambem os repos
+// PUBLICOS (os montantes nao os distinguem: medido a 5 nov 2026). So os privados gastam a quota; a visibilidade de
+// cada repo vem de fora (`visibilidade`: repo -> "privado" | "publico" | "desconhecido"). Um repo desconhecido (ja nao
+// existe, ou nao o encontrei) CONTA: antes contar a mais do que esconder minutos.
+
+const ehLinux = (i) => i.sku === "Actions Linux" && i.unitType === "Minutes";
+
+/**
+ * Os minutos do mes contra a quota: `{ porRepo, total, publicos, desconhecidos, outros, ultimoDia }`. `porRepo` e
+ * `[[repo, min]]` dos que contam (privados e desconhecidos), do maior para o menor; `outros` sao os itens em minutos
+ * de outros SKUs (Windows, macOS, runners maiores) dos que contam, que NAO entram na soma (o multiplicador do Free nao
+ * esta confirmado sobre a faturacao); `ultimoDia` e o dia (UTC) da ultima entrada em minutos, ou 0 sem nenhuma.
+ */
+export function quotaDoMes(itens, visibilidade) {
+  const conta = (repo) => visibilidade.get(repo) !== "publico";
+  const porRepo = new Map();
+  const outros = new Map();
+  let publicos = 0;
+  let ultimoDia = 0;
+  for (const i of itens) {
+    if (i.unitType !== "Minutes") continue;
+    ultimoDia = Math.max(ultimoDia, new Date(i.date).getUTCDate() || 0);
+    const q = Number(i.quantity) || 0;
+    if (!conta(i.repositoryName)) {
+      if (ehLinux(i)) publicos += q;
+    } else if (ehLinux(i)) porRepo.set(i.repositoryName, (porRepo.get(i.repositoryName) ?? 0) + q);
+    else outros.set(`${i.sku} · ${i.repositoryName}`, (outros.get(`${i.sku} · ${i.repositoryName}`) ?? 0) + q);
+  }
+  const lista = [...porRepo].sort((a, b) => b[1] - a[1]);
+  return {
+    porRepo: lista,
+    total: lista.reduce((a, [, m]) => a + m, 0),
+    publicos,
+    desconhecidos: lista.map(([r]) => r).filter((r) => visibilidade.get(r) === "desconhecido"),
+    outros: [...outros],
+    ultimoDia,
+  };
+}
+
+/** Os dias de um mes (`mes` de 1 a 12), em UTC. */
+export const diasDoMes = (ano, mes) => new Date(Date.UTC(ano, mes, 0)).getUTCDate();
+
+/** A projecao linear ao fim do mes: o ritmo ate ao dia `dia` (quem chama da o de hoje), vezes os dias do mes; `null`
+ *  sem nenhum dia. */
+export const projecao = (total, dia, dias) => (dia > 0 ? (total / dia) * dias : null);
+
+/** O nivel da quota: "esgotada" (>= limite), "aviso" (>= 80%, ou a projecao acima do limite), ou `null`. */
+export function nivelDaQuota(total, proj, limite) {
+  if (total >= limite) return "esgotada";
+  if (total >= 0.8 * limite || (proj !== null && proj > limite)) return "aviso";
+  return null;
+}
 
 /** A mediana de uma lista de numeros; `null` com a lista vazia. */
 export function mediana(ns) {
