@@ -29,7 +29,7 @@ import { andaFicheiros, aplicaUpgradeMecanico } from "./upgrade-mecanico.mjs";
 import { imprimeAntesDeAprovar } from "./saida-upgrade.mjs";
 import { agentesDesatualizados } from "./agentes.mjs";
 import { regrasEmFalta } from "./permissoes.mjs";
-import { fronteiraDa2b, validaFronteiraEm } from "./fronteira-upgrade.mjs";
+import { fronteiraDa2b, validaFronteiraEm, notasDaLigacaoParcial } from "./fronteira-upgrade.mjs";
 import { notasDaFormaDoCi } from "./medida-upgrade-ci.mjs";
 import { modoDoProjeto, mensagemDoModo } from "./modo-upgrade.mjs";
 
@@ -333,6 +333,8 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
     // O `deny`/`ask` vem na mesma: e a fronteira, e no parcial so isto o compara (o Guard 11 nao vem, e um `node -e` a
     // mao que cite o `settings.json` e negado pelo proprio hook). O `allow` em falta e o da maquinaria: nao conta.
     notasDasPermissoes({ raiz, template, note, listas: ["deny", "ask"] });
+    // A ligacao dos hooks (#454), so no PARCIAL: as notas citam os passos do `upgrade-parcial.md`, e na contradicao nao se sabe o modo.
+    if (modo.modo === "parcial") notasDaLigacaoParcial({ raiz, template, note });
     fatal(mensagemDoModo(modo));
   }
   // A referencia tem de existir NO TEMPLATE. Sem esta recusa, o motor lia `git show <ref>:x` a

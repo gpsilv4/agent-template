@@ -248,6 +248,60 @@ export function notasDeLigacao(lista, antes, agora, doProjeto, temNoProjeto) {
   return notas;
 }
 
+/** Um texto de settings que e um OBJETO JSON. O `"null"` e o `[]` sao JSON valido e o `ligacoes` le-os como "nada
+ *  ligado": a lista dizia que faltava tudo, ao lado do "nao consegui comparar" do `deny`/`ask` (Fase 0 do #454). */
+function objetoJson(texto) {
+  try {
+    const v = JSON.parse(texto);
+    return v !== null && typeof v === "object" && !Array.isArray(v);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A LIGACAO dos hooks no modo PARCIAL (#454): o `upgrade-parcial.md` diz que o settings traz "a ligacao dos hooks e o
+ * `deny`/`ask`", e so o `deny`/`ask` se comparava. Um hook copiado e nao ligado nunca dispara, e as tres verificacoes a
+ * mao do §3 passam (o `test-hooks` testa os hooks, nao a ligacao).
+ *  - Compara SITIO a SITIO ("Evento (matcher)"): um hook ligado num dos dois sitios do template falta no outro.
+ *  - Um evento ligado SEM matcher no projeto cobre todos os matchers desse evento. O resto e literal (`Bash|Edit`
+ *    contra `Bash` sai como em falta): e uma nota, e o ruido aceita-se.
+ *  - Um hook cujo ficheiro o projeto ainda nao tem vai MARCADO, e nao filtrado: no parcial o settings escreve-se no fim
+ *    (§3 passo 5), e a lista tem de estar inteira nessa altura.
+ */
+export function notasDaLigacaoParcial({ raiz, template, note }) {
+  const [aqui, la] = [leOuNull(join(raiz, ".claude/settings.json")), leOuNull(join(template, ".claude/settings.json"))];
+  if (la === null) return;
+  // O do template ilegivel diz-se (`TP2`): calado, o leitor concluia "os hooks foram comparados e nao falta nenhum".
+  if (!objetoJson(la)) {
+    note("nao consegui comparar os hooks ligados: o .claude/settings.json do template nao e um objeto JSON");
+    return;
+  }
+  if (aqui === null) {
+    note("este projeto nao tem o .claude/settings.json: sem ele nao ha o `deny`/`ask` da fronteira, nem hooks ligados no settings.json — o utilizador escreve-o (src/docs/upgrade-parcial.md, §3 passo 5)");
+    return;
+  }
+  if (!objetoJson(aqui)) {
+    note("nao consegui comparar os hooks ligados: o .claude/settings.json deste projeto nao e um objeto JSON");
+    return;
+  }
+  const [lh, lp] = [ligacoes(la), ligacoes(aqui)];
+  const coberto = (rel, sitio) => {
+    const doProjeto = lp.get(rel) ?? [];
+    return doProjeto.includes(sitio) || doProjeto.includes(sitio.replace(/ \(.*\)$/, ""));
+  };
+  const faltam = [...lh.keys()]
+    .sort()
+    .map((rel) => [rel, lh.get(rel).filter((sitio) => !coberto(rel, sitio))])
+    .filter(([, sitios]) => sitios.length);
+  if (!faltam.length) return;
+  const marca = (rel) => (existsSync(join(raiz, rel)) ? "" : " (ficheiro ainda nao copiado: §3 passo 3)");
+  note(
+    "hook(s) que o template liga e este projeto nao, a ligar na chave `hooks` do .claude/settings.json (a mao): " +
+      faltam.map(([rel, sitios]) => `${rel} -> ${sitios.join(", ")}${marca(rel)}`).join("; ")
+  );
+}
+
 /**
  * A FRONTEIRA da 2b, inteira, e passo do UTILIZADOR (#304, R7B-2): o motor substitui `.claude/hooks/` e
  * `.githooks/` na copia, mas no projeto real o agente nao os pode escrever — o hook de fronteira nega-o,
