@@ -309,7 +309,7 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
     → Adaptar `.github/workflows/` com triggers e targets do projeto
 
 16. **Repo publico ou privado (conta pessoal ou organizacao)? Branch protection?** (require status checks, require reviews, etc.)
-    → Configurar no GitHub Settings > Branches > Branch protection rules. Num privado de conta pessoal gratuita grava-se mas **nao e imposta** (ver `src/docs/github-security.md`); a visibilidade decide tambem o que o §2.7 manda fazer ao `SECURITY.md`
+    → Configurar no GitHub Settings > Branches > Branch protection rules. Num privado de conta pessoal gratuita grava-se mas **nao e imposta** (ver `src/docs/github-security.md`); a visibilidade decide tambem o que o §2.7 manda fazer ao `SECURITY.md` e ao `dependabot.yml`. Num **privado**, cada minuto de CI conta para a quota da CONTA (2000 min/mes no Free, somada por todos os privados): ler o `src/docs/upgrade-derivados-privados.md` §6 (#441)
 
 17. **Email de seguranca** (para disclosure de vulnerabilidades)
     → Substitui `{{SECURITY_EMAIL}}` em `SECURITY.md`
