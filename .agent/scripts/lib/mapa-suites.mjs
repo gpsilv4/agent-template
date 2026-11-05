@@ -31,15 +31,19 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
   // O `check-backlog`, o `minutos-ci`, os hooks e o `.githooks/` vem no modo parcial (#429): mexer num pode acrescentar
   // uma dependencia que a lista do `upgrade-parcial.md` nao tem, e e o `test-modo-upgrade` que calcula o fecho.
-  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/check-backlog\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-backlog-regras.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
   // O harness dele (#191): decide o veredicto dos testes, e a fixture e o que eles medem. Serve tambem o `--corrigir` (#431).
-  { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-backlog-regras.mjs")] },
   // O calculo e a reescrita do backlog sairam do checker (#431): as duas suites, e ANTES da regra geral de `lib/`
   // (que so corria o `test-registo`).
-  { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-backlog-itens.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-backlog-itens.mjs"), S("test-backlog-regras.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
   // O leitor partilhado (#445): o calculo le por ele (as duas suites do checker), e a suite dele congela o resultado.
   // As libs do backlog vem no `/upgrade` parcial: um `import` novo muda o fecho, que e o `test-modo-upgrade` que mede.
-  { re: /^\.agent\/scripts\/lib\/backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/lib\/backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs"), S("test-backlog-regras.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  // As regras que nao sao contagens (#445 PR 2): a suite delas, o `CONGELADO` (no `test-backlog-itens`) e o caso de
+  // ponta a ponta (no `test-backlog`); e o fecho do parcial, porque o `calcula` as importa.
+  { re: /^\.agent\/scripts\/lib\/backlog-regras\.mjs$/, verifica: [S("test-backlog-regras.mjs"), S("test-backlog-itens.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/tests\/test-backlog-regras\.mjs$/, verifica: [S("test-backlog-regras.mjs")] },
   { re: /^\.agent\/scripts\/tests\/test-backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs")] },
   // Os minutos de CI (#429): a CLI e as contas puras dela. A CLI tem par na varredura (as recusas).
   { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")], only: "minutos-ci" },

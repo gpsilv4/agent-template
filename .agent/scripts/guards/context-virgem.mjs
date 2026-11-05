@@ -74,8 +74,8 @@ export const digest = (src) => createHash("sha256").update(src.replace(/\r\n/g, 
  * O guard imprime o hash novo quando reprova, para nao ser preciso calcula-lo a mao.
  */
 export const PRISTINOS = {
-  ".agent/context/backlog-archive.md": "d74b4d538533b42c",
-  ".agent/context/backlog.md": "4908ff23f64ee729",
+  ".agent/context/backlog-archive.md": "895ce7e833e9a8df",
+  ".agent/context/backlog.md": "8171dd6537274918",
   ".agent/context/decisions-archive.md": "4688e54e1ec16db0",
   ".agent/context/decisions.md": "180e340de1cca452",
   ".agent/context/implementation_plan.md": "90b8d7d96b66b49f",

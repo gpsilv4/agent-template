@@ -51,9 +51,10 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 - `.agent/scripts/lib/nomes-proibidos.mjs`
 - `.agent/scripts/lib/agentes.mjs`
 - `.agent/scripts/lib/mapa-suites.mjs`: a tabela do template, **sem a mudar** (§3, passo 1).
-- `.agent/scripts/check-backlog.mjs`, com `.agent/scripts/lib/backlog-calculo.mjs`, `.agent/scripts/lib/backlog-itens.mjs` e `.agent/scripts/lib/backlog-corrige.mjs` (uma linha cada, abaixo).
+- `.agent/scripts/check-backlog.mjs`, com `.agent/scripts/lib/backlog-calculo.mjs`, `.agent/scripts/lib/backlog-itens.mjs`, `.agent/scripts/lib/backlog-regras.mjs` e `.agent/scripts/lib/backlog-corrige.mjs` (uma linha cada, abaixo).
 - `.agent/scripts/lib/backlog-calculo.mjs`
 - `.agent/scripts/lib/backlog-itens.mjs`
+- `.agent/scripts/lib/backlog-regras.mjs`
 - `.agent/scripts/lib/backlog-corrige.mjs`
 - `.agent/scripts/minutos-ci.mjs`, com os dois modulos abaixo.
 - `.agent/scripts/lib/minutos-calculo.mjs`

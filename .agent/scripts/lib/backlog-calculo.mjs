@@ -10,10 +10,8 @@
  * contadores errados, e e de uma pessoa.
  */
 
-import { leBacklog, norm, idDe, idsDe, tableRows, section, SECTIONS, ID_LIKE } from "./backlog-itens.mjs";
-
-export const OPEN_STATES = ["pendente", "a fazer"];
-export const CLOSED_STATES = ["concluido", "cancelado"];
+import { leBacklog, norm, idDe, idsDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
+import { regrasDoBacklog } from "./backlog-regras.mjs";
 
 // Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
 export const BLOCO_VAZIO = new Set(["_", " ", "\t", "-", "\u00b7", "\u2591", "\u2b1c", "\u25cb", "\u25fb", "\u25ab"]);
@@ -109,13 +107,17 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   }
 
   // 2) Items FECHADOS a partir do Historico em backlog-archive.md
-  //    Colunas: ID | Tipo | Descricao | Estado | Sprint | Versao | Data
+  //    Colunas lidas pelo NOME (#445): ID, Tipo, Estado (e Descricao, Sprint, Versao, Data)
   const tipoToKey = {};
   for (const { key, tipos } of SECTIONS) for (const t of tipos) tipoToKey[t] = key;
 
+  // Sem a coluna Tipo ou Estado no Historico, validar linha a linha dava um aviso por linha: a regra das colunas
+  // (`backlog-regras.mjs`) diz uma vez o que falta, e as contagens do arquivo ficam por fazer (#445 PR 2).
+  const historicoLegivel = !lido.colunasEmFaltaNoHistorico.some((c) => c === "tipo" || c === "estado");
   for (const f of lido.fechados) {
     const { id, tipo, estado } = f;
     trackId(id, "arquivo");
+    if (!historicoLegivel) continue;
     const key = tipoToKey[tipo];
     if (!key) {
       if (id) warn(`Arquivo: item "${id}" tem Tipo desconhecido ("${f.tipoCelula}") — usar Bug/UX/Tecnica/Feature`);
@@ -137,7 +139,6 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   const fechados = new Set([...allIds].filter(([, o]) => o.includes("arquivo")).map(([id]) => id));
   const porque = (id) =>
     abertos.has(id) ? null : fechados.has(id) ? "esta fechado (vive no backlog-archive.md)" : "nao existe em nenhuma tabela por tipo";
-  // Um bloco sem a coluna ID tem `id: null` em cada linha, e o `ID_LIKE` nao o casa: nao ha ramo a parte para ele.
   for (const b of lido.blocos) {
     for (const l of b.linhas) {
       const p = ID_LIKE.test(l.id) ? porque(l.id) : null;
@@ -153,6 +154,10 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   for (const [id, origens] of allIds) {
     if (origens.length > 1) warn(`ID duplicado "${id}" em: ${origens.join(", ")}`);
   }
+
+  // 3b) As regras que nao sao contagens (#445 PR 2): a Ordem, o "Depende de", o arquivo, os riscados, os Pendentes.
+  //     Todas reprovam, e nenhuma e `derivado`: o `--corrigir` nao lhes toca.
+  for (const msg of regrasDoBacklog(lido, { ACTIVE, ARCHIVE })) warn(msg);
 
   // --- Totais globais ---
   const g = { pendente: 0, "a fazer": 0, concluido: 0, cancelado: 0, total: 0 };
@@ -180,7 +185,9 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   // do Resumo atribuia os numeros a seccao errada e a mensagem apontava para o sitio errado.
   const porNome = new Map();
   for (const { key, resumo } of SECTIONS) porNome.set(norm(resumo ?? key), key);
-  resumoRows.forEach((cells) => {
+  // Com o Historico ilegivel (sem a coluna Tipo ou Estado), os fechados nao se contaram: comparar o Resumo, o Total e
+  // a barra com essas contagens dava avisos falsos sobre contadores que estao certos. A regra da coluna diz o porque.
+  if (historicoLegivel) resumoRows.forEach((cells) => {
     const key = porNome.get(norm(cells[0]));
     if (key === undefined) {
       warn(`${ACTIVE}: linha do Resumo "${cells[0]}" nao corresponde a nenhuma seccao conhecida`);
@@ -207,7 +214,9 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   });
 
   // --- Validar a linha `**Total**` do Resumo contra o agregado ---
-  if (linhaTotal) {
+  if (!historicoLegivel) {
+    // nada: ver acima
+  } else if (linhaTotal) {
     const nums = linhaTotal.slice(1, 6).map((x) => {
       const m = /-?\d+/.exec(x);
       return m ? Number(m[0]) : null;
@@ -232,7 +241,9 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   const expectedPct = countable > 0 ? Math.round((g.concluido / countable) * 100) : 0;
   const expectedFilled = countable > 0 ? Math.round((g.concluido / countable) * 20) : 0;
 
-  if (!progMatch) {
+  if (!historicoLegivel) {
+    // nada: ver acima
+  } else if (!progMatch) {
     if (g.total > 0) warn("Nao encontrei a linha de Progresso Geral no formato esperado.");
   } else {
     // `[...str]` e nao `.length`: glifos fora do BMP (🟩/⬜, que um projeto derivado pode usar)

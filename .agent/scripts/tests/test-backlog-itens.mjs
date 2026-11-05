@@ -9,7 +9,7 @@
  *  2. **O leitor** (os campos que o PR 2 e a vista do #446 vao usar): cada caso com o seu controlo negativo.
  *
  * A fixture tem os casos de borda que o refactor reescreve (Fase 0 v2, M2): um aberto sem ID (conta), uma tabela sem a
- * coluna Esforco (nao se valida), uma secao com duas tabelas, um `#### Sprint`, um bloco sem coluna ID (salta-se), um
+ * coluna Esforco (nao se valida), uma secao com duas tabelas, um `#### Sprint`, uma tabela com Ordem e sem ID (avisa, PR 2), um
  * ID duplicado entre o ativo e o arquivo, um fechado no ativo, um estado e um Tipo desconhecidos, um `Proximo:` para
  * um fechado, e o Resumo e a barra errados.
  */
@@ -75,7 +75,7 @@ const ATIVO_RICO = `# Backlog
 
 | Ordem | Ticket | Descricao |
 |-------|--------|-----------|
-| 1 | UX1 | sem coluna ID: o calcula salta-o |
+| 1 | UX1 | sem coluna ID: avisa (a tabela tem Ordem e nao tem ID) |
 
 #### Sprint 3 — um #### com coluna ID
 
@@ -150,7 +150,8 @@ const ARQUIVO_RICO = `# Arquivo
 const ATIVO_RICO_SOLTO = ATIVO_RICO.replace("# 📚 Tickets Abertos", "## Notas soltas\n\n| ID | x |\n|----|---|\n| Z5 | solto |\n\n# 📚 Tickets Abertos");
 
 // O resultado do `calcula` ANTES do refactor (capturado em `d0d07e9`). Nao se edita a mao: se mudar, e o
-// comportamento que mudou, e isso e o PR 2 (com o seu caso), nao este.
+// comportamento que mudou. O PR 2 do #445 acrescentou UMA linha a cada cenario (a tabela com Ordem e sem ID), prevista
+// na Fase 0 dele antes de implementar; mais nenhuma mudou.
 const CONGELADO = {
   rico: {
     avisos: [
@@ -164,6 +165,7 @@ const CONGELADO = {
     {"msg": "backlog.md: \"Sprint 3 — um #### com coluna ID\" lista \"B8\", que nao existe em nenhuma tabela por tipo", "derivado": false},
     {"msg": "backlog.md: **Proximo:** aponta para \"T9\", que esta fechado (vive no backlog-archive.md)", "derivado": false},
     {"msg": "ID duplicado \"B1\" em: Bugs (ativo), arquivo", "derivado": false},
+    {"msg": "backlog.md: a tabela de \"Sprint 2 — o bloco sem coluna ID\" tem a coluna Ordem e nao tem ID — um bloco precisa das duas", "derivado": false},
     {"msg": "Resumo \"Bugs\": escrito [9,9,9,9,9] != calculado [6,3,1,2,0] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
     {"msg": "Resumo \"UX\": escrito [2,1,1,0,0] != calculado [3,1,1,0,1] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
     {"msg": "Resumo \"Divida Tecnica\": celula 1 nao e um numero (\"?\") — nao validei esta linha", "derivado": false},
@@ -187,6 +189,7 @@ const CONGELADO = {
     {"msg": "backlog.md: \"Sprint 3 — um #### com coluna ID\" lista \"B8\", que nao existe em nenhuma tabela por tipo", "derivado": false},
     {"msg": "backlog.md: **Proximo:** aponta para \"T9\", que esta fechado (vive no backlog-archive.md)", "derivado": false},
     {"msg": "ID duplicado \"B1\" em: Bugs (ativo), arquivo", "derivado": false},
+    {"msg": "backlog.md: a tabela de \"Sprint 2 — o bloco sem coluna ID\" tem a coluna Ordem e nao tem ID — um bloco precisa das duas", "derivado": false},
     {"msg": "Resumo \"Bugs\": escrito [9,9,9,9,9] != calculado [6,3,1,2,0] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
     {"msg": "Resumo \"UX\": escrito [2,1,1,0,0] != calculado [3,1,1,0,1] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
     {"msg": "Resumo \"Divida Tecnica\": celula 1 nao e um numero (\"?\") — nao validei esta linha", "derivado": false},
@@ -205,6 +208,7 @@ const CONGELADO = {
     {"msg": "backlog.md: \"Sprint 1 — o bloco com ID\" lista \"T9\", que nao existe em nenhuma tabela por tipo", "derivado": false},
     {"msg": "backlog.md: \"Sprint 3 — um #### com coluna ID\" lista \"B8\", que nao existe em nenhuma tabela por tipo", "derivado": false},
     {"msg": "backlog.md: **Proximo:** aponta para \"T9\", que nao existe em nenhuma tabela por tipo", "derivado": false},
+    {"msg": "backlog.md: a tabela de \"Sprint 2 — o bloco sem coluna ID\" tem a coluna Ordem e nao tem ID — um bloco precisa das duas", "derivado": false},
     {"msg": "Resumo \"Bugs\": escrito [9,9,9,9,9] != calculado [5,3,1,1,0] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
     {"msg": "Resumo \"Divida Tecnica\": celula 1 nao e um numero (\"?\") — nao validei esta linha", "derivado": false},
     {"msg": "Resumo \"Features\": escrito [1,1,0,0,0] != calculado [2,2,0,0,0] (Total,Pend,AFazer,Concl,Canc)", "derivado": true},
@@ -259,12 +263,13 @@ caso("fechados: os campos do Historico, e as linhas sem ID tambem", () => {
   ];
 });
 
-caso("blocos: o `###` e os `####`, o objetivo, e o bloco sem coluna ID", () => {
-  const [s1, s2, s3] = lido.blocos;
+// Um bloco e uma tabela com `Ordem` E `ID` (#445 PR 2): o "Sprint 2" (`| Ordem | Ticket |`) sai para `semId`, e avisa.
+caso("blocos: o `###` e o `####` com Ordem e ID, o objetivo, e a tabela com Ordem e sem ID em `semId`", () => {
+  const [s1, s3] = lido.blocos;
   return [
-    ...espera(lido.blocos.length === 3, `3 blocos: ${lido.blocos.length}`),
-    ...igual([s1?.titulo, s1?.objetivo, s1?.temId], ["Sprint 1 — o bloco com ID", "fechar os bugs", true], "Sprint 1"),
-    ...igual([s2?.objetivo, s2?.temId, s2?.linhas[0]?.id], [null, false, null], "Sprint 2 (sem coluna ID)"),
+    ...espera(lido.blocos.length === 2, `2 blocos: ${lido.blocos.length}`),
+    ...igual([s1?.titulo, s1?.objetivo], ["Sprint 1 — o bloco com ID", "fechar os bugs"], "Sprint 1"),
+    ...igual(lido.semId, [{ titulo: "Sprint 2 — o bloco sem coluna ID" }], "Sprint 2 (sem coluna ID)"),
     ...igual([s3?.titulo, s3?.linhas[0]?.id], ["Sprint 3 — um #### com coluna ID", "B8"], "Sprint 3"),
     ...igual(s1?.linhas.map((l) => [l.ordem, l.id, l.prioridade]), [["1", "B1", null], ["2", "B9", null], ["3", "T9", null]], "as linhas do Sprint 1"),
   ];
@@ -276,6 +281,11 @@ caso("o objetivo: as formas com enfase, e nao `Objetivos:`", () => {
     ...igual(["> Objetivo: x", "> **Objetivo:** x", "> **Objetivo**: x", "> _Objetivo:_ x"].map(obj), ["x", "x", "x", "x"], "as formas"),
     ...espera(obj("> Objetivos: x") === null, `Objetivos: ${obj("> Objetivos: x")}`),
   ];
+});
+
+caso("o fecho, e a segunda tabela debaixo do mesmo heading (o `(tabela 2)`, sem o objetivo)", () => {
+  const b = leBacklog("### Sprint 9\n> Objetivo: x\n> Fecho: /audit\n\n| Ordem | ID |\n|---|---|\n| 1 | B1 |\n\nentre as duas\n\n| Ordem | ID |\n|---|---|\n| 1 | B2 |\n", "").blocos;
+  return igual(b.map((x) => [x.titulo, x.objetivo, x.fecho, x.linhas[0]?.id]), [["Sprint 9", "x", "/audit", "B1"], ["Sprint 9 (tabela 2)", null, null, "B2"]], "os dois blocos");
 });
 
 caso("a Prioridade: `null` sem a coluna, `\"\"` com a celula vazia, e o valor com ela", () => {
@@ -302,7 +312,7 @@ caso("dependeDe e idsDe: os IDs, o `Bloqueado:` (com enfase, sem motivo, e nao `
 caso("pendentes: a Nota pelo nome; e `null` (com `encontradas.pendentes` falso) sem o heading", () => {
   const sem = leBacklog(ATIVO_RICO.replace("## Pendentes sem Sprint", "## Parqueados"), ARQUIVO_RICO);
   return [
-    ...igual(lido.pendentes, [{ id: "F1", descricao: "uma feature", esforco: "m", esforcoCelula: "M", nota: "precisa de dados" }], "os pendentes"),
+    ...igual(lido.pendentes, [{ id: "F1", riscado: false, idLimpo: "F1", descricao: "uma feature", esforco: "m", esforcoCelula: "M", nota: "precisa de dados" }], "os pendentes"),
     ...igual([sem.pendentes, sem.encontradas.pendentes, lido.encontradas.pendentes], [null, false, true], "a secao renomeada nao e uma secao vazia"),
     ...igual([lido.encontradas.historico, leBacklog(ATIVO_RICO, "# Arquivo\n").encontradas.historico], [true, false], "o Historico"),
   ];
