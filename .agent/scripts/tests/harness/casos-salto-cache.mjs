@@ -6,7 +6,8 @@
  *     repo de merge commits; pelo committer, num repo de squash), em bloco, e a tabela de verdade de cada forma nos
  *     eventos que importam. A suite chama-a dentro da receita do `ci.yml`.
  *   - `problemasDoCache(texto, ciTexto)`: o `cache-sem-maquinaria.yml` (os eventos, o `if:` de job e a sua tabela, o
- *     restore sem `lookup-only`, quem grava cada chave, as chaves iguais as do `ci.yml`, e o mesmo `(deps`).
+ *     restore sem `lookup-only`, quem grava cada chave, as chaves iguais as do `ci.yml`, e as mesmas MARCAS: `(deps`
+ *     e `,deps`, #442).
  *   - `casosDoCache(caso, …)`: os casos do `cache.yml` e os seus controlos.
  * Sairam da suite pelo tamanho (as ~500 linhas). NAO e uma suite nem um modulo descoberto: a suite importa-o e chama
  * cada funcao com o `caso` dela (os contadores sao dela).
@@ -15,7 +16,7 @@ import { avalia, comT80, cortesDosIf, eventos, ifDeJob, normaliza, passosDoExemp
 
 export const IF_MENSAGEM = "github.event_name == 'pull_request' || !github.event.repository.private || !startsWith(github.event.head_commit.message, 'Merge pull request #')";
 export const IF_SQUASH = "github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'";
-export const IF_CACHE = "github.event_name != 'push' || contains(github.event.head_commit.message, '(deps')";
+export const IF_CACHE = "github.event_name != 'push' || contains(github.event.head_commit.message, '(deps') || contains(github.event.head_commit.message, ',deps')";
 
 const E = "github.event_name";
 const P = "github.event.repository.private";
@@ -74,7 +75,7 @@ export function problemasDoCache(texto, ciTexto) {
   else {
     if (i.forma !== "bloco") out.push("o `if:` do job vai em bloco (`if: >-`)");
     if (normaliza(i.valor) !== IF_CACHE) out.push(`o \`if:\` do job nao e \`${IF_CACHE}\`: ${normaliza(i.valor)}`);
-    const casos = [["o schedule", { [E]: "schedule" }, true], ["o workflow_dispatch", { [E]: "workflow_dispatch" }, true], ["um merge de dependencias", { [E]: "push", [M]: "Merge pull request #3 from d/r\n\nchore(deps-dev): bump x" }, true], ["um merge que so sobe a versao", { [E]: "push", [M]: "feat(app): uma coisa (#4)" }, false]];
+    const casos = [["o schedule", { [E]: "schedule" }, true], ["o workflow_dispatch", { [E]: "workflow_dispatch" }, true], ["um merge de dependencias", { [E]: "push", [M]: "Merge pull request #3 from d/r\n\nchore(deps-dev): bump x" }, true], ["um merge com varios scopes", { [E]: "push", [M]: "feat(reader,deps): usa o x (#5)" }, true], ["um merge que so sobe a versao", { [E]: "push", [M]: "feat(app): uma coisa (#4)" }, false]];
     for (const [nome, ctx, quer] of casos) if (avalia(i.valor, ctx) !== quer) out.push(`o \`if:\` do job ${quer ? "salta" : "corre"} em ${nome}`);
   }
   for (const p of passos) {
@@ -91,8 +92,10 @@ export function problemasDoCache(texto, ciTexto) {
   const a = chaves(passos.find((p) => p.id === "deps")?.corpo);
   const b = chaves(ciDeps?.corpo);
   if (a.length !== 4 || JSON.stringify(a) !== JSON.stringify(b)) out.push("as chaves (o `deps_fp`, a `npm_key` e a `nm_key`) divergem das do passo `deps` do `ci-sem-maquinaria.yml`");
-  const marca = passosDoExemplo(ciTexto ?? "").passos.find((p) => p.env?.MARCA !== undefined)?.env.MARCA;
-  if (!marca || !IF_CACHE.includes(`'${marca}'`) || !(i?.valor ?? "").includes(`'${marca}'`)) out.push(`a MARCA do \`ci.yml\` (${marca ?? "em falta"}) nao e o texto do \`contains\` do \`if:\` do \`cache.yml\``);
+  // As MARCAS do `ci.yml` e os `contains` do `if:` do `cache.yml` sao o MESMO conjunto, nos dois sentidos (#442).
+  const marcas = (passosDoExemplo(ciTexto ?? "").passos.find((p) => p.env?.MARCAS !== undefined)?.env.MARCAS ?? "").split(/\s+/).filter(Boolean).sort();
+  const doIf = [...(i?.valor ?? "").matchAll(/contains\([^,]+,\s*'([^']+)'\)/g)].map((m) => m[1]).sort();
+  if (!marcas.length || JSON.stringify(marcas) !== JSON.stringify(doIf)) out.push(`as MARCAS do \`ci.yml\` (${marcas.join(" ") || "em falta"}) nao sao os textos dos \`contains\` do \`if:\` do \`cache.yml\` (${doIf.join(" ") || "nenhum"})`);
   return out;
 }
 
@@ -105,7 +108,7 @@ export function casosDoCache(caso, { texto, ciTexto }) {
   const T80 = comT80(texto);
   caso("cache: o exemplo cumpre a receita (zero problemas)", () => problemasDoCache(texto, ciTexto));
   caso("cache: o bloco OPCIONAL T80 descomentado cumpre a receita", () => (T80 === null ? ["nao encontrei os marcadores CACHE/OPCIONAL T80"] : problemasDoCache(T80, ciTexto)));
-  const IF = "    if: >-\n      github.event_name != 'push' ||\n      contains(github.event.head_commit.message, '(deps')\n";
+  const IF = "    if: >-\n      github.event_name != 'push' ||\n      contains(github.event.head_commit.message, '(deps') ||\n      contains(github.event.head_commit.message, ',deps')\n";
   const MUTACOES = [
     { nome: "sem o `.nvmrc` no `paths:`", de: "paths: [package-lock.json, .nvmrc]", para: "paths: [package-lock.json]", espera: "`.nvmrc` muda" },
     { nome: "sem o `schedule`", de: "  schedule:\n    - cron: \"17 4 * * 1\" # segunda, 04:17 UTC\n", para: "", espera: "push, schedule e workflow_dispatch" },
@@ -118,6 +121,7 @@ export function casosDoCache(caso, { texto, ciTexto }) {
     { nome: "a impressao digital de outro ficheiro", de: 'fp="$(deps_fp < package-lock.json)"', para: 'fp="$(deps_fp < npm-shrinkwrap.json)"', espera: "divergem" },
     { nome: "a chave sem o ABI", de: "-abi$(node -p process.versions.modules)-", para: "-", espera: "divergem" },
     { nome: "outra MARCA no `contains`", de: "'(deps')", para: "'(dependencias')", espera: "nao e" },
+    { nome: "sem o ramo do `,deps` (#442)", de: " ||\n      contains(github.event.head_commit.message, ',deps')", para: "", espera: "salta em um merge com varios scopes" },
     { base: "t80", nome: "T80: sem o save da node_modules", de: "      - name: node_modules (gravar)\n        if: steps.nmcache.outputs.cache-hit != 'true'\n        uses: actions/cache/save@v6\n        with:\n          path: node_modules\n          key: ${{ steps.deps.outputs.nm_key }}\n", para: "", espera: "ninguem a grava" },
   ];
   for (const m of MUTACOES) {
@@ -129,8 +133,13 @@ export function casosDoCache(caso, { texto, ciTexto }) {
     });
   }
   caso("cache: controlo: a MARCA do `ci.yml` diferente", () => {
-    const ci = (ciTexto ?? "").replace('MARCA: "(deps"', 'MARCA: "[deps]"');
-    if (ci === ciTexto) return ["o texto a mutar ja nao esta no `ci-sem-maquinaria.yml`: MARCA"];
-    return problemasDoCache(texto, ci).some((p) => p.includes("MARCA")) ? [] : ["uma MARCA diferente no `ci.yml` passou"];
+    const ci = (ciTexto ?? "").replace('MARCAS: "(deps ,deps"', 'MARCAS: "[deps] ,deps"');
+    if (ci === ciTexto) return ["o texto a mutar ja nao esta no `ci-sem-maquinaria.yml`: MARCAS"];
+    return problemasDoCache(texto, ci).some((p) => p.includes("MARCAS")) ? [] : ["uma MARCA diferente no `ci.yml` passou"];
+  });
+  caso("cache: controlo: uma marca so no `ci.yml` (o `cache.yml` sem ela)", () => {
+    const ci = (ciTexto ?? "").replace('MARCAS: "(deps ,deps"', 'MARCAS: "(deps ,deps +deps"');
+    if (ci === ciTexto) return ["o texto a mutar ja nao esta no `ci-sem-maquinaria.yml`: MARCAS"];
+    return problemasDoCache(texto, ci).some((p) => p.includes("MARCAS")) ? [] : ["uma marca a mais no `ci.yml` passou"];
   });
 }

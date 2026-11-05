@@ -114,8 +114,9 @@ adapta-se o que esta marcado `# ADAPTAR`. O porque de cada escolha esta nos come
   mensagem `Merge pull request #`). So com squash, a VARIANTE (pelo committer `web-flow`, com a descricao do PR
   verificada no PR, e a opcao de squash "Pull request title and description"). Na duvida, a ativa: num squash nao
   salta nada, e perde-se so a poupanca.
-- **Um PR que mude as dependencias (ou o `.nvmrc`) leva `(deps` no titulo** (o `ci.yml` reprova-o sem ele): e por essa mensagem que o
-  `cache.yml` grava a cache depois do merge. Sem `include: scope` no `dependabot.yml`, adaptar a marca nos dois.
+- **Um PR que mude as dependencias (ou o `.nvmrc`) leva `(deps` ou `,deps` no titulo** (`chore(deps):`,
+  `feat(reader,deps):`; o `ci.yml` reprova-o sem uma delas): e por essa mensagem que o `cache.yml` grava a cache depois
+  do merge. Sem `include: scope` no `dependabot.yml`, adaptar as MARCAS nos dois.
 - **O push nao reverifica a app.** Dois PRs verdes contra o mesmo `main` podem parti-lo juntos: atualizar o PR com o
   `main` antes do merge quando outro entrou entretanto.
 - **A cache da `node_modules`** (o bloco OPCIONAL T80) so com as condicoes escritas nele, e depois de medir.

@@ -10,7 +10,9 @@
  *   - o pedido leva o intervalo e os jobs `filter=all` (o `gh` falso recusa sem ele);
  *   - `--passos` e a mediana (do job mais longo de cada run) contra 120 s, com `--app` (so os PRs em que o passo correu) e sem ele (todos, e di-lo);
  *   - as recusas: cada uma pela SUA mensagem, nunca com "COBRADO 0" — sem `gh`/sessao, nao-JSON, mais de 1000 runs,
- *     uma resposta sem a lista ou sem `total_count`, uma lista mais curta do que o `total_count`, sem repo, argumentos.
+ *     uma resposta sem a lista ou sem `total_count`, uma lista mais curta do que o `total_count`, sem repo, argumentos;
+ *   - o `--quota` (#442): so os privados (um publico fora, um repo que ja nao existe DENTRO), so o Linux (os outros
+ *     SKUs listados fora da soma), a projecao no mes corrente, as linhas `QUOTA:`, e as suas recusas (o scope `user`).
  *
  *   node .agent/scripts/tests/test-minutos-ci.mjs
  */
@@ -18,7 +20,7 @@ import { spawnSync } from "child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { cobrado, correuOPasso, ehDoDependabot, mediana, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -77,6 +79,7 @@ const v = mapa[chave] ?? mapa[base.replace(/\\/runs\\/\\d+\\//, "/runs/*/") + "#
 if (/\\/jobs$/.test(base) && new URLSearchParams(q).get("filter") !== "all") { process.stderr.write("HTTP 404: sem filter=all\\n"); process.exit(1); }
 if (v === undefined) { process.stderr.write("HTTP 404: " + chave + "\\n"); process.exit(1); }
 if (v === "FALHA") { process.stderr.write("HTTP 401: Bad credentials\\n"); process.exit(1); }
+if (v === "ERRO500") { process.stderr.write("HTTP 500: Server Error\\n"); process.exit(1); }
 process.stdout.write(v === "NAOJSON" ? "<html>nao</html>" : JSON.stringify(v));
 `;
 function cli(mapa, args, { semGh = false, cwd = null } = {}) {
@@ -211,6 +214,137 @@ for (const [nome, args] of [["nenhum de --run/--desde", []], ["os dois", ["--run
   caso(`recusa: argumentos — ${nome}`, () => {
     const r = cli({}, [...args, "--repo", "o/r"]);
     return [...NAO_ZERO(r), ...espera(/uso:/.test(r.err), `stderr: ${r.err}`), ...espera(r.log === "", "chamou o gh antes de validar os argumentos")];
+  });
+}
+
+// --- O `--quota` (#442): a quota da CONTA ---
+
+// As contas, puras.
+const ITEM = (repo, quantity, sku = "Actions Linux", unitType = "Minutes", dia = 1) => ({ date: `2026-11-${String(dia).padStart(2, "0")}T00:00:00Z`, product: "actions", sku, quantity, unitType, repositoryName: repo });
+caso("quota: so os privados e os desconhecidos contam; o publico e o storage ficam fora", () => {
+  const vis = new Map([["priv", "privado"], ["pub", "publico"], ["foi", "desconhecido"]]);
+  const q = quotaDoMes([ITEM("priv", 300), ITEM("pub", 700), ITEM("foi", 10), ITEM("priv", 0.5, "Actions storage", "GigabyteHours")], vis);
+  return [...espera(q.total === 310 && q.publicos === 700, `total ${q.total}, publicos ${q.publicos}`), ...espera(JSON.stringify(q.desconhecidos) === '["foi"]', `desconhecidos: ${q.desconhecidos}`), ...espera(q.porRepo[0][0] === "priv", "porRepo nao vem do maior para o menor")];
+});
+caso("quota: um outro SKU em minutos fica FORA da soma, listado", () => {
+  const q = quotaDoMes([ITEM("priv", 100), ITEM("priv", 40, "Actions Windows")], new Map([["priv", "privado"]]));
+  return espera(q.total === 100 && q.outros.length === 1 && q.outros[0][1] === 40, `deu ${JSON.stringify(q)}`);
+});
+caso("quota: a projecao, os dias do mes e o nivel", () => [
+  ...espera(diasDoMes(2026, 11) === 30 && diasDoMes(2028, 2) === 29, "dias do mes"),
+  ...espera(projecao(100, 10, 30) === 300 && projecao(0, 0, 30) === null, "projecao"),
+  ...espera(nivelDaQuota(2000, null, 2000) === "esgotada" && nivelDaQuota(1600, null, 2000) === "aviso" && nivelDaQuota(1000, 2100, 2000) === "aviso" && nivelDaQuota(1000, 1500, 2000) === null, "nivel"),
+]);
+
+// A CLI, contra o `gh` falso.
+const U = "/users/eu/settings/billing/usage";
+const HOJE = new Date().toISOString().slice(0, 7);
+const [AH, MH] = HOJE.split("-").map(Number);
+const DIA = (repo, q, dia, sku) => ({ ...ITEM(repo, q, sku), date: `${HOJE}-${String(dia).padStart(2, "0")}T00:00:00Z` });
+const conta = (itens, repos) => ({ "user#1": { login: "eu" }, [`${U}#1`]: { usageItems: itens }, ...Object.fromEntries(Object.entries(repos).map(([r, v]) => [`repos/eu/${r}#1`, v === null ? "ERRO500" : { private: v }])) });
+const QUOTA_OK = conta([DIA("priv", 300, 1), DIA("priv", 200, 10), DIA("pub", 700, 2)], { priv: true, pub: false });
+const NAO_TOTAL = (r) => [...espera(r.status !== 0, `saiu ${r.status}`), ...espera(!/TOTAL/.test(r.out), "imprimiu um total (um zero falso?)")];
+const linhaQuota = (r) => r.out.split("\n").filter((l) => l.startsWith("QUOTA:"));
+
+caso("--quota: a soma so dos privados, por repo e no total, e os publicos numa linha a parte", () => {
+  const r = cli(QUOTA_OK, ["--quota", "--mes", HOJE]);
+  return [...espera(r.status === 0, `saiu ${r.status}: ${r.err}`), ...espera(/priv\s+500 min/.test(r.out) && /TOTAL 500 \/ 2000 min \(25%\)/.test(r.out), `saida: ${r.out}`), ...espera(/publicos \(fora da quota\): 700 min/.test(r.out), "nao separou os publicos"), ...espera(/year=\d+&month=\d+/.test(r.log), `o pedido nao leva o mes: ${r.log}`)];
+});
+caso("--quota: um repo que ja nao existe (404) CONTA, com o aviso; tratado como publico, a soma descia", () => {
+  const r = cli(conta([DIA("priv", 300, 1), DIA("foi", 50, 2)], { priv: true }), ["--quota", "--mes", HOJE]);
+  return espera(r.status === 0 && /foi\s+50 min\s+\(contado como privado: nao o encontrei\)/.test(r.out) && /TOTAL 350 /.test(r.out), `saida: ${r.out} ${r.err}`);
+});
+caso("--quota: um outro SKU em minutos fica fora da soma, listado, e o total diz 'pelo menos'", () => {
+  const r = cli(conta([DIA("priv", 300, 1), DIA("priv", 40, 1, "Actions Windows")], { priv: true }), ["--quota", "--mes", HOJE]);
+  return espera(r.status === 0 && /FORA DA SOMA: Actions Windows · priv: 40 min/.test(r.out) && /TOTAL pelo menos 300 \//.test(r.out), `saida: ${r.out}`);
+});
+// A projecao usa o dia de HOJE (UTC) no mes corrente, e so a partir do dia 3: o caso calcula o que espera com o mesmo
+// relogio, e nos dias 1 e 2 espera nenhuma projecao.
+const DIA_HOJE = new Date().getUTCDate();
+caso("--quota: a projecao no mes corrente (o ritmo ate hoje, a partir do dia 3) e nenhuma num mes passado", () => {
+  const dia = Math.max(10, DIA_HOJE);
+  const esperada = Math.round((500 / dia) * diasDoMes(AH, MH));
+  const agora = cli(QUOTA_OK, ["--quota", "--mes", HOJE]);
+  const passado = cli(conta([ITEM("priv", 500)], { priv: true }), ["--quota", "--mes", "2020-01"]);
+  const linha = DIA_HOJE >= 3 ? new RegExp(`projecao ao fim do mes \\(o ritmo ate ao dia ${dia}\\): ~${esperada} min`).test(agora.out) : !/projecao/.test(agora.out);
+  return [...espera(linha, `agora (dia ${DIA_HOJE}): ${agora.out}`), ...espera(passado.status === 0 && !/projecao/.test(passado.out), `passado: ${passado.out}`)];
+});
+caso("--quota: as linhas QUOTA: a 85% AVISO, a 100% ESGOTADA, a projecao acima do limite AVISO; a 25%, nenhuma", () => {
+  const um = (q, dia, mesArg = "2020-01") => cli(conta([{ ...ITEM("priv", q), date: `${mesArg}-${String(dia).padStart(2, "0")}T00:00:00Z` }], { priv: true }), ["--quota", "--mes", mesArg]);
+  const a85 = linhaQuota(um(1700, 1));
+  const a100 = linhaQuota(um(2000, 1));
+  const proj = linhaQuota(cli(conta([DIA("priv", 1000, 1)], { priv: true }), ["--quota", "--mes", HOJE]));
+  const baixo = linhaQuota(um(500, 1));
+  return [
+    ...espera(a85.length === 1 && /^QUOTA: AVISO — 85% de 2000 min$/.test(a85[0]), `85%: ${a85}`),
+    ...espera(a100.length === 1 && /^QUOTA: ESGOTADA — 2000 de 2000 min/.test(a100[0]), `100%: ${a100}`),
+    ...espera(DIA_HOJE < 3 ? proj.length === 0 : proj.length === 1 && /^QUOTA: AVISO — 50% de 2000 min, e a projecao \(~\d+\) passa o limite$/.test(proj[0]), `projecao (dia ${DIA_HOJE}): ${proj}`),
+    ...espera(baixo.length === 0, `a 25% saiu uma linha QUOTA: ${baixo}`),
+  ];
+});
+caso("--quota: a percentagem arredonda para BAIXO (1599 -> 79%, sem aviso; 1990 -> 99%, AVISO e nao ESGOTADA)", () => {
+  const um = (q) => cli(conta([{ ...ITEM("priv", q), date: "2020-01-01T00:00:00Z" }], { priv: true }), ["--quota", "--mes", "2020-01"]);
+  const a = um(1599);
+  const b = um(1990);
+  return [...espera(/\(79%\)/.test(a.out) && linhaQuota(a).length === 0, `1599: ${a.out}`), ...espera(/\(99%\)/.test(b.out) && /^QUOTA: AVISO — 99%/.test(linhaQuota(b)[0] ?? ""), `1990: ${b.out}`)];
+});
+caso("--quota: o --limite (3000 no Pro) muda a percentagem", () => {
+  const r = cli(conta([ITEM("priv", 1500)], { priv: true }), ["--quota", "--mes", "2020-01", "--limite", "3000"]);
+  return espera(r.status === 0 && /TOTAL 1500 \/ 3000 min \(50%\)/.test(r.out) && linhaQuota(r).length === 0, `saida: ${r.out}`);
+});
+caso("--quota: um mes sem uso diz 'nenhum minuto registado' e sai 0", () => {
+  const r = cli(conta([], {}), ["--quota", "--mes", "2020-01"]);
+  return espera(r.status === 0 && /nenhum minuto registado/.test(r.out) && /TOTAL 0 \/ 2000/.test(r.out), `saida: ${r.out} ${r.err}`);
+});
+// As recusas do --quota: cada uma pela sua mensagem, e sem total.
+caso("recusa --quota: sem o scope `user` (404 na faturacao) diz o comando", () => {
+  const r = cli({ "user#1": { login: "eu" } }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/gh auth refresh -h github\.com -s user/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: a faturacao com outro erro (500)", () => {
+  const r = cli({ "user#1": { login: "eu" }, [`${U}#1`]: "ERRO500" }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/o gh falhou na faturacao/.test(r.err) && /HTTP 500/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: o `gh api user` sem login", () => {
+  const r = cli({ "user#1": { nome: "x" } }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/nao devolveu o `login`/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: o `gh api user` a falhar", () => {
+  const r = cli({ "user#1": "FALHA" }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/o gh falhou em user/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: uma faturacao sem `usageItems`", () => {
+  const r = cli({ "user#1": { login: "eu" }, [`${U}#1`]: { outra: [] } }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/nao tem a lista `usageItems`/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: a faturacao que nao e JSON", () => {
+  const r = cli({ "user#1": { login: "eu" }, [`${U}#1`]: "NAOJSON" }, ["--quota"]);
+  return [...NAO_TOTAL(r), ...espera(/nao tem a lista `usageItems`/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: a visibilidade de um repo com outro erro (500)", () => {
+  const r = cli(conta([DIA("priv", 300, 1)], { priv: null }), ["--quota", "--mes", HOJE]);
+  return [...NAO_TOTAL(r), ...espera(/nao consegui ler a visibilidade de eu\/priv/.test(r.err), `stderr: ${r.err}`)];
+});
+caso("recusa --quota: um repo que nao diz se e privado", () => {
+  const r = cli({ ...conta([DIA("priv", 300, 1)], {}), "repos/eu/priv#1": { name: "priv" } }, ["--quota", "--mes", HOJE]);
+  return [...NAO_TOTAL(r), ...espera(/nao diz se e privado/.test(r.err), `stderr: ${r.err}`)];
+});
+for (const [nome, args, frase] of [
+  ["o --quota com o --desde", ["--quota", "--desde", "2026-11-01"], "nao se junta"],
+  ["o --quota com o --run", ["--quota", "--run", "7"], "nao se junta"],
+  ["o --quota com o --repo", ["--quota", "--repo", "o/r"], "nao se junta"],
+  ["o --quota com o --ate", ["--quota", "--ate", "2026-11-05"], "nao se junta"],
+  ["o --quota com o --app", ["--quota", "--app", "TypeScript"], "nao se junta"],
+  ["o --quota com o --passos", ["--quota", "--passos"], "nao se junta"],
+  ["um --mes no futuro (um zero que nao mediu)", ["--quota", "--mes", "2999-01"], "esta no futuro"],
+  ["o --mes sem o --quota", ["--desde", "2026-11-01", "--mes", "2026-11"], "so com o `--quota`"],
+  ["o --limite sem o --quota", ["--desde", "2026-11-01", "--limite", "3000"], "so com o `--quota`"],
+  ["um --mes mal formado", ["--quota", "--mes", "2026-13"], "--mes quer AAAA-MM"],
+  ["um --limite que nao e um inteiro", ["--quota", "--limite", "2k"], "--limite quer um inteiro"],
+]) {
+  caso(`recusa --quota: argumentos — ${nome}`, () => {
+    const r = cli({}, args);
+    return [...NAO_TOTAL(r), ...espera(r.err.includes(frase), `stderr: ${r.err}`), ...espera(r.log === "", "chamou o gh antes de validar os argumentos")];
   });
 }
 

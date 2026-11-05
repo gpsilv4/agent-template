@@ -7,13 +7,15 @@
 # zero (o `Install` de 16 s para 71 s, medido num derivado).
 #
 # Corre:
-# - num push ao `main` que toque no `package-lock.json` ou no `.nvmrc`, mas so quando a mensagem tem `(deps`. Cada PR
+# - num push ao `main` que toque no `package-lock.json` ou no `.nvmrc`, mas so quando a mensagem tem `(deps` ou `,deps`
+#   (um titulo com varios scopes, `feat(reader,deps):`, #442). Cada PR
 #   sobe a versao da app, logo o lockfile muda em todos os merges, e sem o filtro este job correria (1 min) em cada um.
-#   O `ci.yml` do exemplo reprova um PR que mude as dependencias sem `(deps` no titulo, e o titulo vai na mensagem.
+#   O `ci.yml` do exemplo reprova um PR que mude as dependencias sem uma das marcas no titulo, e o titulo vai na
+#   mensagem. Falso positivo aceite: o `contains` le a mensagem inteira, o corpo incluido.
 # - toda a semana (`schedule`), a RESTAURAR (sem `lookup-only`): restaurar conta como uso, e e isso que impede a remocao
 #   aos 7 dias. Se a chave faltar, instala e grava.
 # - a mao (`workflow_dispatch`).
-# Riscos, aceites: num repo de rebase, o `head_commit` e o ultimo commit do PR, e pode nao ter `(deps`; um `.nvmrc` com
+# Riscos, aceites: num repo de rebase, o `head_commit` e o ultimo commit do PR, e pode nao ter a marca; um `.nvmrc` com
 # `lts/*` muda o ABI sem mudar o texto. Nos dois, a cache nova so nasce no `schedule` seguinte.
 
 name: Cache
@@ -35,7 +37,8 @@ jobs:
     # Em BLOCO: o `if:` cita texto, e numa linha simples um ` #` cortava-o (o mesmo do `ci-sem-maquinaria.yml`).
     if: >-
       github.event_name != 'push' ||
-      contains(github.event.head_commit.message, '(deps')
+      contains(github.event.head_commit.message, '(deps') ||
+      contains(github.event.head_commit.message, ',deps')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

@@ -16,19 +16,28 @@
  * sem ele conta todos os PRs, os de docs incluidos, e diz-o. Os runs do proprio Dependabot (`dynamic`) PAGAM-SE num
  * privado (medido contra a faturacao, 3 nov 2026: a soma so bateu com eles): entram na soma, contados a parte. Um run
  * ainda em curso fica FORA da soma e da mediana, listado (os jobs por acabar contariam 0). O total da CONTA (todos os
- * repos) nao e isto: ver `src/docs/upgrade-derivados-privados.md` §6.
+ * repos privados) e o `--quota` (#442), abaixo.
+ *
+ * `--quota [--mes AAAA-MM] [--limite 2000]` (#442): os minutos Linux do mes dos repos PRIVADOS da conta autenticada,
+ * contra a quota (2000 no Free; `--limite 3000` no Pro), por repo e no total, com a projecao ao fim do mes (so no mes
+ * corrente) e uma linha fixa `QUOTA: AVISO` (>= 80%, ou a projecao acima do limite) ou `QUOTA: ESGOTADA` (>= 100%).
+ * Sai 0: e uma medicao, e o `/deploy` procura a linha. A faturacao traz tambem os repos publicos (que nao gastam a
+ * quota) e os montantes nao os distinguem (medido a 5 nov 2026): a visibilidade de cada repo pergunta-se, um a um,
+ * e um repo que ja nao existe conta (antes a mais do que esconder minutos). Precisa do scope `user` no `gh`; sem ele,
+ * recusa e diz o comando.
  *
  * Pagina os runs e os jobs (100 por pagina, sem repetidos). Falha ALTO, nunca com "0 min": sem `gh`, sem sessao, um
  * erro da API, uma resposta sem a lista ou sem `total_count`, mais de 1000 runs no intervalo (o limite de uma pesquisa
  * por data: estreitar), ou menos runs/jobs lidos do que a API diz haver. Um zero falso e pior do que nenhum numero.
  */
 import { execFileSync } from "child_process";
-import { cobrado, correuOPasso, ehDoDependabot, mediana, passosDosJobs, resumoDosJobs } from "./lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, projecao, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
 import { repoDoOrigin } from "./lib/marcas-yaml.mjs";
 
 const POR_PAGINA = 100;
 const LIMITE_DA_PESQUISA = 1000;
 const LINHA_DOS_120 = 120;
+const QUOTA_FREE = 2000;
 
 function fatal(msg) {
   console.error(`minutos-ci: ${msg}`);
@@ -42,25 +51,36 @@ const erros = [];
 for (let i = 0; i < ARGS.length; i++) {
   const a = ARGS[i];
   if (a === "--passos") opt.passos = true;
-  else if (["--run", "--desde", "--ate", "--app", "--repo"].includes(a) && ARGS[i + 1] !== undefined) opt[a.slice(2)] = ARGS[++i];
+  else if (a === "--quota") opt.quota = true;
+  else if (["--run", "--desde", "--ate", "--app", "--repo", "--mes", "--limite"].includes(a) && ARGS[i + 1] !== undefined) opt[a.slice(2)] = ARGS[++i];
   else erros.push(`argumento desconhecido ou sem valor: ${a}`);
 }
-if (!opt.run === !opt.desde) erros.push("da exatamente um de `--run <id>` ou `--desde AAAA-MM-DD`");
+if (opt.quota && (opt.run || opt.desde || opt.repo || opt.ate || opt.app || opt.passos)) erros.push("o `--quota` e da CONTA: nao se junta com `--run`, `--desde`, `--ate`, `--app`, `--passos` nem `--repo`");
+if (!opt.quota && (opt.mes || opt.limite)) erros.push("o `--mes` e o `--limite` so com o `--quota`");
+if (opt.mes && !/^\d{4}-(0[1-9]|1[0-2])$/.test(opt.mes)) erros.push(`--mes quer AAAA-MM (deu ${opt.mes})`);
+// Um mes no futuro nao tem faturacao: a API da uma lista vazia, e o TOTAL 0 seria um zero que nao mediu nada.
+if (opt.mes && opt.mes > new Date().toISOString().slice(0, 7)) erros.push(`--mes ${opt.mes} esta no futuro (em UTC): nao ha faturacao para medir`);
+if (opt.limite && !/^[1-9]\d*$/.test(opt.limite)) erros.push(`--limite quer um inteiro positivo (deu ${opt.limite})`);
+if (!opt.quota && !opt.run === !opt.desde) erros.push("da exatamente um de `--run <id>` ou `--desde AAAA-MM-DD` (ou o `--quota`)");
 for (const k of ["desde", "ate"]) if (opt[k] && !/^\d{4}-\d{2}-\d{2}$/.test(opt[k])) erros.push(`--${k} quer AAAA-MM-DD (deu ${opt[k]})`);
 if (opt.run && !/^\d+$/.test(opt.run)) erros.push(`--run quer o id numerico de um run (deu ${opt.run})`);
-if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo]`);
+if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo] | --quota [--mes AAAA-MM] [--limite ${QUOTA_FREE}]`);
+
+/** Um pedido a API pelo `gh`: `{ saida }`, ou `{ erro }` com o que o `gh` disse (quem chama decide a recusa). */
+function ghApi(caminho) {
+  try {
+    return { saida: execFileSync("gh", ["api", caminho], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] }) };
+  } catch (err) {
+    return { erro: err instanceof Error && "stderr" in err ? String(err.stderr).trim() : err instanceof Error ? err.message : String(err) };
+  }
+}
 
 /** Um pedido a API pelo `gh`, ja em JSON. */
 function api(caminho) {
-  let saida;
+  const r = ghApi(caminho);
+  if (r.erro !== undefined) return fatal(`o gh falhou em ${caminho} (sem gh, sem sessao, ou um erro da API): ${r.erro || "sem detalhe"}`);
   try {
-    saida = execFileSync("gh", ["api", caminho], { encoding: "utf8", maxBuffer: 1 << 28, stdio: ["ignore", "pipe", "pipe"] });
-  } catch (err) {
-    const det = err instanceof Error && "stderr" in err ? String(err.stderr).trim() : err instanceof Error ? err.message : String(err);
-    return fatal(`o gh falhou em ${caminho} (sem gh, sem sessao, ou um erro da API): ${det || "sem detalhe"}`);
-  }
-  try {
-    return JSON.parse(saida);
+    return JSON.parse(r.saida);
   } catch {
     return fatal(`o gh devolveu uma resposta que nao e JSON em ${caminho}`);
   }
@@ -85,6 +105,11 @@ function paginado(base, chave, oQue, limite = null) {
   const itens = [...porId.values()];
   if (itens.length < Math.min(total, LIMITE_DA_PESQUISA)) fatal(`li ${itens.length} ${oQue} e a API diz ${total}: a lista vinha cortada`);
   return { itens, total };
+}
+
+if (opt.quota) {
+  quota();
+  process.exit(0);
 }
 
 let repo = opt.repo ?? null;
@@ -141,4 +166,58 @@ if (workflows.length > 1) console.log(`  (mistura ${workflows.length} workflows:
 else {
   const acima = daApp.filter((l) => l.maisLongo > LINHA_DOS_120).length;
   console.log(`mediana ${qual}, do job mais longo de cada run: ${Math.round(med)}s em ${daApp.length} run(s) — ${acima} acima dos ${LINHA_DOS_120}s (um job de ${LINHA_DOS_120 + 1}s ou mais paga ${cobrado(LINHA_DOS_120 + 1)} min)`);
+}
+
+// --- A quota da CONTA (#442) ---
+function quota() {
+  const login = api("user")?.login;
+  if (typeof login !== "string" || !login) fatal("o `gh api user` nao devolveu o `login`: nao sei de quem e a quota");
+  const [ano, mes] = (opt.mes ?? new Date().toISOString().slice(0, 7)).split("-").map(Number);
+  const limite = Number(opt.limite ?? QUOTA_FREE);
+  const caminho = `/users/${login}/settings/billing/usage?year=${ano}&month=${mes}`;
+  const u = ghApi(caminho);
+  // Sem o scope `user`, a API da 404 (ou 403): e o caso de quase todas as sessoes do `gh`, e diz-se como resolver.
+  if (u.erro !== undefined && /HTTP 40[34]/.test(u.erro)) fatal(`sem acesso a faturacao da conta (${u.erro.split("\n")[0]}): o gh precisa do scope \`user\` — \`gh auth refresh -h github.com -s user\``);
+  if (u.erro !== undefined) fatal(`o gh falhou na faturacao (${caminho}): ${u.erro || "sem detalhe"}`);
+  let dados = null;
+  try {
+    dados = JSON.parse(u.saida);
+  } catch {
+    dados = null;
+  }
+  if (!Array.isArray(dados?.usageItems)) fatal(`a resposta da faturacao (${caminho}) nao tem a lista \`usageItems\`: nao e a faturacao que pedi`);
+  // A visibilidade de cada repo com minutos, um a um: uma lista dos privados corta (o `gh repo list` para nos 30) e
+  // perde um repo apagado ou renomeado a meio do mes. Um renomeado responde com o nome novo; um 404 fica desconhecido.
+  const visibilidade = new Map();
+  for (const nome of new Set(dados.usageItems.filter((i) => i.unitType === "Minutes").map((i) => i.repositoryName))) {
+    const r = nome ? ghApi(`repos/${login}/${nome}`) : { erro: "HTTP 404: sem nome de repo" };
+    if (r.erro !== undefined && !/HTTP 404/.test(r.erro)) fatal(`nao consegui ler a visibilidade de ${login}/${nome}: ${r.erro || "sem detalhe"}`);
+    let priv;
+    try {
+      priv = r.erro === undefined ? JSON.parse(r.saida)?.private : "desconhecido";
+    } catch {
+      priv = undefined;
+    }
+    if (priv === undefined || priv === null) fatal(`a resposta de repos/${login}/${nome} nao diz se e privado (\`private\`)`);
+    visibilidade.set(nome, priv === "desconhecido" ? "desconhecido" : priv ? "privado" : "publico");
+  }
+  const q = quotaDoMes(dados.usageItems, visibilidade);
+  const mesCorrente = `${ano}-${String(mes).padStart(2, "0")}` === new Date().toISOString().slice(0, 7);
+  // O ritmo ate HOJE (e nao ate a ultima entrada, que pode estar dias atras), e so a partir do dia 3: os primeiros dias
+  // sao ruido, e 70 min no dia 1 projetavam 2100 (um falso AVISO no /deploy).
+  const hoje = new Date().getUTCDate();
+  const proj = mesCorrente && hoje >= 3 ? projecao(q.total, Math.max(q.ultimoDia, hoje), diasDoMes(ano, mes)) : null;
+  const m = (x) => Math.round(x);
+  console.log(`quota de ${login}, ${ano}-${String(mes).padStart(2, "0")}: so os repos PRIVADOS gastam a quota (Linux; os publicos nao contam)`);
+  if (!dados.usageItems.some((i) => i.unitType === "Minutes")) console.log("  nenhum minuto registado neste mes");
+  for (const [r, min] of q.porRepo) console.log(`  ${String(r).padEnd(32)} ${String(m(min)).padStart(6)} min${q.desconhecidos.includes(r) ? "  (contado como privado: nao o encontrei)" : ""}`);
+  if (q.publicos > 0) console.log(`  publicos (fora da quota): ${m(q.publicos)} min`);
+  for (const [o, min] of q.outros) console.log(`  FORA DA SOMA: ${o}: ${m(min)} min (outro SO ou runner: o multiplicador do Free nao esta confirmado sobre a faturacao)`);
+  // Para baixo: 1599 de 2000 nao e "80%" sem AVISO, e 1990 nao e "100%" sem ESGOTADA.
+  const pct = Math.floor((q.total / limite) * 100);
+  console.log(`\nTOTAL ${q.outros.length ? "pelo menos " : ""}${m(q.total)} / ${limite} min (${pct}%)`);
+  if (proj !== null) console.log(`projecao ao fim do mes (o ritmo ate ao dia ${Math.max(q.ultimoDia, hoje)}): ~${m(proj)} min`);
+  const nivel = nivelDaQuota(q.total, proj, limite);
+  if (nivel === "esgotada") console.log(`QUOTA: ESGOTADA — ${m(q.total)} de ${limite} min: com o limite de gastos a 0, o CI para ate ao dia 1 (src/docs/upgrade-derivados-privados.md §6)`);
+  if (nivel === "aviso") console.log(`QUOTA: AVISO — ${pct}% de ${limite} min${proj !== null && proj > limite ? `, e a projecao (~${m(proj)}) passa o limite` : ""}`);
 }

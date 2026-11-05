@@ -84,7 +84,7 @@ function problemas(texto) {
   }
   out.push(...problemasDoSalto(jobs[0]));
   // O `(deps` no titulo quando as dependencias mudam (#439): o `cache.yml` so grava com ele na mensagem do merge.
-  const marca = passos.find((p) => p.env.MARCA !== undefined);
+  const marca = passos.find((p) => p.env.MARCAS !== undefined);
   if (!marca) out.push("falta o passo que exige `(deps` no titulo quando as dependencias mudam (o `cache.yml` le-o)");
   else {
     if (!conjuntos(marca.if ?? "").includes("github.event_name == 'pull_request'")) out.push("o passo do `(deps` so corre num PR");
@@ -441,7 +441,7 @@ const LOCK = (versao, extra = {}) => `${JSON.stringify({ name: "a", version: ver
 function titulo(base, muda, tit) {
   const passos = passosDoExemplo(base).passos;
   const deps = passos.find((p) => p.id === "deps");
-  const passo = passos.find((p) => p.env.MARCA !== undefined);
+  const passo = passos.find((p) => p.env.MARCAS !== undefined);
   if (!deps || !passo) return "sem os passos";
   return comRepo((raiz) => {
     const dir = repoDePR(raiz, muda, (d) => {
@@ -462,6 +462,8 @@ const CASOS_DEPS = [
   ["uma dependencia nova sem `(deps` reprova", texto, DEP, "feat(app): usa o x", "reprova"],
   ["com `chore(deps):` passa", texto, DEP, "chore(deps): bump x", "passa"],
   ["com `chore(deps-dev):` passa (o Dependabot)", texto, DEP, "chore(deps-dev): bump x", "passa"],
+  ["com varios scopes, `feat(reader,deps):` passa (#442)", texto, DEP, "feat(reader,deps): usa o x", "passa"],
+  ["controlo: sem a marca `,deps`, o titulo com varios scopes reprovava", texto.replace('MARCAS: "(deps ,deps"', 'MARCAS: "(deps"'), DEP, "feat(reader,deps): usa o x", "reprova"],
   ["so a versao subida passa sem `(deps`", texto, (d) => writeFileSync(join(d, "package-lock.json"), LOCK("1.1.0")), "feat(app): uma coisa", "passa"],
   ["o `.nvmrc` mudado sem `(deps` reprova", texto, (d) => writeFileSync(join(d, ".nvmrc"), "24\n"), "chore(node): 24", "reprova"],
   ["controlo: o `if:` sem o `nvmrc_changed` deixava o `.nvmrc` passar", texto.replace(" || steps.deps.outputs.nvmrc_changed == 'true')", ")"), (d) => writeFileSync(join(d, ".nvmrc"), "24\n"), "chore(node): 24", "passa"],
