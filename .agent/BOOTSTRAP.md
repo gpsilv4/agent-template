@@ -309,7 +309,7 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
     → Adaptar `.github/workflows/` com triggers e targets do projeto
 
 16. **Repo publico ou privado (conta pessoal ou organizacao)? Branch protection?** (require status checks, require reviews, etc.)
-    → Configurar no GitHub Settings > Branches > Branch protection rules. Num privado de conta pessoal gratuita grava-se mas **nao e imposta** (ver `src/docs/github-security.md`); a visibilidade decide tambem o que o §2.7 manda fazer ao `SECURITY.md`
+    → Configurar no GitHub Settings > Branches > Branch protection rules. Num privado de conta pessoal gratuita grava-se mas **nao e imposta** (ver `src/docs/github-security.md`); a visibilidade decide tambem o que o §2.7 manda fazer ao `SECURITY.md` e ao `dependabot.yml`. Num **privado**, cada minuto de CI conta para a quota da CONTA (2000 min/mes no Free, somada por todos os privados): ler o `src/docs/upgrade-derivados-privados.md` §6 (#441)
 
 17. **Email de seguranca** (para disclosure de vulnerabilidades)
     → Substitui `{{SECURITY_EMAIL}}` em `SECURITY.md`
@@ -591,7 +591,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.github/workflows/e2e.yml`**: Descomentar PR trigger se E2E deve rodar automaticamente em PRs; adicionar env vars de teste como GitHub Secrets
 - **`.github/pull_request_template.md`**: Verificar que checklist reflete o processo do projeto (alinhar com `/review`)
 - **`.github/ISSUE_TEMPLATE/`**: Adaptar templates se backlog tem estrutura ou campos diferentes
-- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario. **Criar as labels no repo** — o Dependabot aplica labels existentes, **nao as cria**, e abre PRs sem label nenhuma se faltarem (falha silenciosa): `gh label create dependencies -c 0366d6`, `gh label create ci -c 1d76db`, `gh label create automerge -c fbca04`
+- **`.github/dependabot.yml`**: Ajustar schedule e labels se necessario. Num repo **privado**, substitui-lo pelo `src/docs/exemplos/dependabot-privado.yml` (mensal, `rebase-strategy: disabled`; o porque esta no cabecalho dele, #440). **Criar as labels no repo** — o Dependabot aplica labels existentes, **nao as cria**, e abre PRs sem label nenhuma se faltarem (falha silenciosa): `gh label create dependencies -c 0366d6`, `gh label create ci -c 1d76db`, `gh label create automerge -c fbca04`
 - **`.github/workflows/dependabot-auto-merge.yml`**: opt-in (desligado). Liga-se descomentando a label `automerge` no ecosystem escolhido em `.github/dependabot.yml` — so o fazer se o projeto tiver branch protection em `main` com required status checks (ver cabecalho — atencao a repos privados no plano free); senao, deixar como esta ou remover
 - **`.github/CODEOWNERS`**: Substituir `{{GITHUB_OWNER}}` pelo username/team real (senao o autor do template fica code-owner do projeto)
 - **`README.md`**: **Substituir por completo** pelo README do projeto (nome, descricao, stack, setup, scripts). NAO deixar a capa do template ("# Agent Template") nem o badge de CI a apontar para o repo do template

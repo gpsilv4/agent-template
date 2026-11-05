@@ -37,10 +37,11 @@ O audit do CI do template (`npm audit --audit-level=high`) cobre dev e producao,
 - **Sem nenhuma versao compativel** (a correcao so existe numa major que as ferramentas nao aceitam): um ticket
   pendente no backlog, SEM `overrides` (forcar uma versao que a ferramenta nao pede parte-a em silencio). Medido: o job
   de seguranca do Dependabot falhou 3 vezes num dia a tentar.
-- **Opcional, num privado:** o rebase automatico do Dependabot corre o CI do PR dele a cada merge no `main` (medido: 4
-  runs, 17 min, num dia, para um PR). `rebase-strategy: disabled` no `dependabot.yml` para isso; a troca e que os PRs
-  dele ficam desatualizados em silencio, e um PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge).
-  O template e publico, nao paga, e o default dele nao muda.
+- **Por omissao, num privado (#440):** o `src/docs/exemplos/dependabot-privado.yml` (mensal, `rebase-strategy:
+  disabled`). O rebase automatico do Dependabot corre o CI do PR dele a cada merge no `main` (medido: 4 runs, 17 min,
+  num dia, para um PR; 113 min em outubro, num derivado). A troca: os PRs dele ficam desatualizados em silencio, e um
+  PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge). O template e publico, nao paga, e o dele
+  fica semanal.
 
 ## 5. Publicar um texto escrito num ficheiro
 
@@ -50,7 +51,16 @@ O hook `guard-textos-publicos` le o texto antes de o comando correr:
 - Criar o ficheiro e publica-lo **no mesmo comando** e recusado: o hook le o ficheiro antes de ele existir. Escrever
   primeiro (a ferramenta de edicao), publicar num comando a parte.
 
-## 6. Os minutos: medir, e tres regras para os manter
+## 6. Os minutos: medir, e quatro regras para os manter
+
+**Quando a quota acaba** (medido num derivado, a 20 out 2026): o CI para ate ao dia 1. Os jobs falham em 2 s com a
+anotacao "The job was not started because recent account payments have failed or your spending limit needs to be
+increased", e com o limite de gastos a 0 nada se cobra. A quota e da CONTA: cada derivado privado novo gasta da mesma,
+e um repo publico nao conta. **A receita, para nao la chegar** (#441):
+- o CI de um job (`src/docs/exemplos/ci-sem-maquinaria.yml`), que salta o push do merge, e o seu par
+  `cache-sem-maquinaria.yml`, que grava a cache (o porque de cada um esta no `src/docs/upgrade-parcial.md` §4);
+- o Dependabot mensal e sem rebase (`src/docs/exemplos/dependabot-privado.yml`, §4 acima);
+- medir antes e depois de cada mudanca (abaixo), e as quatro regras do fim desta seccao.
 
 Os minutos cobrados sao a soma dos jobs, cada um arredondado ao minuto acima: um job de 8 s paga 1 min, e um de 121 s
 paga 3. Ha dois numeros, e respondem a perguntas diferentes:
@@ -98,8 +108,8 @@ desse PR nunca; um PR cujo ultimo commit diga `[skip ci]` nao corre, e entra sem
 variante, um committer) forjada num push direto salta, e na variante um commit pela UI web no `main` salta sem
 gitleaks; num repo de rebase, ou com um `.nvmrc` de `lts/*`, a cache nova so nasce no `schedule`.
 
-Tres regras que um derivado privado copia para as suas `process-rules` (o template nao as impoe: num repo publico nao
-pagam nada). Medidas num derivado, a 1 e 2 nov:
+Quatro regras que um derivado privado copia para as suas `process-rules` (o template nao as impoe: num repo publico
+nao pagam nada). Medidas num derivado, a 1, 2 e 4 nov:
 - **Iterar no localhost.** Enquanto quem pediu testa e pede ajustes, o agente corrige e verifica localmente (tsc,
   lint, testes, guards), sem push nem PR. O push e o PR so com o ticket fechado, e o push corre antes as mesmas
   verificacoes que o CI correria, para o PR passar a primeira. Um push para um **Preview** so quando o teste pede um
@@ -113,5 +123,8 @@ pagam nada). Medidas num derivado, a 1 e 2 nov:
   mesmo job: um job de 61-120 s paga 2 min, um de 121 s paga 3. O caso medido: o `Install` subiu de 16 s para 71 s
   porque o push do `main` nao instalava e nunca guardava a cache do npm (e a chave mudava a cada PR, com a versao da
   app no lockfile); a correcao (a impressao digital das dependencias sem a versao, gravada so no `main` quando falta:
-  entao pelo push do merge, hoje pelo `cache.yml`, #439) devolveu-o a 16 s e o PR a 2 min. Depois, o build sem repetir o tsc e a `node_modules` em cache levaram a mediana a
-  70 s.
+  entao pelo push do merge, hoje pelo `cache.yml`, #439) devolveu-o a 16 s e o PR a 2 min. Depois, o build sem
+  repetir o tsc e a `node_modules` em cache levaram a mediana a 70 s.
+- **Tickets `S` do mesmo bloco num so PR** (#441): cada PR custa ~3 min fixos (o job do PR, e o push do merge quando
+  ainda corre), seja qual for o tamanho. Cada ticket continua com a sua Fase 0, o seu relatorio e o seu commit, cada um
+  aprovado; o PR junta os commits. Com squash, o corpo diz `Closes #a` e `Closes #b`, senao os issues nao fecham.

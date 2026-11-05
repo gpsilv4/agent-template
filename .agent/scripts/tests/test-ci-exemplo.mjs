@@ -14,7 +14,8 @@
  *   4. o SALTO do push do merge num privado (#439): o `if:` de job em bloco, numa das duas formas (pela mensagem, a
  *      ativa; pelo committer, a VARIANTE squash), com a tabela de verdade de cada uma; o ` #` que corta um `if:`
  *      numa linha simples; a descricao do PR (so na variante) e o `(deps` no titulo, com o shell corrido;
- *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`).
+ *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`);
+ *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template (`harness/casos-dependabot-exemplo.mjs`).
  * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma. Os leitores
  * vivem em `harness/expressoes-ci.mjs`.
  *
@@ -31,6 +32,7 @@ import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { avalia, comSquash, comT80, conjuntos, cortesDosIf, depoisDeFalha, eventos, passosDoExemplo, problemasDeSaidas, semExteriores } from "./harness/expressoes-ci.mjs";
 import { casosDoCache, IF_SQUASH, problemasDoSalto, tabelaDoSalto } from "./harness/casos-salto-cache.mjs";
+import { casosDoDependabot } from "./harness/casos-dependabot-exemplo.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const EXEMPLO = "src/docs/exemplos/ci-sem-maquinaria.yml";
@@ -473,6 +475,9 @@ for (const [nome, base, muda, tit, quer] of CASOS_DEPS) {
 
 // --- O `cache.yml` (os casos estao no `harness/casos-salto-cache.mjs`) ---
 casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });
+
+// --- O `dependabot.yml` de um privado (#440; os casos estao no `harness/casos-dependabot-exemplo.mjs`) ---
+casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);

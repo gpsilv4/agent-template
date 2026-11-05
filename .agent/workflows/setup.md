@@ -156,7 +156,7 @@ Outros ficheiros `.github/`:
 
 - **`pull_request_template.md`**: Checklist obrigatoria em cada PR (alinhada com `/review`)
 - **`ISSUE_TEMPLATE/`**: Templates para bugs e features (alinhados com `backlog.md`)
-- **`dependabot.yml`**: Updates automaticos semanais de dependencias npm e GitHub Actions
+- **`dependabot.yml`**: Updates automaticos semanais de dependencias npm e GitHub Actions (mensais num repo privado: `src/docs/exemplos/dependabot-privado.yml`). Num repo **privado**, o CI gasta da quota da conta: ler o `src/docs/upgrade-derivados-privados.md` §6
 - **`release.yml`**: cada push de uma tag `vX.Y.Z` cria o GitHub Release, com o titulo e as notas da tag anotada (`git tag -a`). Chama o `.github/scripts/release-da-tag.sh` (andam juntos). O Release e criado pelo `GITHUB_TOKEN`, logo nao dispara workflows `on: release`
 - **`dependabot-auto-merge.yml`**: auto-merge de PRs patch/minor do Dependabot — **opt-in** (desligado; ver cabecalho do ficheiro). Majors ficam sempre para review manual
 - **`CODEOWNERS`**: Define reviewers automaticos por ficheiro
