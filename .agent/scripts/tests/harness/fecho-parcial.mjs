@@ -222,7 +222,6 @@ export const ISENCOES = [
   { ficheiro: ".agent/scripts/check-backlog.mjs", literal: ".agent/context/backlog.md", porque: "o backlog e do projeto (e o que se verifica)" },
   { ficheiro: ".agent/scripts/check-backlog.mjs", literal: ".agent/context/backlog-archive.md", porque: "o arquivo e do projeto" },
   { ficheiro: ".claude/hooks/reinject-fronteiras.mjs", literal: "CLAUDE.md", porque: "o ponto de entrada e do projeto (o hook le as Fronteiras DELE)" },
-  { ficheiro: ".agent/scripts/lib/marcas-yaml.mjs", literal: ".github/workflows/codeql.yml", porque: "um nome numa lista (o que e so do template), nao uma leitura" },
   { ficheiro: ".agent/scripts/lib/mapa-suites.mjs", literal: ".agent/scripts/", porque: "dados da tabela (as suites que cada regra nomeia), e nao uma leitura" },
   { ficheiro: ".agent/scripts/lib/mapa-suites.mjs", literal: ".agent/scripts/tests/", porque: "dados da tabela (as suites que cada regra nomeia), e nao uma leitura" },
 ];

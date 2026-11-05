@@ -211,8 +211,13 @@ export const SUITES = [
   // de cada um esta declarado no proprio ficheiro; estas regras espelham-no.
   { re: /^\.agent\/scripts\/tests\/tests-surface-[\w-]+\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // As marcas e a forma do `PLANO_JOB` (#400): os testes do portao e a nota da 2b (no `test-guards`, e de ponta a ponta no
-  // `test-simulate-upgrade`) leem-na tambem; o `minutos-ci` usa o `repoDoOrigin` dele.
-  { re: /^\.agent\/scripts\/lib\/marcas-yaml\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs"), S("test-minutos-ci.mjs")] },
+  // `test-simulate-upgrade`) leem-na tambem.
+  { re: /^\.agent\/scripts\/lib\/marcas-yaml\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")] },
+  // O `dono/repo` do `origin` (#455, saiu do `marcas-yaml`): o `minutos-ci` e o `check-test-surface` usam-no.
+  { re: /^\.agent\/scripts\/lib\/repo-origin\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-test-surface.mjs")] },
+  // O `concurrency:` de topo (#455, saiu do `marcas-yaml`): a 2b (`test-guards` e `test-simulate-upgrade`), o teste do
+  // `ci.yml` (no `test-guards`) e o do exemplo sem a maquinaria.
+  { re: /^\.agent\/scripts\/lib\/concurrency-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")] },
   // O escape de um literal (#400): a fonte; as duas copias e a guarda vivem no `tests-regex-literal` (no `test-guards`).
   { re: /^\.agent\/scripts\/lib\/regex-literal\.mjs$/, verifica: [S("test-guards.mjs"), S("test-codigo-morto.mjs"), S("test-bundle-sizes.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica

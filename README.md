@@ -270,6 +270,8 @@ not to* line, so every agent sees it.
     │   ├── backlog-corrige.mjs <- --corrigir: rewrites only the derived counters, or nothing (#431)
     │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
+    │   ├── repo-origin.mjs     <- The owner/repo of a GitHub `origin` URL (#455)
+    │   ├── concurrency-ci.mjs  <- A workflow's top-level `concurrency:` block, and what it lacks (#427, #455)
     │   ├── varredura-paralela.mjs <- The sweep's measuring engine: one repo copy per worker
     │   ├── varredura-tempos.mjs   <- ...and its time summary, by target (moved out at 500 lines, #374b)
     │   ├── varredura-fatia.mjs <- The sweep's shard slice: reads `--shard=k/n` / `SWEEP_SHARD`, splits sites
