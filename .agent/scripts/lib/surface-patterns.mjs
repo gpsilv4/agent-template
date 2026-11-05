@@ -87,14 +87,24 @@ const CONTAGENS = [
   // acrescentada escondia uma chamada apagada, e renomear o parametro de uma dava um alarme falso. O `\b` A FRENTE: com ele o lookbehind so se tenta num
   // inicio de palavra, e `meuscasosX(test)` nao conta (o teste de tempo prende-o). Sem `cru` (de proposito, ao contrario
   // de entradas vizinhas): conta-se com as strings apagadas, logo as fixtures `'casosX(test);'` dos testes nao contam.
-  // Medido: 0 ocorrencias nos dois derivados (todo o historico); no template, so as 3 chamadas do #400 (b).
+  // Medido: 0 ocorrencias nos dois derivados (todo o historico); no template, as 3 chamadas do #400 (b) e as 2 do #439/#440.
   // Limites (escritos): NAO se ve um modulo `casos-*` novo sem chamada nenhuma, a chamada movida para um ficheiro que
   // nao corre (da NOTE: "movido" nao e "corre"), uma chamada mantida e tornada inutil (`return;` no topo, uma
   // closure que nunca corre), nem a chamada dentro de um comentario de bloco em varias linhas (o `semComentarios` so
   // apaga as linhas que COMECAM por `//`, `*` ou `/*`: limite de todas as `CONTAGENS`). AVISA num refactor legitimo, sem
   // saida por trailer: renomear sem o prefixo `casos`, um alias (`casosDaProsa(t)`), um import de namespace
   // (`casos.prosa(test)`), um argumento a mais (`casosDaProsa(test, opcoes)`) e um espaco antes do `(` — explica-se no PR.
-  { re: /\b(?<!function\s+)casos[A-Z]\w*\(\s*test\s*\)(?!\s*\{)/, msg: "chamadas de modulos de casos (casos*(test))" },
+  // #452: o primeiro argumento pode ser `caso` (o nome do registo noutras suites) e vir seguido de outros
+  // (`casosDoCache(caso, { … })`, #439/#440): eram 2 chamadas de 5 sem contar — o T1 da `v0.62.0` outra vez. A
+  // definicao continua fora: o lookbehind (`function casosX(caso, …)`) e o `{` logo a seguir a um `)` sem mais
+  // argumentos. Limite (escrito): um METODO com dois parametros (`casosX(caso, o) {`) conta.
+  { re: /\b(?<!function\s+)casos[A-Z]\w*\(\s*(?:test|caso)\s*(?:\)(?!\s*\{)|,)/, msg: "chamadas de modulos de casos (casos*(test))" },
+  // As chamadas ENCADEADAS de registos (#452): `registarModo();` dentro de um `registar()` que um entry point chama a
+  // mao (`tests-medida-2b.mjs`), e os oito `registarX();` do `test-simulate-upgrade.mjs`. Apagar uma (e o import) tirava
+  // os casos do modulo sem nenhuma contagem descer: o modulo ficava, com os seus `test(`. So sem argumentos e com
+  // maiuscula a seguir a `registar` (o `registarResultado(…)` e o `mod.registar()` da descoberta sao outra coisa); a
+  // definicao nao conta (o lookbehind, e o `{` a seguir). Medido: 10 no template.
+  { re: /\b(?<!function\s+)registar[A-Z]\w*\(\s*\)(?!\s*\{)/, msg: "chamadas encadeadas de registos de casos (registar*())" },
   // A2: a "configuracao do runner" deste repo conta-se assim.
   // O `-?` e o `\b` nao sao cosmetica: a primeira versao exigia `run:` depois de so espacos
   // e `alvo:` no inicio da linha, logo media a forma que eu por acaso tinha escrito e nao a
