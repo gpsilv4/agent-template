@@ -419,6 +419,7 @@ src/docs/
 ├── upgrade-parcial.md          <- The PARTIAL /upgrade: a derived project without the machinery (what comes, in what order)
 ├── exemplos/ci-sem-maquinaria.yml <- A one-job CI for a derived project WITHOUT the machinery (not run here)
 ├── exemplos/cache-sem-maquinaria.yml <- Its pair: saves the dependency cache, since the merge push no longer runs
+├── exemplos/dependabot-privado.yml <- dependabot.yml for a PRIVATE repo: monthly, rebase disabled (the account quota)
 └── CHANGELOG.md                <- Changelog template
 ```
 

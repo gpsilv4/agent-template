@@ -37,10 +37,11 @@ O audit do CI do template (`npm audit --audit-level=high`) cobre dev e producao,
 - **Sem nenhuma versao compativel** (a correcao so existe numa major que as ferramentas nao aceitam): um ticket
   pendente no backlog, SEM `overrides` (forcar uma versao que a ferramenta nao pede parte-a em silencio). Medido: o job
   de seguranca do Dependabot falhou 3 vezes num dia a tentar.
-- **Opcional, num privado:** o rebase automatico do Dependabot corre o CI do PR dele a cada merge no `main` (medido: 4
-  runs, 17 min, num dia, para um PR). `rebase-strategy: disabled` no `dependabot.yml` para isso; a troca e que os PRs
-  dele ficam desatualizados em silencio, e um PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge).
-  O template e publico, nao paga, e o default dele nao muda.
+- **Por omissao, num privado (#440):** o `src/docs/exemplos/dependabot-privado.yml` (mensal, `rebase-strategy:
+  disabled`). O rebase automatico do Dependabot corre o CI do PR dele a cada merge no `main` (medido: 4 runs, 17 min,
+  num dia, para um PR; 113 min em outubro, num derivado). A troca: os PRs dele ficam desatualizados em silencio, e um
+  PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge). O template e publico, nao paga, e o dele
+  fica semanal.
 
 ## 5. Publicar um texto escrito num ficheiro
 

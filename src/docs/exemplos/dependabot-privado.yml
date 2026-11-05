@@ -1,0 +1,68 @@
+# O `dependabot.yml` de um projeto derivado num repo PRIVADO (#440)
+#
+# NAO corre aqui. Num repo privado, copia-se por cima do `.github/dependabot.yml` (o `BOOTSTRAP.md`, item 16, e o
+# `/upgrade` dizem quando). E o do template com duas diferencas, nos dois ecossistemas; o resto (as labels, os grupos,
+# os prefixos, o `cooldown`) e o mesmo, e a suite `test-ci-exemplo.mjs` reprova se divergir.
+#
+# Porque: num privado, cada minuto de CI conta para a quota da CONTA (2000 min/mes no Free, somada por todos os repos
+# privados), e os runs do proprio Dependabot tambem se pagam. Medido num derivado em outubro: 8 PRs do Dependabot
+# custaram 113 min, e um so deles 80 min (40 runs) antes do `rebase-strategy: disabled`. O template e publico, nao
+# paga, e fica semanal.
+#   - `interval: monthly`: uma corrida por mes, em vez de quatro. As atualizacoes de SEGURANCA nao esperam pelo
+#     `schedule` nem pelo `cooldown`.
+#   - `rebase-strategy: disabled`: sem ele, cada merge no `main` rebaseia os PRs abertos do Dependabot, e cada rebase
+#     corre o CI do PR outra vez. A troca: os PRs dele ficam desatualizados em silencio, e um PR de seguranca faz-se no
+#     proprio dia (`@dependabot rebase`, CI, merge). Esta opcao vale tambem para os de seguranca.
+version: 2
+# NOTA: o bloco `npm` abaixo so funciona num repo COM `package.json`. Sem manifesto, comentar este bloco;
+# `github-actions` e sempre valido e fica ligado.
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: monthly
+    rebase-strategy: disabled
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      # Descomentar para LIGAR o auto-merge de patch/minor neste ecosystem
+      # (ver .github/workflows/dependabot-auto-merge.yml — majors ficam sempre
+      # para review humano). Requer branch protection em `main` com required
+      # status checks; sem isso, nao ligar.
+      # - automerge
+    versioning-strategy: increase
+    # Uma versao publicada hoje so entra passados 7 dias (#377). Com a corrida mensal, so conta no dia da corrida, e
+    # fica pelo mesmo motivo: um pacote comprometido costuma ser retirado em horas ou dias.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: chore
+      prefix-development: chore
+      include: scope
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    rebase-strategy: disabled
+    open-pull-requests-limit: 3
+    labels:
+      - ci
+      # Descomentar para LIGAR o auto-merge de patch/minor neste ecosystem.
+      # - automerge
+    # O mesmo `cooldown` do `npm` acima (#377): uma action comprometida corre no CI com os segredos dele.
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+      include: scope
+    # As sub-actions do CodeQL (`init`, `analyze`) tem de ter a MESMA versao (os PRs #345 e #346 do template).
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"

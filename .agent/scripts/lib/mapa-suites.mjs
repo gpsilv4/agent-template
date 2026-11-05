@@ -49,8 +49,10 @@ export const SUITES = [
   { re: /^\.agent\/workflows\/upgrade\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O exemplo de CI de um derivado sem a maquinaria (#429): nenhum gate o le, e esta suite e a unica protecao dele.
   // O par do `cache.yml` (#439) e os leitores e casos que sairam da suite pelo tamanho, tambem.
-  { re: /^src\/docs\/exemplos\/(?:ci|cache)-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
-  { re: /^\.agent\/scripts\/tests\/harness\/(?:expressoes-ci|casos-salto-cache)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
+  { re: /^src\/docs\/exemplos\/(?:(?:ci|cache)-sem-maquinaria|dependabot-privado)\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/(?:expressoes-ci|casos-salto-cache|casos-dependabot-exemplo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O `dependabot-privado.yml` tem de ser o do template com duas diferencas: mexer no do template corre a suite (#440).
+  { re: /^\.github\/dependabot\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
