@@ -130,7 +130,7 @@ node .agent/scripts/minutos-ci.mjs --desde AAAA-MM-DD --app TypeScript
 ```
 
 Cobrado (o que a quota ve) e real (o que o runner gastou), e a mediana do job mais longo dos PRs de app contra 120 s.
-O metodo, a faturacao da conta e as tres regras estao no `src/docs/upgrade-derivados-privados.md` §6.
+O metodo, a faturacao da conta e as quatro regras estao no `src/docs/upgrade-derivados-privados.md` §6.
 
 ## 6. As notas
 

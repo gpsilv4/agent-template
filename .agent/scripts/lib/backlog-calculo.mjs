@@ -352,7 +352,7 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
     // O que nao souber classificar, di-lo em vez de assumir.
     const desconhecidos = [...new Set(blocos.filter((c) => !BLOCO_VAZIO.has(c) && !BLOCO_CHEIO.has(c)))];
     if (desconhecidos.length) {
-      warn(`Barra: nao sei classificar ${desconhecidos.map((c) => `"${c}"`).join(", ")} — usar \`_\`/\`⬜\` (vazio) e \`█\`/\`🟩\` (cheio), ou acrescentar o glifo a check-backlog.mjs`);
+      warn(`Barra: nao sei classificar ${desconhecidos.map((c) => `"${c}"`).join(", ")} — usar \`_\`/\`⬜\` (vazio) e \`█\`/\`🟩\` (cheio), ou acrescentar o glifo a BLOCO_VAZIO/BLOCO_CHEIO (lib/backlog-calculo.mjs) e ao PAR do lib/backlog-corrige.mjs`);
     }
     const filled = blocos.filter((c) => BLOCO_CHEIO.has(c)).length;
     const pct = parseInt(progMatch[2], 10);

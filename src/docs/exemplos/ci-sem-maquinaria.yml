@@ -10,6 +10,10 @@
 # da app so correm com ela bem-sucedida (`steps.install.conclusion == 'success'`): sem `node_modules`, o `npx tsc` ia
 # buscar ao registo um pacote que nao esta fixado (o defeito que o #428 corrigiu no CI do template). Nunca `paths-ignore` no `on:`: um check que
 # nao corre fica pendente se um dia for obrigatorio. O alcance decide-se num passo, com `if:`.
+#
+# As mensagens e o gitleaks leem os ficheiros do PROPRIO PR: um PR que mude o `.githooks/`, o `.gitleaksignore` ou o
+# `.gitleaks.toml` decide como e julgado. Num privado, quem abre PRs ja tem escrita (e um contorno de politica, nao uma
+# escalada), mas esses caminhos pedem revisao humana: por exemplo, uma linha no `CODEOWNERS` para eles.
 
 name: CI
 

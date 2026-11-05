@@ -100,6 +100,11 @@ export const diasDoMes = (ano, mes) => new Date(Date.UTC(ano, mes, 0)).getUTCDat
  *  sem nenhum dia. */
 export const projecao = (total, dia, dias) => (dia > 0 ? (total / dia) * dias : null);
 
+/** A projecao do mes CORRENTE (#453): o ritmo ate HOJE (e nao ate a ultima entrada, que pode estar dias atras), e so a
+ *  partir do dia 3 — os primeiros dias sao ruido, e 70 min no dia 1 projetavam 2100 (um falso AVISO no /deploy). O
+ *  `hoje` e um parametro, para os dias 1, 2 e 3 se testarem em todas as corridas. `null` antes do dia 3. */
+export const projecaoDoMes = ({ total, ultimoDia, hoje, dias }) => (hoje >= 3 ? projecao(total, Math.max(ultimoDia, hoje), dias) : null);
+
 /** O nivel da quota: "esgotada" (>= limite), "aviso" (>= 80%, ou a projecao acima do limite), ou `null`. */
 export function nivelDaQuota(total, proj, limite) {
   if (total >= limite) return "esgotada";

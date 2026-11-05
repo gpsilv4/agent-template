@@ -532,10 +532,12 @@ duas falhas na mesma corrida.
 Duas pecas vem junto:
 - **O gate do `Install`.** Com o `!cancelled()`, as verificacoes correriam precisamente quando o `Install` falhou: sem
   `node_modules`, e o `npx tsc` ia buscar ao npm um pacote que nao esta fixado. O `Install` tem `id: install`, e cada
-  verificacao le `INSTALOU: ${{ steps.install.outcome }}` num `case` e sai calada (o job ja esta vermelho por ele). O
+  verificacao le `INSTALOU: ${{ steps.install.conclusion }}` num `case` e sai calada (o job ja esta vermelho por ele): o
+  `conclusion`, e nao o `outcome`, que com um `continue-on-error` no `Install` diz `failure` e deixava correr tudo. O
   `Audit` so le o lockfile, e nao precisa dele.
 - **A isencao no medidor da superficie.** Um `if:` num passo e uma marca, e nenhum trailer a aceita. A forma exata e
-  isenta, mas so nos passos do job `quality` do `ci.yml` (`lib/marcas-yaml.mjs`, `NAO_CANCELADO`). A mesma forma
+  isenta, mas so nos passos do job `quality` do `ci.yml`, e so nas cinco verificacoes pelo `name:` (`lib/marcas-yaml.mjs`,
+  `NAO_CANCELADO` e `VERIFICACOES_DA_APP`). A mesma forma
   noutro job (um `deploy`), noutro workflow, ou como `if:` do job, conta: e a licao do #308.
 
 **O que isto pede a um derivado:** nada; e OPCIONAL (so minutos). O `ci.yml` e do projeto, e a 2b da a nota a quem

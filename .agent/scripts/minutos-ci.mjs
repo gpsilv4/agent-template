@@ -31,7 +31,7 @@
  * por data: estreitar), ou menos runs/jobs lidos do que a API diz haver. Um zero falso e pior do que nenhum numero.
  */
 import { execFileSync } from "child_process";
-import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, projecao, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, projecaoDoMes, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
 import { repoDoOrigin } from "./lib/marcas-yaml.mjs";
 
 const POR_PAGINA = 100;
@@ -159,11 +159,13 @@ const daApp = opt.app ? prs.filter((l) => correuOPasso(l.jobs, opt.app)) : prs;
 // O job mais longo de cada run, e nao a soma: e um job que paga 3 min ao passar dos 120 s.
 const med = mediana(daApp.map((l) => l.maisLongo));
 const qual = opt.app ? `dos PRs de app (em que o passo "${opt.app}" correu)` : "de TODOS os PRs (sem --app: os de docs incluidos)";
+// Sem PRs (um `--run` de um push, um intervalo sem PRs) diz-se so isso: a linha da mediana com "0s em 0 run(s)" era
+// um zero que nao mediu nada (#453).
 if (med === null) console.log(`mediana ${qual}: sem runs`);
 // Sem --app, varios workflows com `pull_request` (um CodeQL, por exemplo) misturam-se na mesma mediana: di-lo.
 const workflows = [...new Set(daApp.map((l) => l.r.name ?? "?"))];
-if (workflows.length > 1) console.log(`  (mistura ${workflows.length} workflows: ${workflows.join(", ")} — o --app filtra pelo passo)`);
-else {
+if (med !== null && workflows.length > 1) console.log(`  (mistura ${workflows.length} workflows: ${workflows.join(", ")} — o --app filtra pelo passo)`);
+else if (med !== null) {
   const acima = daApp.filter((l) => l.maisLongo > LINHA_DOS_120).length;
   console.log(`mediana ${qual}, do job mais longo de cada run: ${Math.round(med)}s em ${daApp.length} run(s) — ${acima} acima dos ${LINHA_DOS_120}s (um job de ${LINHA_DOS_120 + 1}s ou mais paga ${cobrado(LINHA_DOS_120 + 1)} min)`);
 }
@@ -203,10 +205,8 @@ function quota() {
   }
   const q = quotaDoMes(dados.usageItems, visibilidade);
   const mesCorrente = `${ano}-${String(mes).padStart(2, "0")}` === new Date().toISOString().slice(0, 7);
-  // O ritmo ate HOJE (e nao ate a ultima entrada, que pode estar dias atras), e so a partir do dia 3: os primeiros dias
-  // sao ruido, e 70 min no dia 1 projetavam 2100 (um falso AVISO no /deploy).
   const hoje = new Date().getUTCDate();
-  const proj = mesCorrente && hoje >= 3 ? projecao(q.total, Math.max(q.ultimoDia, hoje), diasDoMes(ano, mes)) : null;
+  const proj = mesCorrente ? projecaoDoMes({ total: q.total, ultimoDia: q.ultimoDia, hoje, dias: diasDoMes(ano, mes) }) : null;
   const m = (x) => Math.round(x);
   console.log(`quota de ${login}, ${ano}-${String(mes).padStart(2, "0")}: so os repos PRIVADOS gastam a quota (Linux; os publicos nao contam)`);
   if (!dados.usageItems.some((i) => i.unitType === "Minutes")) console.log("  nenhum minuto registado neste mes");

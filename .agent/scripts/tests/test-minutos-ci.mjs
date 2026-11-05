@@ -20,7 +20,7 @@ import { spawnSync } from "child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -167,6 +167,10 @@ caso("sem --app, dois workflows com pull_request na mesma mediana: di-lo", () =>
   const r = cli({ [`${R}#1`]: { total_count: 2, workflow_runs: [run(1), run(2, "pull_request", { name: "CodeQL" })] }, [`${R}/*/jobs#*`]: { total_count: 1, jobs: [job(30)] } }, ["--desde", "2026-11-01", "--repo", "o/r"]);
   return espera(r.status === 0 && /mistura 2 workflows: CI, CodeQL/.test(r.out), `saida: ${r.out}`);
 });
+caso("sem PRs (um --run de um push): 'sem runs', e nunca a linha '0s em 0 run(s)' (#453)", () => {
+  const r = cli({ [`${R}/7#1`]: run(7, "push"), [`${R}/7/jobs#1`]: { total_count: 1, jobs: [job(30)] } }, ["--run", "7", "--repo", "o/r"]);
+  return [...espera(r.status === 0 && /mediana .*: sem runs/.test(r.out), `saida: ${r.out}`), ...espera(!/0s em 0 run/.test(r.out), "imprimiu a mediana de zero runs")];
+});
 caso("--passos: a duracao de cada passo; sem ele, nenhuma", () => {
   const com = cli(TRES_PRS, ["--desde", "2026-11-01", "--passos", "--repo", "o/r"]);
   const sem = cli(TRES_PRS, ["--desde", "2026-11-01", "--repo", "o/r"]);
@@ -234,6 +238,14 @@ caso("quota: a projecao, os dias do mes e o nivel", () => [
   ...espera(diasDoMes(2026, 11) === 30 && diasDoMes(2028, 2) === 29, "dias do mes"),
   ...espera(projecao(100, 10, 30) === 300 && projecao(0, 0, 30) === null, "projecao"),
   ...espera(nivelDaQuota(2000, null, 2000) === "esgotada" && nivelDaQuota(1600, null, 2000) === "aviso" && nivelDaQuota(1000, 2100, 2000) === "aviso" && nivelDaQuota(1000, 1500, 2000) === null, "nivel"),
+]);
+
+// O limiar do dia 3 (#453), com o `hoje` como parametro: os tres lados em TODAS as corridas, e nao pelo relogio.
+caso("quota: a projecao do mes so a partir do dia 3, pelo ritmo ate hoje (dias 1, 2 e 3, e a ultima entrada a frente)", () => [
+  ...espera(projecaoDoMes({ total: 70, ultimoDia: 1, hoje: 1, dias: 30 }) === null, "dia 1: projetou (o falso AVISO do /deploy)"),
+  ...espera(projecaoDoMes({ total: 70, ultimoDia: 2, hoje: 2, dias: 30 }) === null, "dia 2: projetou"),
+  ...espera(projecaoDoMes({ total: 70, ultimoDia: 1, hoje: 3, dias: 30 }) === 700, "dia 3: o ritmo e ate HOJE (70/3 x 30)"),
+  ...espera(projecaoDoMes({ total: 70, ultimoDia: 10, hoje: 3, dias: 30 }) === 210, "uma entrada a frente de hoje: o ritmo e ate ela"),
 ]);
 
 // A CLI, contra o `gh` falso.

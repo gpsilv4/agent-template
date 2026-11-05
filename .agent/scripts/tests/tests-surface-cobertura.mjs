@@ -140,6 +140,10 @@ export function registar() {
         ["uma definicao vazia acrescentada nao esconde a chamada apagada", A, DEF, { de: 1, para: 0 }],
         ["`casos` a meio de um identificador nao conta (o `\\b`)", "meuscasosX(test);\n" + A, "meuscasosX(test);\n", { de: 1, para: 0 }],
         ["acrescentar fica calado", A, A + B, { de: 1, para: 2 }],
+        // #452: o `caso` e os argumentos a seguir (as chamadas do #439/#440), e a definicao com dois parametros.
+        ["uma chamada `casosX(caso, { … })` conta, e apaga-la desce", "casosDoCache(caso, { a: 1 });\n" + A, A, { de: 2, para: 1 }],
+        ["a definicao com dois parametros nao conta (o lookbehind)", "export function casosDoCache(caso, { a }) {}\n" + A, "export function casosDoCache(caso, { a }) {}\n", { de: 1, para: 0 }],
+        ["um `casosX(outro)` nao conta (so `test` e `caso`)", "casosX(outro);\n" + A, "casosX(outro);\n", { de: 1, para: 0 }],
       ]) {
         test(`cobertura (modulos de casos): ${nome}`, (dir) => muda(dir, "tests/a.test.js", antes, depois),
           para < de ? { code: 1, includes: [`${MSG}: ${de} -> ${para}`] } : { code: 0, excludes: [`${MSG}:`] });
@@ -148,7 +152,7 @@ export function registar() {
       // com a regex da TABELA (e nao uma copia), sobre o texto sem as linhas de comentario: uma fixture numa string do
       // ficheiro real daria um vermelho falso aqui (na direccao segura), e e por isso que o caso o diz.
       const regex = new RegExp(CONTAGENS.find((c) => c.msg === MSG).re.source, "g");
-      for (const [suite, chamada] of [["test-commit-msg.mjs", "casosDaProsa(test);"], ["test-mutation-sweep.mjs", "casosDoList(test);"], ["test-mutation-sweep.mjs", "casosDoDiff(test);"]]) {
+      for (const [suite, chamada] of [["test-commit-msg.mjs", "casosDaProsa(test);"], ["test-mutation-sweep.mjs", "casosDoList(test);"], ["test-mutation-sweep.mjs", "casosDoDiff(test);"], ["test-ci-exemplo.mjs", "casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });"], ["test-ci-exemplo.mjs", 'casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });']]) {
         const real = readFileSync(join(ROOT, ".agent/scripts/tests", suite), "utf8");
         const n = (real.split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l)).join("\n").match(regex) || []).length;
         test(`cobertura (modulos de casos): apagar \`${chamada}\` do ${suite} real avisa`, (dir) =>
@@ -181,6 +185,34 @@ export function registar() {
         problemas = [err.signal ? `nao terminou em 5 s (${err.signal}) — backtracking?` : `rebentou: ${err.message}`];
       }
       registarResultado("cobertura (modulos de casos): uma palavra de `casosA` repetido e espacos longos medem-se em < 5 s", problemas, "");
+    });
+  }
+
+  // --- As chamadas ENCADEADAS de registos (#452) ----------------------------------------
+  // Atras da guarda pela mensagem. Os casos sao linhas `[rotulo, ..., { de, para }]`.
+  {
+    const MSG = "chamadas encadeadas de registos de casos (registar*())";
+    const A = "registarModo();\n", B = "registarConfig();\n";
+    seAContagemExistir(MSG, "cobertura (registos encadeados)", () => {
+      for (const [nome, antes, depois, { de, para }] of [
+        ["apagar uma chamada desce", A + B, B, { de: 2, para: 1 }],
+        ["a definicao nao conta (o lookbehind)", "export function registarModo() {}\n" + A, "export function registarModo() {}\n", { de: 1, para: 0 }],
+        ["um metodo `registarX() {` nao conta (o `{` a seguir)", "const o = { registarX() {} };\n" + A, "const o = { registarX() {} };\n", { de: 1, para: 0 }],
+        ["o `registarResultado(…)` e o `mod.registar()` nao contam", 'registarResultado("a", []);\nmod.registar();\n' + A, 'registarResultado("a", []);\nmod.registar();\n', { de: 1, para: 0 }],
+        ["acrescentar fica calado", A, A + B, { de: 1, para: 2 }],
+      ]) {
+        test(`cobertura (registos encadeados): ${nome}`, (dir) => muda(dir, "tests/a.test.js", antes, depois),
+          para < de ? { code: 1, includes: [`${MSG}: ${de} -> ${para}`] } : { code: 0, excludes: [`${MSG}:`] });
+      }
+      // As chamadas REAIS: a do modo parcial (#429) e uma das oito do `test-simulate-upgrade`.
+      const regex = new RegExp(CONTAGENS.find((c) => c.msg === MSG).re.source, "g");
+      for (const [suite, chamada] of [["tests-medida-2b.mjs", "registarModo();"], ["test-simulate-upgrade.mjs", "registarMedida2b();"]]) {
+        const real = readFileSync(join(ROOT, ".agent/scripts/tests", suite), "utf8");
+        const n = (real.split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l)).join("\n").match(regex) || []).length;
+        test(`cobertura (registos encadeados): apagar \`${chamada}\` do ${suite} real avisa`, (dir) =>
+          muda(dir, `tests/${suite}`, real, real.split("\n").filter((l) => l.trim() !== chamada).join("\n")),
+        { code: 1, includes: [`${MSG}: ${n} -> ${n - 1}`] });
+      }
     });
   }
 
