@@ -14,8 +14,8 @@ import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
-/** As libs do checker e do `--corrigir` (#431), copiadas para a sandbox. */
-const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs"];
+/** As libs do checker e do `--corrigir` (#431), e o leitor que o calculo usa (#445), copiadas para a sandbox. */
+const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs", "backlog-itens.mjs"];
 
 // --- A fixture valida -------------------------------------------------------
 // Contas que ela codifica (o checker tem de chegar exatamente a estas):

@@ -36,7 +36,11 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/tests\/harness\/test-backlog-harness\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")] },
   // O calculo e a reescrita do backlog sairam do checker (#431): as duas suites, e ANTES da regra geral de `lib/`
   // (que so corria o `test-registo`).
-  { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/lib\/backlog-(?:calculo|corrige)\.mjs$/, verifica: [S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-backlog-itens.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  // O leitor partilhado (#445): o calculo le por ele (as duas suites do checker), e a suite dele congela o resultado.
+  // As libs do backlog vem no `/upgrade` parcial: um `import` novo muda o fecho, que e o `test-modo-upgrade` que mede.
+  { re: /^\.agent\/scripts\/lib\/backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs")], only: "backlog" },
+  { re: /^\.agent\/scripts\/tests\/test-backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs")] },
   // Os minutos de CI (#429): a CLI e as contas puras dela. A CLI tem par na varredura (as recusas).
   { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")], only: "minutos-ci" },
   { re: /^\.agent\/scripts\/lib\/minutos-calculo\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
