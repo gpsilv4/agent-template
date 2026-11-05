@@ -32,7 +32,7 @@
  */
 import { execFileSync } from "child_process";
 import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, projecaoDoMes, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
-import { repoDoOrigin } from "./lib/marcas-yaml.mjs";
+import { repoDoOrigin } from "./lib/repo-origin.mjs";
 
 const POR_PAGINA = 100;
 const LIMITE_DA_PESQUISA = 1000;

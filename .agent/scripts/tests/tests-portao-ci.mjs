@@ -19,7 +19,7 @@ import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { correCorpo, gitEm } from "./harness/repo-descartavel.mjs";
 import { VARIAVEL } from "../lib/nomes-proibidos.mjs";
-import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/marcas-yaml.mjs";
+import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/concurrency-ci.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(

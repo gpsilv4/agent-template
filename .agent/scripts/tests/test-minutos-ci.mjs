@@ -21,6 +21,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "os";
 import { join } from "path";
 import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
+import { repoDoOrigin } from "../lib/repo-origin.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -56,6 +57,20 @@ caso("um run: a soma dos jobs arredondados, sem os saltados e os por acabar", ()
   ]);
   return espera(r.n === 4 && r.real === 69 && r.cobrado === 3, `deu ${JSON.stringify(r)}, esperava n 4, real 69, cobrado 3`);
 });
+// O `dono/repo` do `origin` (`lib/repo-origin.mjs`, #455): sem `--repo`, e de onde o `minutos-ci` tira o repo que mede.
+// Nunca teve caso proprio enquanto viveu no `marcas-yaml`: so corria dentro do CLI. O `null` (nao e do GitHub) faz o CLI
+// pedir o `--repo`, em vez de medir outro repo.
+caso("repoDoOrigin: https e ssh, com e sem .git, nomes com ponto e hifen; outro host ou sem repo da null", () =>
+  [
+    ["https://github.com/dono/repo.git", "dono/repo"],
+    ["https://github.com/dono/repo", "dono/repo"],
+    ["git@github.com:dono/repo.git", "dono/repo"],
+    ["git@github.com:o-dono/o.repo-x", "o-dono/o.repo-x"],
+    ["https://GitHub.com/dono/repo.git", "dono/repo"],
+    ["https://gitlab.com/dono/repo.git", null],
+    ["https://github.com/dono", null],
+    ["", null],
+  ].flatMap(([url, esperado]) => espera(repoDoOrigin(url) === esperado, `repoDoOrigin(${JSON.stringify(url)}) = ${repoDoOrigin(url)}, esperava ${esperado}`)));
 caso("segundos: 0 sem inicio ou fim", () => espera(segundos(null, "2026-11-01T00:00:10Z") === 0 && segundos("2026-11-01T00:00:00Z", "2026-11-01T00:00:10Z") === 10, "segundos errados"));
 caso("mediana: impar, par e vazia", () => [...espera(mediana([65, 87, 70]) === 70, `impar: ${mediana([65, 87, 70])}`), ...espera(mediana([60, 80]) === 70, `par: ${mediana([60, 80])}`), ...espera(mediana([]) === null, "vazia")]);
 caso("um passo saltado nao faz de um PR um PR de app", () => {

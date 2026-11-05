@@ -11,7 +11,8 @@
  * `test-guards`; a varredura corre-o primeiro, e cada `note()` desligada morre em milissegundos); os de ponta
  * a ponta, nas suites da 2b (`tests-medida-2b-config.mjs`, `test-simulate-upgrade.mjs`).
  */
-import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO, NAO_CANCELADO, VERIFICACOES_DA_APP, concurrencyDeTopo, problemasDaConcurrency } from "./marcas-yaml.mjs";
+import { PLANO_DO_SWEEP, PLANO_JOB_DO_PORTAO, NAO_CANCELADO, VERIFICACOES_DA_APP } from "./marcas-yaml.mjs";
+import { concurrencyDeTopo, problemasDaConcurrency } from "./concurrency-ci.mjs";
 import { jobsDe, passosDe } from "./estrutura-workflow.mjs";
 
 /**

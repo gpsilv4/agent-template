@@ -31,7 +31,8 @@ import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs";
 import { ehDerivado } from "./lib/derivado.mjs";
-import { SO_DO_TEMPLATE, paraMarcas, repoDoOrigin, gateDesteRepo } from "./lib/marcas-yaml.mjs";
+import { SO_DO_TEMPLATE, paraMarcas, gateDesteRepo } from "./lib/marcas-yaml.mjs";
+import { repoDoOrigin } from "./lib/repo-origin.mjs";
 import { verificaGate } from "./lib/superficie-gate.mjs";
 import { CONFIG_CONTAVEIS } from "./lib/superficie-contaveis.mjs";
 

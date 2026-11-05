@@ -27,7 +27,7 @@ import { spawnSync } from "child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/marcas-yaml.mjs";
+import { concurrencyDeTopo, problemasDaConcurrency } from "../lib/concurrency-ci.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { avalia, comSquash, comT80, conjuntos, cortesDosIf, depoisDeFalha, eventos, passosDoExemplo, problemasDeSaidas, semExteriores } from "./harness/expressoes-ci.mjs";
