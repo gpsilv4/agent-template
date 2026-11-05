@@ -29,7 +29,8 @@ Com a resposta, escrever a linha na marca (`modo: parcial` ou `modo: completo`).
 upgrades seguintes (reescreve `commit`/`template`/`data`, larga o `versao:` velho, e mantem o resto).
 
 O `simulate-upgrade --projeto` nao mede um projeto parcial: lista o `deny`/`ask` do `settings.json` do template que o
-projeto nao tem, explica e sai != 0 (um 0 que nao mediu nada era um portao a passar sobre nada). No projeto, as tres
+projeto nao tem e os hooks que o template liga e ele nao (por evento e matcher; #454), diz se o projeto nao tem o
+`settings.json`, explica e sai != 0 (um 0 que nao mediu nada era um portao a passar sobre nada). No projeto, as tres
 verificacoes a mao do §3 substituem o resto.
 
 ## 2. O que vem
@@ -92,7 +93,11 @@ libs vem antes de quem as importa, e os testes (que nao estao ligados) no fim.
    `ordem-por-alvo`, `tmp-limpo`, o `harness/relatorio.mjs`) e so depois o `.claude/hooks/tests/`; o `check-backlog.mjs`
    com as suas libs; e o `minutos-ci.mjs`.
 5. **O `.claude/settings.json`**, escrito pelo utilizador: a ligacao dos hooks e o `deny`/`ask` que o
-   `simulate-upgrade --projeto` listou.
+   `simulate-upgrade --projeto` listou. Um hook copiado e nao ligado nunca dispara, e o `test-hooks` nao o ve: a lista
+   dos hooks por ligar e a unica rede. Ela so diz o que **falta** ligar: um hook que o template passou a ligar noutro
+   sitio, ou deixou de ligar, nao se compara aqui. Para isso, ver o diff da chave `hooks` do `settings.json` do template
+   entre a marca e a tag (`git -C "$TPL" diff <marca>..<tag> -- .claude/settings.json`): um hook apagado e ainda ligado
+   faz o Claude Code falhar a cada evento.
 
 Depois, as tres verificacoes que o simulador nao faz aqui:
 
