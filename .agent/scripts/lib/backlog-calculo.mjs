@@ -10,103 +10,10 @@
  * contadores errados, e e de uma pessoa.
  */
 
-// Remove acentos e normaliza para comparar de forma resiliente.
-export function norm(s) {
-  // A enfase markdown sai ANTES do resto. Sem isto, um cabecalho escrito `| **Esforco** |`
-  // — forma corrente, e a que o proprio template usa na linha do Total — dava
-  // `indexOf("esforco") === -1`, e a validacao de Esforco **desligava-se em silencio** com
-  // exit 0. Falha-aberta no campo que decide o rigor de todo o `ticket-method`.
-  // Vale para as celulas tambem: um `| **Concluido** |` caia fora de OPEN_STATES da mesma forma.
-  return (s ?? "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[*`]/g, "")
-    // Espacos e `_` juntos, e numa so passagem: o `tableHeader` normaliza celulas NAO
-    // aparadas (`" _Esforco_ "`), e com o strip de `_` antes do `.trim()` sobrava
-    // `"_esforco_"` -> `indexOf("esforco") === -1` -> a validacao voltava a desligar-se em
-    // silencio. O negrito so ficou coberto por acaso: o strip de `*` e global.
-    .replace(/^[\s_]+|[\s_]+$/g, "")
-    .toLowerCase();
-}
-
-/** O ID com a mesma tolerancia a enfase que o Estado e o Esforco ganharam. Sem isto,
- *  `| **B7** |` no ativo e `| B7 |` no arquivo eram duas chaves diferentes em `allIds` —
- *  logo o aviso de ID duplicado **nao saia** — e nenhuma delas casava o `ID_LIKE`, pelo que
- *  a linha tambem escapava ao aviso de "tabela que nenhuma seccao reconhece". Dar a
- *  tolerancia a dois campos e a um terceiro nao e pior do que nao a dar a nenhum: e uma
- *  incoerencia que abre uma porta que ninguem procura. */
-export const idDe = (celula) => norm(celula).toUpperCase();
-
-// Extrai as linhas de dados das tabelas markdown numa seccao de texto.
-// Ignora cabecalho, separador (|---|) e linhas totalmente vazias (placeholder).
-/** As celulas do CABECALHO de uma tabela. O `tableRows` descarta-o de propósito; a
- *  validacao de `Esforco` precisa dele para achar a coluna **pelo nome** e nao pela posicao
- *  — as quatro seccoes tem esquemas diferentes, e uma posicao fixa mentia a primeira vez
- *  que alguem acrescentasse uma coluna. */
-export function tableHeader(text) {
-  for (const line of text.split("\n")) {
-    const t = line.trim();
-    if (!t.startsWith("|")) continue;
-    if (/^\|[\s|:-]+\|?$/.test(t)) continue;
-    return t.replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => norm(c));
-  }
-  return null;
-}
-
-export function tableRows(text) {
-  const rows = [];
-  for (const line of text.split("\n")) {
-    const t = line.trim();
-    if (!t.startsWith("|")) continue;
-    if (/^\|[\s|:-]+\|?$/.test(t)) continue; // separador
-    // Proteger pipes escapados (`\|`) em celulas — GFM permite-os e descricoes reais usam-nos.
-    const cells = t
-      .replace(/^\|/, "")
-      .replace(/\|$/, "")
-      .replace(/\\\|/g, "\u0000")
-      .split("|")
-      .map((c) => c.replace(/\u0000/g, "|").trim());
-    const first = norm(cells[0]);
-    if (["id", "seccao", "ordem", "sprint"].includes(first)) continue; // cabecalho
-    if (cells.every((c) => c === "")) continue; // placeholder vazio
-    rows.push(cells);
-  }
-  return rows;
-}
-
-// Conteudo entre um heading que faz match e o proximo heading.
-export function section(text, headingRegex) {
-  const out = [];
-  let capturing = false;
-  for (const line of text.split("\n")) {
-    const isHeading = /^#{1,6}\s/.test(line);
-    if (isHeading) {
-      if (capturing) break;
-      if (headingRegex.test(line)) {
-        capturing = true;
-        continue;
-      }
-    }
-    if (capturing) out.push(line);
-  }
-  return out.join("\n");
-}
+import { leBacklog, norm, idDe, idsDe, tableRows, section, SECTIONS, ID_LIKE } from "./backlog-itens.mjs";
 
 export const OPEN_STATES = ["pendente", "a fazer"];
 export const CLOSED_STATES = ["concluido", "cancelado"];
-
-// Seccoes por tipo (ordem == ordem das linhas do Resumo, sem a linha Total).
-// `resumo` e o rotulo tal como aparece na primeira coluna da tabela Resumo — usado para
-// casar por nome em vez de por posicao. Ao renomear uma seccao num projeto derivado,
-// atualizar aqui e no `backlog.md` em simultaneo (o guard avisa se divergirem).
-export const SECTIONS = [
-  // Pelo NOME, a seguir a um numero opcional (#191): o numero do heading nao e da regra, e a
-  // `process-rules` manda actualizar pelo nome. Renumerar ou reordenar ja nao parte nada.
-  { key: "Bugs", resumo: "Bugs / Violacoes de Regras", re: /^##\s*(?:\d+\.\s*)?Bugs\b/i, tipos: ["bug", "bugs"] },
-  { key: "UX", resumo: "Melhorias UX", re: /^##\s*(?:\d+\.\s*)?Melhorias UX\b/i, tipos: ["ux"] },
-  { key: "Divida Tecnica", resumo: "Divida Tecnica", re: /^##\s*(?:\d+\.\s*)?Divida Tecnica\b/i, tipos: ["tecnica", "divida tecnica", "tech"] },
-  { key: "Features", resumo: "Features Futuras", re: /^##\s*(?:\d+\.\s*)?Features Futuras\b/i, tipos: ["feature", "features"] },
-];
 
 // Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
 export const BLOCO_VAZIO = new Set(["_", " ", "\t", "-", "\u00b7", "\u2591", "\u2b1c", "\u25cb", "\u25fb", "\u25ab"]);
@@ -123,7 +30,6 @@ const DERIVADO = true;
  * @param {{ ACTIVE: string, ARCHIVE: string }} nomes  os caminhos, para as mensagens
  */
 export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
-  const archive = archiveRaw ?? "";
   const avisos = [];
   const warn = (msg, derivado = false) => avisos.push({ msg, derivado });
 
@@ -144,39 +50,37 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
     allIds.get(id).push(origem);
   };
 
+  // O backlog LIDO (#445): as tabelas vem do leitor partilhado, e daqui so sai o que se conta e o que se avisa.
+  const lido = leBacklog(active, archiveRaw);
+
   // 1) Items ABERTOS a partir das tabelas por tipo em backlog.md
   const ESFORCOS = ["s", "m", "l"];
-  for (const { key, re } of SECTIONS) {
-    const seccao = section(active, re);
+  for (const l of lido.linhasPorTipo) {
+    const { seccao: key, id } = l;
     // `Esforco` gate-ia todo o `ticket-method` (Fase 0, Fase 3, Fase 4) e era texto livre sem
     // validacao nenhuma — medido: um item com `Esforco = XXL` passava com exit 0. Um campo que
-    // decide o rigor do processo nao pode ser o unico sem rede.
-    const cabecalho = tableHeader(seccao);
-    const iEsforco = cabecalho ? cabecalho.indexOf("esforco") : -1;
-    for (const cells of tableRows(seccao)) {
-      const id = idDe(cells[0]);
-      if (iEsforco >= 0 && id) {
-        // `-`, `—` e `n/a` sao a convencao markdown para "vazio", e a celula vazia ja era
-        // tolerada de propósito. Reprovar a forma escrita e tolerar a vazia era incoerente.
-        const e = norm(cells[iEsforco] ?? "").replace(/^(?:-+|–|—|n\/a|\?)$/, ""); // `norm` ja tira a enfase
-        if (e && !ESFORCOS.includes(e)) {
-          warn(`${key}: item "${id}" tem Esforco "${cells[iEsforco]}" — esperado S, M ou L (ver a legenda do backlog)`);
-        }
+    // decide o rigor do processo nao pode ser o unico sem rede. `null` e a tabela sem a coluna: nao se valida.
+    if (l.esforco !== null && id) {
+      // `-`, `—` e `n/a` sao a convencao markdown para "vazio", e a celula vazia ja era
+      // tolerada de propósito. Reprovar a forma escrita e tolerar a vazia era incoerente.
+      const e = l.esforco.replace(/^(?:-+|–|—|n\/a|\?)$/, ""); // `norm` ja tira a enfase
+      if (e && !ESFORCOS.includes(e)) {
+        warn(`${key}: item "${id}" tem Esforco "${l.esforcoCelula}" — esperado S, M ou L (ver a legenda do backlog)`);
       }
-      const estado = norm(cells[1]);
-      trackId(id, `${key} (ativo)`);
-      if (OPEN_STATES.includes(estado)) {
-        abertos.add(id);
-        counts[key][estado]++;
-        counts[key].total++;
-      } else if (CLOSED_STATES.includes(estado)) {
-        warn(`${key}: item "${id}" esta "${cells[1]}" mas continua no ficheiro ativo — mover para backlog-archive.md`);
-        counts[key][estado]++;
-        counts[key].total++;
-      } else if (id) {
-        warn(`${key}: item "${id}" tem Estado desconhecido ("${cells[1]}")`);
-        counts[key].total++;
-      }
+    }
+    const estado = l.estado;
+    trackId(id, `${key} (ativo)`);
+    if (OPEN_STATES.includes(estado)) {
+      abertos.add(id);
+      counts[key][estado]++;
+      counts[key].total++;
+    } else if (CLOSED_STATES.includes(estado)) {
+      warn(`${key}: item "${id}" esta "${l.estadoCelula}" mas continua no ficheiro ativo — mover para backlog-archive.md`);
+      counts[key][estado]++;
+      counts[key].total++;
+    } else if (id) {
+      warn(`${key}: item "${id}" tem Estado desconhecido ("${l.estadoCelula}")`);
+      counts[key].total++;
     }
   }
 
@@ -196,7 +100,6 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
     }
   }
 
-  const ID_LIKE = /^[A-Z]{1,4}\d+$/;
   const contados = new Set(allIds.keys());
   for (const cells of tableRows(active)) {
     const id = idDe(cells[0]);
@@ -210,21 +113,19 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   const tipoToKey = {};
   for (const { key, tipos } of SECTIONS) for (const t of tipos) tipoToKey[t] = key;
 
-  for (const cells of tableRows(section(archive, /^##\s*Historico/i))) {
-    const id = idDe(cells[0]);
-    const tipo = norm(cells[1]);
-    const estado = norm(cells[3]);
+  for (const f of lido.fechados) {
+    const { id, tipo, estado } = f;
     trackId(id, "arquivo");
     const key = tipoToKey[tipo];
     if (!key) {
-      if (id) warn(`Arquivo: item "${id}" tem Tipo desconhecido ("${cells[1]}") — usar Bug/UX/Tecnica/Feature`);
+      if (id) warn(`Arquivo: item "${id}" tem Tipo desconhecido ("${f.tipoCelula}") — usar Bug/UX/Tecnica/Feature`);
       continue;
     }
     if (CLOSED_STATES.includes(estado)) {
       counts[key][estado]++;
       counts[key].total++;
     } else if (id) {
-      warn(`Arquivo: item "${id}" tem Estado invalido ("${cells[3]}") — deve ser Concluido ou Cancelado`);
+      warn(`Arquivo: item "${id}" tem Estado invalido ("${f.estadoCelula}") — deve ser Concluido ou Cancelado`);
     }
   }
 
@@ -236,22 +137,16 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   const fechados = new Set([...allIds].filter(([, o]) => o.includes("arquivo")).map(([id]) => id));
   const porque = (id) =>
     abertos.has(id) ? null : fechados.has(id) ? "esta fechado (vive no backlog-archive.md)" : "nao existe em nenhuma tabela por tipo";
-  const linhasAtivo = active.split("\n");
-  linhasAtivo.forEach((titulo, i) => {
-    if (!/^#{2,4}\s*Sprint\b/i.test(titulo)) return;
-    const fim = linhasAtivo.findIndex((l, j) => j > i && /^#{1,6}\s/.test(l));
-    const seccao = linhasAtivo.slice(i + 1, fim < 0 ? undefined : fim).join("\n");
-    const iId = (tableHeader(seccao) ?? []).indexOf("id");
-    if (iId < 0) return;
-    for (const cells of tableRows(seccao)) {
-      const id = idDe(cells[iId] ?? "");
-      const p = ID_LIKE.test(id) ? porque(id) : null;
-      if (p) warn(`${ACTIVE}: "${titulo.replace(/^#+\s*/, "")}" lista "${id}", que ${p}`);
+  // Um bloco sem a coluna ID tem `id: null` em cada linha, e o `ID_LIKE` nao o casa: nao ha ramo a parte para ele.
+  for (const b of lido.blocos) {
+    for (const l of b.linhas) {
+      const p = ID_LIKE.test(l.id) ? porque(l.id) : null;
+      if (p) warn(`${ACTIVE}: "${b.titulo}" lista "${l.id}", que ${p}`);
     }
-  });
+  }
   // So o PRIMEIRO ID da linha: e para la que ela aponta, e o resto e texto livre que pode citar outros.
   const proximo = /^\*\*Pr[oó]ximo:\*\*(.*)$/im.exec(active)?.[1] ?? "";
-  const alvo = proximo.split(/[^A-Za-z0-9]+/).find((w) => ID_LIKE.test(w));
+  const alvo = idsDe(proximo)[0];
   if (alvo && porque(alvo)) warn(`${ACTIVE}: **Proximo:** aponta para "${alvo}", que ${porque(alvo)}`);
 
   // 3) Duplicados de ID (um item vive num so sitio)

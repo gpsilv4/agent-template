@@ -14,7 +14,8 @@
  * Edita a LINHA CRUA: so o primeiro numero de cada celula, e a barra com o par de glifos do proprio ficheiro. O
  * negrito, as celulas a mais, o alinhamento, os `\|`, o `\r` de um ficheiro CRLF e o BOM ficam como estavam.
  */
-import { norm, SECTIONS, BLOCO_CHEIO, BLOCO_VAZIO } from "./backlog-calculo.mjs";
+import { BLOCO_CHEIO, BLOCO_VAZIO } from "./backlog-calculo.mjs";
+import { norm, SECTIONS } from "./backlog-itens.mjs";
 
 /** O par de um glifo da barra, quando ela so tem um dos dois (0 % ou 100 %). */
 const PAR = new Map([
