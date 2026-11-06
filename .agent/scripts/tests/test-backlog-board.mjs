@@ -149,7 +149,7 @@ caso("o `&` de um URL valido escapa-se no href, e o `javascript:` fica texto", (
 });
 caso("o JSON dos dados nao fecha o `<script>`, e ha exatamente dois `<script` (os dados e o inline)", () => {
   const html = vistaHostil();
-  const json = /<script type="application\/json" id="dados">([^]*?)<\/script>/.exec(html)?.[1] ?? "";
+  const json = /<script type="application\/json" id="dados">([^]*?)<\/script>/i.exec(html)?.[1] ?? "";
   return [...espera(json.length > 0 && !json.includes("</") && !json.includes("<"), `o JSON tem um "<": ${json.slice(0, 80)}`), ...espera((html.match(/<script/g) ?? []).length === 2, `scripts: ${(html.match(/<script/g) ?? []).length}`)];
 });
 caso("uma celula de ID hostil da um cartao cinzento escapado, sem id=, data-id nem href", () => {
@@ -167,7 +167,7 @@ caso("nada vai a rede, e os href sao so ancoras ou links das descricoes", () => 
 });
 caso("a CSP exata, com o hash do script inline que la esta", () => {
   const html = vista();
-  const script = /<script>([^]*?)<\/script>/.exec(html)?.[1] ?? "";
+  const script = /<script>([^]*?)<\/script>/i.exec(html)?.[1] ?? "";
   const hash = createHash("sha256").update(script, "utf8").digest("base64");
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'`;
   return espera(html.includes(`<meta http-equiv="Content-Security-Policy" content="${csp}">`), "a CSP nao e a esperada");
@@ -256,7 +256,7 @@ caso("o que o check-backlog acusa, a vista diz (um heading do Historico renomead
   return [...espera(/class="aviso"[^>]*>O check-backlog tem \d+ aviso\(s\); nao encontrei o Historico/.test(html), "sem o aviso"), ...espera(!vista().includes('class="aviso"'), "CONTROLO: a fixture valida deu um aviso")];
 });
 caso("o JS inline e JavaScript valido, e as funcoes injetadas correm sozinhas (sem imports)", () => {
-  const script = /<script>([^]*?)<\/script>/.exec(vista())?.[1] ?? "";
+  const script = /<script>([^]*?)<\/script>/i.exec(vista())?.[1] ?? "";
   try {
     new Function(script);
     const f = new Function(`${passaFiltro.toString()}\n${vistaParou.toString()}\nreturn [passaFiltro({ tipo: "UX", esforco: "s", prioridade: "", busca: "x" }, {}), vistaParou(0, 1, true, false, 30000)];`)();
@@ -305,7 +305,7 @@ caso("uma linha Concluido deixada numa tabela por tipo do ativo tem um cartao ci
 caso("o script inline vai com o fim de linha normalizado (o hash e o do texto que o browser ve)", () => [
   // Com fonte CRLF de facto (num checkout LF o caso de baixo passava mesmo sem a normalizacao).
   ...espera(normalizaFimDeLinha("a\r\nb\rc\n") === "a\nb\nc\n", JSON.stringify(normalizaFimDeLinha("a\r\nb\rc\n"))),
-  ...espera(!/\r/.test(/<script>([^]*?)<\/script>/.exec(vista())?.[1] ?? "\r"), "ha um \\r no script"),
+  ...espera(!/\r/.test(/<script>([^]*?)<\/script>/i.exec(vista())?.[1] ?? "\r"), "ha um \\r no script"),
 ]);
 caso("um ID invalido no Historico fica uma linha so de texto nos Fechados (e o total continua a bater)", () => {
   const html = vista(ACTIVE_OK, troca(ARCHIVE_OK, [["| B3 | Bug | bug fechado |", "| ~~B3~~ | Bug | bug fechado |"]]));
