@@ -209,9 +209,10 @@ not to* line, so every agent sees it.
 │   ├── market-scan.md          <- /market-scan — Market/competitor analysis + feature ideation
 │   ├── backlog-review.md       <- /backlog-review — Review the existing backlog against the code
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
-└── scripts/                    <- 11 entry points at the root: what you INVOKE
+└── scripts/                    <- 12 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
     ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
+    ├── backlog-board.mjs       <- A local, read-only HTML board of the backlog; --vigiar (#446)
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
     ├── check-codigo-morto.mjs  <- Imports nobody uses: dead code travels to derived projects
@@ -270,6 +271,8 @@ not to* line, so every agent sees it.
     │   ├── backlog-corrige.mjs <- --corrigir: rewrites only the derived counters, or nothing (#431)
     │   ├── backlog-itens.mjs   <- The backlog read once: the tickets, shared by the checker and the board (#445)
     │   ├── backlog-regras.mjs  <- The rules that are not counts: Ordem, "Depende de", struck-out rows, Pendentes (#445)
+    │   ├── backlog-vista.mjs   <- The backlog board HTML, pure: escape per context, CSP, detail rendered in Node (#446)
+    │   ├── backlog-vista-assets.mjs <- The board's inline CSS and JS (#446)
     │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── repo-origin.mjs     <- The owner/repo of a GitHub `origin` URL (#455)
@@ -456,12 +459,13 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every PR and push** (†) in the `guard-tests` job |
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every PR and push** (†) in the `guard-tests` job |
 | Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every PR and push** (†) in the `guard-tests` job |
+| Backlog board | `node .agent/scripts/backlog-board.mjs [--vigiar]` — writes `.agent/backlog-board.html`, a local read-only view (blocks, cards, filters, the closed items); refuses when that file or its `.tmp` is not in `.gitignore` (#446). **Not run in CI**: you run it by hand |
 | Sweep plan | the `Plano da varredura` step: runs the BASE commit's `lib/plano-ci.mjs` on the PR's diff and writes `aplica=true\|false` for the `sweep` job's `if:` — first step of the `guard-tests` job, PR only (#347) |
 | Commit messages | `.githooks/commit-msg` over every commit message in the range, and over the PR title in a PR (Conventional Commits prefix, no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
 | Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps, a new step before the suites that is not read-only (#362), or a step that skips on a literal `case` variable (#353) passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |
 | Guard Tests | `node .agent/scripts/tests/test-guards.mjs` — breaks each doc guard on purpose and asserts it warns and exits non-zero (runs on every PR and push (†) in the `guard-tests` job) |
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
-| Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns; `node .agent/scripts/tests/test-backlog-corrige.mjs` — `--corrigir` rewrites only the derived counters, and nothing when another warning is present (#431); `node .agent/scripts/tests/test-backlog-itens.mjs` — the shared reader, and the checker's output frozen before it moved onto it (#445); `node .agent/scripts/tests/test-backlog-regras.mjs` — each rule (Ordem, "Depende de", the archive, struck-out rows, Pendentes) warns, with its control (#445) (all four in the `guard-tests` job) |
+| Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns; `node .agent/scripts/tests/test-backlog-corrige.mjs` — `--corrigir` rewrites only the derived counters, and nothing when another warning is present (#431); `node .agent/scripts/tests/test-backlog-itens.mjs` — the shared reader, and the checker's output frozen before it moved onto it (#445); `node .agent/scripts/tests/test-backlog-regras.mjs` — each rule (Ordem, "Depende de", the archive, struck-out rows, Pendentes) warns, with its control (#445); `node .agent/scripts/tests/test-backlog-board.mjs` and `test-backlog-board-cli.mjs` — the board: cards, escape per context, CSP, the CLI and `--vigiar` (#446) (all six in the `guard-tests` job) |
 | Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks**, decided by the plan read from the base commit (#347): on a PR without them the shards are `skipped`, never started, and the gate recomputes the plan. Its own `sweep` job, in parallel: the full sweep split into 2 shards (the `Guard Tests` gate checks every shard reported) and `--skips`; run locally after touching a `check-*.mjs` |
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |

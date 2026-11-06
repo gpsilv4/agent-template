@@ -269,6 +269,8 @@ jobs:
             node .agent/scripts/tests/test-backlog-corrige.mjs \
             node .agent/scripts/tests/test-backlog-itens.mjs \
             node .agent/scripts/tests/test-backlog-regras.mjs \
+            node .agent/scripts/tests/test-backlog-board.mjs \
+            node .agent/scripts/tests/test-backlog-board-cli.mjs \
             node .agent/scripts/tests/test-minutos-ci.mjs \
             node .agent/scripts/tests/test-ci-exemplo.mjs \
             node .agent/scripts/tests/test-modo-upgrade.mjs \

@@ -601,3 +601,22 @@ Saiu do `scripts-guide.md` no #375, para dar lugar a entrada do `check-textos-pu
 O `check-codigo-morto.mjs` so olha para **imports**. Funcoes internas que ninguem chama e exportacoes por usar
 ficam de fora, e o cabecalho dele di-lo, com a razao: a classe que viaja para os derivados e a dos imports, e um
 analisador de ambito escrito a mao com defeitos era pior do que nenhum.
+
+## `minutos-ci` — o que cada modo mede (#429, #442)
+
+Por run, o cobrado (cada job arredondado ao minuto acima) e o real; `--passos` da a duracao de cada passo; a mediana
+dos PRs de app (o job mais longo de cada run) contra os 120 s, porque um job de 121 s paga 3 min. `--quota` le a
+faturacao da conta (`/users/<login>/settings/billing/usage`), soma so os repos PRIVADOS contra a quota gratis, projeta
+o fim do mes a partir do dia 3, e escreve `QUOTA: AVISO`/`ESGOTADA` (sai sempre 0: e o `/deploy` que para). Falha alto,
+nunca `0 min`: um zero que nao mediu era um portao a passar sobre nada.
+
+## `backlog-board` — a vista do backlog (#446)
+
+Gera `.agent/backlog-board.html` a partir do leitor partilhado (`lib/backlog-itens.mjs`) e do `calcula`. So de leitura:
+mudar um estado e pedi-lo ao agente (o botao "copiar pedido"), que segue o `backlog-method.md`. A seguranca: o texto
+divide-se em segmentos antes do escape, os IDs so viram link sobre o texto cru, um URL so passa se for `http(s)://`, os
+dados do JS vao num JSON com o `<` escapado, e uma CSP so deixa correr o script da propria pagina (pelo hash).
+`--vigiar` vigia a PASTA `.agent/context/` (um editor que grava por copia e rename deixava um watch de ficheiro no inode
+antigo), volta a gerar de 30 em 30 s para a hora (o `--batida`), e a pagina diz "o --vigiar parou" passadas tres batidas (90 s por omissao). Recusa num repo git
+em que a vista nao esta no `.gitignore`: um `git add -A` publicava o backlog. Fica fora do `/upgrade` parcial.
+

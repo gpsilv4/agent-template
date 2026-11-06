@@ -230,6 +230,38 @@ caso("fixture rica com uma linha solta: os avisos sao os de antes (a rede 1b)", 
 caso("fixture rica sem arquivo: os avisos sao os de antes", () =>
   igual(calcula(ATIVO_RICO, null, NOMES).avisos, CONGELADO.semArquivo.avisos, "o calcula mudou"));
 
+// O `Proximo:` (#446): o regex mudou-se LITERALMENTE do `calcula` para o leitor. Os avisos do `Proximo:` em cada cenario
+// foram capturados com o `calcula` de ANTES da mudanca; o acento, as maiusculas, duas linhas (vale a 1.a), a linha a meio
+// do ficheiro, e sem a linha.
+const L_PROXIMO = "**Proximo:** T9";
+const CENARIOS_PROXIMO = {
+  semProximo: ATIVO_RICO.replace(L_PROXIMO + "\n", ""),
+  comAcento: ATIVO_RICO.replace(L_PROXIMO, "**Próximo:** B9"),
+  maiusculas: ATIVO_RICO.replace(L_PROXIMO, "**PROXIMO:** B9"),
+  duasLinhas: ATIVO_RICO.replace(L_PROXIMO, L_PROXIMO + "\n\n**Proximo:** B9"),
+  aMeio: ATIVO_RICO.replace(L_PROXIMO + "\n", "").replace("## Pendentes sem Sprint", "**Proximo:** B9\n\n## Pendentes sem Sprint"),
+};
+const PROXIMO_CONGELADO = {
+  "semProximo": [],
+  "comAcento": [
+    "backlog.md: **Proximo:** aponta para \"B9\", que nao existe em nenhuma tabela por tipo"
+  ],
+  "maiusculas": [
+    "backlog.md: **Proximo:** aponta para \"B9\", que nao existe em nenhuma tabela por tipo"
+  ],
+  "duasLinhas": [
+    "backlog.md: **Proximo:** aponta para \"T9\", que esta fechado (vive no backlog-archive.md)"
+  ],
+  "aMeio": [
+    "backlog.md: **Proximo:** aponta para \"B9\", que nao existe em nenhuma tabela por tipo"
+  ]
+};
+caso("o Proximo: os avisos de antes em cada cenario (o acento, as maiusculas, duas linhas, a meio, sem ela)", () => {
+  const erros = Object.entries(CENARIOS_PROXIMO).filter(([, a]) => a === ATIVO_RICO).map(([k]) => `o cenario ${k} nao mudou a fixture`);
+  const agora = Object.fromEntries(Object.entries(CENARIOS_PROXIMO).map(([k, a]) => [k, calcula(a, ARQUIVO_RICO, NOMES).avisos.filter((x) => /Proximo/.test(x.msg)).map((x) => x.msg)]));
+  return [...erros, ...igual(agora, PROXIMO_CONGELADO, "o Proximo mudou")];
+});
+
 console.log("\n  O leitor\n");
 const lido = leBacklog(ATIVO_RICO, ARQUIVO_RICO);
 const doTipo = (id) => lido.linhasPorTipo.find((l) => l.id === id);
@@ -330,6 +362,13 @@ caso("tickets: a juncao por ID (o bloco e a ordem, a nota, o `noArquivo`), e a p
     ...igual([dup.tickets.get("B1")?.estado, dup.tickets.get("B1")?.ordem, dup.tickets.get("B1")?.descricao], ["pendente", "1", "um bug"], "a primeira ocorrencia ganha"),
   ];
 });
+
+caso("o proximo, o indice dos sprints fechados (pelo nome) e as colunas do ticket (#446)", () => [
+  ...igual(lido.proximo, { texto: " T9", alvo: "T9" }, "o proximo"),
+  ...igual(leBacklog(ATIVO_RICO.replace(L_PROXIMO + "\n", ""), ARQUIVO_RICO).proximo, { texto: null, alvo: null }, "sem a linha"),
+  ...igual(lido.sprintsFechados, [{ sprint: "S1", objetivo: "o primeiro", data: "2026-01-05" }], "o indice"),
+  ...espera(lido.tickets.get("B1")?.colunas?.severidade === "Alta", "as colunas no ticket"),
+]);
 
 caso("o placeholder vazio do template nao da linhas", () => {
   const vazio = leBacklog("## 1. Bugs\n\n| ID | Estado | Problema |\n|---|---|---|\n| | | |\n\n### Sprint 1\n\n| Ordem | ID |\n|---|---|\n| | |\n", "");

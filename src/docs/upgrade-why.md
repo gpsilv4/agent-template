@@ -579,6 +579,15 @@ todas as redes. Um derivado privado pediu-o, e tinha os quatro casos no seu back
 3. **Um script proprio do projeto que importe o `norm`, o `SECTIONS`, o `OPEN_STATES` ou o `CLOSED_STATES` de
    `lib/backlog-calculo.mjs`** tem de passar a importa-los de `lib/backlog-itens.mjs`. Sairam de la sem reexportar.
 
+## Porque chega uma vista do backlog, e o `.gitignore` muda (#446)
+
+**O que muda.** `node .agent/scripts/backlog-board.mjs` gera `.agent/backlog-board.html`: uma vista local, so de
+leitura, do `backlog.md` e do arquivo (os blocos, os cartoes, os filtros, os fechados). `--vigiar` mantem-na atualizada.
+
+**O que isto pede a um derivado:** a linha `.agent/backlog-board.html` (e `.agent/backlog-board.html.tmp`) no
+`.gitignore`, que no `/upgrade` e "diff e decidir". **Sem ela, o script recusa gerar**: o backlog tem detalhes do
+projeto, e um `git add -A` publicava-o. Num projeto parcial a vista nao vem; ver `upgrade-parcial.md`.
+
 ## Porque o CI so cancela um run em curso num PR (#427)
 
 O `concurrency:` do `ci.yml` tinha `cancel-in-progress: true` para todos os eventos. Num PR e o que poupa minutos: um

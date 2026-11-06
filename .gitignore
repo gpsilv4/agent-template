@@ -58,3 +58,7 @@ id_ed25519*
 .git-credentials
 credentials*
 secrets/
+
+# A vista do backlog (#446): local, so de leitura, com detalhes do projeto — nunca se publica.
+.agent/backlog-board.html
+.agent/backlog-board.html.tmp
