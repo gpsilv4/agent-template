@@ -46,10 +46,10 @@
 > F12", "valor por confirmar") — sem isso, um item volta a ser discutido de zero cada vez que
 > se planeia um sprint.
 >
-> **Prioridade nao se escreve aqui nem no sprint.** No sprint, a `Ordem` **e** a prioridade;
-> uma coluna de urgencia ao lado dela seriam dois campos a ter de concordar a mao, sem nada a
-> verifica-los — e ao primeiro reordenar o documento passa a mentir (ver `TP1`). Nesta tabela
-> nao ha ordem porque a decisao ainda nao foi tomada: o que falta e a **razao**, nao um rotulo.
+> **A ordem nao se escreve aqui.** No sprint, a `Ordem` **e** a ordem de execucao (o `check-backlog` verifica-a);
+> nesta tabela nao ha ordem porque a decisao ainda nao foi tomada: o que falta e a **razao**, nao um rotulo. Uma
+> coluna `Prioridade` e opcional (o valor, como a Priority do Jira, e nao a ordem): "importante, mas depois" e
+> informacao, e vive na tabela do bloco. O formato completo esta no `backlog-method.md`.
 
 | ID | Descricao | Esforco | Nota |
 |----|-----------|---------|------|

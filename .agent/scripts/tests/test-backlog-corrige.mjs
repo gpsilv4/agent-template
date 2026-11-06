@@ -65,6 +65,20 @@ caso("os contadores errados reescrevem-se, e NADA mais muda (BOM, CRLF, celula a
   ];
 });
 
+// Um aviso de uma REGRA (#445 PR 2) nao e uma contagem: com ele, o `--corrigir` nao reescreve nada, nem os contadores.
+caso("com um aviso de uma regra (a Ordem) e um contador errado, nao reescreve nada", (dir) => {
+  // As trocas sobre a BASE (LF), e o CRLF/BOM depois: sobre o `CERTO` (CRLF), um `\n` na troca nao casava, e o caso
+  // testava so o contador. Cada troca tem de casar (um `replace` que nao casa e silencioso).
+  const ORDEM = ["| 1 | B2 | outra coisa | M | — |\n| 2 | UX1 | melhorar algo | S | B2 |", "| 2 | B2 | outra coisa | M | — |\n| 1 | UX1 | melhorar algo | S | — |"];
+  const TOTAL = ["| **Total** | **6** |", "| **Total** | **7** |"];
+  const naoCasou = [ORDEM, TOTAL].filter(([de]) => !BASE.includes(de)).map(([de]) => `a fixture nao tem: ${de.slice(0, 40)}`);
+  if (naoCasou.length) return naoCasou;
+  const errado = hostil(BASE.replace(...ORDEM).replace(...TOTAL));
+  writeF(dir, A, errado);
+  const r = run(dir, undefined, ["--corrigir"]);
+  return [...(r.code !== 0 ? [] : ["saiu 0 com um aviso de regra"]), ...(readF(dir, A) === errado ? [] : ["reescreveu com um aviso que nao e uma contagem"])];
+});
+
 caso("idempotente: um ficheiro consistente fica igual", (dir) => {
   writeF(dir, A, CERTO);
   const r = run(dir, undefined, ["--corrigir"]);

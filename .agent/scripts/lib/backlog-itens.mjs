@@ -9,9 +9,9 @@
  * Quem avisa e o `calcula`. Uma linha estranha (sem ID, com um estado desconhecido) VEM na mesma, como esta: e o
  * `calcula` que decide o que ela conta e o que ela diz.
  *
- * LE PELOS SITIOS DE SEMPRE (PR 1 do #445, sem mudar comportamento): nas tabelas por tipo o Estado e a 2.a coluna e a
- * descricao a 3.a, e o Historico do arquivo le-se por posicao. Ler tudo pelo nome das colunas e o PR 2. Os campos que
- * so o PR 2 e a vista usam (`ordem`, `prioridade`, `dependeDe`, `nota`, `objetivo`) leem-se ja pelo nome.
+ * ONDE LE: nas tabelas por tipo, o Estado e a 2.a coluna e a descricao a 3.a (como sempre); o Historico, os blocos e os
+ * Pendentes pelo NOME das colunas (#445). Um bloco e uma tabela com `Ordem` e `ID` (as regras estao em
+ * `lib/backlog-regras.mjs`, e o `calcula` passa-as como avisos).
  */
 
 // Remove acentos e normaliza para comparar de forma resiliente.
@@ -40,6 +40,10 @@ export function norm(s) {
  *  tolerancia a dois campos e a um terceiro nao e pior do que nao a dar a nenhum: e uma
  *  incoerencia que abre uma porta que ninguem procura. */
 export const idDe = (celula) => norm(celula).toUpperCase();
+
+/** Os estados de um ticket: os abertos vivem no ativo, os fechados no arquivo. */
+export const OPEN_STATES = ["pendente", "a fazer"];
+export const CLOSED_STATES = ["concluido", "cancelado"];
 
 /** A forma de um ID (`B7`, `UX12`, `T58`). */
 export const ID_LIKE = /^[A-Z]{1,4}\d+$/;
@@ -161,6 +165,7 @@ function linhasPorTipo(active) {
         seccao: key,
         id: idDe(cells[0]),
         idCelula: cells[0],
+        ...riscoDe(cells[0]),
         estado: norm(cells[1]),
         estadoCelula: cells[1],
         // `null` sem a coluna, e `""` com a celula vazia: o `calcula` so valida o Esforco quando a coluna existe.
@@ -174,64 +179,149 @@ function linhasPorTipo(active) {
   return out;
 }
 
-/** As linhas do Historico do arquivo, por posicao (`ID | Tipo | Descricao | Estado | Sprint | Versao | Data`). */
-function fechados(archive) {
-  return tableRows(section(archive ?? "", /^##\s*Historico/i)).map((cells) => ({
-    id: idDe(cells[0]),
-    idCelula: cells[0],
-    tipo: norm(cells[1]),
-    tipoCelula: cells[1],
-    descricao: cells[2] ?? "",
-    estado: norm(cells[3]),
-    estadoCelula: cells[3],
-    sprint: cells[4] ?? "",
-    versao: cells[5] ?? "",
-    data: cells[6] ?? "",
-  }));
-}
+/** O `~~X~~`: o `id` NAO muda (um riscado nao casa o `ID_LIKE`, e a rede 2b e o `trackId` ficam iguais); `idLimpo` e so
+ *  para a mensagem dizer qual e (#445 PR 2). */
+const riscoDe = (celula) => ({ riscado: /~~/.test(celula ?? ""), idLimpo: idDe((celula ?? "").replace(/~~/g, "")) });
 
-/** As tabelas de bloco: as secoes `##`-`####` cujo titulo comeca por `Sprint`, ate ao heading seguinte. Sem a coluna
- *  `ID`, o bloco vem com `temId: false` e as linhas com `id: null`. */
-function blocos(active) {
-  const linhas = active.split("\n");
+/** As tabelas de um texto, cada uma com o seu cabecalho, as linhas e onde comeca: uma tabela acaba numa linha que nao
+ *  comeca por `|`. As tabelas por tipo NAO passam por aqui (o `calcula` le-as como sempre); os blocos e o arquivo sim. */
+export function tabelasDe(texto) {
+  const linhas = (texto ?? "").split("\n");
   const out = [];
-  linhas.forEach((titulo, i) => {
-    if (!/^#{2,4}\s*Sprint\b/i.test(titulo)) return;
-    const fim = linhas.findIndex((l, j) => j > i && /^#{1,6}\s/.test(l));
-    const seccao = linhas.slice(i + 1, fim < 0 ? undefined : fim).join("\n");
-    const cabecalho = tableHeader(seccao) ?? [];
-    const temId = cabecalho.includes("id");
-    out.push({
-      titulo: titulo.replace(/^#+\s*/, ""),
-      // `> Objetivo: x`, `> **Objetivo:** x`, `> **Objetivo**: x`, `> _Objetivo:_ x`; e nao `> Objetivos: x`. O texto vem como
-      // esta (com a enfase do meio): e para mostrar.
-      objetivo: /^>\s*[*_]*Objetivo[*_]*\s*:[*_]*\s*(.*)$/im.exec(seccao)?.[1].trim() ?? null,
-      temId,
-      linhas: tableRows(seccao).map((cells) => ({
-        ordem: pelaColuna(cabecalho, cells, "ordem"),
-        id: temId ? idDe(pelaColuna(cabecalho, cells, "id")) : null,
-        descricao: pelaColuna(cabecalho, cells, "descricao"),
-        ...((e) => ({ esforco: e.v, esforcoCelula: e.c }))(parDe(cabecalho, cells, "esforco")),
-        prioridade: pelaColuna(cabecalho, cells, "prioridade"),
-        dependeDe: leDependeDe(pelaColuna(cabecalho, cells, "depende de")),
-      })),
-    });
-  });
+  for (let i = 0; i < linhas.length; i++) {
+    if (!linhas[i].trim().startsWith("|")) continue;
+    let f = i;
+    while (f < linhas.length && linhas[f].trim().startsWith("|")) f++;
+    // O cabecalho e a 1.a linha que nao e o separador, e sai EXPLICITAMENTE: o `tableRows` so o reconhece pela 1.a celula
+    // (`ID`, `Ordem`…), e um `| Prioridade | Ordem | ID |` era lido como uma linha de dados.
+    const tabela = linhas.slice(i, f);
+    const iCab = tabela.findIndex((l) => !/^\|[\s|:-]+\|?$/.test(l.trim()));
+    const corpo = tabela.filter((_, k) => k !== iCab).join("\n");
+    out.push({ inicio: i, cabecalho: tableHeader(tabela.join("\n")) ?? [], linhas: tableRows(corpo) });
+    i = f - 1;
+  }
   return out;
 }
 
+/** O heading imediatamente acima da linha `i` (o indice e o texto sem os `#`), ou `null`. */
+function headingAntes(linhas, i) {
+  for (let j = i - 1; j >= 0; j--) if (/^#{1,6}\s/.test(linhas[j])) return { i: j, texto: linhas[j].replace(/^#+\s*/, ""), linha: linhas[j] };
+  return null;
+}
+
+/** As linhas do Historico do arquivo, pelo NOME das colunas (#445 PR 2: por posicao, uma coluna acrescentada antes do
+ *  Estado dava avisos falsos em todas as linhas). Uma coluna em falta da `null` nesse campo. */
+function fechados(archive) {
+  const seccao = section(archive ?? "", /^##\s*Historico/i);
+  const cab = tableHeader(seccao);
+  return tableRows(seccao).map((cells) => {
+    const tipo = pelaColuna(cab, cells, "tipo");
+    const estado = pelaColuna(cab, cells, "estado");
+    const id = pelaColuna(cab, cells, "id") ?? "";
+    return {
+      id: idDe(id),
+      idCelula: id,
+      tipo: tipo === null ? null : norm(tipo),
+      tipoCelula: tipo,
+      descricao: pelaColuna(cab, cells, "descricao") ?? "",
+      estado: estado === null ? null : norm(estado),
+      estadoCelula: estado,
+      sprint: pelaColuna(cab, cells, "sprint") ?? "",
+      versao: pelaColuna(cab, cells, "versao") ?? "",
+      data: pelaColuna(cab, cells, "data") ?? "",
+    };
+  });
+}
+
+/** As colunas que o Historico TEM de ter e nao tem (so com o arquivo e o heading presentes, e com uma tabela). */
+function colunasEmFaltaNoHistorico(archive) {
+  if (archive === null || !/^##\s*Historico/im.test(archive)) return [];
+  const cab = tableHeader(section(archive, /^##\s*Historico/i));
+  return cab ? ["id", "tipo", "estado"].filter((c) => !cab.includes(c)) : [];
+}
+
+/** Os IDs das tabelas do arquivo, pela coluna `ID` (o indice de sprints nao a tem, e nao da nenhum). Os do proprio
+ *  Historico vem tambem, e estao la por definicao: a regra so diz os que la NAO estao (sem filtros que nenhum teste
+ *  distinguisse, `TP7`). */
+function arquivoForaDoHistorico(archive) {
+  const linhas = (archive ?? "").split("\n");
+  const out = [];
+  for (const t of tabelasDe(archive)) {
+    const h = headingAntes(linhas, t.inicio);
+    for (const cells of t.linhas) {
+      const id = idDe((pelaColuna(t.cabecalho, cells, "id") ?? "").replace(/~~/g, ""));
+      if (ID_LIKE.test(id)) out.push({ id, titulo: h?.texto ?? "" });
+    }
+  }
+  return out;
+}
+
+/**
+ * Os BLOCOS, pelo CABECALHO (#445 PR 2): toda a tabela do ativo com as colunas `Ordem` e `ID`, seja qual for o titulo. O
+ * `titulo` e o heading acima (`(tabela 2)` para a segunda debaixo do mesmo); o `objetivo` e o `fecho` sao as linhas `>`
+ * entre o heading e a 1.a tabela dele. Devolve tambem o que PARECE um bloco e nao o e, para avisar (`TP2`):
+ *  - `semId`: uma tabela com `Ordem` e sem `ID` (um bloco com a coluna mal nomeada passava calado);
+ *  - `sprintSemOrdem`: uma tabela com `ID` e sem `Ordem` debaixo de um `Sprint` (a rede 2b de antes valia la).
+ */
+function blocos(active) {
+  const linhas = active.split("\n");
+  const out = [];
+  const semId = [];
+  const sprintSemOrdem = [];
+  const porHeading = new Map();
+  for (const t of tabelasDe(active)) {
+    const h = headingAntes(linhas, t.inicio);
+    const n = (porHeading.get(h?.i ?? -1) ?? 0) + 1;
+    porHeading.set(h?.i ?? -1, n);
+    const titulo = (h?.texto ?? "") + (n > 1 ? ` (tabela ${n})` : "");
+    const temOrdem = t.cabecalho.includes("ordem");
+    const temId = t.cabecalho.includes("id");
+    if (temOrdem && !temId) semId.push({ titulo });
+    if (!temOrdem && temId && h && /^#{2,4}\s*Sprint\b/i.test(h.linha)) sprintSemOrdem.push({ titulo });
+    if (!temOrdem || !temId) continue;
+    const prefacio = n === 1 ? linhas.slice((h?.i ?? -1) + 1, t.inicio).join("\n") : "";
+    const cab = t.cabecalho;
+    out.push({
+      titulo,
+      cabecalho: cab,
+      // `> Objetivo: x`, `> **Objetivo:** x`, `> **Objetivo**: x`, `> _Objetivo:_ x`; e nao `> Objetivos: x`. O texto vem como
+      // esta (com a enfase do meio): e para mostrar. O `> Fecho:` le-se para a vista; o guarda nao o usa.
+      objetivo: /^>\s*[*_]*Objetivo[*_]*\s*:[*_]*\s*(.*)$/im.exec(prefacio)?.[1].trim() ?? null,
+      fecho: /^>\s*[*_]*Fecho[*_]*\s*:[*_]*\s*(.*)$/im.exec(prefacio)?.[1].trim() ?? null,
+      linhas: t.linhas.map((cells) => {
+        const idCelula = pelaColuna(cab, cells, "id");
+        return {
+          ordem: pelaColuna(cab, cells, "ordem"),
+          id: idDe(idCelula),
+          idCelula,
+          ...riscoDe(idCelula),
+          descricao: pelaColuna(cab, cells, "descricao"),
+          ...((e) => ({ esforco: e.v, esforcoCelula: e.c }))(parDe(cab, cells, "esforco")),
+          prioridade: pelaColuna(cab, cells, "prioridade"),
+          dependeDe: leDependeDe(pelaColuna(cab, cells, "depende de")),
+        };
+      }),
+    });
+  }
+  return { blocos: out, semId, sprintSemOrdem };
+}
+
+/** O heading dos Pendentes, TOLERANTE (decidido a 5 nov): um emoji no inicio, e `Pendentes sem Sprint` ou `Pendente (sem
+ *  sprint)` — as formas dos dois derivados. A coluna `Nota` e estrita (renomeia-se). */
+const RE_PENDENTES = /^#{2,3}\s*(?:\d+\.\s*)?(?:\p{Extended_Pictographic}\S*\s*)?Pendentes?\s*\(?sem sprint\)?/iu;
+
 /** A tabela dos Pendentes sem Sprint: a `Nota` pelo nome (`null` sem a coluna). `null` inteiro SEM o heading, e `[]`
  *  com ele e sem linhas: "a secao foi renomeada" e "nao ha pendentes" pedem coisas diferentes (`TP2`). */
-const RE_PENDENTES = /^##\s*Pendentes sem Sprint/i;
 function pendentes(active) {
-  if (!active.split("\n").some((l) => RE_PENDENTES.test(l))) return null;
+  if (!active.split("\n").some((l) => RE_PENDENTES.test(l))) return { ps: null, temNota: false, temTabela: false };
   const seccao = section(active, RE_PENDENTES);
   const cabecalho = tableHeader(seccao);
-  return tableRows(seccao).map((cells) => {
+  const ps = tableRows(seccao).map((cells) => {
     const id = pelaColuna(cabecalho, cells, "id");
     const e = parDe(cabecalho, cells, "esforco");
-    return { id: id === null ? null : idDe(id), descricao: pelaColuna(cabecalho, cells, "descricao"), esforco: e.v, esforcoCelula: e.c, nota: pelaColuna(cabecalho, cells, "nota") };
+    return { id: id === null ? null : idDe(id), ...riscoDe(id), descricao: pelaColuna(cabecalho, cells, "descricao"), esforco: e.v, esforcoCelula: e.c, nota: pelaColuna(cabecalho, cells, "nota") };
   });
+  return { ps, temNota: (cabecalho ?? []).includes("nota"), temTabela: cabecalho !== null };
 }
 
 /**
@@ -242,8 +332,8 @@ function pendentes(active) {
 export function leBacklog(active, archiveRaw) {
   const porTipo = linhasPorTipo(active);
   const arquivo = fechados(archiveRaw);
-  const bs = blocos(active);
-  const ps = pendentes(active);
+  const { blocos: bs, semId, sprintSemOrdem } = blocos(active);
+  const { ps, temNota, temTabela } = pendentes(active);
   // A JUNCAO (o pedido do #445): um ticket por ID, a partir das tabelas por tipo. E um `Map` (a ordem e a das tabelas);
   // para embutir em JSON, `[...tickets.values()]` — o `JSON.stringify` de um `Map` da `{}`. Com um ID repetido fica a PRIMEIRA
   // linha: o duplicado e o `calcula` que o diz. Uma linha sem ID nao e um ticket.
@@ -266,6 +356,18 @@ export function leBacklog(active, archiveRaw) {
   // `noArquivo` e "o ID tambem esta no Historico" (um duplicado), e NAO "fechado": o fechado e o Estado.
   for (const t of tickets.values()) t.noArquivo = fechadosIds.has(t.id);
   // O que se procurou e NAO se encontrou (`TP2`): sem isto, uma secao renomeada e uma secao vazia davam o mesmo `[]`.
-  const encontradas = { historico: /^##\s*Historico/im.test(archiveRaw ?? ""), pendentes: ps !== null };
-  return { linhasPorTipo: porTipo, fechados: arquivo, blocos: bs, pendentes: ps, tickets, encontradas };
+  const encontradas = { arquivo: archiveRaw !== null, historico: /^##\s*Historico/im.test(archiveRaw ?? ""), pendentes: ps !== null, tabelaNosPendentes: temTabela, notaNosPendentes: temNota };
+  return {
+    linhasPorTipo: porTipo,
+    fechados: arquivo,
+    blocos: bs,
+    pendentes: ps,
+    tickets,
+    encontradas,
+    // O que so as regras leem (#445 PR 2).
+    semId,
+    sprintSemOrdem,
+    colunasEmFaltaNoHistorico: colunasEmFaltaNoHistorico(archiveRaw),
+    arquivoForaDoHistorico: arquivoForaDoHistorico(archiveRaw),
+  };
 }

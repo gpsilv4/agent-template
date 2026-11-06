@@ -545,6 +545,40 @@ nao o tem, ou o tem a meias: trazer JUNTOS o `if:`, o `id: install` e o `case "$
 `tests-portao-ci.mjs` diz `SKIP` com a razao. Outra forma do `if:` (uma cauda, um `&&`, `! cancelled()`) e uma marca
 que reprova.
 
+## Porque o `check-backlog` passa a verificar a ordem e o "Depende de" (#445)
+
+**O problema.** A ordem de execucao de um bloco vivia numa coluna `Ordem` que ninguem verificava, ou em prosa. Um
+"Depende de" podia apontar para um ticket que so se faz depois, e uma linha riscada (`~~X~~`) ficava no ativo, fora de
+todas as redes. Um derivado privado pediu-o, e tinha os quatro casos no seu backlog.
+
+**O que muda.**
+- O `check-backlog` le o backlog por um leitor partilhado (`lib/backlog-itens.mjs`, o mesmo da vista do #446) e aplica
+  as regras de `lib/backlog-regras.mjs`:
+  - a `Ordem` de cada bloco cresce, sem repetidos, e cada linha de bloco tem ID;
+  - o "Depende de" aponta para um ID que existe e, se esta aberto, vem antes;
+  - nao ha linhas riscadas;
+  - os Pendentes sem Sprint tem o heading e a coluna `Nota`;
+  - o Historico tem o heading e as colunas ID, Tipo e Estado, lidas pelo nome;
+  - uma tabela com `Ordem` tem `ID`, e uma tabela com `ID` debaixo de um `Sprint` tem `Ordem`;
+  - uma tabela do arquivo fora do Historico so cita IDs que estejam no Historico.
+- Um bloco e qualquer tabela com `Ordem` e `ID`, seja qual for o titulo.
+- O formato completo esta no `backlog-method.md`.
+
+**O que isto pede a um derivado — e REPROVA ate estar feito** (decidido no `/grill` do #445).
+1. **Antes do commit do `/upgrade`,** correr o `node .agent/scripts/check-backlog.mjs` novo sobre o backlog do projeto, e
+   corrigir o que ele diz:
+   - renumerar uma `Ordem` fora de ordem;
+   - num par "num so PR", deixar so a linha de depois a citar a de antes;
+   - mover uma dependencia aberta para um bloco anterior, ou marca-la `Bloqueado: <motivo>`;
+   - fechar as linhas riscadas;
+   - renomear a coluna dos Pendentes para `Nota` (e ter o heading `## Pendentes sem Sprint`);
+   - dar `Ordem` a um `### Sprint` que so tem `ID`, e `ID` a uma tabela que so tem `Ordem`;
+   - por no Historico um ID que uma tabela do arquivo cite fora dele.
+2. **As mensagens dizem a linha e o porque.** Nenhuma e `derivado`, por isso o `--corrigir` nao as reescreve: reordenar
+   e fechar sao decisoes de uma pessoa.
+3. **Um script proprio do projeto que importe o `norm`, o `SECTIONS`, o `OPEN_STATES` ou o `CLOSED_STATES` de
+   `lib/backlog-calculo.mjs`** tem de passar a importa-los de `lib/backlog-itens.mjs`. Sairam de la sem reexportar.
+
 ## Porque o CI so cancela um run em curso num PR (#427)
 
 O `concurrency:` do `ci.yml` tinha `cancel-in-progress: true` para todos os eventos. Num PR e o que poupa minutos: um

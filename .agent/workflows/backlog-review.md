@@ -124,7 +124,7 @@ FECHAR errado fecha trabalho por fazer, e e o veredicto que mais custa.
 | AGRUPAR | o que fica: ATUALIZAR; o outro "Ao cancelar um item", com "agrupado em X" | o outro fechado como duplicado, com a referencia |
 | FECHAR (feito) | "Ao concluir um item". O commit que o fez vai na **descricao** (o Historico nao tem coluna de PR). No "Resumo" desce o contador do estado em que o item **estava** — um feito "de lado" esta quase sempre `Pendente`, nao `A Fazer` | `gh issue close` com o PR/commit |
 | FECHAR (obsoleto) | "Ao cancelar um item", com a razao | `gh issue close --reason "not planned"`, com a razao |
-| REORDENAR | a `Ordem` do sprint **e a linha `Proximo:`** — o `check-backlog` so verifica que aponta para um item aberto, nao que e o primeiro. De "Pendentes sem Sprint" para um sprint: a linha sai de la e entra na tabela do sprint, com `Ordem` | o corpo do issue do plano (sem ele: perguntar onde) |
+| REORDENAR | a `Ordem` do sprint (renumerar: a ordem das linhas e a de execucao, e o `check-backlog` reprova se nao crescer, ou se um "Depende de" ficar depois) **e a linha `Proximo:`** — o `check-backlog` so verifica que aponta para um item aberto, nao que e o primeiro. De "Pendentes sem Sprint" para um sprint: a linha sai de la e entra na tabela do sprint, com `Ordem` | o corpo do issue do plano (sem ele: perguntar onde) |
 
 Depois de aplicar, num derivado: `node .agent/scripts/check-backlog.mjs` — os contadores sao
 derivados, nunca a olho.

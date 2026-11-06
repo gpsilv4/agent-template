@@ -405,4 +405,10 @@ test("backlog vazio (estado do template) passa sem avisos", (dir) => {
     ARCHIVE_OK.replace(/^\| (B3|T1|F1) \|.*$/gm, "| | | | | | | |"));
 }, { code: 0, includes: ["Backlog vazio (template) — nada a validar"], excludes: ["  WARN  "] });
 
+// As regras que nao sao contagens (#445 PR 2) reprovam pelo CLI: um aviso delas sai com 1. O `warn(msg)` do `calcula`
+// que as entrega e um sitio do par dele (`--only=backlog`), e e este caso que o mata.
+test("regras: uma Ordem que desce no bloco reprova pelo CLI (exit 1)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace("| 1 | B2 | outra coisa | M | — |\n| 2 | UX1 | melhorar algo | S | B2 |", "| 2 | B2 | outra coisa | M | — |\n| 1 | UX1 | melhorar algo | S | — |"));
+}, { code: 1, includes: ["a Ordem nao cresce em UX1"] });
+
 resumo();

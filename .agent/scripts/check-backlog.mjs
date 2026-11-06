@@ -6,7 +6,9 @@
  * e do Historico (items fechados em `backlog-archive.md`), e avisa se o que
  * esta escrito no Resumo / Progresso Geral divergir. Deteta tambem:
  *   - IDs duplicados (um item deve viver num so ficheiro);
- *   - items fechados (Concluido/Cancelado) esquecidos no ficheiro ativo.
+ *   - items fechados (Concluido/Cancelado) esquecidos no ficheiro ativo;
+ *   - o formato (#445, `lib/backlog-regras.mjs`): a `Ordem` de cada bloco, o "Depende de", as linhas riscadas, os
+ *     Pendentes sem Sprint (e a coluna `Nota`) e o Historico lido pelo nome das colunas.
  *
  * Tolerante a template vazio: linhas-placeholder (sem ID) sao ignoradas,
  * nunca rebenta em tabelas por preencher.

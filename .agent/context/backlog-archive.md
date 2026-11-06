@@ -9,6 +9,8 @@
 >   - consultar como um item passado foi resolvido.
 > O trabalho **ativo/aberto** (Pendente, A Fazer) vive em `backlog.md`. Um item so existe num
 > dos dois ficheiros — ao fechar, **move-se** de `backlog.md` para aqui (nao se duplica).
+> Fora do "Historico (Fechados)" (os sprints fechados, notas) e historia livre; uma tabela com a coluna `ID`
+> so cita IDs que estejam no Historico (o `check-backlog` verifica-o).
 > Atualizado: {{DATE}}
 
 **Coluna `Tipo`**: `Bug` | `UX` | `Tecnica` | `Feature` (usada para recalcular os contadores por seccao).

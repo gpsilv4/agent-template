@@ -14,8 +14,8 @@ import { dirname, resolve, join } from "path";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
-/** As libs do checker e do `--corrigir` (#431), e o leitor que o calculo usa (#445), copiadas para a sandbox. */
-const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs", "backlog-itens.mjs"];
+/** As libs do checker e do `--corrigir` (#431), e o leitor e as regras que o calculo usa (#445), copiadas para a sandbox. */
+const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs", "backlog-itens.mjs", "backlog-regras.mjs"];
 
 // --- A fixture valida -------------------------------------------------------
 // Contas que ela codifica (o checker tem de chegar exatamente a estas):
@@ -78,6 +78,12 @@ const ACTIVE_OK = `# Backlog
 |-------|-----|-----------|---------|------------|
 | 1 | B2 | outra coisa | M | — |
 | 2 | UX1 | melhorar algo | S | B2 |
+
+## Pendentes sem Sprint
+
+| ID | Descricao | Esforco | Nota |
+|----|-----------|---------|------|
+| | | | |
 `;
 
 const ARCHIVE_OK = `# Backlog Archive
