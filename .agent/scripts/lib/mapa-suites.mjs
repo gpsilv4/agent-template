@@ -46,7 +46,7 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/tests\/test-backlog-regras\.mjs$/, verifica: [S("test-backlog-regras.mjs")] },
   { re: /^\.agent\/scripts\/tests\/test-backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs")] },
   // A vista do backlog (#446): o gerador e os assets pela suite dele (sem processos); o CLI e o `--vigiar` pela outra.
-  { re: /^\.agent\/scripts\/lib\/backlog-vista(?:-assets)?\.mjs$/, verifica: [S("test-backlog-board.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog-vista" },
+  { re: /^\.agent\/scripts\/lib\/backlog-vista(?:-assets|-pecas)?\.mjs$/, verifica: [S("test-backlog-board.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog-vista" },
   { re: /^\.agent\/scripts\/backlog-board\.mjs$/, verifica: [S("test-backlog-board-cli.mjs")], only: "backlog-board" },
   { re: /^\.agent\/scripts\/tests\/test-backlog-board\.mjs$/, verifica: [S("test-backlog-board.mjs")] },
   { re: /^\.agent\/scripts\/tests\/test-backlog-board-cli\.mjs$/, verifica: [S("test-backlog-board-cli.mjs")] },

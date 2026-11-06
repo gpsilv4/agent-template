@@ -68,7 +68,7 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 <!-- fecho:fim -->
 
 **A vista do backlog** (`backlog-board.mjs`, #446) nao vem: nao e fronteira. Um projeto parcial que a queira copia o
-`backlog-board.mjs`, as duas libs dela (`lib/backlog-vista.mjs` e `lib/backlog-vista-assets.mjs`), o leitor
+`backlog-board.mjs`, as tres libs dela (`lib/backlog-vista.mjs`, `lib/backlog-vista-pecas.mjs` e `lib/backlog-vista-assets.mjs`), o leitor
 (`lib/backlog-itens.mjs`, que ja vem) e as duas linhas do `.gitignore`: `.agent/backlog-board.html` e
 `.agent/backlog-board.html.tmp` (o CLI recusa sem qualquer uma delas).
 

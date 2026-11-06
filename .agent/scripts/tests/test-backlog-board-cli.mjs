@@ -14,7 +14,7 @@ import { join } from "path";
 import { ACTIVE_OK, ARCHIVE_OK } from "./harness/test-backlog-harness.mjs";
 
 const SCRIPTS = join(import.meta.dirname, "..");
-const LIBS = ["backlog-itens.mjs", "backlog-calculo.mjs", "backlog-regras.mjs", "backlog-vista.mjs", "backlog-vista-assets.mjs"];
+const LIBS = ["backlog-itens.mjs", "backlog-calculo.mjs", "backlog-regras.mjs", "backlog-vista.mjs", "backlog-vista-pecas.mjs", "backlog-vista-assets.mjs"];
 const SAIDA = ".agent/backlog-board.html";
 
 let passed = 0;

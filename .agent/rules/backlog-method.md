@@ -31,7 +31,7 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 - **Os Pendentes sem Sprint** tem a coluna `Nota`, com esse nome.
 - **Uma linha riscada** (`~~X~~`) num bloco, nos Pendentes ou numa tabela por tipo e um fecho a meio: fechar move a linha para o arquivo.
 
-**A vista** (#446): `node .agent/scripts/backlog-board.mjs` gera `.agent/backlog-board.html` (abrir no browser; local, so de leitura, fora do git). Com `--vigiar`, deixado aberto num terminal enquanto se trabalha, volta a gerar a cada gravacao e a pagina recarrega-se sozinha, salvo com um detalhe aberto, texto selecionado ou um campo em uso (sem ele, a pagina mostra o que foi gerado da ultima vez). Mudar um estado e pedi-lo ao agente: o botao "copiar pedido" de cada cartao da o texto, e o agente segue este metodo.
+**A vista** (#446): `node .agent/scripts/backlog-board.mjs` gera `.agent/backlog-board.html` (abrir no browser; local, so de leitura, fora do git). Com `--vigiar`, deixado aberto num terminal enquanto se trabalha, volta a gerar a cada gravacao e a pagina recarrega-se sozinha, salvo com um detalhe aberto, texto selecionado ou um campo em uso (sem ele, a pagina mostra o que foi gerado da ultima vez). A pagina divide-se em gavetas (Sprints, Outros blocos, Pendentes, Sem bloco, Por tipo, Fechados), e os filtros valem para todas. Mudar um estado e pedi-lo ao agente: o botao "copiar pedido" de cada cartao da o texto, e o agente segue este metodo.
 
 **Ao concluir um item:**
 1. **Remover** a linha do item da tabela da seccao por tipo (1-4) em `backlog.md` — items fechados nao ficam no ficheiro ativo

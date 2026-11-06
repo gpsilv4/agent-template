@@ -272,6 +272,7 @@ not to* line, so every agent sees it.
     │   ├── backlog-itens.mjs   <- The backlog read once: the tickets, shared by the checker and the board (#445)
     │   ├── backlog-regras.mjs  <- The rules that are not counts: Ordem, "Depende de", struck-out rows, Pendentes (#445)
     │   ├── backlog-vista.mjs   <- The backlog board HTML, pure: escape per context, CSP, detail rendered in Node (#446)
+    │   ├── backlog-vista-pecas.mjs <- The board's pure pieces: text to HTML, card titles, filter and sort decisions (#468)
     │   ├── backlog-vista-assets.mjs <- The board's inline CSS and JS (#446)
     │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files

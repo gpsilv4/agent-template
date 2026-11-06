@@ -12,113 +12,21 @@
  *  - Os dados para o JS vao num `<script type="application/json">` com o `<` escapado (`jsonSeguro`).
  *  - A pagina leva uma CSP que so deixa correr o seu proprio script (pelo hash): um escape falhado nao executa.
  *  - O detalhe de cada ticket e renderizado AQUI, em elementos `hidden`: o JS so mostra e esconde.
- * REGRA DO CODIGO: o `escapa(`, o `urlSegura(` e o `jsonSeguro(` chamam-se numa linha propria, FORA de um template
+ * REGRA DO CODIGO: o `escapa(` e o `jsonSeguro(` chamam-se numa linha propria, FORA de um template
  * literal, um por linha. A varredura apaga as strings antes de procurar o sinal, e uma chamada dentro de `${...}` era
  * invisivel para o par (`lib/pares.mjs`).
  */
 import { createHash } from "crypto";
-import { CLOSED_STATES, ID_LIKE, OPEN_STATES, SECTIONS } from "./backlog-itens.mjs";
+import { CLOSED_STATES, ID_LIKE, OPEN_STATES, SECTIONS, norm } from "./backlog-itens.mjs";
 import { CSS, JS_CORPO } from "./backlog-vista-assets.mjs";
 
-/** O texto escapado para HTML (texto e atributos entre aspas). */
-export function escapa(t) {
-  return String(t ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
+import { escapa, urlSegura, jsonSeguro, faixaDeErro, FAIXA_RE, renderTexto, tituloDe, pedidosDe, rotuloDe, passaFiltro, vistaParou, normalizaFimDeLinha, comparaCelulas, prioridadesDe, SEM_PRIORIDADE } from "./backlog-vista-pecas.mjs";
+// Quem le a vista (o CLI, as suites) importa daqui: o gerador continua a ser a porta de entrada.
+export { escapa, urlSegura, jsonSeguro, faixaDeErro, FAIXA_RE, renderTexto, tituloDe, pedidosDe, rotuloDe, passaFiltro, vistaParou, normalizaFimDeLinha, comparaCelulas, prioridadesDe };
 
-/** O URL, se o texto CRU for `http(s)://` sem espacos, aspas nem `<>`; senao `null` (o `javascript:` e tudo o resto). */
-export function urlSegura(cru) {
-  return /^https?:\/\/[^\s"'<>]+$/.test(cru ?? "") ? cru : null;
-}
-
-/** Um valor em JSON para dentro de um `<script>`: o `<` escapado, e um `</script>` numa descricao nao sai do bloco. */
-export function jsonSeguro(valor) {
-  return JSON.stringify(valor).replace(/</g, "\\u003c");
-}
-
-/** A faixa de erro, entre marcadores (o CLI substitui-a, nunca a acumula). Uma so, para o gerador e o CLI (`TP8`). */
-export const FAIXA_RE = /<!-- erro:inicio -->[\s\S]*?<!-- erro:fim -->/;
-export function faixaDeErro(msg) {
-  const seguro = escapa(msg);
-  return `<!-- erro:inicio --><div class="erro" role="alert">${seguro}</div><!-- erro:fim -->`;
-}
-
-/** Os IDs de um texto cru que viram link: so os que tem a forma de um ID E um destino na pagina. */
-const destinoDe = (ids, id) => (ID_LIKE.test(id) ? ids.get(id) ?? null : null);
-
-/** Um texto cru com os IDs como links (por palavra inteira), e cada outro pedaco escapado. */
-function comIds(cru, ids) {
-  let html = "";
-  for (const p of String(cru).split(/([A-Za-z0-9]+)/)) {
-    const ancora = destinoDe(ids, p);
-    const seguro = escapa(p);
-    html += ancora ? `<a class="id" href="#${ancora}">${seguro}</a>` : seguro;
-  }
-  return html;
-}
-
-/** O Markdown simples de uma descricao: `codigo`, [texto](url) e **negrito**, numa so alternacao (vence o mais a esquerda). */
-export function renderTexto(cru, ids = new Map()) {
-  const re = /(`[^`]*`)|\[([^\]\n]*)\]\(([^)\s]*)\)|\*\*(.+?)\*\*/g;
-  let html = "";
-  let pos = 0;
-  for (const m of String(cru ?? "").matchAll(re)) {
-    html += comIds(String(cru).slice(pos, m.index), ids);
-    if (m[1]) {
-      const codigo = escapa(m[1].slice(1, -1));
-      html += `<code>${codigo}</code>`;
-    } else if (m[3] !== undefined) {
-      const url = urlSegura(m[3]);
-      const rotulo = escapa(m[2]);
-      const href = escapa(url ?? "");
-      const literal = escapa(m[0]);
-      html += url ? `<a href="${href}" rel="noopener noreferrer" target="_blank">${rotulo}</a>` : literal;
-    } else {
-      html += `<b>${comIds(m[4], ids)}</b>`;
-    }
-    pos = m.index + m[0].length;
-  }
-  return html + comIds(String(cru ?? "").slice(pos), ids);
-}
-
-/** O titulo de um cartao: o texto a negrito da descricao, senao a 1.a frase; ate 80 caracteres, com `…`. */
-export function tituloDe(descricao) {
-  const d = String(descricao ?? "").trim();
-  // O negrito so quando ABRE a descricao (`**Export PDF**: …`): um negrito a meio (`… em **dark-only**`) e enfase, e
-  // como titulo dava "dark-only" ou "e" (medido nos backlogs dos derivados).
-  const t = (/^\*\*(.+?)\*\*/.exec(d)?.[1] ?? d.split(/\.\s|;\s|\s—\s/)[0]).replace(/[`*]/g, "").trim();
-  return t.length > 80 ? `${t.slice(0, 79)}…` : t;
-}
-
-/** Os pedidos a colar no chat do agente, por estado (decidido a 5 nov: a vista nao escreve; o agente cumpre as regras). */
-export function pedidosDe(estado, id) {
-  if (estado === "pendente") return [`passa o ${id} a A Fazer`, `cancela o ${id}`];
-  if (estado === "a fazer") return [`fecha o ${id} como Concluido`, `cancela o ${id}`];
-  return [];
-}
-
-/** O rotulo curto de um pedido, para o botao do cartao (o texto inteiro e o que se copia). */
-export function rotuloDe(pedido) {
-  if (pedido.startsWith("passa")) return "→ A Fazer";
-  if (pedido.startsWith("fecha")) return "✓ Concluido";
-  return "✕ Cancelar";
-}
-
-/** Se um cartao passa os filtros (o JS chama-a no browser, com o mesmo texto: `passaFiltro.toString()`). */
-export function passaFiltro(c, f) {
-  const q = String(f.q || "").toLowerCase();
-  return (!f.tipo || c.tipo === f.tipo) && (!f.esforco || c.esforco === f.esforco) && (!f.prioridade || c.prioridade.toLowerCase().indexOf(String(f.prioridade).toLowerCase()) >= 0) && (!q || c.busca.indexOf(q) >= 0);
-}
-
-/** Se o `--vigiar` parou: so com ele, com a batida ligada (sem ela, uma vista sem gravacoes e so velha, nao parada), sem
- *  erro (a faixa ja o diz), e com a ultima geracao a mais de 3 batidas. */
-export function vistaParou(geradaEm, agora, vigiar, erro, batida) {
-  return Boolean(vigiar) && batida > 0 && !erro && agora - geradaEm > batida * 3;
-}
-
+// Os titulos da tabela dos Fechados, pela ordem das celulas (cada um e um botao que ordena por essa coluna, #468).
+const TITULOS_FECHADOS = ["ID", "Tipo", "Estado", "Titulo", "Sprint", "Versao", "Data"];
 const ordemNumerica = (o) => (/^\s*\d+\s*$/.test(o ?? "") ? Number(o) : Infinity);
-
-/** O CRLF e o CR sozinho passam a LF: e o que o browser faz ao texto de um script inline antes de lhe calcular o hash. */
-export const normalizaFimDeLinha = (texto) => texto.replace(/\r\n?/g, "\n");
 
 /** As colunas da vista: um cartao por ticket ABERTO, no 1.o bloco onde aparece, senao nos Pendentes, senao "Sem bloco". */
 function colunasDaVista(lido) {
@@ -152,6 +60,8 @@ function colunasDaVista(lido) {
   const ordena = (cs) => cs.sort((a, b) => Number(Boolean(b.emCurso)) - Number(Boolean(a.emCurso)) || ordemNumerica(a.ordemLinha) - ordemNumerica(b.ordemLinha));
   const colunas = lido.blocos.map((b) => ({
     titulo: b.titulo,
+    // Um bloco e um Sprint se o titulo comecar por "Sprint" (a gaveta "Sprints"); os outros vao para "Outros blocos".
+    sprint: /^\s*sprint\b/i.test(b.titulo ?? ""),
     objetivo: b.objetivo,
     fecho: b.fecho,
     // Um ciclo so (verificar e marcar na mesma passagem): o mesmo ID duas vezes no mesmo bloco da um cartao.
@@ -233,7 +143,8 @@ function cartaoHtml(c, ids, dados) {
   const nota = c.notaLinha ? `<div class="nota">${renderTexto(c.notaLinha, ids)}</div>` : "";
   const curso = c.emCurso ? `<span class="curso">Em curso</span>` : "";
   const noArq = c.noArquivo ? `<small>tambem no arquivo</small>` : "";
-  dados.push({ id: c.id, tipo: c.seccao, esforco: c.esforco || "", prioridade: c.prioridadeLinha || "", busca: `${c.id} ${c.descricao}`.toLowerCase(), pedidos: pedidosDe(c.estado, c.id) });
+  // A prioridade vai como a CHAVE normalizada: o filtro compara por igualdade com o valor da opcao (`prioridadesDe`).
+  dados.push({ id: c.id, tipo: c.seccao, esforco: c.esforco || "", prioridade: norm(c.prioridadeLinha || ""), busca: `${c.id} ${c.descricao}`.toLowerCase(), pedidos: pedidosDe(c.estado, c.id) });
   // Os pedidos sao constantes com o ID (que casa o ID_LIKE): nada a escapar.
   // Rotulos curtos (o cartao fica limpo); o texto inteiro vai no `title` e e o que se copia.
   const botoes = pedidosDe(c.estado, c.id).map((p, k) => `<button type="button" class="pedido" data-p="${k}" title="copiar: ${p}" aria-label="copiar o pedido: ${p}">${rotuloDe(p)}</button>`);
@@ -256,21 +167,37 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
   for (const [id, t] of lido.tickets) if (ID_LIKE.test(id) && OPEN_STATES.includes(t.estado)) ids.set(id, `t-${id}`);
   const dados = [];
   const colunas = colunasDaVista(lido);
-  const colunasHtml = colunas
-    .map((col, k) => {
+  const colunaHtml = (col, k) => {
       const titulo = escapa(col.titulo);
       const objetivo = col.objetivo ? `<p class="objetivo">${renderTexto(col.objetivo, ids)}</p>` : "";
       const fecho = col.fecho ? `<p class="fecho">${renderTexto(col.fecho, ids)}</p>` : "";
       const cartoes = col.cartoes.map((c) => cartaoHtml(c, ids, dados)).join("");
       const abertosNaColuna = col.cartoes.filter((c) => !c.cinzento).length;
       const vazio = col.cartoes.length ? "" : `<p class="vazio">Sem tickets.</p>`;
-      // `data-sprint` so nos blocos: o "So os sprints" esconde os Pendentes e o "Sem bloco".
-      const sprint = col.pendentes || col.semBloco ? "" : " data-sprint";
-      return `<section class="coluna" data-bloco="${k}"${sprint}><h2>${titulo}</h2><span class="n" title="tickets abertos">${abertosNaColuna}</span>${objetivo}<ul>${cartoes}</ul>${vazio}${fecho}</section>`;
-    })
-    .join("");
+      return `<section class="coluna" data-bloco="${k}"><h2>${titulo}</h2><span class="n" title="tickets abertos">${abertosNaColuna}</span>${objetivo}<ul>${cartoes}</ul>${vazio}${fecho}</section>`;
+  };
+  // As gavetas (#468): cada parte da pagina e um `<details>` "Nome (N)", com o mesmo padrao dos Fechados. Abertas por
+  // omissao as de trabalho. Uma gaveta aparece com um cartao (mesmo cinzento) ou com um bloco que tenha objetivo ou
+  // fecho (o Sprint 1 vazio do template mostra o objetivo). O N e o de cartoes VIVOS, como o `.n` de cada coluna: o JS
+  // passa-o a "k de N" com um filtro ativo, e o k so conta vivos (os cinzentos saem com qualquer filtro).
+  const gaveta = (id, nome, aberta, cols) => {
+    if (!cols.some(([col]) => col.cartoes.length || col.objetivo || col.fecho)) return "";
+    const n = cols.reduce((t, [col]) => t + col.cartoes.filter((c) => !c.cinzento).length, 0);
+    // Os cinzentos contam-se a parte: "Sem bloco (0)" com dez cartoes la dentro parecia vazio.
+    const nCinzentos = cols.reduce((t, [col]) => t + col.cartoes.filter((c) => c.cinzento).length, 0);
+    const anomalias = nCinzentos ? ` · <span class="anomalias">${nCinzentos} ${nCinzentos === 1 ? "anomalia" : "anomalias"}</span>` : "";
+    const html = cols.map(([col, k]) => colunaHtml(col, k)).join("");
+    return `<details class="gaveta" id="g-${id}"${aberta ? " open" : ""}><summary>${nome} (<span class="n-gaveta" data-total="${n}">${n}</span>${anomalias})</summary><div class="quadro">${html}</div></details>`;
+  };
+  const indexadas = colunas.map((col, k) => [col, k]);
+  const gavetasHtml = [
+    gaveta("sprints", "Sprints", true, indexadas.filter(([c]) => c.sprint)),
+    gaveta("blocos", "Outros blocos", true, indexadas.filter(([c]) => !c.sprint && !c.pendentes && !c.semBloco)),
+    gaveta("pendentes", "Pendentes sem sprint", true, indexadas.filter(([c]) => c.pendentes)),
+    gaveta("sem-bloco", "Sem bloco", false, indexadas.filter(([c]) => c.semBloco)),
+  ].join("");
   // Por TIPO (a zona de referencia do backlog.md): uma coluna por secao, com os cartoes abertos dela, os em curso a
-  // cabeca e depois pelo numero do ID. E outro quadro, e o seletor "Agrupar" mostra um ou o outro.
+  // cabeca e depois pelo numero do ID. Uma gaveta fechada por omissao: repete os cartoes das outras.
   const porTipoHtml = SECTIONS.map((s, k) => {
     const cartoes = [...lido.tickets.values()]
       .filter((t) => t.seccao === s.key && ID_LIKE.test(t.id) && OPEN_STATES.includes(t.estado))
@@ -283,15 +210,21 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
     const vazio = cartoes.length ? "" : `<p class="vazio">Sem tickets.</p>`;
     return `<section class="coluna" data-tipo-col="${k}"><h2>${s.resumo}</h2><span class="n" title="tickets abertos">${cartoes.length}</span><ul>${html}</ul>${vazio}</section>`;
   }).join("");
-  // O filtro por bloco: "todos", ou so uma coluna (num backlog com muitos sprints, as colunas lado a lado sao muitas).
-  // "Mostrar": tudo por bloco, tudo por tipo, um bloco (`b:k`) ou um tipo (`t:k`) — um seletor so (pedido de 6 nov).
-  const opcoesBloco = colunas
-    .map((col, k) => {
-      const titulo = escapa(col.titulo);
-      return `<option value="b:${k}">${titulo}</option>`;
+  const nPorTipo = SECTIONS.reduce((t, s) => t + [...lido.tickets.values()].filter((x) => x.seccao === s.key && ID_LIKE.test(x.id) && OPEN_STATES.includes(x.estado)).length, 0);
+  const porTipoGaveta = nPorTipo ? `<details class="gaveta" id="g-por-tipo"><summary>Por tipo (<span class="n-gaveta" data-total="${nPorTipo}">${nPorTipo}</span>)</summary><div class="quadro">${porTipoHtml}</div></details>` : "";
+  // A Prioridade (#468): um seletor com os valores dos cartoes VIVOS (um valor so de uma linha riscada ou fechada
+  // filtrava para zero), e sem a coluna em lado nenhum, nenhum filtro. `null`/`undefined` = sem a coluna.
+  const vivos = colunas.flatMap((col) => col.cartoes.filter((c) => !c.cinzento));
+  const valoresPrioridade = [...vivos.map((c) => c.prioridadeLinha), ...[...lido.tickets.values()].filter((t) => ID_LIKE.test(t.id) && OPEN_STATES.includes(t.estado)).map((t) => t.prioridade)];
+  const prioridades = prioridadesDe(valoresPrioridade);
+  const opcoesPrioridade = (prioridades ?? [])
+    .map(({ chave, rotulo }) => {
+      const valor = escapa(chave);
+      const texto = escapa(rotulo);
+      return `<option value="${valor}">${texto}</option>`;
     })
     .join("");
-  const opcoesTipo = SECTIONS.map((s, k) => `<option value="t:${k}">${s.resumo}</option>`).join("");
+  const filtroPrioridade = prioridades ? `<label class="filtro"><span>Prioridade</span><select id="f-prioridade"><option value="">Todas</option>${opcoesPrioridade}<option value="${SEM_PRIORIDADE}">(sem prioridade)</option></select></label>` : "";
   const abertos = [...lido.tickets.values()].filter((t) => ID_LIKE.test(t.id) && OPEN_STATES.includes(t.estado));
   // Um por ID: um ID repetido no Historico (o check-backlog ja avisa) dava dois detalhes com o mesmo `id=`.
   const vistosF = new Set();
@@ -338,7 +271,7 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
   const json = jsonSeguro({ cartoes: dados, geradaEm: agora.getTime(), vigiar, erro: Boolean(erro), batida, chave });
   // O fim de linha normalizado ANTES do hash: o browser normaliza o CRLF do HTML para LF antes de calcular o hash do
   // script inline, e um checkout com CRLF (o `toString()` traz a fonte como esta) bloqueava o script em silencio.
-  const script = normalizaFimDeLinha(`${passaFiltro.toString()}\n${vistaParou.toString()}\n${JS_CORPO}`);
+  const script = normalizaFimDeLinha(`${passaFiltro.toString()}\n${vistaParou.toString()}\n${comparaCelulas.toString()}\n${JS_CORPO}`);
   const hash = createHash("sha256").update(script, "utf8").digest("base64");
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'`;
   // O recarregar e do JS (so com o `--vigiar`, e nao com o foco na pesquisa): um `meta refresh` perdia o que se escreve.
@@ -364,10 +297,9 @@ ${faixa}${aviso}<header>
 <details class="seguir"><summary>A seguir: ${renderTexto(proximo, ids)}</summary></details>
 <p class="gerada">Gerada: <time datetime="${geradaEm}">${geradaEm}</time> — ${modo}<span id="parou" hidden> — o --vigiar parou: volte a gerar</span></p>
 </header>
-<div class="filtros"><select id="f-mostrar" aria-label="Mostrar"><option value="bloco">Tudo (sprints, pendentes e sem bloco)</option><option value="sprints">So os sprints</option><option value="tipo">So os tipos (Bugs, UX, Divida, Features)</option><optgroup label="Um bloco">${opcoesBloco}</optgroup><optgroup label="Um tipo">${opcoesTipo}</optgroup></select><input id="q" type="search" placeholder="ID ou texto" aria-label="Pesquisar"><select id="f-tipo" aria-label="Tipo"><option value="">Tipo</option>${SECTIONS.map((s) => `<option>${s.key}</option>`).join("")}</select><select id="f-esforco" aria-label="Esforco"><option value="">Esforco</option><option value="s">S</option><option value="m">M</option><option value="l">L</option></select><input id="f-prioridade" placeholder="Prioridade" aria-label="Prioridade"></div>
-<main class="quadro" id="por-bloco">${colunasHtml}</main>
-<main class="quadro" id="por-tipo" hidden>${porTipoHtml}</main>
-<details id="fechados"><summary>Fechados (${fechados.length + lido.fechados.filter((f) => !ID_LIKE.test(f.id ?? "")).length})</summary><input id="qf" type="search" placeholder="Pesquisar nos fechados" aria-label="Pesquisar nos fechados"><div class="rolar"><table class="tabela-fechados"><thead><tr><th>ID</th><th>Tipo</th><th>Estado</th><th>Titulo</th><th>Sprint</th><th>Versao</th><th>Data</th></tr></thead><tbody>${listaFechados}${fechadosInvalidos}</tbody></table></div><h3>Sprints Fechados</h3><ul>${indice}</ul></details>
+<div class="filtros" role="search"><label class="filtro"><span>Pesquisar</span><input id="q" type="search" placeholder="ID ou texto"></label><label class="filtro"><span>Tipo</span><select id="f-tipo"><option value="">Todos</option>${SECTIONS.map((s) => `<option>${s.key}</option>`).join("")}</select></label><label class="filtro"><span>Esforco</span><select id="f-esforco"><option value="">Todos</option><option value="s">S</option><option value="m">M</option><option value="l">L</option></select></label>${filtroPrioridade}</div>
+<main>${gavetasHtml}${porTipoGaveta}
+<details class="gaveta" id="fechados"><summary>Fechados (${fechados.length + lido.fechados.filter((f) => !ID_LIKE.test(f.id ?? "")).length})</summary><input id="qf" type="search" placeholder="Pesquisar nos fechados" aria-label="Pesquisar nos fechados"><div class="rolar"><table class="tabela-fechados"><thead><tr>${TITULOS_FECHADOS.map((t, k) => `<th aria-sort="none"><button type="button" class="ordena" data-col="${k}">${t}</button></th>`).join("")}</tr></thead><tbody>${listaFechados}${fechadosInvalidos}</tbody></table></div><h3>Sprints Fechados</h3><ul>${indice}</ul></details></main>
 <aside id="painel">${detalhes}</aside>
 <script type="application/json" id="dados">${json}</script>
 <script>${script}</script>

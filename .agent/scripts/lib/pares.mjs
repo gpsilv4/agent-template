@@ -428,7 +428,9 @@ const PARES_DO_TEMPLATE = [
   // um `<script>` de uma descricao. Cada escape desligado (a identidade) tem de pintar um caso do `test-backlog-board`.
   // As chamadas estao numa linha propria, fora de template literals: a varredura apaga as strings antes do sinal.
   { alvo: ".agent/scripts/lib/backlog-vista.mjs", suite: ".agent/scripts/tests/test-backlog-board.mjs", sinal: /(?<![\w.$]|function )escapa\(/, neutro: "((x) => String(x ?? \"\"))(" },
-  { alvo: ".agent/scripts/lib/backlog-vista.mjs", suite: ".agent/scripts/tests/test-backlog-board.mjs", sinal: /(?<![\w.$]|function )urlSegura\(/, neutro: "((x) => x)(" },
+  // As pecas (#468 dividiu o gerador): o texto das descricoes e os links escapam-se aqui.
+  { alvo: ".agent/scripts/lib/backlog-vista-pecas.mjs", suite: ".agent/scripts/tests/test-backlog-board.mjs", sinal: /(?<![\w.$]|function )escapa\(/, neutro: "((x) => String(x ?? \"\"))(" },
+  { alvo: ".agent/scripts/lib/backlog-vista-pecas.mjs", suite: ".agent/scripts/tests/test-backlog-board.mjs", sinal: /(?<![\w.$]|function )urlSegura\(/, neutro: "((x) => x)(" },
   { alvo: ".agent/scripts/lib/backlog-vista.mjs", suite: ".agent/scripts/tests/test-backlog-board.mjs", sinal: /(?<![\w.$]|function )jsonSeguro\(/, neutro: "((x) => JSON.stringify(x))(" },
   // As regras do backlog que nao sao contagens (#445 PR 2): desligada uma, a Ordem, o "Depende de" ou um riscado passavam.
   { alvo: ".agent/scripts/lib/backlog-regras.mjs", suite: ".agent/scripts/tests/test-backlog-regras.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },
