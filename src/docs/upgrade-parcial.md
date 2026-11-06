@@ -67,6 +67,11 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 - `.agent/scripts/tests/harness/relatorio.mjs`
 <!-- fecho:fim -->
 
+**A vista do backlog** (`backlog-board.mjs`, #446) nao vem: nao e fronteira. Um projeto parcial que a queira copia o
+`backlog-board.mjs`, as duas libs dela (`lib/backlog-vista.mjs` e `lib/backlog-vista-assets.mjs`), o leitor
+(`lib/backlog-itens.mjs`, que ja vem) e as duas linhas do `.gitignore`: `.agent/backlog-board.html` e
+`.agent/backlog-board.html.tmp` (o CLI recusa sem qualquer uma delas).
+
 **Nao vem:** as outras suites `test-*` e os seus `tests-*.mjs`, os `guards/`, o `check-doc-versions`, o
 `check-test-surface`, o `mutation-sweep`, os `simulate-*`, e os jobs `guard-tests`, `sweep` e `simulators`. As rules, os
 workflows e os pontos de entrada que o projeto ja tem seguem a tabela do §2 do `upgrade.md`, como num upgrade completo.

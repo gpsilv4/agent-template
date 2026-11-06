@@ -10,7 +10,7 @@
  * contadores errados, e e de uma pessoa.
  */
 
-import { leBacklog, norm, idDe, idsDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
+import { leBacklog, norm, idDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
 import { regrasDoBacklog } from "./backlog-regras.mjs";
 
 // Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
@@ -146,8 +146,8 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
     }
   }
   // So o PRIMEIRO ID da linha: e para la que ela aponta, e o resto e texto livre que pode citar outros.
-  const proximo = /^\*\*Pr[oó]ximo:\*\*(.*)$/im.exec(active)?.[1] ?? "";
-  const alvo = idsDe(proximo)[0];
+  // A leitura e a do leitor partilhado (#446), com o mesmo regex de sempre: a vista mostra a linha que aqui se verifica.
+  const alvo = lido.proximo.alvo;
   if (alvo && porque(alvo)) warn(`${ACTIVE}: **Proximo:** aponta para "${alvo}", que ${porque(alvo)}`);
 
   // 3) Duplicados de ID (um item vive num so sitio)

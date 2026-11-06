@@ -108,6 +108,8 @@ export const PREFIXOS_DE_TESTE = [
   "regex-runner-test-",
   // Do `tests-nomes-proibidos.mjs` (#375): a lista de nomes, e o repo onde ela nao pode estar.
   "nomes-proibidos-test-",
+  // Do `test-backlog-board-cli.mjs` (#446): o CLI da vista e o `--vigiar`, num repo git descartavel.
+  "board-test-",
   // Do `test-textos-publicos.mjs` (#375): a lista, e o repo onde ela nao pode estar.
   "textos-publicos-test-",
   // Do `tests-textos-publicos.mjs` dos hooks (#375b): o cwd do payload, a lista, e a copia do hook sem a lib.

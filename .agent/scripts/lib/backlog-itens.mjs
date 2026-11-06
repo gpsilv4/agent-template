@@ -324,6 +324,21 @@ function pendentes(active) {
   return { ps, temNota: (cabecalho ?? []).includes("nota"), temTabela: cabecalho !== null };
 }
 
+/** A linha `**Proximo:**` (#191): o texto, e o ID para onde aponta (so o PRIMEIRO da linha: o resto e texto livre). O
+ *  regex e o de sempre, mudado LITERALMENTE do `calcula` (#446): a vista mostra-a, e o guarda verifica-a, pela mesma leitura. */
+function proximo(active) {
+  const texto = /^\*\*Pr[oó]ximo:\*\*(.*)$/im.exec(active)?.[1] ?? null;
+  return { texto, alvo: idsDe(texto ?? "")[0] ?? null };
+}
+
+/** O indice "Sprints Fechados" do arquivo, pelo nome das colunas: cada linha como `{ coluna: celula }` (as colunas do
+ *  template e as de um derivado diferem; a vista mostra-as como estao). `[]` sem o heading. */
+function sprintsFechados(archive) {
+  const seccao = section(archive ?? "", /^##\s*Sprints Fechados/i);
+  const cab = tableHeader(seccao);
+  return tableRows(seccao).map((cells) => colunasDe(cab, cells));
+}
+
 /**
  * O backlog lido: as tabelas como estao, e a juncao por ticket.
  * @param {string} active o `backlog.md`
@@ -340,7 +355,7 @@ export function leBacklog(active, archiveRaw) {
   const tickets = new Map();
   for (const l of porTipo) {
     if (!l.id || tickets.has(l.id)) continue;
-    tickets.set(l.id, { id: l.id, seccao: l.seccao, estado: l.estado, esforco: l.esforco, descricao: l.descricao, bloco: null, ordem: null, prioridade: null, dependeDe: null, nota: null, noArquivo: false });
+    tickets.set(l.id, { id: l.id, seccao: l.seccao, estado: l.estado, esforco: l.esforco, descricao: l.descricao, colunas: l.colunas, bloco: null, ordem: null, prioridade: null, dependeDe: null, nota: null, noArquivo: false });
   }
   for (const b of bs) {
     for (const l of b.linhas) {
@@ -369,5 +384,8 @@ export function leBacklog(active, archiveRaw) {
     sprintSemOrdem,
     colunasEmFaltaNoHistorico: colunasEmFaltaNoHistorico(archiveRaw),
     arquivoForaDoHistorico: arquivoForaDoHistorico(archiveRaw),
+    // O que a vista (#446) mostra, e o guarda verifica pela mesma leitura.
+    proximo: proximo(active),
+    sprintsFechados: sprintsFechados(archiveRaw),
   };
 }
