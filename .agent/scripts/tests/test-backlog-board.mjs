@@ -11,7 +11,7 @@ import { join } from "path";
 import { ACTIVE_OK, ARCHIVE_OK } from "./harness/test-backlog-harness.mjs";
 import { leBacklog } from "../lib/backlog-itens.mjs";
 import { calcula } from "../lib/backlog-calculo.mjs";
-import { normalizaFimDeLinha, geraVista, renderTexto, tituloDe, pedidosDe, passaFiltro, vistaParou, urlSegura, faixaDeErro, rotuloDe } from "../lib/backlog-vista.mjs";
+import { comparaCelulas, prioridadesDe, normalizaFimDeLinha, geraVista, renderTexto, tituloDe, pedidosDe, passaFiltro, vistaParou, urlSegura, faixaDeErro, rotuloDe } from "../lib/backlog-vista.mjs";
 import { CSS } from "../lib/backlog-vista-assets.mjs";
 
 let passed = 0;
@@ -42,7 +42,9 @@ function troca(texto, pares) {
 }
 const vista = (ativo = ACTIVE_OK, arquivo = ARCHIVE_OK, o = {}) => geraVista(leBacklog(ativo, arquivo), calcula(ativo, arquivo, NOMES), { agora: AGORA, ...o });
 // Os cartoes do quadro POR BLOCO (o "por tipo" repete-os, agrupados de outra forma).
-const porBloco = (html) => /<main class="quadro" id="por-bloco">([^]*?)<\/main>/.exec(html)?.[1] ?? "";
+// As gavetas dos blocos (#468): Sprints, Outros blocos, Pendentes e Sem bloco — sem o "Por tipo" nem os Fechados.
+const porBloco = (html) => [...html.matchAll(/<details class="gaveta" id="g-(?:sprints|blocos|pendentes|sem-bloco)"[^>]*>([^]*?)<\/details>/g)].map((m) => m[1]).join("");
+const porTipo = (html) => /<details class="gaveta" id="g-por-tipo">([^]*?)<\/details>/.exec(html)?.[1] ?? "";
 const cartoesDe = (html) => (porBloco(html).match(/<li class="cartao" data-i=/g) ?? []).length;
 const cinzentosDe = (html) => [...html.matchAll(/<li class="cartao cinzento"><b>([^<]*)<\/b> <small>([^<]*)<\/small>/g)].map((m) => `${m[1]}:${m[2]}`);
 const fechadosDe = (html) => (html.match(/<tr data-busca=/g) ?? []).length;
@@ -55,7 +57,7 @@ caso("numa fixture limpa: os cartoes abertos e os fechados sao os do calcula", (
     ...espera(cartoesDe(html) === g.pendente + g["a fazer"], `cartoes ${cartoesDe(html)} != ${g.pendente + g["a fazer"]}`),
     ...espera(fechadosDe(html) === g.concluido + g.cancelado, `fechados ${fechadosDe(html)} != ${g.concluido + g.cancelado}`),
     // CONTROLO: a contagem ve um cartao a mais (senao a igualdade acima passava sempre).
-    ...espera(cartoesDe(html.replace('<main class="quadro" id="por-bloco">', '<main class="quadro" id="por-bloco"><li class="cartao" data-i="9">')) !== g.pendente + g["a fazer"], "a contagem nao ve um cartao a mais"),
+    ...espera(cartoesDe(html.replace('<details class="gaveta" id="g-sprints" open>', '<details class="gaveta" id="g-sprints" open><li class="cartao" data-i="9">')) !== g.pendente + g["a fazer"], "a contagem nao ve um cartao a mais"),
   ];
 });
 caso("as anomalias: sem ID, fechado e Estado desconhecido nao dao cartao; um orfao vai para 'Sem bloco'", () => {
@@ -178,9 +180,9 @@ caso("o mesmo backlog, com a mesma hora, da o mesmo HTML; e a hora em ISO UTC, n
 caso("o --vigiar: a pagina sabe-o (o texto e o JSON que o JS le), e sem ele diz para voltar a gerar", () => [...espera(vista(undefined, undefined, { vigiar: true }).includes("atualizada sozinha") && vista(undefined, undefined, { vigiar: true }).includes('"vigiar":true'), "com"), ...espera(vista().includes("volte a gerar depois de mexer") && vista().includes('"vigiar":false'), "sem")]);
 caso("agrupar por tipo: um segundo quadro com uma coluna por secao e os mesmos cartoes abertos", () => {
   const html = vista();
-  const tipo = /<main class="quadro" id="por-tipo" hidden>([^]*?)<\/main>/.exec(html)?.[1] ?? "";
+  const tipo = porTipo(html);
   const ids = (h) => [...h.matchAll(/href="#t-(\w+)"><b>/g)].map((m) => m[1]).sort().join();
-  return [...espera((tipo.match(/data-tipo-col=/g) ?? []).length === 4, "4 colunas por tipo"), ...espera(ids(tipo) === ids(porBloco(html)), `${ids(tipo)} != ${ids(porBloco(html))}`), ...espera(html.includes('<select id="f-mostrar"'), "o seletor")];
+  return [...espera((tipo.match(/data-tipo-col=/g) ?? []).length === 4, "4 colunas por tipo"), ...espera(ids(tipo) === ids(porBloco(html)), `${ids(tipo)} != ${ids(porBloco(html))}`)];
 });
 caso("o detalhe de um aberto tem tudo: o tipo, onde esta planeado e com que Ordem, o Depende de, o bloqueio, a nota e os pedidos", () => {
   const ativo = troca(ACTIVE_OK, [
@@ -209,6 +211,11 @@ caso("cada detalhe tem um botao para fechar; os fechados sao uma tabela com o Ti
   return [...espera(detalhes > 0 && (html.match(/<button type="button" class="fechar" aria-label="Fechar o detalhe">/g) ?? []).length === detalhes, "um detalhe sem o botao"), ...espera((html.match(/<section class="detalhe" id="([tf]-\w+)" role="dialog" aria-modal="true" aria-labelledby="h-\1"/g) ?? []).length === detalhes, "um detalhe sem o papel de dialogo modal"), ...espera(/<tr data-busca="[^"]*"><td><a href="#f-B3">B3<\/a><\/td><td>Bug<\/td><td>Concluido<\/td><td>bug fechado<\/td><td>S1<\/td><td>v0\.1\.0<\/td><td>2026-01-01<\/td><\/tr>/.test(html), "a linha do B3 na tabela")];
 });
 caso("o CSS respeita o hidden (senao o .quadro { display: flex } mostrava os dois quadros ao mesmo tempo)", () => espera(/\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(CSS), "sem a regra [hidden]"));
+caso("o CSS dos filtros (#468): o estilo do rotulo so no texto dele, e os botoes de ordenar com 44px no telemovel", () => [
+  // No <label> inteiro, os campos (`font: inherit`) herdavam os 11px a negrito do rotulo.
+  ...espera(/\.filtro > span \{[^}]*font-size: 11px/.test(CSS) && !/\.filtro \{[^}]*font-size/.test(CSS), "o tamanho do rotulo no .filtro inteiro"),
+  ...espera(/@media \(max-width: 640px\) \{[^]*\.ordena \{ min-height: 44px/.test(CSS), "o alvo de toque do .ordena"),
+]);
 caso("no quadro por tipo, o cartao tem os mesmos campos (prioridade, Bloqueado, nota) e a ordem e pelo prefixo e numero", () => {
   const ativo = troca(ACTIVE_OK, [
     ["| Ordem | ID | Descricao | Esforco | Depende de |\n|-------|-----|-----------|---------|------------|\n| 1 | B2 | outra coisa | M | — |", "| Ordem | ID | Descricao | Esforco | Prioridade | Depende de |\n|---|---|---|---|---|---|\n| 1 | B2 | outra coisa | M | Alta | Bloqueado: espera |"],
@@ -216,14 +223,43 @@ caso("no quadro por tipo, o cartao tem os mesmos campos (prioridade, Bloqueado, 
     ["| B1 | Pendente | algo |", "| B10 | Pendente | dez |\n| B9 | Pendente | nove |\n| B1 | Pendente | algo |"],
   ]);
   const html = vista(ativo);
-  const tipo = /<main class="quadro" id="por-tipo" hidden>([^]*?)<\/main>/.exec(html)?.[1] ?? "";
+  const tipo = porTipo(html);
   const b2 = /<li class="cartao" data-i="\d+" data-tipo="0" data-curso><a class="abre" href="#t-B2">[^]*?<\/li>/.exec(tipo)?.[0] ?? "";
   const bugs = [...(/data-tipo-col="0">([^]*?)<\/section>/.exec(tipo)?.[1] ?? "").matchAll(/href="#t-(\w+)"><b>/g)].map((m) => m[1]);
   return [...espera(b2.includes('<span class="et">Alta</span>') && b2.includes('class="bloqueado"'), `o B2 no quadro por tipo: ${b2.slice(0, 160)}`), ...espera(bugs.join() === "B2,B1,B9,B10", `a ordem dos Bugs: ${bugs}`)];
 });
-caso("so os blocos sao sprints: os Pendentes e o 'Sem bloco' nao tem o data-sprint", () => {
+caso("as gavetas (#468): cada uma 'Nome (N)' com o N dos seus cartoes, pela ordem, e as de trabalho abertas", () => {
+  // Um bloco que nao e Sprint ("Fala real") vai para "Outros blocos"; com um pendente, a gaveta dos Pendentes aparece.
+  const ativo = troca(ACTIVE_OK, [
+    // O Sprint 2 fica com dois VIVOS numa so coluna (B2, UX1): o N conta cartoes, e nao colunas. O B1 vai para o bloco
+    // "Fala real"; os Pendentes so tem um cinzento (B9): a gaveta aparece, com N 0 (o N so conta vivos).
+    ["### Sprint 2 — o que esta aberto\n", "### Fala real — depois do Sprint 2\n\n| Ordem | ID | Descricao | Esforco | Depende de |\n|---|---|---|---|---|\n| 1 | B1 | x | S | — |\n\n### Sprint 2 — o que esta aberto\n"],
+    ["|----|-----------|---------|------|\n| | | | |", "|----|-----------|---------|------|\n| B9 | nao existe | S | x |"],
+  ]);
+  const html = vista(ativo);
+  const gavetas = [...html.matchAll(/<details class="gaveta" id="(g-[\w-]+|fechados)"( open)?><summary>([^(<]*)\((?:<span class="n-gaveta" data-total="(\d+)">\d+<\/span>)?/g)].map((m) => `${m[1]}${m[2] ? "+" : ""}`);
+  const nDe = (id) => Number(new RegExp(`id="g-${id}"[^>]*><summary>[^<]*<span class="n-gaveta" data-total="(\\d+)"`).exec(html)?.[1]);
+  const cartoesNa = (id) => (new RegExp(`<details class="gaveta" id="g-${id}"[^>]*>([^]*?)<\\/details>`).exec(html)?.[1].match(/<li class="cartao" data-i=/g) ?? []).length;
+  return [
+    ...espera(gavetas.join() === "g-sprints+,g-blocos+,g-pendentes+,g-por-tipo,fechados", `as gavetas: ${gavetas}`),
+    ...espera(/id="g-sprints"[^]*?<h2>Sprint 2/.test(html) && /id="g-blocos"[^]*?<h2>Fala real/.test(html), "o Sprint em Sprints, o outro bloco em Outros blocos"),
+    ...espera(["sprints", "blocos", "pendentes"].every((g) => nDe(g) === cartoesNa(g)) && nDe("sprints") === 2 && nDe("pendentes") === 0, `os N: ${["sprints", "blocos", "pendentes"].map((g) => `${nDe(g)}/${cartoesNa(g)}`)}`),
+    ...espera(/id="g-pendentes" open><summary>Pendentes sem sprint \(/.test(html), "o titulo dos Pendentes (sem parenteses a dobrar)"),
+    // O cinzento (B9) conta-se a parte, no singular; uma gaveta so com vivos nao tem a contagem.
+    ...espera(/id="g-pendentes" open><summary>[^<]*<span class="n-gaveta" data-total="0">0<\/span> · <span class="anomalias">1 anomalia<\/span>\)/.test(html), "as anomalias dos Pendentes"),
+    ...espera(!(/id="g-sprints"[^>]*><summary>([^]*?)<\/summary>/.exec(html)?.[1] ?? "anomalia").includes("anomalia"), "anomalias nos Sprints, que nao tem cinzentos"),
+  ];
+});
+caso("um sprint sem cartoes, mas com objetivo, mostra a gaveta (o Sprint 1 vazio do template)", () => {
+  const vazio = troca(ACTIVE_OK, [["| 1 | B2 | outra coisa | M | — |\n| 2 | UX1 | melhorar algo | S | B2 |", "| | | | | |"], ["### Sprint 2 — o que esta aberto\n", "### Sprint 2 — o que esta aberto\n> Objetivo: arrancar\n"]]);
+  // CONTROLO: o mesmo sem o objetivo, e a gaveta nao aparece.
+  const semObjetivo = troca(vazio, [["> Objetivo: arrancar\n", ""]]);
+  return [...espera(/id="g-sprints"[^]*?arrancar/.test(vista(vazio)), "o objetivo do sprint vazio sumiu"), ...espera(!vista(semObjetivo).includes('id="g-sprints"'), "o controlo")];
+});
+caso("uma gaveta sem cartoes nao aparece (os Pendentes vazios, o 'Sem bloco' sem anomalias)", () => {
   const html = vista();
-  return espera(/data-bloco="\d+"><h2>Sem bloco/.test(html) && !/data-sprint><h2>(Sem bloco|Pendentes)/.test(html), "o data-sprint");
+  // CONTROLO: no caso de cima, com um pendente, a gaveta dos Pendentes aparece.
+  return [...espera(!html.includes('id="g-pendentes"') && !html.includes('id="g-blocos"'), "uma gaveta vazia"), ...espera(html.includes('id="g-sem-bloco"'), "o B1 orfao: o 'Sem bloco' tem de aparecer")];
 });
 caso("os pedidos: os tres rotulos curtos, e o nome acessivel com o pedido inteiro", () => [
   ...espera(rotuloDe("passa o B1 a A Fazer") === "→ A Fazer" && rotuloDe("fecha o B1 como Concluido") === "✓ Concluido" && rotuloDe("cancela o B1") === "✕ Cancelar", "os rotulos"),
@@ -237,18 +273,35 @@ caso("E dependencia de: nem o proprio, nem uma linha riscada; e um ID repetido n
   return [...espera(b2.includes('<dt>E dependencia de</dt><dd><a class="id" href="#t-UX1">UX1</a></dd>'), `o B2: ${/E dependencia de<\/dt><dd>[^]*?<\/dd>/.exec(b2)?.[0]}`), ...espera((html.match(/id="f-B3"/g) ?? []).length === 1, "dois detalhes do B3")];
 });
 caso("a chave do browser vai no JSON (por projeto)", () => espera(vista(undefined, undefined, { chave: "vista-abc" }).includes('"chave":"vista-abc"'), "sem a chave"));
-caso("o 'Mostrar': tudo por bloco, tudo por tipo, uma opcao por bloco (b:k) e uma por tipo (t:k)", () => {
+caso("os filtros (#468): sem o 'Mostrar', com um rotulo visivel em cada um", () => {
   const html = vista();
-  const sel = /<select id="f-mostrar"[^>]*>([^]*?)<\/select>/.exec(html)?.[1] ?? "";
-  const colunas = [...html.matchAll(/<section class="coluna" data-bloco="(\d+)"(?: data-sprint)?><h2>([^<]*)<\/h2>/g)].map((m) => `b:${m[1]}:${m[2]}`);
-  const blocos = [...sel.matchAll(/<option value="(b:\d+)">([^<]*)<\/option>/g)].map((m) => `${m[1]}:${m[2]}`);
-  const tipos = [...sel.matchAll(/<option value="(t:\d+)">/g)].length;
+  const rotulos = [...html.matchAll(/<label class="filtro"><span>([^<]*)<\/span>/g)].map((m) => m[1]);
+  return [...espera(!html.includes("f-mostrar"), "o 'Mostrar' ainda esta"), ...espera(rotulos.join() === "Pesquisar,Tipo,Esforco", `os rotulos: ${rotulos}`)];
+});
+caso("a Prioridade (#468): um seletor com os valores do backlog pela escala, e '(sem prioridade)' no fim; sem a coluna, nada", () => {
+  const ativo = troca(ACTIVE_OK, [["| Ordem | ID | Descricao | Esforco | Depende de |\n|-------|-----|-----------|---------|------------|\n| 1 | B2 | outra coisa | M | — |\n| 2 | UX1 | melhorar algo | S | B2 |", "| Ordem | ID | Descricao | Esforco | Prioridade | Depende de |\n|---|---|---|---|---|---|\n| 1 | B2 | outra coisa | M | baixo | — |\n| 2 | UX1 | melhorar algo | S | Alto | B2 |\n| 3 | B1 | algo | S | Médio | — |"]]);
+  const sel = /<select id="f-prioridade">([^]*?)<\/select>/.exec(vista(ativo))?.[1] ?? "";
+  const opcoes = [...sel.matchAll(/<option value="([^"]*)">([^<]*)<\/option>/g)].map((m) => `${m[1]}=${m[2]}`);
   return [
-    ...espera(colunas.length > 0 && JSON.stringify(colunas) === JSON.stringify(blocos), `colunas ${colunas} != opcoes ${blocos}`),
-    ...espera(tipos === 4, `opcoes de tipo: ${tipos}`),
-    ...espera(sel.includes('<option value="bloco">') && sel.includes('<option value="sprints">So os sprints</option>') && sel.includes('<option value="tipo">So os tipos'), "sem o 'tudo', o 'so os sprints' ou o 'so os tipos'"),
-    // So os blocos sao sprints: os Pendentes (e o "Sem bloco") nao levam o `data-sprint`.
-    ...espera(/data-bloco="0" data-sprint><h2>Sprint 2/.test(html) && /data-bloco="\d+"><h2>Pendentes \(sem sprint\)/.test(html), "o data-sprint"),
+    ...espera(opcoes.join() === "=Todas,alto=Alto,medio=Médio,baixo=baixo,__sem__=(sem prioridade)", `as opcoes: ${opcoes}`),
+    // Um valor so de uma linha riscada nao e opcao (filtrava para zero cartoes).
+    ...espera(!vista(troca(ativo, [["| 3 | B1 | algo | S | Médio | — |", "| 3 | B1 | algo | S | Médio | — |\n| 4 | ~~B9~~ | velho | S | Urgente | — |"]])).includes(">Urgente<"), "a prioridade de uma linha riscada"),
+    // CONTROLO: a fixture limpa nao tem a coluna — o filtro nao aparece.
+    ...espera(!vista().includes('id="f-prioridade"'), "sem a coluna, o filtro aparece"),
+    ...espera(vista(ativo).includes('"prioridade":"medio"'), "o cartao leva a chave normalizada"),
+    // Sem repetidos pelo `norm` (a 1.a forma escrita fica), e um valor fora da escala depois dela.
+    ...espera(JSON.stringify(prioridadesDe(["Média", "media", "P1", "Crítico", null])) === JSON.stringify([{ chave: "critico", rotulo: "Crítico" }, { chave: "media", rotulo: "Média" }, { chave: "p1", rotulo: "P1" }]), JSON.stringify(prioridadesDe(["Média", "media", "P1", "Crítico", null]))),
+  ];
+});
+caso("os Fechados ordenam-se (#468): sete titulos-botao com aria-sort, e a comparacao natural com as vazias no fim", () => {
+  const html = vista();
+  const botoes = [...html.matchAll(/<th aria-sort="none"><button type="button" class="ordena" data-col="(\d)">([^<]*)<\/button><\/th>/g)].map((m) => `${m[1]}${m[2]}`);
+  const ordem = (xs, s) => [...xs].sort((a, b) => comparaCelulas(a, b, s)).join();
+  return [
+    ...espera(botoes.join() === "0ID,1Tipo,2Estado,3Titulo,4Sprint,5Versao,6Data", `os botoes: ${botoes}`),
+    ...espera(ordem(["S10", "", "s2", "S1"], "asc") === "S1,s2,S10,", `asc: ${ordem(["S10", "", "s2", "S1"], "asc")}`),
+    ...espera(ordem(["v0.9.0", "", "v0.10.0"], "desc") === "v0.10.0,v0.9.0,", `desc: ${ordem(["v0.9.0", "", "v0.10.0"], "desc")}`),
+    ...espera(ordem(["2026-05-29", "2026-01-02"], "asc") === "2026-01-02,2026-05-29", "as datas"),
   ];
 });
 caso("o que o check-backlog acusa, a vista diz (um heading do Historico renomeado nao e um quadro limpo)", () => {
@@ -259,8 +312,10 @@ caso("o JS inline e JavaScript valido, e as funcoes injetadas correm sozinhas (s
   const script = /<script>([^]*?)<\/script>/i.exec(vista())?.[1] ?? "";
   try {
     new Function(script);
-    const f = new Function(`${passaFiltro.toString()}\n${vistaParou.toString()}\nreturn [passaFiltro({ tipo: "UX", esforco: "s", prioridade: "", busca: "x" }, {}), vistaParou(0, 1, true, false, 30000)];`)();
-    return espera(f[0] === true && f[1] === false, `as funcoes deram ${f}`);
+    // As tres funcoes de decisao vao no script da pagina (o JS chama-as; sem uma, o clique falhava so no browser).
+    if (!["function passaFiltro(", "function vistaParou(", "function comparaCelulas("].every((f) => script.includes(f))) return ["falta uma funcao injetada no script"];
+    const f = new Function(`${passaFiltro.toString()}\n${vistaParou.toString()}\n${comparaCelulas.toString()}\nreturn [passaFiltro({ tipo: "UX", esforco: "s", prioridade: "", busca: "x" }, {}), vistaParou(0, 1, true, false, 30000), comparaCelulas("S2", "S10", "asc") < 0];`)();
+    return espera(f[0] === true && f[1] === false && f[2] === true, `as funcoes deram ${f}`);
   } catch (err) {
     return [`o script nao e valido: ${err instanceof Error ? err.message : String(err)}`];
   }
@@ -270,7 +325,9 @@ caso("as funcoes do JS: o filtro, o 'parou', os pedidos e o titulo", () => [
   ...espera(!passaFiltro({ tipo: "UX", esforco: "s", prioridade: "", busca: "ux1" }, { tipo: "Bugs" }), "o filtro devia barrar"),
   ...espera(vistaParou(0, 90001, true, false, 30000) && !vistaParou(0, 90001, false, false, 30000) && !vistaParou(0, 90001, true, true, 30000) && !vistaParou(0, 89000, true, false, 30000), "o parou"),
   ...espera(!vistaParou(0, 10 ** 9, true, false, 0), "com a batida desligada, uma vista sem gravacoes nao esta parada"),
-  ...espera(passaFiltro({ tipo: "UX", esforco: "s", prioridade: "Alta", busca: "x" }, { prioridade: "alt" }), "o filtro da prioridade e como a pesquisa (caixa e parte)"),
+  // A prioridade por IGUALDADE da chave (#468): "alta" nao apanha "altissima"; "(sem prioridade)" apanha os vazios.
+  ...espera(passaFiltro({ tipo: "UX", esforco: "s", prioridade: "alta", busca: "x" }, { prioridade: "alta" }) && !passaFiltro({ tipo: "UX", esforco: "s", prioridade: "alta urgente", busca: "x" }, { prioridade: "alta" }), "a prioridade por igualdade"),
+  ...espera(passaFiltro({ tipo: "UX", esforco: "s", prioridade: "", busca: "x" }, { prioridade: "__sem__" }) && !passaFiltro({ tipo: "UX", esforco: "s", prioridade: "alta", busca: "x" }, { prioridade: "__sem__" }), "o (sem prioridade)"),
   ...espera(pedidosDe("pendente", "B1")[0] === "passa o B1 a A Fazer" && pedidosDe("a fazer", "B1")[0] === "fecha o B1 como Concluido" && pedidosDe("concluido", "B1").length === 0, "os pedidos"),
   ...espera(tituloDe("**Export PDF**: corta a linha") === "Export PDF" && tituloDe("um. dois") === "um" && tituloDe("x".repeat(90)).length === 80, "o titulo"),
   // O negrito a meio e enfase, nao titulo (os fechados de um derivado davam "e", "dark-only"): e a 1.a frase.
@@ -284,14 +341,14 @@ caso("o mesmo ID duas vezes no mesmo bloco da UM cartao; um riscado numa tabela 
 caso("uma linha riscada num BLOCO fica cinzenta no seu lugar; o ticket aberto vai para onde iria sem ela", () => {
   const ativo = troca(ACTIVE_OK, [["| 2 | UX1 | melhorar algo | S | B2 |", "| 2 | UX1 | melhorar algo | S | B2 |\n| 3 | ~~B1~~ | algo | S | B2 |"]]);
   const html = vista(ativo);
-  const sprint = /data-bloco="0" data-sprint><h2>Sprint 2[^]*?<\/section>/.exec(porBloco(html))?.[0] ?? "";
+  const sprint = /data-bloco="0"><h2>Sprint 2[^]*?<\/section>/.exec(porBloco(html))?.[0] ?? "";
   const sem = /<h2>Sem bloco[^]*?<\/section>/.exec(porBloco(html))?.[0] ?? "";
   return [
     ...espera(/cinzento"><b>~~B1~~<\/b> <small>riscado/.test(sprint), `no Sprint 2: ${sprint.slice(0, 200)}`),
     ...espera(!sprint.includes('href="#t-B1"'), "o B1 vivo no Sprint 2"),
     ...espera(sem.includes('href="#t-B1"'), "o B1 aberto nao foi para o 'Sem bloco'"),
     // CONTROLO: sem o risco, o B1 e um cartao vivo no Sprint 2 (o caso distingue as duas formas).
-    ...espera(/data-bloco="0" data-sprint><h2>Sprint 2[^]*?href="#t-B1"/.test(porBloco(vista(troca(ativo, [["~~B1~~", "B1"]])))), "o controlo"),
+    ...espera(/data-bloco="0"><h2>Sprint 2[^]*?href="#t-B1"/.test(porBloco(vista(troca(ativo, [["~~B1~~", "B1"]])))), "o controlo"),
   ];
 });
 caso("uma linha Concluido deixada numa tabela por tipo do ativo tem um cartao cinzento (o cabecalho conta-a)", () => {

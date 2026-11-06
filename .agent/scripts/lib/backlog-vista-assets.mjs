@@ -25,7 +25,7 @@ export const CSS = `
   }
 }
 * { box-sizing: border-box; }
-/* O [hidden] vence as regras de autor (.quadro { display: flex } escondia-o do browser, e os dois quadros apareciam). */
+/* O [hidden] vence as regras de autor (um \`display: flex\` de autor escondia-o do browser). */
 [hidden] { display: none !important; }
 body { margin: 0; padding: 20px 24px 40px; background: var(--fundo); color: var(--texto); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
 a { color: var(--acento); }
@@ -44,11 +44,14 @@ progress::-moz-progress-bar { background: var(--ok); border-radius: 999px; }
 .gerada { font-size: 12px; }
 #parou { color: var(--bloq); font-weight: 600; }
 /* So os filtros ficam presos ao topo: com um "A seguir" longo, o cabecalho inteiro tapava um terco do quadro. */
-.filtros { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 -24px 14px; padding: 10px 24px; background: color-mix(in srgb, var(--fundo) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--linha); }
+.filtros { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; margin: 0 -24px 14px; padding: 10px 24px; background: color-mix(in srgb, var(--fundo) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--linha); }
 .seguir { margin: 6px 0; color: var(--suave); font-size: 13px; }
 .seguir summary { cursor: pointer; list-style: none; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .seguir summary::-webkit-details-marker { display: none; }
 .seguir[open] summary { display: block; }
+/* O estilo do rotulo so no texto dele: no <label> inteiro, os campos (font: inherit) herdavam os 11px a negrito. */
+.filtro { display: flex; flex-direction: column; gap: 3px; }
+.filtro > span { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--suave); }
 .filtros input, .filtros select { min-height: 36px; padding: 6px 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--cartao); color: var(--texto); font: inherit; }
 .filtros input[type=search] { min-width: 200px; }
 .quadro { display: flex; gap: 14px; overflow-x: auto; align-items: flex-start; padding: 2px 2px 10px; scroll-snap-type: x proximity; }
@@ -77,7 +80,7 @@ progress::-moz-progress-bar { background: var(--ok); border-radius: 999px; }
 .pedidos { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--linha); }
 .pedido { font: inherit; font-size: 11px; min-height: 26px; border: 0; background: transparent; color: var(--suave); border-radius: 6px; padding: 2px 6px; cursor: pointer; }
 .pedido:hover { color: var(--acento); background: var(--painel); }
-.pedido:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
+.pedido:focus-visible, .ordena:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 .copiado { width: 100%; font: inherit; font-size: 12px; margin-top: 6px; border-radius: 6px; }
 #painel .detalhe { position: fixed; right: 16px; top: 16px; bottom: 16px; z-index: 3; width: min(460px, calc(100vw - 32px)); overflow: auto; background: var(--cartao); border: 1px solid var(--linha); border-radius: 12px; padding: 16px 18px; box-shadow: var(--sombra-alta); }
 #painel .detalhe h2 { margin: 0 0 8px; font-size: 17px; color: var(--acento); }
@@ -97,6 +100,14 @@ dt { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: v
 .detalhe .meta { margin-top: 16px; } .pedidos-detalhe { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
 details { margin-top: 22px; background: var(--painel); border: 1px solid var(--linha); border-radius: 12px; padding: 10px 14px; }
 summary { cursor: pointer; font-weight: 600; }
+/* As gavetas (#468): o mesmo padrao para cada parte da pagina, com o titulo "Nome (N)". */
+.gaveta > summary { font-size: 15px; }
+.gaveta > .quadro { margin-top: 12px; }
+.anomalias { color: var(--curso); font-weight: 500; }
+.gaveta[data-vazia] > summary::after { content: " — sem tickets com estes filtros"; font-weight: 400; color: var(--suave); }
+.ordena { all: unset; cursor: pointer; border-radius: 4px; }
+.ordena:hover { color: var(--texto); }
+th[aria-sort="ascending"] .ordena::after { content: " ▲"; } th[aria-sort="descending"] .ordena::after { content: " ▼"; }
 details input { margin: 10px 0; min-height: 34px; padding: 6px 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--cartao); color: var(--texto); font: inherit; width: min(360px, 100%); }
 .erro { background: var(--bloq); color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
 .aviso { border: 1px solid var(--curso); color: var(--curso); padding: 8px 12px; border-radius: 8px; margin: 0 0 12px; }
@@ -106,8 +117,11 @@ details input { margin: 10px 0; min-height: 34px; padding: 6px 10px; border: 1px
   .filtros { margin: 0 -14px 12px; padding: 8px 14px; }
   .quadro { flex-direction: column; scroll-snap-type: none; }
   .coluna { flex: 1 1 auto; width: 100%; }
-  .filtros input[type=search] { min-width: 0; flex: 1 1 100%; }
+  .filtro { flex: 1 1 45%; }
+  .filtro:first-child { flex-basis: 100%; }
+  .filtros input[type=search] { min-width: 0; width: 100%; }
   .pedido { min-height: 44px; padding: 4px 10px; }
+  .ordena { min-height: 44px; display: inline-flex; align-items: center; }
 }
 @media (prefers-reduced-motion: reduce) { .cartao { transition: none; } .cartao:hover { transform: none; } }
 `;
@@ -119,21 +133,13 @@ export const JS_CORPO = `
   var K = function (k) { return dados.chave + "-" + k; };
   var guarda = function (k, v) { try { localStorage.setItem(K(k), v); } catch (e) { /* sem localStorage: segue */ } };
   var le = function (k) { try { return localStorage.getItem(K(k)) || ""; } catch (e) { return ""; } };
-  var fm = document.getElementById("f-mostrar"), q = document.getElementById("q"), ft = document.getElementById("f-tipo"), fe = document.getElementById("f-esforco"), fp = document.getElementById("f-prioridade");
+  // Os filtros valem para todas as gavetas (#468: o seletor "Mostrar" saiu; as gavetas fazem o trabalho dele). O da
+  // Prioridade so existe quando o backlog tem a coluna.
+  var q = document.getElementById("q"), ft = document.getElementById("f-tipo"), fe = document.getElementById("f-esforco"), fp = document.getElementById("f-prioridade");
   var antes = {}; try { antes = JSON.parse(le("filtros") || "{}"); } catch (e) { antes = {}; }
-  // O "Mostrar" guarda-se pelo TEXTO da opcao: um bloco novo antes do guardado mudava o indice.
-  fm.value = "bloco";
-  Array.prototype.forEach.call(fm.options, function (o) { if (o.textContent === antes.mostrarTexto) fm.value = o.value; });
-  q.value = antes.q || ""; ft.value = antes.tipo || ""; fe.value = antes.esforco || ""; fp.value = antes.prioridade || "";
+  q.value = antes.q || ""; ft.value = antes.tipo || ""; fe.value = antes.esforco || ""; if (fp) fp.value = antes.prioridade || "";
   function aplica() {
-    var f = { mostrar: fm.value, q: q.value, tipo: ft.value, esforco: fe.value, prioridade: fp.value };
-    var porTipo = f.mostrar === "tipo" || f.mostrar.indexOf("t:") === 0;
-    document.getElementById("por-bloco").hidden = porTipo;
-    document.getElementById("por-tipo").hidden = !porTipo;
-    ft.disabled = f.mostrar.indexOf("t:") === 0;
-    if (ft.disabled) f.tipo = "";
-    document.querySelectorAll("#por-bloco .coluna").forEach(function (col) { col.hidden = (f.mostrar.indexOf("b:") === 0 && "b:" + col.getAttribute("data-bloco") !== f.mostrar) || (f.mostrar === "sprints" && !col.hasAttribute("data-sprint")); });
-    document.querySelectorAll("#por-tipo .coluna").forEach(function (col) { col.hidden = f.mostrar.indexOf("t:") === 0 && "t:" + col.getAttribute("data-tipo-col") !== f.mostrar; });
+    var f = { q: q.value, tipo: ft.value, esforco: fe.value, prioridade: fp ? fp.value : "" };
     document.querySelectorAll(".cartao[data-i]").forEach(function (li) { li.hidden = !passaFiltro(dados.cartoes[Number(li.getAttribute("data-i"))], f); });
     // Com um filtro de cartoes ativo, os cinzentos saem, e cada coluna conta e diz so o que mostra.
     var filtrado = f.q || f.tipo || f.esforco || f.prioridade;
@@ -143,17 +149,30 @@ export const JS_CORPO = `
       var c = col.querySelector(".n"); if (c) c.textContent = String(n);
       if (filtrado && n === 0) col.setAttribute("data-vazia", ""); else col.removeAttribute("data-vazia");
     });
-    var sel = fm.options[fm.selectedIndex];
-    guarda("filtros", JSON.stringify({ mostrarTexto: sel ? sel.textContent : "", q: f.q, tipo: ft.value, esforco: f.esforco, prioridade: f.prioridade }));
+    // Cada gaveta conta o que mostra: "k de N" com um filtro ativo, e diz quando nao sobra nenhum.
+    document.querySelectorAll(".gaveta .n-gaveta").forEach(function (n) {
+      var g = n.closest(".gaveta"), total = n.getAttribute("data-total"), k = g.querySelectorAll(".cartao[data-i]:not([hidden])").length;
+      n.textContent = filtrado ? k + " de " + total : total;
+      // Com um filtro, os cinzentos saem: as anomalias tambem deixam de se contar no titulo.
+      var an = g.querySelector(".anomalias"); if (an) an.hidden = Boolean(filtrado);
+      if (filtrado && k === 0) g.setAttribute("data-vazia", ""); else g.removeAttribute("data-vazia");
+    });
+    guarda("filtros", JSON.stringify({ q: f.q, tipo: f.tipo, esforco: f.esforco, prioridade: f.prioridade }));
   }
-  [fm, q, ft, fe, fp].forEach(function (el) { el.addEventListener("input", aplica); });
+  [q, ft, fe, fp].forEach(function (el) { if (el) el.addEventListener("input", aplica); });
   aplica();
+  // Cada gaveta lembra-se de aberta ou fechada; sem nada guardado, vale o \`open\` do HTML. Antes do painel: um #f- reabre
+  // os Fechados depois disto.
+  document.querySelectorAll("details.gaveta").forEach(function (g) {
+    var v = le("gaveta-" + g.id); if (v) g.open = v === "1";
+    g.addEventListener("toggle", function () { guarda("gaveta-" + g.id, g.open ? "1" : "0"); });
+  });
   // O painel e um dialogo: ao abrir, o foco vai para o x; ao fechar, volta para onde estava.
   var origem = null;
   // O link do quadro visivel com este href, comparado a letra (um seletor com o href la dentro partia com uma aspa).
   var linkPara = function (href) {
-    var q = document.querySelector(".quadro:not([hidden])"), achado = null;
-    if (href && q) q.querySelectorAll("a[href]").forEach(function (a) { if (!achado && a.getAttribute("href") === href) achado = a; });
+    var achado = null;
+    if (href) document.querySelectorAll("details.gaveta[open] a[href]").forEach(function (a) { if (!achado && a.getAttribute("href") === href) achado = a; });
     return achado;
   };
   function mostra() {
@@ -192,12 +211,26 @@ export const JS_CORPO = `
     var aberto = document.querySelector(".detalhe:not([hidden])");
     if (aberto && !aberto.contains(e.target) && !e.target.closest("a[href^='#t-'], a[href^='#f-']")) fecha();
   });
-  var fech = document.getElementById("fechados");
-  if (le("fechados") === "1") fech.open = true;
-  fech.addEventListener("toggle", function () { guarda("fechados", fech.open ? "1" : ""); });
   var qf = document.getElementById("qf");
   var filtraFechados = function () { var t = qf.value.toLowerCase(); document.querySelectorAll(".tabela-fechados tr[data-busca]").forEach(function (tr) { tr.hidden = t !== "" && tr.getAttribute("data-busca").indexOf(t) < 0; }); guarda("qf", qf.value); };
   qf.value = le("qf"); qf.addEventListener("input", filtraFechados); filtraFechados();
+  // Ordenar os Fechados (#468): cada titulo e um botao; o 1.o clique e crescente, o 2.o decrescente. As linhas de ID
+  // invalido ficam sempre no fim. A ordem escolhida guarda-se; sem ela, a do ficheiro.
+  var tabela = document.querySelector(".tabela-fechados"), corpo = tabela.tBodies[0];
+  var ordena = function (col, sentido) {
+    if (!(col >= 0 && col < 7)) return;
+    var linhas = Array.prototype.slice.call(corpo.querySelectorAll("tr[data-busca]:not(.invalido)"));
+    linhas.sort(function (a, b) { return comparaCelulas(a.cells[col].textContent, b.cells[col].textContent, sentido); });
+    linhas.forEach(function (tr) { corpo.appendChild(tr); });
+    corpo.querySelectorAll("tr.invalido").forEach(function (tr) { corpo.appendChild(tr); });
+    tabela.querySelectorAll("th").forEach(function (th, k) { th.setAttribute("aria-sort", k === col ? (sentido === "desc" ? "descending" : "ascending") : "none"); });
+    guarda("ordem", col + ":" + sentido);
+  };
+  tabela.querySelectorAll("button.ordena").forEach(function (b) {
+    b.addEventListener("click", function () { ordena(Number(b.getAttribute("data-col")), b.parentNode.getAttribute("aria-sort") === "ascending" ? "desc" : "asc"); });
+  });
+  var ordemAntes = le("ordem").split(":");
+  if (ordemAntes[0] !== "") ordena(Number(ordemAntes[0]), ordemAntes[1] === "desc" ? "desc" : "asc");
   var seguir = document.querySelector(".seguir");
   if (seguir) { if (le("seguir") === "1") seguir.open = true; seguir.addEventListener("toggle", function () { guarda("seguir", seguir.open ? "1" : ""); }); }
   document.querySelectorAll(".pedido").forEach(function (b) {
@@ -217,11 +250,12 @@ export const JS_CORPO = `
   var tempo = document.querySelector("time"); tempo.textContent = new Date(dados.geradaEm).toLocaleString();
   if (vistaParou(dados.geradaEm, Date.now(), dados.vigiar, dados.erro, dados.batida)) document.getElementById("parou").hidden = false;
   // O scroll so se restaura com o --vigiar (e o recarregar dele): numa vista gerada uma vez, era um valor antigo.
-  var quadroVisivel = function () { return document.querySelector(".quadro:not([hidden])"); };
+  // O scroll lateral e por gaveta (cada uma tem o seu quadro).
+  var quadros = function () { return document.querySelectorAll("details.gaveta > .quadro"); };
   if (dados.vigiar) {
-    var y = Number(le("scroll")), x = Number(le("scroll-x"));
+    var y = Number(le("scroll"));
     if (y) window.scrollTo(0, y);
-    if (x && quadroVisivel()) quadroVisivel().scrollLeft = x;
+    quadros().forEach(function (qd) { var x = Number(le("sx-" + qd.parentNode.id)); if (x) qd.scrollLeft = x; });
     // A navegacao por Tab continua no cartao onde estava (senao voltava ao inicio a cada recarregamento).
     var focado = linkPara(le("foco"));
     if (focado && !location.hash) focado.focus({ preventScroll: true });
@@ -233,7 +267,7 @@ export const JS_CORPO = `
       if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || selecao || document.querySelector(".copiado, .detalhe:not([hidden])")) { setTimeout(recarrega, 5000); return; }
       guarda("foco", tag === "A" ? el.getAttribute("href") || "" : "");
       guarda("scroll", String(window.scrollY));
-      if (quadroVisivel()) guarda("scroll-x", String(quadroVisivel().scrollLeft));
+      quadros().forEach(function (qd) { guarda("sx-" + qd.parentNode.id, String(qd.scrollLeft)); });
       location.reload();
     };
     setTimeout(recarrega, 5000);
