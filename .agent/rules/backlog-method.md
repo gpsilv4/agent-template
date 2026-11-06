@@ -15,7 +15,7 @@ O `backlog.md` e o documento central de trabalho pendente. Qualquer agente deve 
 **Layout e arquivo (ordem das seccoes).** O backlog divide-se em dois ficheiros, por frequencia de leitura:
 - **`backlog.md`** (importado nos **tres** pontos de entrada — `CLAUDE.md`, `GEMINI.md` e `AGENTS.md`, este ultimo para Cursor/Copilot/Codex — entra no contexto a cada sessao): so trabalho **ativo**, ordenado do acionavel para o topo:
   1. **Zona Ativa**: `Progresso Geral` + `Proximo:`, `Resumo` (contadores) e o cabecalho `🎯 Trabalho Ativo` (sprints ativos + `Pendentes sem Sprint`).
-  2. **Zona de Referencia**: cabecalho `📚 Tickets Abertos por Tipo (Referencia)` com as quatro tabelas por tipo (Bugs, UX, Divida Tecnica, Features) — apenas items **abertos** (Pendente, A Fazer).
+  2. **Zona de Referencia**: cabecalho `📚 Tickets Abertos por Tipo (Referencia)` com as quatro tabelas por tipo (Bugs, UX, Divida Tecnica, Features) — apenas items **abertos** (Pendente, A Fazer). Os titulos leem-se sem acentos ("Dívida Técnica", "Histórico" casam).
 - **`backlog-archive.md`** (**nao** importado — nunca esta permanentemente no contexto): `Historico (Fechados)` (Concluido/Cancelado) e o indice de sprints fechados. O agente le-o **on-demand** (via `Read`/grep), sobretudo para confirmar unicidade de IDs.
 
 O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao — e mantem esta ordem. **Um item vive num so ficheiro**: ao fechar (Concluido/Cancelado), a linha **move-se** de `backlog.md` para `backlog-archive.md`, mantendo o ficheiro ativo enxuto no contexto do agente.
