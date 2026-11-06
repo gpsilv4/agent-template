@@ -10,7 +10,7 @@
  * contadores errados, e e de uma pessoa.
  */
 
-import { leBacklog, norm, idDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
+import { leBacklog, norm, semAcentos, idDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
 import { regrasDoBacklog } from "./backlog-regras.mjs";
 
 // Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
@@ -93,7 +93,8 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
   // linha com aspeto de item ficou de fora da contagem — esta ultima apanha o drift mesmo
   // que os cabecalhos mudem de forma que (a) nao preveja.
   for (const { key, re } of SECTIONS) {
-    if (!active.split("\n").some((l) => re.test(l))) {
+    // Sem acentos, como o `section()` do leitor (#466): os dois nao podem discordar sobre o mesmo titulo.
+    if (!active.split("\n").some((l) => re.test(semAcentos(l)))) {
       warn(`${ACTIVE}: nao encontrei o cabecalho da seccao "${key}" (${re}) — os items dessa seccao nao estao a ser contados`);
     }
   }

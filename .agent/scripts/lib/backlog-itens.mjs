@@ -85,7 +85,12 @@ export function tableRows(text) {
   return rows;
 }
 
-// Conteudo entre um heading que faz match e o proximo heading.
+/** O texto sem os acentos, e so isso (#466): "Dívida Técnica" e "Histórico" casam os `re` escritos sem acentos. NAO e o
+ *  `norm`: esse tira tambem `*` e passa a minusculas, e um `## **Bugs**` passava a casar um titulo que hoje nao casa.
+ *  Para os TITULOS; o `Proximo:` fica com o `Pr[oó]ximo` dele, porque o leitor devolve o texto da linha (com acentos). */
+export const semAcentos = (s) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+// Conteudo entre um heading que faz match e o proximo heading (o titulo compara-se sem acentos, #466).
 export function section(text, headingRegex) {
   const out = [];
   let capturing = false;
@@ -93,7 +98,7 @@ export function section(text, headingRegex) {
     const isHeading = /^#{1,6}\s/.test(line);
     if (isHeading) {
       if (capturing) break;
-      if (headingRegex.test(line)) {
+      if (headingRegex.test(semAcentos(line))) {
         capturing = true;
         continue;
       }
@@ -235,7 +240,7 @@ function fechados(archive) {
 
 /** As colunas que o Historico TEM de ter e nao tem (so com o arquivo e o heading presentes, e com uma tabela). */
 function colunasEmFaltaNoHistorico(archive) {
-  if (archive === null || !/^##\s*Historico/im.test(archive)) return [];
+  if (archive === null || !/^##\s*Historico/im.test(semAcentos(archive))) return [];
   const cab = tableHeader(section(archive, /^##\s*Historico/i));
   return cab ? ["id", "tipo", "estado"].filter((c) => !cab.includes(c)) : [];
 }
@@ -313,7 +318,8 @@ const RE_PENDENTES = /^#{2,3}\s*(?:\d+\.\s*)?(?:\p{Extended_Pictographic}\S*\s*)
 /** A tabela dos Pendentes sem Sprint: a `Nota` pelo nome (`null` sem a coluna). `null` inteiro SEM o heading, e `[]`
  *  com ele e sem linhas: "a secao foi renomeada" e "nao ha pendentes" pedem coisas diferentes (`TP2`). */
 function pendentes(active) {
-  if (!active.split("\n").some((l) => RE_PENDENTES.test(l))) return { ps: null, temNota: false, temTabela: false };
+  // Sem acentos, como o `section()` logo abaixo: os dois nao podem discordar sobre o mesmo titulo (#466).
+  if (!active.split("\n").some((l) => RE_PENDENTES.test(semAcentos(l)))) return { ps: null, temNota: false, temTabela: false };
   const seccao = section(active, RE_PENDENTES);
   const cabecalho = tableHeader(seccao);
   const ps = tableRows(seccao).map((cells) => {
@@ -371,7 +377,7 @@ export function leBacklog(active, archiveRaw) {
   // `noArquivo` e "o ID tambem esta no Historico" (um duplicado), e NAO "fechado": o fechado e o Estado.
   for (const t of tickets.values()) t.noArquivo = fechadosIds.has(t.id);
   // O que se procurou e NAO se encontrou (`TP2`): sem isto, uma secao renomeada e uma secao vazia davam o mesmo `[]`.
-  const encontradas = { arquivo: archiveRaw !== null, historico: /^##\s*Historico/im.test(archiveRaw ?? ""), pendentes: ps !== null, tabelaNosPendentes: temTabela, notaNosPendentes: temNota };
+  const encontradas = { arquivo: archiveRaw !== null, historico: /^##\s*Historico/im.test(semAcentos(archiveRaw)), pendentes: ps !== null, tabelaNosPendentes: temTabela, notaNosPendentes: temNota };
   return {
     linhasPorTipo: porTipo,
     fechados: arquivo,

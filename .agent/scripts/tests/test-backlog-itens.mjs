@@ -230,6 +230,29 @@ caso("fixture rica com uma linha solta: os avisos sao os de antes (a rede 1b)", 
 caso("fixture rica sem arquivo: os avisos sao os de antes", () =>
   igual(calcula(ATIVO_RICO, null, NOMES).avisos, CONGELADO.semArquivo.avisos, "o calcula mudou"));
 
+// #466: os titulos com acentos, como um derivado os escreve. A prova e uma IGUALDADE com a fixture sem acentos (os
+// mesmos avisos, pela mesma ordem, e as mesmas contagens), e nao "sem avisos": hoje um titulo com acentos da tres de uma
+// vez (o cabecalho em falta, as linhas que nenhuma secao cobre, e o Historico em falta). "Violações" vai junto, mas nao
+// prova nada sozinho: o `re` dos Bugs ja casava pelo "Bugs".
+const ATIVO_ACENTOS = ATIVO_RICO.replace("## 3. Divida Tecnica / Code Quality", "## 3. Dívida Técnica / Code Quality").replace("## 1. Bugs / Violacoes de Regras do Projeto", "## 1. Bugs / Violações de Regras do Projeto");
+const ARQUIVO_ACENTOS = ARQUIVO_RICO.replace("## Historico (Fechados)", "## Histórico (Fechados)");
+caso("titulos com acentos (Dívida Técnica, Histórico): o calcula e o leitor dao o mesmo que sem acentos (#466)", () => [
+  // As fixtures mudaram mesmo (uma troca que nao casa nao testa nada).
+  ...espera(ATIVO_ACENTOS !== ATIVO_RICO && ARQUIVO_ACENTOS !== ARQUIVO_RICO && ATIVO_ACENTOS.includes("Dívida Técnica"), "a troca nao casou"),
+  ...igual(calcula(ATIVO_ACENTOS, ARQUIVO_ACENTOS, NOMES), CONGELADO.rico, "com acentos, o calcula difere"),
+  ...igual(leBacklog(ATIVO_ACENTOS, ARQUIVO_ACENTOS).fechados, leBacklog(ATIVO_RICO, ARQUIVO_RICO).fechados, "com acentos, os fechados diferem"),
+  // O mesmo titulo com os acentos DECOMPOSTOS (NFD: um editor ou um sistema de ficheiros que os grava assim).
+  ...igual(calcula(ATIVO_ACENTOS.normalize("NFD"), ARQUIVO_ACENTOS.normalize("NFD"), NOMES), CONGELADO.rico, "com acentos em NFD, o calcula difere"),
+  ...igual(leBacklog(ATIVO_ACENTOS, ARQUIVO_ACENTOS).colunasEmFaltaNoHistorico, [], "com acentos, o Historico perde colunas"),
+  // O `[]` acima e tambem o que sai com o heading por achar: um Historico com acentos e SEM a coluna Estado tem de a
+  // acusar (senao a regra das colunas desligava-se em silencio para quem escreve "Histórico").
+  ...igual(leBacklog(ATIVO_ACENTOS, ARQUIVO_ACENTOS.replace("| ID | Tipo | Descricao | Estado |", "| ID | Tipo | Descricao | Situacao |")).colunasEmFaltaNoHistorico, ["estado"], "com acentos e sem Estado"),
+]);
+caso("so os acentos: um titulo com enfase (`## **Bugs**`) continua a nao casar, como hoje (o `semAcentos` nao e o `norm`)", () => {
+  const avisos = calcula(ATIVO_RICO.replace("## 1. Bugs / Violacoes de Regras do Projeto", "## 1. **Bugs** / Violacoes"), ARQUIVO_RICO, NOMES).avisos.map((x) => x.msg);
+  return espera(avisos.some((m) => m.includes('nao encontrei o cabecalho da seccao "Bugs"')), `avisos: ${avisos.slice(0, 3)}`);
+});
+
 // O `Proximo:` (#446): o regex mudou-se LITERALMENTE do `calcula` para o leitor. Os avisos do `Proximo:` em cada cenario
 // foram capturados com o `calcula` de ANTES da mudanca; o acento, as maiusculas, duas linhas (vale a 1.a), a linha a meio
 // do ficheiro, e sem a linha.
