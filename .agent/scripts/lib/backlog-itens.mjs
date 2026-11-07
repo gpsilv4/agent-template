@@ -90,6 +90,10 @@ export function tableRows(text) {
  *  Para os TITULOS; o `Proximo:` fica com o `Pr[oó]ximo` dele, porque o leitor devolve o texto da linha (com acentos). */
 export const semAcentos = (s) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+/** Se o titulo de um bloco e o de um Sprint: comeca por "Sprint", com o mesmo prefixo opcional que os Pendentes toleram
+ *  (um numero, um emoji) e com enfase (`**Sprint 4**`). Um so sitio para o leitor e para a vista (#471). */
+export const ehSprint = (titulo) => /^(?:\d+\.\s*)?(?:\p{Extended_Pictographic}\S*\s*)?[*_]*sprint\b/iu.test(semAcentos(String(titulo ?? "")).trim());
+
 // Conteudo entre um heading que faz match e o proximo heading (o titulo compara-se sem acentos, #466).
 export function section(text, headingRegex) {
   const out = [];
@@ -282,7 +286,7 @@ function blocos(active) {
     const temOrdem = t.cabecalho.includes("ordem");
     const temId = t.cabecalho.includes("id");
     if (temOrdem && !temId) semId.push({ titulo });
-    if (!temOrdem && temId && h && /^#{2,4}\s*Sprint\b/i.test(h.linha)) sprintSemOrdem.push({ titulo });
+    if (!temOrdem && temId && h && /^#{2,4}\s/.test(h.linha) && ehSprint(h.texto)) sprintSemOrdem.push({ titulo });
     if (!temOrdem || !temId) continue;
     const prefacio = n === 1 ? linhas.slice((h?.i ?? -1) + 1, t.inicio).join("\n") : "";
     const cab = t.cabecalho;
@@ -333,7 +337,10 @@ function pendentes(active) {
 /** A linha `**Proximo:**` (#191): o texto, e o ID para onde aponta (so o PRIMEIRO da linha: o resto e texto livre). O
  *  regex e o de sempre, mudado LITERALMENTE do `calcula` (#446): a vista mostra-a, e o guarda verifica-a, pela mesma leitura. */
 function proximo(active) {
-  const texto = /^\*\*Pr[oó]ximo:\*\*(.*)$/im.exec(active)?.[1] ?? null;
+  // A linha procura-se SEM acentos (um "ó" gravado em NFD, decomposto, nao casava o `[oó]`, #471), mas o texto
+  // devolvido e o da linha original: e o que o utilizador escreveu, com os acentos.
+  const linha = active.split("\n").find((l) => /^\*\*Proximo:\*\*/i.test(semAcentos(l)));
+  const texto = linha === undefined ? null : /^\*\*[^*]*:\*\*(.*)$/.exec(linha)?.[1] ?? null;
   return { texto, alvo: idsDe(texto ?? "")[0] ?? null };
 }
 

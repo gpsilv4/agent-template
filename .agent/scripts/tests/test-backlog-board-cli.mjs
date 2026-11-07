@@ -150,6 +150,23 @@ await caso("a vista anterior fica, com UMA faixa de erro (e nao acumula)", async
     rmSync(dir, { recursive: true, force: true });
   }
 });
+await caso("um backlog VAZIO e um erro de leitura (#471): a faixa diz-o, e nao 'N avisos' que o check-backlog nunca imprime", async () => {
+  const dir = sandbox();
+  try {
+    corre(dir);
+    writeFileSync(join(dir, ".agent/context/backlog.md"), "\n  \n");
+    const r = corre(dir);
+    const v = vistaDe(dir);
+    return [
+      ...espera(r.status === 0 && v.includes("esta vazio — impossivel validar o backlog"), `${r.status}: ${v.slice(0, 200)}`),
+      // A vista anterior (de uma fixture limpa) nao tinha a faixa de avisos; gerada do texto vazio, teria "N aviso(s)".
+      ...espera(!v.includes("O check-backlog tem"), "a contagem de avisos de um backlog vazio"),
+      ...espera((v.match(/class="erro"/g) ?? []).length === 1, "a faixa"),
+    ];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 await caso("sem uma vista anterior, a pagina e so o erro", async () => {
   const dir = sandbox();
   try {

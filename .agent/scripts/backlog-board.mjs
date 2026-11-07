@@ -93,29 +93,40 @@ function escreve(html) {
 let ultimaBoa = existsSync(SAIDA) ? readFileSync(SAIDA, "utf8") : null;
 let geradas = 0;
 
-/** Gera a vista; com um backlog que nao se le, a anterior fica, com uma faixa de erro (substituida, nunca acumulada). */
+/** A ultima vista boa com a faixa de erro (substituida, nunca acumulada); sem vista anterior, um esqueleto. */
+function vistaDeErro(motivo, vigiar) {
+  const msg = `nao consegui ler o backlog (${motivo}) — esta e a ultima vista boa`;
+  // A mesma faixa do gerador (o escape dela tem par na varredura, e um caso hostil no `test-backlog-board`).
+  const faixa = faixaDeErro(msg);
+  // O JSON da vista anterior passa a dizer o erro (sem o "parou", que seria falso) e o modo de AGORA (ao sair, o
+  // `--vigiar` deixa de recarregar a pagina mesmo com o backlog ilegivel).
+  // Sem vista anterior (a 1.a geracao falhou): um esqueleto com o charset (a mensagem pode ter acentos) e, com o
+  // --vigiar, um refresh (nao ha o script da vista para recarregar quando o backlog for corrigido).
+  const esqueleto = `<!doctype html><html lang="pt"><head><meta charset="utf-8">${vigiar ? '<meta http-equiv="refresh" content="5">' : ""}<title>Backlog</title></head><body></body></html>`;
+  const base = (ultimaBoa ?? esqueleto)
+    .replace(FAIXA_RE, "")
+    .replace(/"vigiar":(?:true|false)/, `"vigiar":${vigiar}`)
+    .replace(/"erro":(?:true|false)/, '"erro":true');
+  return base.replace(/<body>\n?/, (b) => `${b}${faixa}`);
+}
+
+/** Gera a vista; com um backlog que nao se le (ou vazio), a anterior fica, com uma faixa de erro. */
 function gera(vigiar) {
   let html;
   try {
     const active = readFileSync(ACTIVE, "utf8");
-    const archive = existsSync(ARCHIVE) ? readFileSync(ARCHIVE, "utf8") : null;
-    const nomes = { ACTIVE: ".agent/context/backlog.md", ARCHIVE: ".agent/context/backlog-archive.md" };
-    html = geraVista(leBacklog(active, archive), calcula(active, archive, nomes), { agora: new Date(), vigiar, batida: BATIDA, chave: CHAVE });
-    ultimaBoa = html;
+    // Vazio: o `check-backlog` da um so aviso ("nao encontrado ou vazio") e para; a vista dizia "N avisos" (os
+    // cabecalhos, o Resumo...), um numero que ele nunca imprime (#471). E um erro de leitura como os outros.
+    if (!active.trim()) {
+      html = vistaDeErro(".agent/context/backlog.md esta vazio — impossivel validar o backlog", vigiar);
+    } else {
+      const archive = existsSync(ARCHIVE) ? readFileSync(ARCHIVE, "utf8") : null;
+      const nomes = { ACTIVE: ".agent/context/backlog.md", ARCHIVE: ".agent/context/backlog-archive.md" };
+      html = geraVista(leBacklog(active, archive), calcula(active, archive, nomes), { agora: new Date(), vigiar, batida: BATIDA, chave: CHAVE });
+      ultimaBoa = html;
+    }
   } catch (err) {
-    const msg = `nao consegui ler o backlog (${err instanceof Error ? err.message : String(err)}) — esta e a ultima vista boa`;
-    // A mesma faixa do gerador (o escape dela tem par na varredura, e um caso hostil no `test-backlog-board`).
-    const faixa = faixaDeErro(msg);
-    // O JSON da vista anterior passa a dizer o erro (sem o "parou", que seria falso) e o modo de AGORA (ao sair, o
-    // `--vigiar` deixa de recarregar a pagina mesmo com o backlog ilegivel).
-    // Sem vista anterior (a 1.a geracao falhou): um esqueleto com o charset (a mensagem pode ter acentos) e, com o
-    // --vigiar, um refresh (nao ha o script da vista para recarregar quando o backlog for corrigido).
-    const esqueleto = `<!doctype html><html lang="pt"><head><meta charset="utf-8">${vigiar ? '<meta http-equiv="refresh" content="5">' : ""}<title>Backlog</title></head><body></body></html>`;
-    const base = (ultimaBoa ?? esqueleto)
-      .replace(FAIXA_RE, "")
-      .replace(/"vigiar":(?:true|false)/, `"vigiar":${vigiar}`)
-      .replace(/"erro":(?:true|false)/, '"erro":true');
-    html = base.replace(/<body>\n?/, (b) => `${b}${faixa}`);
+    html = vistaDeErro(err instanceof Error ? err.message : String(err), vigiar);
   }
   try {
     escreve(html);

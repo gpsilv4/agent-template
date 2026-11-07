@@ -15,7 +15,7 @@
  */
 import { deepStrictEqual } from "assert";
 import { calcula } from "../lib/backlog-calculo.mjs";
-import { leBacklog, leDependeDe, idsDe } from "../lib/backlog-itens.mjs";
+import { leBacklog, leDependeDe, idsDe, ehSprint } from "../lib/backlog-itens.mjs";
 
 let passed = 0;
 const falhas = [];
@@ -393,6 +393,20 @@ caso("o proximo, o indice dos sprints fechados (pelo nome) e as colunas do ticke
   ...espera(lido.tickets.get("B1")?.colunas?.severidade === "Alta", "as colunas no ticket"),
 ]);
 
+caso("o Proximo com o 'ó' em NFD (decomposto) le-se como o composto, e o texto vem como esta escrito (#471)", () => {
+  const nfd = ATIVO_RICO.replace(L_PROXIMO, "**Pro\u0301ximo:** B9 de \u0301");
+  const aviso = (a) => calcula(a, ARQUIVO_RICO, NOMES).avisos.filter((x) => /Proximo/.test(x.msg)).map((x) => x.msg);
+  return [
+    ...igual(aviso(nfd), aviso(CENARIOS_PROXIMO.comAcento), "os avisos do Proximo em NFD"),
+    ...espera(leBacklog(nfd, ARQUIVO_RICO).proximo.texto === " B9 de \u0301" && leBacklog(nfd, ARQUIVO_RICO).proximo.alvo === "B9", `o texto: ${JSON.stringify(leBacklog(nfd, ARQUIVO_RICO).proximo)}`),
+  ];
+});
+caso("ehSprint: um titulo de Sprint com um numero, um emoji ou enfase antes; e a tabela sem Ordem debaixo dele avisa (#471)", () => [
+  ...espera(["Sprint 4", "🚀 Sprint 4 — x", "1. Sprint 4", "**Sprint 4**", "sprint 4"].every(ehSprint), "um titulo de Sprint nao foi reconhecido"),
+  // CONTROLO: o que nao e um Sprint.
+  ...espera(!["Fala real — depois do Sprint 2", "Sprints Fechados", "Pendentes sem Sprint"].some(ehSprint), "um titulo que nao e Sprint foi reconhecido"),
+  ...igual(leBacklog(ATIVO_RICO.replace("## Pendentes sem Sprint", "### 🚀 Sprint 9\n\n| ID | x |\n|----|---|\n| B9 | y |\n\n## Pendentes sem Sprint"), ARQUIVO_RICO).sprintSemOrdem.map((s) => s.titulo), ["🚀 Sprint 9"], "o Sprint com emoji e sem Ordem"),
+]);
 caso("o placeholder vazio do template nao da linhas", () => {
   const vazio = leBacklog("## 1. Bugs\n\n| ID | Estado | Problema |\n|---|---|---|\n| | | |\n\n### Sprint 1\n\n| Ordem | ID |\n|---|---|\n| | |\n", "");
   return [...espera(vazio.linhasPorTipo.length === 0, `linhas: ${vazio.linhasPorTipo.length}`), ...espera(vazio.blocos[0].linhas.length === 0, "o bloco vazio deu linhas"), ...espera(vazio.tickets.size === 0, "tickets")];
