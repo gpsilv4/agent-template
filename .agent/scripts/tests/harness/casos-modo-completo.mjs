@@ -39,9 +39,10 @@ export function problemasDosDocGuards(texto) {
   return out;
 }
 
-/** Os problemas do bloco MODO COMPLETO: existe, o passo corre so num PR que toca a maquinaria, e a lista de suites e a
- *  do `ci.yml` do template (uma lista so, e nao duas a concordar a mao, `TP8`). */
-export function problemasDoModoCompleto(texto, ciTemplate) {
+/** Os problemas do bloco MODO COMPLETO: existe, o passo corre so num PR que toca a maquinaria, e (com `ciTemplate`) a
+ *  lista de suites e a do `ci.yml` do template (uma lista so, e nao duas a concordar a mao, `TP8`). Sem `ciTemplate`
+ *  (num derivado), a lista nao se compara: o `ci.yml` dele e outro, com as suites dele e por outra ordem. */
+export function problemasDoModoCompleto(texto, ciTemplate = null) {
   const completo = comModoCompleto(texto ?? "");
   if (completo === null) return ["nao encontrei o bloco `# --- MODO COMPLETO inicio/fim ---` (com um `# - name:` dentro)"];
   const p = passosDoExemplo(completo).passos.find((x) => /suites-em-paralelo\.mjs/.test(`${x.run ?? ""}\n${x.corpo ?? ""}`));
@@ -51,6 +52,7 @@ export function problemasDoModoCompleto(texto, ciTemplate) {
   for (const c of ["!cancelled()", "github.event_name == 'pull_request'", "steps.scope.outputs.maquinaria == 'true'"]) {
     if (!cs.includes(c)) out.push(`as suites da maquinaria levam \`${c}\` no \`if:\``);
   }
+  if (ciTemplate === null) return out;
   const doExemplo = suitesDoPasso(`${p.corpo ?? ""}`);
   const doTemplate = suitesDoPasso(ciTemplate);
   if (doTemplate.length === 0) out.push("nao encontrei a lista de suites no `ci.yml` do template");
@@ -63,23 +65,27 @@ export function problemasDoModoCompleto(texto, ciTemplate) {
 }
 
 /** Regista os casos. `deps`: o exemplo, o `ci.yml` do template e os leitores da suite. */
-export function casosDoModoCompleto(caso, { texto, ciTemplate, problemas, correScope, repoDePR, comRepo }) {
+export function casosDoModoCompleto(caso, { texto, ciTemplate, noTemplate, problemas, correScope, repoDePR, comRepo }) {
+  // A lista do bloco e a do `ci.yml` do TEMPLATE: num derivado o `ci.yml` e outro (o `/upgrade` acrescenta-lhe as
+  // suites novas, e ele tem as suas), e a comparacao saltaria a dizer porque (o defeito que o `simulate-upgrade` mediu).
+  const ci = noTemplate ? ciTemplate : null;
+  if (!noTemplate) console.log("  SKIP  a lista do bloco MODO COMPLETO contra o `ci.yml`: num derivado o `ci.yml` e o do projeto");
   caso("o passo dos guards dos docs (#472): em todos os PRs, depois de uma falha", () => problemasDosDocGuards(texto));
   caso("controlo: sem o passo dos guards dos docs, reprova", () =>
     problemasDosDocGuards(texto.replace("node .agent/scripts/check-doc-versions.mjs", "true")).length ? [] : ["o exemplo sem o passo passou"]);
 
-  caso("o bloco MODO COMPLETO (#472): as suites so num PR que toca a maquinaria, com a lista do `ci.yml` do template", () => problemasDoModoCompleto(texto, ciTemplate));
+  caso("o bloco MODO COMPLETO (#472): as suites so num PR que toca a maquinaria, com a lista do `ci.yml` do template", () => problemasDoModoCompleto(texto, ci));
   caso("o bloco MODO COMPLETO descomentado cumpre a receita (zero problemas)", () => {
     const completo = comModoCompleto(texto);
     return completo === null ? ["nao encontrei o bloco MODO COMPLETO"] : problemas(completo);
   });
-  caso("controlo: uma suite a menos no `ci.yml` do template reprova a lista do bloco", () => {
+  if (noTemplate) caso("controlo: uma suite a menos no `ci.yml` do template reprova a lista do bloco", () => {
     const menos = (ciTemplate ?? "").replace(/^[ \t]*node \.agent\/scripts\/tests\/test-tmp-limpo\.mjs[ \t]*\\\n/m, "");
     return menos !== ciTemplate && problemasDoModoCompleto(texto, menos).some((m) => /a lista de suites/.test(m)) ? [] : ["a lista divergente passou"];
   });
   caso("controlo: sem o alcance da maquinaria no `if:`, o bloco reprova", () => {
     const sem = texto.replace(" && steps.scope.outputs.maquinaria == 'true' }}", " }}");
-    return sem !== texto && problemasDoModoCompleto(sem, ciTemplate).some((m) => /maquinaria == 'true'/.test(m)) ? [] : ["o bloco sem o alcance passou"];
+    return sem !== texto && problemasDoModoCompleto(sem, ci).some((m) => /maquinaria == 'true'/.test(m)) ? [] : ["o bloco sem o alcance passou"];
   });
 
   // O `scope` escreve `maquinaria` nos tres caminhos (falha fechada como o `app`).

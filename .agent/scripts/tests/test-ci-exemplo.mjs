@@ -484,7 +484,7 @@ casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });
 
 // --- O `dependabot.yml` de um privado (#440; os casos estao no `harness/casos-dependabot-exemplo.mjs`) ---
 casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });
-casosDoModoCompleto(caso, { texto, ciTemplate: ler(".github/workflows/ci.yml"), problemas, correScope, repoDePR, comRepo });
+casosDoModoCompleto(caso, { texto, ciTemplate: ler(".github/workflows/ci.yml"), noTemplate: !ehDerivado((p) => leOuNull(join(ROOT, p))), problemas, correScope, repoDePR, comRepo });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
