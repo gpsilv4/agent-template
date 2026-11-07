@@ -3,7 +3,8 @@
  *
  * So texto: o gerador (`lib/backlog-vista.mjs`) poe-no na pagina, e calcula o hash do script para a CSP. O JS nao monta
  * HTML: mostra e esconde o que o gerador ja renderizou, e escreve so por `textContent`. As decisoes dele (o filtro, se o
- * `--vigiar` parou) sao funcoes do gerador, testadas em Node e injetadas antes deste corpo (`fn.toString()`).
+ * `--vigiar` parou, a ordem dos Fechados) sao as tres funcoes de `lib/backlog-vista-pecas.mjs` (`passaFiltro`,
+ * `vistaParou`, `comparaCelulas`), testadas em Node e injetadas antes deste corpo (`fn.toString()`).
  * Sem vocabulario de recusa (e um modulo so de dados): um desses nomes aqui pedia-lhe um par na varredura.
  */
 
@@ -133,7 +134,7 @@ export const JS_CORPO = `
   var K = function (k) { return dados.chave + "-" + k; };
   var guarda = function (k, v) { try { localStorage.setItem(K(k), v); } catch (e) { /* sem localStorage: segue */ } };
   var le = function (k) { try { return localStorage.getItem(K(k)) || ""; } catch (e) { return ""; } };
-  // Os filtros valem para todas as gavetas (#468: o seletor "Mostrar" saiu; as gavetas fazem o trabalho dele). O da
+  // Os filtros valem para todas as gavetas de cartoes (#468: o seletor "Mostrar" saiu); os Fechados tem a sua pesquisa. O da
   // Prioridade so existe quando o backlog tem a coluna.
   var q = document.getElementById("q"), ft = document.getElementById("f-tipo"), fe = document.getElementById("f-esforco"), fp = document.getElementById("f-prioridade");
   var antes = {}; try { antes = JSON.parse(le("filtros") || "{}"); } catch (e) { antes = {}; }

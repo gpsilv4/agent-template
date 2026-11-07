@@ -11,7 +11,7 @@ import { join } from "path";
 import { ACTIVE_OK, ARCHIVE_OK } from "./harness/test-backlog-harness.mjs";
 import { leBacklog } from "../lib/backlog-itens.mjs";
 import { calcula } from "../lib/backlog-calculo.mjs";
-import { comparaCelulas, prioridadesDe, normalizaFimDeLinha, geraVista, renderTexto, tituloDe, pedidosDe, passaFiltro, vistaParou, urlSegura, faixaDeErro, rotuloDe } from "../lib/backlog-vista.mjs";
+import { scriptDaPagina, comparaCelulas, prioridadesDe, normalizaFimDeLinha, geraVista, renderTexto, tituloDe, pedidosDe, passaFiltro, vistaParou, urlSegura, faixaDeErro, rotuloDe } from "../lib/backlog-vista.mjs";
 import { CSS } from "../lib/backlog-vista-assets.mjs";
 
 let passed = 0;
@@ -210,7 +210,7 @@ caso("cada detalhe tem um botao para fechar; os fechados sao uma tabela com o Ti
   const detalhes = (html.match(/<section class="detalhe"/g) ?? []).length;
   return [...espera(detalhes > 0 && (html.match(/<button type="button" class="fechar" aria-label="Fechar o detalhe">/g) ?? []).length === detalhes, "um detalhe sem o botao"), ...espera((html.match(/<section class="detalhe" id="([tf]-\w+)" role="dialog" aria-modal="true" aria-labelledby="h-\1"/g) ?? []).length === detalhes, "um detalhe sem o papel de dialogo modal"), ...espera(/<tr data-busca="[^"]*"><td><a href="#f-B3">B3<\/a><\/td><td>Bug<\/td><td>Concluido<\/td><td>bug fechado<\/td><td>S1<\/td><td>v0\.1\.0<\/td><td>2026-01-01<\/td><\/tr>/.test(html), "a linha do B3 na tabela")];
 });
-caso("o CSS respeita o hidden (senao o .quadro { display: flex } mostrava os dois quadros ao mesmo tempo)", () => espera(/\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(CSS), "sem a regra [hidden]"));
+caso("o CSS respeita o hidden (um display de autor vencia-o: os cartoes filtrados, os detalhes e o aviso do --vigiar ficavam a vista)", () => espera(/\[hidden\]\s*\{\s*display:\s*none\s*!important/.test(CSS), "sem a regra [hidden]"));
 caso("o CSS dos filtros (#468): o estilo do rotulo so no texto dele, e os botoes de ordenar com 44px no telemovel", () => [
   // No <label> inteiro, os campos (`font: inherit`) herdavam os 11px a negrito do rotulo.
   ...espera(/\.filtro > span \{[^}]*font-size: 11px/.test(CSS) && !/\.filtro \{[^}]*font-size/.test(CSS), "o tamanho do rotulo no .filtro inteiro"),
@@ -364,6 +364,28 @@ caso("o script inline vai com o fim de linha normalizado (o hash e o do texto qu
   ...espera(normalizaFimDeLinha("a\r\nb\rc\n") === "a\nb\nc\n", JSON.stringify(normalizaFimDeLinha("a\r\nb\rc\n"))),
   ...espera(!/\r/.test(/<script>([^]*?)<\/script>/i.exec(vista())?.[1] ?? "\r"), "ha um \\r no script"),
 ]);
+caso("o script e o hash da CSP (#471): com CRLF de facto, o hash e o do texto normalizado", () => {
+  const { script, hash } = scriptDaPagina(["a\r\nb", "c\rd"]);
+  return [...espera(script === "a\nb\nc\nd", JSON.stringify(script)), ...espera(hash === createHash("sha256").update("a\nb\nc\nd", "utf8").digest("base64"), "o hash nao e o do texto normalizado")];
+});
+caso("o numero de avisos da faixa e o EXATO do calcula (#471: um so aviso de contagem, e o controlo sem avisos)", () => {
+  const ativo = troca(ACTIVE_OK, [["| Bugs / Violacoes de Regras | 3 | 1 | 1 | 1 | 0 |", "| Bugs / Violacoes de Regras | 4 | 1 | 1 | 1 | 0 |"]]);
+  const n = calcula(ativo, ARCHIVE_OK, NOMES).avisos.length;
+  return [...espera(n > 0 && vista(ativo).includes(`O check-backlog tem ${n} aviso(s)`), `o calcula da ${n}; a faixa: ${/O check-backlog tem \d+/.exec(vista(ativo))?.[0]}`), ...espera(!vista().includes('class="aviso"'), "CONTROLO: a fixture limpa tem a faixa")];
+});
+caso("uma anomalia conta numa gaveta so (#471): um Estado desconhecido listado nos Pendentes nao se repete em 'Sem bloco'", () => {
+  const ativo = troca(ACTIVE_OK, [["| B1 | Pendente | algo |", "| B1 | Pendente (sem sprint) | algo |"], ["|----|-----------|---------|------|\n| | | | |", "|----|-----------|---------|------|\n| B1 | algo | S | x |"]]);
+  const html = vista(ativo);
+  const vezes = (porBloco(html).match(/cinzento"><b>B1<\/b>/g) ?? []).length;
+  // CONTROLO: sem a linha nos Pendentes, o B1 continua a ter o seu cinzento (em "Sem bloco").
+  const semPendentes = vista(troca(ACTIVE_OK, [["| B1 | Pendente | algo |", "| B1 | Pendente (sem sprint) | algo |"]]));
+  return [...espera(vezes === 1, `o B1 cinzento aparece ${vezes} vezes`), ...espera((porBloco(semPendentes).match(/cinzento"><b>B1<\/b>/g) ?? []).length === 1, "o controlo")];
+});
+caso("a gaveta Sprints aceita '🚀 Sprint', '1. Sprint' e '**Sprint**' (#471)", () => {
+  const titulos = ["🚀 Sprint 2", "1. Sprint 2", "**Sprint 2**"];
+  const emSprints = titulos.filter((t) => /id="g-sprints"/.test(vista(troca(ACTIVE_OK, [["### Sprint 2 — o que esta aberto", `### ${t} — o que esta aberto`]]))));
+  return espera(emSprints.length === 3, `so estes foram para Sprints: ${emSprints}`);
+});
 caso("um ID invalido no Historico fica uma linha so de texto nos Fechados (e o total continua a bater)", () => {
   const html = vista(ACTIVE_OK, troca(ARCHIVE_OK, [["| B3 | Bug | bug fechado |", "| ~~B3~~ | Bug | bug fechado |"]]));
   return [

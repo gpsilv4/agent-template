@@ -17,12 +17,20 @@
  * invisivel para o par (`lib/pares.mjs`).
  */
 import { createHash } from "crypto";
-import { CLOSED_STATES, ID_LIKE, OPEN_STATES, SECTIONS, norm } from "./backlog-itens.mjs";
+import { CLOSED_STATES, ID_LIKE, OPEN_STATES, SECTIONS, norm, ehSprint } from "./backlog-itens.mjs";
 import { CSS, JS_CORPO } from "./backlog-vista-assets.mjs";
 
 import { escapa, urlSegura, jsonSeguro, faixaDeErro, FAIXA_RE, renderTexto, tituloDe, pedidosDe, rotuloDe, passaFiltro, vistaParou, normalizaFimDeLinha, comparaCelulas, prioridadesDe, SEM_PRIORIDADE } from "./backlog-vista-pecas.mjs";
 // Quem le a vista (o CLI, as suites) importa daqui: o gerador continua a ser a porta de entrada.
 export { escapa, urlSegura, jsonSeguro, faixaDeErro, FAIXA_RE, renderTexto, tituloDe, pedidosDe, rotuloDe, passaFiltro, vistaParou, normalizaFimDeLinha, comparaCelulas, prioridadesDe };
+
+/** O script inline da pagina e o hash dele para a CSP: o fim de linha normalizado ANTES do hash (o browser normaliza o
+ *  CRLF do HTML para LF antes de o calcular, e um checkout com CRLF — o `toString()` traz a fonte como esta — bloqueava o
+ *  script em silencio). Exportada para o teste lhe dar um texto com `\r\n` de facto (#471). */
+export function scriptDaPagina(partes) {
+  const script = normalizaFimDeLinha(partes.join("\n"));
+  return { script, hash: createHash("sha256").update(script, "utf8").digest("base64") };
+}
 
 // Os titulos da tabela dos Fechados, pela ordem das celulas (cada um e um botao que ordena por essa coluna, #468).
 const TITULOS_FECHADOS = ["ID", "Tipo", "Estado", "Titulo", "Sprint", "Versao", "Data"];
@@ -46,9 +54,15 @@ function colunasDaVista(lido) {
     return CLOSED_STATES.includes(t.estado) ? "fechado no ativo: mover a linha para o arquivo" : "estado desconhecido";
   };
   const cinzento = (id, porque, extra = {}) => ({ id, cinzento: true, porque, ...extra });
+  // Os IDs que ja tem um cinzento num bloco ou nos Pendentes: o "Sem bloco" nao os repete (#471: a mesma anomalia
+  // contava em duas gavetas).
+  const jaCinzentos = new Set();
   const cartaoDe = (id, extra) => {
     const t = abertos.get(id);
-    if (!t) return cinzento(id, porqueNaoAberto(id), extra);
+    if (!t) {
+      jaCinzentos.add(id);
+      return cinzento(id, porqueNaoAberto(id), extra);
+    }
     colocados.add(id);
     return { ...t, ...extra, emCurso: t.estado === "a fazer" };
   };
@@ -61,7 +75,7 @@ function colunasDaVista(lido) {
   const colunas = lido.blocos.map((b) => ({
     titulo: b.titulo,
     // Um bloco e um Sprint se o titulo comecar por "Sprint" (a gaveta "Sprints"); os outros vao para "Outros blocos".
-    sprint: /^\s*sprint\b/i.test(b.titulo ?? ""),
+    sprint: ehSprint(b.titulo),
     objetivo: b.objetivo,
     fecho: b.fecho,
     // Um ciclo so (verificar e marcar na mesma passagem): o mesmo ID duas vezes no mesmo bloco da um cartao.
@@ -74,7 +88,7 @@ function colunasDaVista(lido) {
   });
   // Uma linha Concluido/Cancelado (ou de estado desconhecido) que ficou numa tabela por tipo conta no cabecalho do calcula
   // e nao estava em lado nenhum: um cartao cinzento diz onde esta e o que falta.
-  const foraDeLugar = [...lido.tickets].filter(([, t]) => !OPEN_STATES.includes(t.estado)).map(([id]) => cinzento(id, porqueNaoAberto(id)));
+  const foraDeLugar = [...lido.tickets].filter(([id, t]) => !OPEN_STATES.includes(t.estado) && !jaCinzentos.has(id)).map(([id]) => cinzento(id, porqueNaoAberto(id)));
   const sem = [...[...abertos.keys()].filter((id) => !colocados.has(id)).map((id) => cartaoDe(id, {})), ...invalidos.map((id) => cinzento(id, porqueInvalido(id))), ...foraDeLugar];
   if (sem.length) colunas.push({ titulo: "Sem bloco", semBloco: true, cartoes: sem });
   return colunas;
@@ -269,10 +283,7 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
   const geradaEm = agora.toISOString().replace(/\.\d{3}Z$/, "Z");
   // A `chave` separa o que o browser guarda por projeto: duas vistas abertas do disco partilham o `localStorage`.
   const json = jsonSeguro({ cartoes: dados, geradaEm: agora.getTime(), vigiar, erro: Boolean(erro), batida, chave });
-  // O fim de linha normalizado ANTES do hash: o browser normaliza o CRLF do HTML para LF antes de calcular o hash do
-  // script inline, e um checkout com CRLF (o `toString()` traz a fonte como esta) bloqueava o script em silencio.
-  const script = normalizaFimDeLinha(`${passaFiltro.toString()}\n${vistaParou.toString()}\n${comparaCelulas.toString()}\n${JS_CORPO}`);
-  const hash = createHash("sha256").update(script, "utf8").digest("base64");
+  const { script, hash } = scriptDaPagina([passaFiltro.toString(), vistaParou.toString(), comparaCelulas.toString(), JS_CORPO]);
   const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'`;
   // O recarregar e do JS (so com o `--vigiar`, e nao com o foco na pesquisa): um `meta refresh` perdia o que se escreve.
   const faixa = erro ? faixaDeErro(erro) : "";
