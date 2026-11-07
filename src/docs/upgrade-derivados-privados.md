@@ -65,11 +65,40 @@ e um repo publico nao conta. **A receita, para nao la chegar** (#441):
 - o Dependabot mensal e sem rebase (`src/docs/exemplos/dependabot-privado.yml`, §4 acima);
 - medir antes e depois de cada mudanca (abaixo), e as quatro regras do fim desta seccao.
 
-**Um derivado com a maquinaria completa** (o `/upgrade` completo, #472) usa o MESMO pacote, e descomenta no exemplo
-o bloco `MODO COMPLETO`: as suites dos scripts do template correm no mesmo job, SO quando o PR toca `.agent/scripts/`,
-`.claude/hooks/` ou `.githooks/` (um `/upgrade`). Num PR normal nao custam nada; num de upgrade verificam o codigo que
-ele traz. Medido a 7 nov 2026: um derivado completo com o CI de 10 jobs gastava 13 min por PR (o mais longo, as
-suites, 173 s; os outros de 5 a 75 s, cada um a pagar o seu minuto), e o derivado parcial com o pacote, 2-3.
+**Um derivado com a maquinaria completa** (o `/upgrade` completo, #472, #477) usa o MESMO pacote, e descomenta no
+exemplo os DOIS blocos `MODO COMPLETO`.
+- **(a)** O passo dos guards dos docs, no job `ci`: corre em todos os PRs, por ~1-2 s.
+- **(b)** O job `guard-tests`, com as suites dos scripts do template e os verificadores so-node (`check-doc-versions`,
+  `check-backlog`, `check-codigo-morto`).
+  - Espera pelo `ci` (`needs: ci`) e corre SO quando o PR toca `.agent/scripts/`, `.claude/hooks/` ou `.githooks/`
+    (um `/upgrade`).
+  - Num PR normal salta, e um job saltado nao se cobra. Num de upgrade paga o job das suites (~3 min cobrados; ~1 min
+    mais do que se fossem um passo do `ci`) e verifica o codigo que ele traz. Um PR que so mexa no `ci.yml` tambem o
+    corre (`.github/workflows/` conta como maquinaria).
+- No bloco (a) vem tambem o `check-test-surface` contra a base do PR, em todos os PRs: um teste da app enfraquecido
+  nao toca a maquinaria.
+
+Medido a 7 nov 2026: um derivado completo com o CI de 10 jobs gastava 13 min por PR (o mais longo, as suites, 173 s;
+os outros de 5 a 75 s, cada um a pagar o seu minuto), e o derivado parcial com o pacote, 2-3.
+
+Ao adotar:
+- **Os checks obrigatorios.** Um job saltado conta como passado num check obrigatorio. Um ruleset que exigia o
+  `Guard Tests` (o portao do CI de 10 jobs, que o pacote tira) passa a exigir o `CI` E o `Guard Suites`. Sem o
+  `Guard Tests` fora, cada PR fica pendente para sempre; so com o `CI`, as suites vermelhas de um PR de upgrade nao
+  bloqueiam o merge.
+- **O trailer.** O commit que troca o `ci.yml` tira jobs com maquinaria: leva o trailer
+  `Test-Surface: .github/workflows/ci.yml — <porque>` (o `check-test-surface` reprova sem ele).
+- **O que a 2b do `/upgrade` diz com o pacote.** Sai a nota "CI do pacote de um job": as notas da forma do CI de 10
+  jobs (o plano da varredura, o salto do merge e o titulo no portao) nao se aplicam, e nao aparecem. Saem tambem duas
+  notas esperadas sobre o `mutation-sweep.mjs`, que fica no CI do template de proposito: "o template corre 1
+  verificacao(oes) que o ci.yml deste projeto nao corre" e "conta(m) na comparacao mas nao corre(m) aqui". As tres
+  ignoram-se.
+
+**Porque um job a parte, e nao um passo do `ci`** (como o #472 o tinha):
+- O `/upgrade` reconhece o modo completo pelo job `guard-tests` (`lib/modo-upgrade.mjs`). Sem ele, a marca
+  `modo: completo` e o `ci.yml` contradiziam-se, e a 2b nao media nada.
+- As suites sao codigo do PR, e no mesmo job das verificacoes da app podiam escrever no `$GITHUB_PATH`.
+- Um derivado parcial nao traz o `check-doc-versions.mjs`, por isso o passo (a) nasce comentado.
 
 Os minutos cobrados sao a soma dos jobs, cada um arredondado ao minuto acima: um job de 8 s paga 1 min, e um de 121 s
 paga 3. Ha dois numeros, e respondem a perguntas diferentes:

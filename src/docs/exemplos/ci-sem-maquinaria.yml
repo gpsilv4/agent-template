@@ -5,7 +5,8 @@
 # 1-2 nov 2026): um PR mais o push do seu merge passou de ~15 min cobrados para ~3. O porque de cada escolha esta em
 # `src/docs/upgrade-derivados-privados.md` e nos comentarios do #429. A suite `test-ci-exemplo.mjs` prende cada uma.
 #
-# O GitHub cobra um repo privado POR JOB, arredondado ao minuto acima: por isso UM job. Cada verificacao tem
+# O GitHub cobra um repo privado POR JOB, arredondado ao minuto acima: por isso UM job (no MODO COMPLETO, dois: o
+# segundo, `guard-tests`, salta — e nao se cobra — em todo o PR que nao toca a maquinaria). Cada verificacao tem
 # `!cancelled()`, para uma falha (o tsc) nao esconder as outras (os testes). A instalacao nao o tem, e as verificacoes
 # da app so correm com ela bem-sucedida (`steps.install.conclusion == 'success'`): sem `node_modules`, o `npx tsc` ia
 # buscar ao registo um pacote que nao esta fixado (o defeito que o #428 corrigiu no CI do template). Nunca `paths-ignore` no `on:`: um check que
@@ -14,6 +15,12 @@
 # As mensagens e o gitleaks leem os ficheiros do PROPRIO PR: um PR que mude o `.githooks/`, o `.gitleaksignore` ou o
 # `.gitleaks.toml` decide como e julgado. Num privado, quem abre PRs ja tem escrita (e um contorno de politica, nao uma
 # escalada), mas esses caminhos pedem revisao humana: por exemplo, uma linha no `CODEOWNERS` para eles.
+# O gitleaks fica no FIM de proposito (#477): antes dele ja corre codigo do PR (o `npm ci`, o `tsc`, o `commit-msg`), e
+# a frente, um falso positivo dele saltava o Install e com ele todas as verificacoes da app (o Install nao tem
+# `!cancelled()`). E um limite aceite, nao uma garantia: o PR controla a config do gitleaks na mesma, e o codigo que
+# corre antes dele no mesmo job (um `$GITHUB_PATH` escrito por um `postinstall`) podia sombrear um binario que a acao
+# chame, com o `GITHUB_TOKEN` (so leitura) e a `GITLEAKS_LICENSE` dela ao alcance. Num privado quem abre PRs ja tem
+# escrita; um job proprio para o gitleaks fechava-o, por mais um minuto cobrado em cada PR.
 
 name: CI
 
@@ -63,6 +70,9 @@ jobs:
     # --- VARIANTE squash fim ---
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    # O alcance da maquinaria, para o job `guard-tests` do MODO COMPLETO (no fim). Inofensivo sem ele.
+    outputs:
+      maquinaria: ${{ steps.scope.outputs.maquinaria }}
     # O gitleaks lista os commits do PR pela API. As permissions de um job SUBSTITUEM as do topo.
     permissions:
       contents: read
@@ -96,8 +106,10 @@ jobs:
           fi
           # ADAPTAR: os caminhos da app.
           APP='^(src/|tests/|public/|package(-lock)?\.json$|tsconfig\.json$|eslint\.config\.|vitest\.config\.|\.nvmrc$|\.github/workflows/)'
-          # A maquinaria do template (so conta no MODO COMPLETO, abaixo): muda num `/upgrade`, quase nunca noutro PR.
-          MAQUINARIA='^(\.agent/scripts/|\.claude/hooks/|\.githooks/)'
+          # A maquinaria do template (so conta no MODO COMPLETO, abaixo): muda num `/upgrade`, quase nunca noutro PR. O
+          # `.github/workflows/` tambem: um PR que so tire uma suite da lista do `guard-tests` (ou lhe ponha um
+          # `|| true`) e julgado pelas suites que o leem (#477).
+          MAQUINARIA='^(\.agent/scripts/|\.claude/hooks/|\.githooks/|\.github/workflows/)'
           # `--no-renames`: uma renomeacao mostra os DOIS caminhos (mover um ficheiro da app para `docs/` toca a app).
           # `-z`: os nomes chegam sem aspas nem escapes, mesmo com espacos, acentos ou uma quebra de linha.
           tocados="$RUNNER_TEMP/tocados-pelo-pr"
@@ -280,48 +292,20 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: node .claude/hooks/tests/test-hooks.mjs
 
-      # Os guards dos docs (orcamentos, paridades, citacoes): ~1-2 s, e apanham um doc que divergiu do codigo (#472).
-      - name: Doc guards
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-        run: node .agent/scripts/check-doc-versions.mjs
-
-      # --- MODO COMPLETO inicio: so num derivado com a maquinaria do template (o `/upgrade` completo): descomentar o
-      # passo. As suites dos scripts do template correm SO quando o PR toca a maquinaria (`.agent/scripts/`,
-      # `.claude/hooks/`, `.githooks/` — um `/upgrade`): num PR normal nao custam nada, e num de upgrade verificam o
-      # codigo que ele traz, no MESMO job (um job a parte pagava outro arredondamento ao minuto). A lista e a do passo
-      # "Suites — negative tests" do `ci.yml` do template (a suite deste exemplo compara-as). A varredura de mutacao
-      # fica no CI do template, que mede o mesmo codigo antes de cada tag.
-      # - name: Suites da maquinaria
-      #   if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.maquinaria == 'true' }}
-      #   run: |
-      #     node .agent/scripts/lib/suites-em-paralelo.mjs -- \
-      #       node .agent/scripts/tests/test-test-surface.mjs \
-      #       node .agent/scripts/tests/test-guards.mjs \
-      #       node .agent/scripts/tests/test-simulate-upgrade.mjs \
-      #       node .claude/hooks/tests/test-hooks.mjs \
-      #       node .agent/scripts/tests/test-mutation-sweep.mjs \
-      #       node .agent/scripts/tests/test-simulate-derived.mjs \
-      #       node .agent/scripts/tests/test-commit-msg.mjs \
-      #       node .agent/scripts/tests/test-bundle-sizes.mjs \
-      #       node .agent/scripts/tests/test-backlog.mjs \
-      #       node .agent/scripts/tests/test-backlog-corrige.mjs \
-      #       node .agent/scripts/tests/test-backlog-itens.mjs \
-      #       node .agent/scripts/tests/test-backlog-regras.mjs \
-      #       node .agent/scripts/tests/test-backlog-board.mjs \
-      #       node .agent/scripts/tests/test-backlog-board-cli.mjs \
-      #       node .agent/scripts/tests/test-minutos-ci.mjs \
-      #       node .agent/scripts/tests/test-ci-exemplo.mjs \
-      #       node .agent/scripts/tests/test-modo-upgrade.mjs \
-      #       node .agent/scripts/tests/test-baseline-superficie.mjs \
-      #       node .agent/scripts/tests/test-registo.mjs \
-      #       node .agent/scripts/tests/test-mapa-suites.mjs \
-      #       node .agent/scripts/tests/test-codigo-morto.mjs \
-      #       node .agent/scripts/tests/test-textos-publicos.mjs \
-      #       node .agent/scripts/tests/test-adotar-template.mjs \
-      #       node .agent/scripts/tests/test-release-da-tag.mjs \
-      #       node .agent/scripts/tests/test-tmp-limpo.mjs \
-      #       node .agent/scripts/tests/test-derivado-maduro.mjs
-      # --- MODO COMPLETO fim ---
+      # --- MODO COMPLETO (a) inicio: so num derivado com a maquinaria do template (o `/upgrade` completo): descomentar
+      # este passo E o job `guard-tests` no fim. Os guards dos docs (orcamentos, paridades, citacoes): ~1-2 s, em todos
+      # os PRs, e apanham um doc que divergiu do codigo (#472). Um derivado PARCIAL nao traz o `check-doc-versions.mjs`
+      # (`src/docs/upgrade-parcial.md`): por isso nasce comentado (#477). E a superficie de teste contra a base do PR
+      # (o `check-test-surface`, que o `guard-tests` do template corre): em todos os PRs, porque um teste da app
+      # enfraquecido nao toca a maquinaria. Precisa do `fetch-depth: 0` deste job.
+      # - name: Doc guards
+      #   if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+      #   run: node .agent/scripts/check-doc-versions.mjs
+      #
+      # - name: Test surface — nao enfraquecida desde a base do PR
+      #   if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+      #   run: node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD^1)"
+      # --- MODO COMPLETO (a) fim ---
 
       # Sempre, tambem no push: o hook local so corre em quem fez `git config core.hooksPath .githooks`. Num PR, os
       # commits do PR sem os de merge (o `Merge <sha> into <sha>` do GitHub nao tem prefixo) e o titulo, que e a 1.a
@@ -378,3 +362,74 @@ jobs:
           # Num repo de ORGANIZACAO a acao exige esta licenca (gratis, em gitleaks.io); sem ela o job fica vermelho em
           # todas as corridas. Numa conta pessoal o secret nao existe, o valor e vazio e a acao corre na mesma.
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # --- MODO COMPLETO (b) inicio: o job da maquinaria, com o passo (a) acima. As suites dos scripts do template e os
+  # verificadores so-node que a 2b do `/upgrade` le no job `guard-tests` (#477: o `/upgrade` reconhece o modo completo
+  # por este job; sem ele, a marca `modo: completo` e o `ci.yml` contradizem-se). Corre SO num PR que toca a maquinaria
+  # (`.agent/scripts/`, `.claude/hooks/`, `.githooks/`, `.github/workflows/` — um `/upgrade`): num PR normal SALTA, e
+  # um job saltado nao se cobra e conta como passado num check obrigatorio. Num PR de upgrade paga o job das suites
+  # (~3 min cobrados; ~1 min mais do que no mesmo job, pelo arredondamento a parte) e espera pelo `ci` (o `needs:`,
+  # como o `sweep` do template espera pelo `guard-tests`). Um job a parte, e nao um passo do `ci`:
+  # as suites sao codigo do PR, e no mesmo job podiam escrever no `$GITHUB_PATH` um `tsc` falso (o `ci.yml` do template
+  # separa-os pela mesma razao). Com o `!cancelled()`, corre tambem com o `ci` vermelho; se o `ci` cair antes do
+  # `scope`, o output vem vazio e salta (o CI ja esta vermelho). A lista e a do passo "Suites — negative tests" do
+  # `ci.yml` do template (a suite deste exemplo compara-as). A varredura de mutacao fica no CI do template, que mede o
+  # mesmo codigo antes de cada tag. Os checks obrigatorios passam a ser o `CI` E o `Guard Suites` (este nunca fica
+  # pendente num PR: corre ou salta); o `Guard Tests` (o portao do CI de 10 jobs) sai, senao cada PR fica pendente para
+  # sempre. So o `CI` deixava as suites vermelhas de um PR de upgrade fora do bloqueio do merge.
+  # guard-tests:
+  #   name: Guard Suites
+  #   needs: ci
+  #   if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.ci.outputs.maquinaria == 'true' }}
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 20
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         # O historico inteiro, como o `guard-tests` do template: ha suites que chamam o git.
+  #         fetch-depth: 0
+  #         persist-credentials: false
+  #     - uses: actions/setup-node@v7
+  #       with:
+  #         node-version-file: .nvmrc
+  #     - name: Suites — negative tests (em paralelo)
+  #       run: |
+  #         node .agent/scripts/lib/suites-em-paralelo.mjs -- \
+  #           node .agent/scripts/tests/test-test-surface.mjs \
+  #           node .agent/scripts/tests/test-guards.mjs \
+  #           node .agent/scripts/tests/test-simulate-upgrade.mjs \
+  #           node .claude/hooks/tests/test-hooks.mjs \
+  #           node .agent/scripts/tests/test-mutation-sweep.mjs \
+  #           node .agent/scripts/tests/test-simulate-derived.mjs \
+  #           node .agent/scripts/tests/test-commit-msg.mjs \
+  #           node .agent/scripts/tests/test-bundle-sizes.mjs \
+  #           node .agent/scripts/tests/test-backlog.mjs \
+  #           node .agent/scripts/tests/test-backlog-corrige.mjs \
+  #           node .agent/scripts/tests/test-backlog-itens.mjs \
+  #           node .agent/scripts/tests/test-backlog-regras.mjs \
+  #           node .agent/scripts/tests/test-backlog-board.mjs \
+  #           node .agent/scripts/tests/test-backlog-board-cli.mjs \
+  #           node .agent/scripts/tests/test-minutos-ci.mjs \
+  #           node .agent/scripts/tests/test-ci-exemplo.mjs \
+  #           node .agent/scripts/tests/test-modo-upgrade.mjs \
+  #           node .agent/scripts/tests/test-baseline-superficie.mjs \
+  #           node .agent/scripts/tests/test-registo.mjs \
+  #           node .agent/scripts/tests/test-mapa-suites.mjs \
+  #           node .agent/scripts/tests/test-codigo-morto.mjs \
+  #           node .agent/scripts/tests/test-textos-publicos.mjs \
+  #           node .agent/scripts/tests/test-adotar-template.mjs \
+  #           node .agent/scripts/tests/test-release-da-tag.mjs \
+  #           node .agent/scripts/tests/test-tmp-limpo.mjs \
+  #           node .agent/scripts/tests/test-derivado-maduro.mjs
+  #     - name: Doc guards
+  #       if: ${{ !cancelled() }}
+  #       run: node .agent/scripts/check-doc-versions.mjs
+  #     - name: Backlog
+  #       if: ${{ !cancelled() }}
+  #       run: node .agent/scripts/check-backlog.mjs
+  #     - name: Codigo morto
+  #       if: ${{ !cancelled() }}
+  #       run: node .agent/scripts/check-codigo-morto.mjs
+  # --- MODO COMPLETO (b) fim ---

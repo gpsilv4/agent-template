@@ -249,16 +249,30 @@ export function comT80(texto) {
     .replaceAll("steps.install.conclusion == 'success'", "(steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true')");
 }
 
-/** O exemplo com o bloco MODO COMPLETO (#472) descomentado no lugar: o derivado com a maquinaria do template. `null`
- *  sem os marcadores, ou com eles fora de ordem. */
+/** O exemplo com os dois blocos MODO COMPLETO (#472, #477) descomentados no lugar: o derivado com a maquinaria do
+ *  template. O (a) e um passo do job `ci` (desde o `# - name:`); o (b) e o job `guard-tests` (desde o `# guard-tests:`
+ *  a dois espacos). `null` sem os marcadores, com eles fora de ordem, ou sem o inicio do passo ou do job. */
 export function comModoCompleto(texto) {
+  let ls = texto.split("\n");
+  for (const [bloco, inicio] of [["a", /^[ \t]*# - name:/], ["b", /^  # guard-tests:/]]) {
+    const i = ls.findIndex((l) => l.includes(`# --- MODO COMPLETO (${bloco}) inicio`));
+    const f = ls.findIndex((l) => l.includes(`# --- MODO COMPLETO (${bloco}) fim ---`));
+    if (i < 0 || f < i) return null;
+    const p0 = ls.findIndex((l, k) => k > i && k < f && inicio.test(l));
+    if (p0 < 0) return null;
+    ls = [...ls.slice(0, i), ...ls.slice(p0, f).map(descomenta), ...ls.slice(f + 1)];
+  }
+  return ls.join("\n");
+}
+
+/** O texto sem o job `id` (do cabecalho dele ate ao job seguinte, ou ao fim): o job `ci` do modo completo, sozinho,
+ *  para a receita de UM job se lhe aplicar. */
+export function semJob(texto, id) {
   const ls = texto.split("\n");
-  const i = ls.findIndex((l) => /# --- MODO COMPLETO inicio/.test(l));
-  const f = ls.findIndex((l) => /# --- MODO COMPLETO fim ---/.test(l));
-  if (i < 0 || f < i) return null;
-  const p0 = ls.findIndex((l, k) => k > i && k < f && /^[ \t]*# - name:/.test(l));
-  if (p0 < 0) return null;
-  return [...ls.slice(0, i), ...ls.slice(p0, f).map(descomenta), ...ls.slice(f + 1)].join("\n");
+  const i = ls.findIndex((l) => new RegExp(`^  ${id}:[ \\t]*(?:#.*)?$`).test(l));
+  if (i < 0) return texto;
+  const f = ls.findIndex((l, k) => k > i && /^  [\w-]+:[ \t]*(?:#.*)?$/.test(l));
+  return [...ls.slice(0, i), ...(f < 0 ? [] : ls.slice(f))].join("\n");
 }
 
 /** O exemplo com a VARIANTE squash (#439): sai o que esta entre `# --- FORMA mensagem inicio/fim ---`, e descomenta-se

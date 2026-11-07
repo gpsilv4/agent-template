@@ -330,6 +330,7 @@ not to* line, so every agent sees it.
             ├── expressoes-ci.mjs         <- The CI example suite's readers: if: expressions, steps, variants (#439)
             ├── casos-salto-cache.mjs     <- The merge-push skip and the cache.yml example's cases (#439)
             ├── casos-dependabot-exemplo.mjs <- The private-repo dependabot.yml example's cases (#440)
+            ├── casos-modo-completo.mjs   <- The CI example's full mode, read by the real /upgrade readers (#472, #477)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -434,7 +435,8 @@ src/docs/
 ├── upgrade-why.md              <- Why /upgrade decides by category, and what it measured
 ├── upgrade-derivados-privados.md <- /upgrade in a PRIVATE repo: CI minutes, and the notes a derived project needed
 ├── upgrade-parcial.md          <- The PARTIAL /upgrade: a derived project without the machinery (what comes, in what order)
-├── exemplos/ci-sem-maquinaria.yml <- A one-job CI for a derived project WITHOUT the machinery (not run here)
+├── exemplos/ci-sem-maquinaria.yml <- The cheap CI for a PRIVATE derived project: one job; with the machinery, a
+│                                  `guard-tests` job that runs only when it changes (#472, #477; not run here)
 ├── exemplos/cache-sem-maquinaria.yml <- Its pair: saves the dependency cache, since the merge push no longer runs
 ├── exemplos/dependabot-privado.yml <- dependabot.yml for a PRIVATE repo: monthly, rebase disabled (the account quota)
 └── CHANGELOG.md                <- Changelog template

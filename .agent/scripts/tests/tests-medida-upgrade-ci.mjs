@@ -153,6 +153,25 @@ export function registar() {
       ["`id: install`", "`case \"$INSTALOU\"`", "forma EXACTA", "OPCIONAL"].filter((t) => !n.includes(t)).map((t) => `a nota nao diz "${t}"`));
   }
 
+  // O PACOTE de um job (#477): um job `ci` E um `guard-tests` com `needs: ci`. As tres notas do portao (o plano, o salto
+  // do merge, o titulo) calam-se, e sai a do pacote. O sinal e positivo: um CI completo sem `guard-gate` (o de antes do
+  // #308) continua a recebe-las — e o controlo de que a condicao nao e "sem portao".
+  {
+    const PORTAO_TODO = C2 + IF_MERGE + PORTAO + TITULO + FINAL;
+    const PAC = "jobs:\n  ci:\n    name: CI\n  guard-tests:\n    needs: ci\n";
+    const PACOTE = "CI do pacote de um job";
+    registarResultado("2b CI: o pacote de um job cala as notas do portao e da a sua (#477)", so(notas({ ciLa: PORTAO_TODO, ciAqui: PAC + TITULO, guardAqui: "    needs: ci\n" }), PACOTE));
+    registarResultado("2b CI: `needs: [ci]` tambem e o pacote (#477)", so(notas({ ciLa: PORTAO_TODO, ciAqui: PAC + TITULO, guardAqui: "    needs: [ci]\n" }), PACOTE));
+    const semNeeds = notas({ ciLa: PORTAO_TODO, ciAqui: PAC + TITULO, guardAqui: "    runs-on: x\n" });
+    registarResultado("2b CI: um job `ci` sem o `needs: ci` no `guard-tests` nao e o pacote: as tres notas voltam (#477)",
+      semNeeds.length === 3 && !semNeeds.some((n) => n.includes(PACOTE)) ? [] : [`sairam: ${JSON.stringify(semNeeds.map((n) => n.slice(0, 40)))}`]);
+    const semCi = notas({ ciLa: PORTAO_TODO, ciAqui: "jobs:\n  guard-tests:\n    needs: ci\n" + TITULO, guardAqui: "    needs: ci\n" });
+    registarResultado("2b CI: um `needs: ci` sem o job `ci` nao e o pacote (#477)", semCi.some((n) => n.includes(PACOTE)) ? ["saiu a nota do pacote"] : []);
+    const antigo = notas({ ciLa: PORTAO_TODO, ciAqui: "jobs:\n  quality:\n  guard-tests:\n" + FINAL, guardAqui: "    runs-on: x\n" });
+    registarResultado("2b CI: um CI completo de antes do `guard-gate` (#308) continua a receber as tres notas (#477)",
+      ["quando o plano da base diz", "push de um merge", "verifica o TITULO do PR"].filter((t) => !antigo.some((n) => n.includes(t))).map((t) => `faltou "${t}"`));
+  }
+
   // A ORDEM, que era a de antes de sair do `medida-upgrade.mjs`.
   const todas = notas({ repetidos: { "guard-tests": ["node x.mjs"] }, guardLa: PARALELO, ciLa: NOVO + SHARDS + C2 + IF_MERGE + PORTAO, ciAqui: `${VELHO}  detect:\n  unit-tests:\n` });
   const ordem = ["corre 2x no job", "em paralelo", "reparte a varredura", "quando o plano da base diz", "push de um merge", COM, "passos de UM job"];

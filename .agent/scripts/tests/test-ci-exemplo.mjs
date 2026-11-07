@@ -16,8 +16,8 @@
  *      numa linha simples; a descricao do PR (so na variante) e o `(deps` no titulo, com o shell corrido;
  *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`);
  *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template (`harness/casos-dependabot-exemplo.mjs`);
- *   7. o passo dos guards dos docs e o bloco MODO COMPLETO (#472): as suites da maquinaria so quando ela muda, com a
- *      lista do `ci.yml` do template (`harness/casos-modo-completo.mjs`).
+ *   7. os dois blocos MODO COMPLETO (#472, #477): (a) os passos so-node no job `ci`; (b) o job `guard-tests`, que so
+ *      corre quando a maquinaria muda e e lido pelos leitores reais da 2b (`harness/casos-modo-completo.mjs`).
  * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma. Os leitores
  * vivem em `harness/expressoes-ci.mjs`.
  *
@@ -35,7 +35,7 @@ import { leOuNull } from "../lib/ficheiros.mjs";
 import { avalia, comSquash, comT80, conjuntos, cortesDosIf, depoisDeFalha, eventos, passosDoExemplo, problemasDeSaidas, semExteriores } from "./harness/expressoes-ci.mjs";
 import { casosDoCache, IF_SQUASH, problemasDoSalto, tabelaDoSalto } from "./harness/casos-salto-cache.mjs";
 import { casosDoDependabot } from "./harness/casos-dependabot-exemplo.mjs";
-import { casosDoModoCompleto } from "./harness/casos-modo-completo.mjs";
+import { casosDasFalhasFechadas, casosDoModoCompleto } from "./harness/casos-modo-completo.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const EXEMPLO = "src/docs/exemplos/ci-sem-maquinaria.yml";
@@ -110,7 +110,7 @@ function problemas(texto) {
     if (usaNode(p) && !cs.includes("github.event_name == 'pull_request'")) out.push(`${nome}: corre no push (so as mensagens e o gitleaks correm la)`);
     if (usaNode(p) || ehMensagens(p) || ehGitleaks(p)) {
       if (!cs.includes("!cancelled()")) out.push(`${nome}: corre depois de uma falha, com \`!cancelled()\``);
-      // So o alcance da APP: as suites do MODO COMPLETO (#472) dependem, de proposito, do da maquinaria.
+      // So o alcance da APP: um passo `node` corre tambem nos PRs de docs (a maquinaria tem o seu job, #477).
       if (/\bsteps\.scope\.outputs\.app\b/.test(p.if ?? "")) out.push(`${nome}: nao depende do alcance da app (corre tambem nos PRs de docs)`);
     }
     if ((ehMensagens(p) || ehGitleaks(p)) && /\bgithub\.event_name\b/.test(p.if ?? "")) out.push(`${nome}: corre em todos os eventos (tambem no push)`);
@@ -349,26 +349,7 @@ for (const c of CASOS_SCOPE) {
     return r.status === 0 && r.app === c.app ? [] : [`saiu ${r.status}, app=${r.app} (esperava 0, app=${c.app}): ${r.saida.trim()}`];
   }));
 }
-caso("scope: um PR sem `HEAD^1` (commit-raiz) -> app=true", () => comRepo((raiz) => {
-  const dir = join(raiz, "repo");
-  mkdirSync(join(dir, "docs"), { recursive: true });
-  writeFileSync(join(dir, "docs", "d.md"), "d\n");
-  git(dir, "init", "-q", "-b", "main");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "raiz");
-  const r = correScope(scopeCorpo ?? "", dir, raiz, "pull_request");
-  return r.status === 0 && r.app === "true" ? [] : [`saiu ${r.status}, app=${r.app}: ${r.saida.trim()}`];
-}));
-caso("scope: o `git diff` a falhar -> app=true (falha fechada)", () => comRepo((raiz) => {
-  const dir = repoDePR(raiz, (d) => writeFileSync(join(d, "docs", "d.md"), "d2\n"));
-  const bin = join(raiz, "bin");
-  mkdirSync(bin);
-  const real = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
-  writeFileSync(join(bin, "git"), `#!/bin/sh\nif [ "$1" = "diff" ]; then exit 1; fi\nexec "${real}" "$@"\n`);
-  chmodSync(join(bin, "git"), 0o755);
-  const r = correScope(scopeCorpo ?? "", dir, raiz, "pull_request", `${bin}:${process.env.PATH}`);
-  return r.status === 0 && r.app === "true" ? [] : [`saiu ${r.status}, app=${r.app}: ${r.saida.trim()}`];
-}));
+casosDasFalhasFechadas(caso, { scopeCorpo: scopeCorpo ?? "", correScope, repoDePR, comRepo, git });
 caso("scope: um evento desconhecido sai != 0 (e nao escreve app)", () => comRepo((raiz) => {
   const dir = repoDePR(raiz, (d) => writeFileSync(join(d, "src", "a.ts"), "a2\n"));
   const r = correScope(scopeCorpo ?? "", dir, raiz, "workflow_dispatch");
