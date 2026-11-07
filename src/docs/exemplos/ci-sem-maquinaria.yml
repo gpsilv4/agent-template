@@ -87,27 +87,31 @@ jobs:
         run: |
           set -euo pipefail
           case "$EVENTO" in
-            push) echo "app=false" >> "$GITHUB_OUTPUT"; echo "  push: mensagens e gitleaks."; exit 0 ;;
+            push) { echo "app=false"; echo "maquinaria=false"; } >> "$GITHUB_OUTPUT"; echo "  push: mensagens e gitleaks."; exit 0 ;;
             pull_request) ;;
             *) echo "  evento inesperado: $EVENTO"; exit 1 ;;
           esac
           if ! base="$(git rev-parse --verify --quiet HEAD^1)"; then
-            echo "app=true" >> "$GITHUB_OUTPUT"; echo "  sem base: verifica tudo."; exit 0
+            { echo "app=true"; echo "maquinaria=true"; } >> "$GITHUB_OUTPUT"; echo "  sem base: verifica tudo."; exit 0
           fi
           # ADAPTAR: os caminhos da app.
           APP='^(src/|tests/|public/|package(-lock)?\.json$|tsconfig\.json$|eslint\.config\.|vitest\.config\.|\.nvmrc$|\.github/workflows/)'
+          # A maquinaria do template (so conta no MODO COMPLETO, abaixo): muda num `/upgrade`, quase nunca noutro PR.
+          MAQUINARIA='^(\.agent/scripts/|\.claude/hooks/|\.githooks/)'
           # `--no-renames`: uma renomeacao mostra os DOIS caminhos (mover um ficheiro da app para `docs/` toca a app).
           # `-z`: os nomes chegam sem aspas nem escapes, mesmo com espacos, acentos ou uma quebra de linha.
           tocados="$RUNNER_TEMP/tocados-pelo-pr"
           if ! git diff --name-only --no-renames -z "$base" HEAD > "$tocados"; then
-            echo "app=true" >> "$GITHUB_OUTPUT"; echo "  o git diff falhou: verifica tudo."; exit 0
+            { echo "app=true"; echo "maquinaria=true"; } >> "$GITHUB_OUTPUT"; echo "  o git diff falhou: verifica tudo."; exit 0
           fi
           app=false
+          maquinaria=false
           while IFS= read -r -d '' f; do
-            if [[ "$f" =~ $APP ]]; then app=true; break; fi
+            if [[ "$f" =~ $APP ]]; then app=true; fi
+            if [[ "$f" =~ $MAQUINARIA ]]; then maquinaria=true; fi
           done < "$tocados"
-          echo "app=$app" >> "$GITHUB_OUTPUT"
-          echo "  app=$app"
+          { echo "app=$app"; echo "maquinaria=$maquinaria"; } >> "$GITHUB_OUTPUT"
+          echo "  app=$app maquinaria=$maquinaria"
 
       - uses: actions/setup-node@v7
         with:
@@ -275,6 +279,49 @@ jobs:
       - name: Hooks
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: node .claude/hooks/tests/test-hooks.mjs
+
+      # Os guards dos docs (orcamentos, paridades, citacoes): ~1-2 s, e apanham um doc que divergiu do codigo (#472).
+      - name: Doc guards
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: node .agent/scripts/check-doc-versions.mjs
+
+      # --- MODO COMPLETO inicio: so num derivado com a maquinaria do template (o `/upgrade` completo): descomentar o
+      # passo. As suites dos scripts do template correm SO quando o PR toca a maquinaria (`.agent/scripts/`,
+      # `.claude/hooks/`, `.githooks/` — um `/upgrade`): num PR normal nao custam nada, e num de upgrade verificam o
+      # codigo que ele traz, no MESMO job (um job a parte pagava outro arredondamento ao minuto). A lista e a do passo
+      # "Suites — negative tests" do `ci.yml` do template (a suite deste exemplo compara-as). A varredura de mutacao
+      # fica no CI do template, que mede o mesmo codigo antes de cada tag.
+      # - name: Suites da maquinaria
+      #   if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.scope.outputs.maquinaria == 'true' }}
+      #   run: |
+      #     node .agent/scripts/lib/suites-em-paralelo.mjs -- \
+      #       node .agent/scripts/tests/test-test-surface.mjs \
+      #       node .agent/scripts/tests/test-guards.mjs \
+      #       node .agent/scripts/tests/test-simulate-upgrade.mjs \
+      #       node .claude/hooks/tests/test-hooks.mjs \
+      #       node .agent/scripts/tests/test-mutation-sweep.mjs \
+      #       node .agent/scripts/tests/test-simulate-derived.mjs \
+      #       node .agent/scripts/tests/test-commit-msg.mjs \
+      #       node .agent/scripts/tests/test-bundle-sizes.mjs \
+      #       node .agent/scripts/tests/test-backlog.mjs \
+      #       node .agent/scripts/tests/test-backlog-corrige.mjs \
+      #       node .agent/scripts/tests/test-backlog-itens.mjs \
+      #       node .agent/scripts/tests/test-backlog-regras.mjs \
+      #       node .agent/scripts/tests/test-backlog-board.mjs \
+      #       node .agent/scripts/tests/test-backlog-board-cli.mjs \
+      #       node .agent/scripts/tests/test-minutos-ci.mjs \
+      #       node .agent/scripts/tests/test-ci-exemplo.mjs \
+      #       node .agent/scripts/tests/test-modo-upgrade.mjs \
+      #       node .agent/scripts/tests/test-baseline-superficie.mjs \
+      #       node .agent/scripts/tests/test-registo.mjs \
+      #       node .agent/scripts/tests/test-mapa-suites.mjs \
+      #       node .agent/scripts/tests/test-codigo-morto.mjs \
+      #       node .agent/scripts/tests/test-textos-publicos.mjs \
+      #       node .agent/scripts/tests/test-adotar-template.mjs \
+      #       node .agent/scripts/tests/test-release-da-tag.mjs \
+      #       node .agent/scripts/tests/test-tmp-limpo.mjs \
+      #       node .agent/scripts/tests/test-derivado-maduro.mjs
+      # --- MODO COMPLETO fim ---
 
       # Sempre, tambem no push: o hook local so corre em quem fez `git config core.hooksPath .githooks`. Num PR, os
       # commits do PR sem os de merge (o `Merge <sha> into <sha>` do GitHub nao tem prefixo) e o titulo, que e a 1.a

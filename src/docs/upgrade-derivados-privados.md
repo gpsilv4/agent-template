@@ -65,6 +65,12 @@ e um repo publico nao conta. **A receita, para nao la chegar** (#441):
 - o Dependabot mensal e sem rebase (`src/docs/exemplos/dependabot-privado.yml`, §4 acima);
 - medir antes e depois de cada mudanca (abaixo), e as quatro regras do fim desta seccao.
 
+**Um derivado com a maquinaria completa** (o `/upgrade` completo, #472) usa o MESMO pacote, e descomenta no exemplo
+o bloco `MODO COMPLETO`: as suites dos scripts do template correm no mesmo job, SO quando o PR toca `.agent/scripts/`,
+`.claude/hooks/` ou `.githooks/` (um `/upgrade`). Num PR normal nao custam nada; num de upgrade verificam o codigo que
+ele traz. Medido a 7 nov 2026: um derivado completo com o CI de 10 jobs gastava 13 min por PR (o mais longo, as
+suites, 173 s; os outros de 5 a 75 s, cada um a pagar o seu minuto), e o derivado parcial com o pacote, 2-3.
+
 Os minutos cobrados sao a soma dos jobs, cada um arredondado ao minuto acima: um job de 8 s paga 1 min, e um de 121 s
 paga 3. Ha dois numeros, e respondem a perguntas diferentes:
 - **Cobrado (arredondado)**: o que a quota gratis ve. A quota (2000 min/mes) e partilhada por TODOS os repos privados
