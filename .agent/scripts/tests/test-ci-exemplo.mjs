@@ -15,7 +15,9 @@
  *      ativa; pelo committer, a VARIANTE squash), com a tabela de verdade de cada uma; o ` #` que corta um `if:`
  *      numa linha simples; a descricao do PR (so na variante) e o `(deps` no titulo, com o shell corrido;
  *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`);
- *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template (`harness/casos-dependabot-exemplo.mjs`).
+ *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template (`harness/casos-dependabot-exemplo.mjs`);
+ *   7. o passo dos guards dos docs e o bloco MODO COMPLETO (#472): as suites da maquinaria so quando ela muda, com a
+ *      lista do `ci.yml` do template (`harness/casos-modo-completo.mjs`).
  * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma. Os leitores
  * vivem em `harness/expressoes-ci.mjs`.
  *
@@ -33,6 +35,7 @@ import { leOuNull } from "../lib/ficheiros.mjs";
 import { avalia, comSquash, comT80, conjuntos, cortesDosIf, depoisDeFalha, eventos, passosDoExemplo, problemasDeSaidas, semExteriores } from "./harness/expressoes-ci.mjs";
 import { casosDoCache, IF_SQUASH, problemasDoSalto, tabelaDoSalto } from "./harness/casos-salto-cache.mjs";
 import { casosDoDependabot } from "./harness/casos-dependabot-exemplo.mjs";
+import { casosDoModoCompleto } from "./harness/casos-modo-completo.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const EXEMPLO = "src/docs/exemplos/ci-sem-maquinaria.yml";
@@ -107,7 +110,8 @@ function problemas(texto) {
     if (usaNode(p) && !cs.includes("github.event_name == 'pull_request'")) out.push(`${nome}: corre no push (so as mensagens e o gitleaks correm la)`);
     if (usaNode(p) || ehMensagens(p) || ehGitleaks(p)) {
       if (!cs.includes("!cancelled()")) out.push(`${nome}: corre depois de uma falha, com \`!cancelled()\``);
-      if (/\bsteps\.scope\b/.test(p.if ?? "")) out.push(`${nome}: nao depende do alcance (corre tambem nos PRs de docs)`);
+      // So o alcance da APP: as suites do MODO COMPLETO (#472) dependem, de proposito, do da maquinaria.
+      if (/\bsteps\.scope\.outputs\.app\b/.test(p.if ?? "")) out.push(`${nome}: nao depende do alcance da app (corre tambem nos PRs de docs)`);
     }
     if ((ehMensagens(p) || ehGitleaks(p)) && /\bgithub\.event_name\b/.test(p.if ?? "")) out.push(`${nome}: corre em todos os eventos (tambem no push)`);
     if (ehGitleaks(p) && !/^[ \t]+GITLEAKS_LICENSE:[ \t]*\$\{\{[ \t]*secrets\.GITLEAKS_LICENSE[ \t]*\}\}/m.test(p.ls.join("\n"))) out.push(`${nome}: passa o \`GITLEAKS_LICENSE\` (a acao exige-o numa organizacao)`);
@@ -230,7 +234,7 @@ function comRepo(fn) {
 /** O `scope` como o runner o corre, com o `EVENTO` do `env:` dele. */
 function correScope(corpo, dir, raiz, evento, path = process.env.PATH) {
   const r = correPasso(corpo, dir, raiz, { EVENTO: evento }, path);
-  return { status: r.status, app: r.saidas.app ?? null, saida: r.saida };
+  return { status: r.status, app: r.saidas.app ?? null, maquinaria: r.saidas.maquinaria ?? null, saida: r.saida };
 }
 
 // --- Os casos ---
@@ -480,6 +484,7 @@ casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });
 
 // --- O `dependabot.yml` de um privado (#440; os casos estao no `harness/casos-dependabot-exemplo.mjs`) ---
 casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });
+casosDoModoCompleto(caso, { texto, ciTemplate: ler(".github/workflows/ci.yml"), noTemplate: !ehDerivado((p) => leOuNull(join(ROOT, p))), problemas, correScope, repoDePR, comRepo });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);

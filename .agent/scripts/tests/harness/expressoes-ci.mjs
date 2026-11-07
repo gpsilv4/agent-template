@@ -249,6 +249,18 @@ export function comT80(texto) {
     .replaceAll("steps.install.conclusion == 'success'", "(steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true')");
 }
 
+/** O exemplo com o bloco MODO COMPLETO (#472) descomentado no lugar: o derivado com a maquinaria do template. `null`
+ *  sem os marcadores, ou com eles fora de ordem. */
+export function comModoCompleto(texto) {
+  const ls = texto.split("\n");
+  const i = ls.findIndex((l) => /# --- MODO COMPLETO inicio/.test(l));
+  const f = ls.findIndex((l) => /# --- MODO COMPLETO fim ---/.test(l));
+  if (i < 0 || f < i) return null;
+  const p0 = ls.findIndex((l, k) => k > i && k < f && /^[ \t]*# - name:/.test(l));
+  if (p0 < 0) return null;
+  return [...ls.slice(0, i), ...ls.slice(p0, f).map(descomenta), ...ls.slice(f + 1)].join("\n");
+}
+
 /** O exemplo com a VARIANTE squash (#439): sai o que esta entre `# --- FORMA mensagem inicio/fim ---`, e descomenta-se
  *  o que esta entre cada `# --- VARIANTE squash inicio/fim ---`. `null` sem os marcadores, ou com eles desemparelhados. */
 export function comSquash(texto) {
