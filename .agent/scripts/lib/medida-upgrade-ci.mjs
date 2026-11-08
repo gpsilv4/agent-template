@@ -26,6 +26,19 @@ import { jobsDe, passosDe } from "./estrutura-workflow.mjs";
  * @param {(m: string) => void} o.note
  */
 export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, sweepAqui, note }) {
+  // O PACOTE de um job (`src/docs/exemplos/ci-sem-maquinaria.yml`, #472/#477): o projeto troca o CI de 10 jobs por um
+  // job `ci`, e a maquinaria por um `guard-tests` com `needs: ci` que so arranca num PR que a toca. As notas que mandam
+  // trazer pecas do portao (o plano, o salto do merge, o titulo no `Guard Tests`) reconstruiam o CI que ele tira: nele
+  // nao se aplicam. O sinal e POSITIVO — um CI completo de qualquer versao (tambem o de antes do `guard-gate`, #308)
+  // continua a receber as notas; o template nunca teve um job `ci` (`git log -G "^  ci:"`). So a forma do exemplo
+  // (`needs: ci` ou `needs: [ci]`): um `needs:` em lista de bloco, ou com mais jobs, nao e reconhecido, e as notas
+  // voltam (o lado seguro).
+  const pacote = /^  ci:[ \t]*(?:#.*)?$/m.test(ciAqui) && /^[ \t]+needs:[ \t]*\[?[ \t]*ci[ \t]*\]?[ \t]*(?:#.*)?$/m.test(guardAqui);
+  if (pacote)
+    note(
+      "CI do pacote de um job (`src/docs/exemplos/ci-sem-maquinaria.yml`): as notas da forma do CI de 10 jobs (o plano da varredura, o salto do merge, o titulo no portao) nao se aplicam — " +
+        "a varredura de mutacao fica no CI do template, de proposito; do `ci.yml` do template trazer SO a lista de suites do `guard-tests` e os passos do exemplo novo, e NAO os jobs `quality`, `sweep`, `guard-gate` nem `secret-scan` (`src/docs/upgrade-derivados-privados.md` §6)"
+    );
   // OS REPETIDOS no mesmo job (#337): um passo que o template SUBSTITUIU (as suites em paralelo, no lugar de um
   // passo por suite) trazido sem tirar os que substitui. Le-se DEPOIS de mexer no `ci.yml` (a 2b corre-se outra vez).
   for (const [job, cs] of Object.entries(repetidos ?? {})) {
@@ -56,7 +69,7 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
   // do `sweep` na forma EXACTA (a da isencao, importada: uma terceira copia envelhecia, `TP8`) E o portao a ler o
   // output do job. A meias — so o `if:`, ou so o portao — tambem da a nota: e o caso que fica vermelho.
   const temPlano = (t) => t.split(/\r?\n/).some((l) => PLANO_DO_SWEEP.test(l)) && t.split(/\r?\n/).some((l) => PLANO_JOB_DO_PORTAO.test(l));
-  if (temPlano(ciLa) && !temPlano(ciAqui))
+  if (!pacote && temPlano(ciLa) && !temPlano(ciAqui))
     note(
       "o template so arranca os shards da varredura quando o plano da base diz que ela se aplica (#347, C2) e o deste projeto nao — OPCIONAL (so minutos: num repo privado cada shard de um PR sem maquinaria e um minuto cobrado); " +
         "trazer JUNTOS o passo `Plano da varredura` e o `outputs:` do `guard-tests`, o `if:` do `sweep` e o shell do portao `Guard Tests`, " +
@@ -72,13 +85,13 @@ export function notasDaFormaDoCi({ ciAqui, ciLa, guardAqui, guardLa, repetidos, 
   const curtos = (t) => t.match(/^  (?:detect|unit-tests|security-audit):/gm)?.length ?? 0;
   // E o push de um merge num privado (#347, PR B): so o portao corre. "Ja tem" = o `if:` E o shell do portao (a meias, nota).
   const saltaMerge = (t) => /^[ \t]+if:.*committer\.username != 'web-flow'/m.test(t) && /"\$COMMITTER" = web-flow/.test(t);
-  if (saltaMerge(ciLa) && !saltaMerge(ciAqui))
+  if (!pacote && saltaMerge(ciLa) && !saltaMerge(ciAqui))
     note("o template salta o `Code Quality` e o `Guard Suites` no push de um merge num repo privado (#347) — OPCIONAL (so minutos); trazer JUNTOS os dois `if:` de job e o shell do portao `Guard Tests` que recalcula o salto e corre o `commit-msg` (os `if:` sem esse shell poem o push vermelho). O shell do portao de hoje traz TAMBEM o plano da varredura (C2, a nota dele): adotam-se os dois, ou copia-se o shell sem o bloco do plano (o `if [ \"$EVENTO\" = pull_request ]` antes do `varredura-shards`) — senao cada PR fica vermelho. O `Secret Scan` NAO salta (#372): um commit pela UI web no `main` tem o mesmo committer, e nunca era varrido");
   // O TITULO do PR e a mensagem FINAL (#394): o hook novo verifica o prefixo, mas o `ci.yml` e do projeto. "Ja tem" = o
   // `PR_TITULO` do evento E tantos `COMMIT_MSG_FINAL: "1"` como o template (o passo e o portao); a meias, a nota.
   const titulo = (t) => /^[ \t]*PR_TITULO:[ \t]*\$\{\{[ \t]*github\.event\.pull_request\.title[ \t]*\}\}/m.test(t);
   const finais = (t) => t.match(/^[ \t]*COMMIT_MSG_FINAL:[ \t]*"1"/gm)?.length ?? 0;
-  if (titulo(ciLa) && (!titulo(ciAqui) || finais(ciAqui) < finais(ciLa)))
+  if (!pacote && titulo(ciLa) && (!titulo(ciAqui) || finais(ciAqui) < finais(ciLa)))
     note(
       "o template verifica o TITULO do PR (num squash, a 1.a linha do commit no `main`) e le a mensagem final no CI (#394), e o deste projeto nao — " +
         "trazer JUNTOS o passo `Mensagens de commit` (o nome novo, o `env:` com `COMMIT_MSG_FINAL` e `PR_TITULO`, e o bloco do titulo no fim do `run:`) " +

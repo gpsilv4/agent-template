@@ -10,7 +10,11 @@
  * importa-o e chama `registar()`.
  */
 import { pathToFileURL } from "url";
+import { join } from "path";
+import { ehDerivado } from "../lib/derivado.mjs";
+import { leOuNull } from "../lib/ficheiros.mjs";
 import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
+import { comModoCompleto } from "./harness/expressoes-ci.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -173,4 +177,27 @@ export function registar() {
   // A ORDEM: sem marca utilizavel e o Modo B, seja qual for o job. O modo so se le com uma marca.
   test("modo: sem marca e sem o job -> a mensagem do Modo B, e nao a do parcial", () =>
     exige(contraProjeto({ marca: null, projeto: SEM_JOB }), { codigo: 1, inclui: ["Modo B", "nao se mede"], exclui: [PARCIAL] }));
+  // O PACOTE de um job no modo completo (#477), de ponta a ponta: o `ci.yml` REAL do template e o exemplo com os
+  // blocos MODO COMPLETO descomentados. Mede-se, e as notas do portao (o plano, o salto, o titulo) calam-se.
+  // SO NO TEMPLATE (leituras do #477): num derivado o `ci.yml` e o do projeto — com o pacote, os dois lados eram
+  // iguais e o caso reprovava no primeiro PR de upgrade dele.
+  const lerRaiz = (p) => leOuNull(join(import.meta.dirname, "..", "..", "..", p));
+  if (ehDerivado(lerRaiz)) {
+    console.log("  SKIP  o pacote de um job contra o `ci.yml` do template: num derivado o `ci.yml` e o do projeto");
+    return;
+  }
+  {
+    const ciLa = lerRaiz(".github/workflows/ci.yml") ?? "";
+    const pacote = comModoCompleto(lerRaiz("src/docs/exemplos/ci-sem-maquinaria.yml") ?? "") ?? "";
+    const PORTAO = ["quando o plano da base diz", "push de um merge num repo privado", "verifica o TITULO do PR"];
+    const comPacote = (ci) => contraProjeto({ ontem: { ".github/workflows/ci.yml": ciLa }, projeto: { ".github/workflows/ci.yml": ci }, naMarca: "modo: completo\n" });
+    test("modo: o pacote de um job no modo completo mede-se, com a nota do pacote e sem as do portao (#477)", () =>
+      exige(comPacote(pacote), {
+        codigo: 0,
+        inclui: ["CI do pacote de um job", "que o ci.yml deste projeto nao corre", "mutation-sweep.mjs", "conta(m) na comparacao mas nao corre(m) aqui"],
+        exclui: [...PORTAO, "a marca e o disco contradizem-se", PARCIAL],
+      }));
+    test("modo: CONTROLO — o mesmo pacote sem o `needs: ci` -> as notas do portao voltam (#477)", () =>
+      exige(comPacote(pacote.replace(/^    needs: ci\n/m, "")), { codigo: 0, inclui: [PORTAO[0]], exclui: ["CI do pacote de um job"] }));
+  }
 }

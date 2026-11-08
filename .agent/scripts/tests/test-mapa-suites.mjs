@@ -100,6 +100,13 @@ test("um ficheiro so leva ao SEU verificador, nao a todos", () => {
   return chaves.length === 1 && chaves[0].endsWith("test-commit-msg.mjs") ? [] : [`levou a ${JSON.stringify(chaves)}`];
 });
 
+// O `ci.yml` do template e lido pelo Guard 17 e pelas listas das suites (`test-guards`), e pela 2b de ponta a ponta
+// com o pacote de um job (`test-simulate-upgrade`, #477): mexer-lhe obriga a correr os dois (achado do `/audit`).
+test("o `ci.yml` do template leva ao `test-guards` e ao `test-simulate-upgrade` (#477)", () => {
+  const verifica = regraDe(".github/workflows/ci.yml")?.verifica ?? [];
+  return ["test-guards.mjs", "test-simulate-upgrade.mjs", "test-ci-exemplo.mjs"].filter((s) => !verifica.some((v) => v.endsWith(s))).map((s) => `falta ${s}`);
+});
+
 // A LIGACAO ao `PARES`, que e o que o `--diff` usa: toda a suite nomeada por uma regra tem de
 // ser uma suite que existe do outro lado, ou um alvo indirecto nunca e seleccionado. Derivado
 // dos dois lados e nao escrito a mao — uma lista aqui envelhecia a primeira suite nova.

@@ -588,6 +588,41 @@ leitura, do `backlog.md` e do arquivo (os blocos, os cartoes, os filtros, os fec
 `.gitignore`, que no `/upgrade` e "diff e decidir". **Sem ela, o script recusa gerar**: o backlog tem detalhes do
 projeto, e um `git add -A` publicava-o. Num projeto parcial a vista nao vem; ver `upgrade-parcial.md`.
 
+## Porque o `repoDoOrigin` e o leitor do `concurrency:` saem do `marcas-yaml` (#455)
+
+**O problema.** O `lib/marcas-yaml.mjs` e o leitor das marcas do `check-test-surface` (modo completo), mas tinha
+tambem o `repoDoOrigin` (o `minutos-ci` usa-o) e a leitura do `concurrency:`. Por isso vinha no `/upgrade` parcial,
+com uma isencao no fecho para o `codeql.yml` que ele nomeia.
+
+**O que muda.** Duas libs pequenas, `lib/repo-origin.mjs` e `lib/concurrency-ci.mjs`, sem reexportar pelo
+`marcas-yaml`. O parcial deixa de o trazer.
+
+**O que isto pede a um derivado:** um script PROPRIO que importe o `repoDoOrigin`, o `concurrencyDeTopo` ou o
+`problemasDaConcurrency` de `lib/marcas-yaml.mjs` passa a importa-los da lib nova. No modo parcial, o `marcas-yaml.mjs`
+que ja la estava fica (o `/upgrade` nunca apaga), e pode sair a mao.
+
+## Porque o CI barato serve tambem o modo completo, com um job a parte (#472, #477)
+
+**O problema.** Um derivado completo com o CI de 10 jobs gastava 13 min por PR, medido a 7 nov 2026. Cada job pagava o
+seu minuto arredondado, e as suites correm 173 s. O parcial, com o pacote de um job, gastava 2-3 min.
+
+**O que muda.**
+- O exemplo `src/docs/exemplos/ci-sem-maquinaria.yml` ganha dois blocos `MODO COMPLETO`, comentados: (a) os guards
+  dos docs no job `ci`, e (b) um job `guard-tests` que so arranca num PR que toca a maquinaria.
+- A 2b reconhece o pacote (um job `ci` e um `guard-tests` com `needs: ci`), e cala as notas da forma do CI de 10 jobs.
+- O pormenor, e o que fazer ao adotar, esta no `upgrade-derivados-privados.md` §6.
+
+**Porque um job a parte.** No #472 as suites eram um passo do job `ci`. O `/audit` pre-tag da v0.63.1 mediu dois
+defeitos:
+- sem o job `guard-tests`, o `/upgrade` dava "contradicao" a um derivado completo;
+- o passo dos guards dos docs reprovava num parcial, que nao traz o `check-doc-versions.mjs`.
+
+**O gitleaks fica no fim.** Antes dele ja corre codigo do PR, e a frente um falso positivo saltava todas as
+verificacoes da app. E um limite escrito no cabecalho do exemplo.
+
+**O que isto pede a um derivado:** nada, se nao adotar (e OPCIONAL, so minutos, e so num privado: num publico os
+minutos nao contam). Para adotar, seguir o §6.
+
 ## Porque o CI so cancela um run em curso num PR (#427)
 
 O `concurrency:` do `ci.yml` tinha `cancel-in-progress: true` para todos os eventos. Num PR e o que poupa minutos: um

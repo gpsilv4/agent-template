@@ -55,21 +55,25 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/minutos-calculo\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
   // O modo parcial do `/upgrade` (#429): a regra (os casos no `test-modo-upgrade`, a ponta no `test-simulate-upgrade`),
   // o fecho (o `harness/fecho-parcial.mjs`, do `test-modo-upgrade`) e o doc, cuja ordem e lista a suite verifica.
-  { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs")], only: "modo-upgrade" },
+  { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")], only: "modo-upgrade" },
   { re: /^\.agent\/scripts\/tests\/harness\/fecho-parcial\.mjs$/, verifica: [S("test-modo-upgrade.mjs")] },
   { re: /^src\/docs\/upgrade-parcial\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O §4 e corrido pela suite, e o §1 tambem (a extracao do SHA).
   { re: /^\.agent\/workflows\/upgrade\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O exemplo de CI de um derivado sem a maquinaria (#429): nenhum gate o le, e esta suite e a unica protecao dele.
   // O par do `cache.yml` (#439) e os leitores e casos que sairam da suite pelo tamanho, tambem.
-  { re: /^src\/docs\/exemplos\/(?:(?:ci|cache)-sem-maquinaria|dependabot-privado)\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
-  { re: /^\.agent\/scripts\/tests\/harness\/(?:expressoes-ci|casos-salto-cache|casos-dependabot-exemplo|casos-modo-completo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
+  { re: /^src\/docs\/exemplos\/(?:cache-sem-maquinaria|dependabot-privado)\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O CI de um job e lido tambem pela 2b de ponta a ponta (#477: o modo completo do pacote, no `tests-medida-2b-modo`).
+  { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/(?:casos-salto-cache|casos-dependabot-exemplo|casos-modo-completo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O `comModoCompleto` serve tambem o caso de ponta a ponta da 2b (#477).
+  { re: /^\.agent\/scripts\/tests\/harness\/expressoes-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs")] },
   // O `dependabot-privado.yml` tem de ser o do template com duas diferencas: mexer no do template corre a suite (#440).
   // O Guard 13 tambem le o `dependabot.yml` (os placeholders): mexer nele pede os dois.
   { re: /^\.github\/dependabot\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("check-doc-versions.mjs")] },
   // O bloco MODO COMPLETO do exemplo de CI copia a lista de suites do `ci.yml` (#472): mudar a lista aqui obriga a mudar
   // a do exemplo, e o `test-ci-exemplo` compara-as.
-  { re: /^\.github\/workflows\/ci\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("check-doc-versions.mjs")] },
+  { re: /^\.github\/workflows\/ci\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("check-doc-versions.mjs"), S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
   // O simulador do `/upgrade` e o motor dele. O motor vive em `lib/` e e o que ESCREVE por
   // cima dos ficheiros de um consumidor: mexer nele sem correr a suite e a divida mais cara
   // que este mapa pode deixar passar.
@@ -88,14 +92,14 @@ export const SUITES = [
   // O plano do CI (#347, C1): o dono no `test-guards` (a CLI, o desvio face a descoberta, as regex do `ci.yml`).
   { re: /^\.agent\/scripts\/lib\/plano-ci\.mjs$/, verifica: [S("test-guards.mjs")] },
   // As notas da forma do `ci.yml` na 2b (#347, C0): o dono no `test-guards` (unitarios, rapidos), e a 2b de ponta a ponta.
-  { re: /^\.agent\/scripts\/lib\/medida-upgrade-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/medida-upgrade-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")] },
   { re: /^\.agent\/scripts\/lib\/fora-do-template\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   // O que os dois modos do `/upgrade` imprimem: a ordem e a promessa tem casos puros no
   // `tests-saida-upgrade.mjs` (corre no `test-guards`), e o simulador imprime-o de ponta a ponta.
   { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
   // As tres libs com regex do runner ou do caminho de uma suite (#374a): o `tests-regex-runner.mjs`, do `test-guards`,
   // prende-as umas as outras, logo mexer numa corre tambem o `test-guards`. Antes dos grupos: a primeira regra vence.
-  { re: /^\.agent\/scripts\/lib\/medida-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs")], only: "upgrade" },
+  { re: /^\.agent\/scripts\/lib\/medida-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-ci-exemplo.mjs")], only: "upgrade" },
   { re: /^\.agent\/scripts\/lib\/(passo-paralelo|surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs")] },
   {
     re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
@@ -265,7 +269,7 @@ export const SUITES = [
   // ...e o `harness/test-surface-harness.mjs` e o `tests-surface-blocos.mjs` (#308), pela mesma razao; no `test-guards`,
   // tambem o `tests-estrutura-workflow.mjs` (#382). E o `test-backlog-corrige` (#431), que le o backlog real do template, e o `test-ci-exemplo` (#429).
   { re: /^\.agent\/scripts\/lib\/ficheiros\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs"), S("test-modo-upgrade.mjs")] },
-  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs"), S("test-modo-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-backlog-corrige.mjs"), S("test-ci-exemplo.mjs"), S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/simulate-derived\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O `patch.mjs` e importado tambem por dois modulos do `test-guards` (#271).
   { re: /^\.agent\/scripts\/lib\/patch\.mjs$/, verifica: [S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
