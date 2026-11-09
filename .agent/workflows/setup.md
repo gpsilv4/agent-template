@@ -149,7 +149,7 @@ Os dois que interessam no primeiro dia: **`/grill`** antes de um ticket `L` ou a
 
 O repositorio tem workflows automaticos em `.github/workflows/`:
 
-- **`ci.yml`**: Corre em cada PR e em cada push para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre —, salvo num push para o `main` de um repo privado com o committer `web-flow` — o merge feito pelo GitHub, e tambem um commit feito na UI web, que nao teve PR: ai so correm o portao `Guard Tests` e o `Secret Scan` (#347; os limites em `src/docs/scripts-guide-why.md`). O bundle size check e opt-in (descomentar no ficheiro); os doc guards e o backlog correm no job `guard-tests`, com ou sem `package.json`. **Todos os checks devem estar verdes antes de mergear** — exceto o passo Audit do `Code Quality` (o security audit), que e informativo (`continue-on-error`) e fica verde mesmo com advisories: abrir o log e ler o relatorio. Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
+- **`ci.yml`**: Corre em cada PR e em cada push para main — TypeScript, lint, build, unit tests, security audit, e um `secret-scan` (gitleaks) que corre sempre —, salvo num push para o `main` de um repo privado com o committer `web-flow` — o merge feito pelo GitHub, e tambem um commit feito na UI web, que nao teve PR: ai so correm o portao `Guard Tests` e o `Secret Scan` (#347; os limites em `src/docs/scripts-guide-why.md`). O bundle size check e opt-in (descomentar no ficheiro); os doc guards e o backlog correm no job `guard-tests`, com ou sem `package.json`. **Todos os checks devem estar verdes antes de mergear** — exceto o passo Audit do `Code Quality` (o security audit), que e informativo (`continue-on-error`) e fica verde mesmo com advisories: abrir o log e ler o relatorio. No CI de um job de um derivado privado (`ci-sem-maquinaria.yml`) o audit de producao bloqueia (quando a app e tocada), e so o de dev e informativo (#485). Usa `permissions: contents: read`; PRs do Dependabot correm no `pull_request` normal (sem secrets).
 - **`e2e.yml`**: Trigger manual (`workflow_dispatch`) — testes E2E e de seguranca. Usar para validar em staging/preview URLs antes de deploy.
 
 Outros ficheiros `.github/`:
@@ -169,7 +169,7 @@ npm audit --audit-level=high   # separado: informativo, nao deve abortar a cadei
 ```
 
 > **Tres diferencas face ao CI**, para nao criares expectativas erradas:
-> 1. O `npm audit` corre com `continue-on-error` no CI — nunca reprova o merge.
+> 1. O `npm audit` corre com `continue-on-error` no CI do template — nunca reprova o merge (no CI de um job, o de producao reprova, #485).
 > 2. Falta aqui o `secret-scan` (gitleaks), que no CI corre **sempre**, ate no template puro.
 > 3. No CI cada step e **guardado** (salta se faltar `tsconfig.json` ou o script); a cadeia
 >    `&&` local morre no primeiro que faltar.

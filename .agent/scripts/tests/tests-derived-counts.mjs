@@ -187,9 +187,11 @@ test("G12c: \"tres fases escalam\" nao e citacao do total (sem intervalo na linh
   // Num ficheiro que o guard JA varria antes desta correcao — senao o teste ficava verde
   // pela razao errada (ficheiro nao lido) em vez de pela ancora. Medido: sem a ancora este
   // teste fica vermelho; com ela, verde.
-  writeF(dir, ".agent/workflows/review.md",
-    readF(dir, ".agent/workflows/review.md") +
-      "\nE por isso que tres fases escalam por tamanho: sem escala, o metodo e abandonado.\n");
+  // Em `src/docs/` e nao no `review.md` (#485): este tem tecto de 12 000 bytes, e num derivado perto dele os ~83 bytes
+  // da frase davam o aviso do ORCAMENTO — o caso reprovava pela razao errada. O caso seguinte prova que o guard le este.
+  // Escrito de raiz (a sandbox e sintetica e nao o tem), como o caso seguinte: o `src/docs` enumera-se do disco.
+  writeF(dir, "src/docs/ticket-method-why.md",
+    "# porque\n\nE por isso que tres fases escalam por tamanho: sem escala, o metodo e abandonado.\n");
 }, { code: 0, excludes: ['diz "tres fases"'] });
 
 test("G12c: total errado COM intervalo avisa, e em src/docs tambem", (dir) => {
