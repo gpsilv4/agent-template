@@ -64,24 +64,24 @@
 
 ## 1. Bugs / Violacoes de Regras do Projeto
 
-| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina afetada |
-|----|--------|---------|-------------|------------|---------|----------------|
-| | | | | | | |
+| ID | Estado | Problema | Area | Ficheiro(s) | Severidade | Esforco | Pagina afetada |
+|----|--------|---------|------|-------------|------------|---------|----------------|
+| | | | | | | | |
 
 ## 2. Melhorias UX (impacto direto no utilizador)
 
-| ID | Estado | Melhoria | Detalhe | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| | | | | | |
+| ID | Estado | Melhoria | Area | Detalhe | Esforco | Pagina afetada |
+|----|--------|---------|------|---------|---------|----------------|
+| | | | | | | |
 
 ## 3. Divida Tecnica / Code Quality
 
-| ID | Estado | Issue | Detalhe | Esforco | Ficheiro(s) |
-|----|--------|-------|---------|---------|-------------|
-| | | | | | |
+| ID | Estado | Issue | Area | Detalhe | Esforco | Ficheiro(s) |
+|----|--------|-------|------|---------|---------|-------------|
+| | | | | | | |
 
 ## 4. Features Futuras (valor para o utilizador)
 
-| ID | Estado | Feature | Impacto | Esforco | Pagina afetada |
-|----|--------|---------|---------|---------|----------------|
-| | | | | | |
+| ID | Estado | Feature | Area | Impacto | Esforco | Pagina afetada |
+|----|--------|---------|------|---------|---------|----------------|
+| | | | | | | |

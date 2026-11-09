@@ -8,7 +8,8 @@
  *   - IDs duplicados (um item deve viver num so ficheiro);
  *   - items fechados (Concluido/Cancelado) esquecidos no ficheiro ativo;
  *   - o formato (#445, `lib/backlog-regras.mjs`): a `Ordem` de cada bloco, o "Depende de", as linhas riscadas, os
- *     Pendentes sem Sprint (e a coluna `Nota`) e o Historico lido pelo nome das colunas.
+ *     Pendentes sem Sprint (e a coluna `Nota`) e o Historico lido pelo nome das colunas;
+ *   - a coluna `Area` contra a lista `config/areas-do-backlog.mjs` (#465).
  *
  * Tolerante a template vazio: linhas-placeholder (sem ID) sao ignoradas,
  * nunca rebenta em tabelas por preencher.
@@ -17,7 +18,8 @@
  *   node .agent/scripts/check-backlog.mjs              # verifica
  *   node .agent/scripts/check-backlog.mjs --corrigir   # reescreve so os contadores (#431)
  *
- * Sai com codigo != 0 se houver divergencias (pode funcionar como gate no CI).
+ * Sai com codigo != 0 se houver divergencias (pode funcionar como gate no CI): 1 um aviso, 2 um argumento desconhecido ou
+ * a lista de areas (`config/areas-do-backlog.mjs`, #465) partida.
  * Correr antes de commit. Corre no CI (o job `guard-tests` do `ci.yml`), sempre sem `--corrigir`.
  *
  * `--corrigir` (#431): reescreve no `backlog.md` so os valores DERIVADOS (as linhas do Resumo, o Total, a linha do
@@ -29,6 +31,7 @@
 import { readFileSync, writeFileSync, renameSync, rmSync, lstatSync, statSync, chmodSync } from "fs";
 import { calcula, ehBacklogVazio } from "./lib/backlog-calculo.mjs";
 import { corrige } from "./lib/backlog-corrige.mjs";
+import { carregaAreas } from "./lib/backlog-areas.mjs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 
@@ -62,6 +65,15 @@ const CORRIGIR = ARGS.includes("--corrigir");
 
 console.log("\n=== Backlog Check ===\n");
 
+// A lista de areas (#465) carrega-se ANTES de tudo: uma `config/` partida sai 2 aqui e na vista, seja qual for o backlog.
+let areas;
+try {
+  areas = await carregaAreas();
+} catch (err) {
+  console.error(`check-backlog: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(2);
+}
+
 const active = read(ACTIVE);
 if (ehBacklogVazio(active)) {
   // NAO sair 0: este ficheiro e importado pelas rules e a sua ausencia impede a
@@ -80,14 +92,14 @@ const warn = (msg) => {
   warnings++;
 };
 
-const calc = calcula(active, archiveRaw, { ACTIVE, ARCHIVE });
+const calc = calcula(active, archiveRaw, { ACTIVE, ARCHIVE }, { areas });
 const { avisos, g, countable, expectedPct, expectedFilled } = calc;
 for (const a of avisos) warn(a.msg);
 
 if (CORRIGIR && avisos.length) {
   const { texto, problemas } = corrige(active, calc);
   // O texto novo passa pelo MESMO calculo antes de se gravar: so se escreve o que o verificador da por consistente.
-  const depois = texto === null ? null : calcula(texto, archiveRaw, { ACTIVE, ARCHIVE }).avisos;
+  const depois = texto === null ? null : calcula(texto, archiveRaw, { ACTIVE, ARCHIVE }, { areas }).avisos;
   if (texto === null || depois.length) {
     for (const p of [...problemas, ...(depois ?? []).map((a) => a.msg)]) console.log(`  NAO CORRIGI  ${p}`);
     console.log(`\n  --corrigir: nada escrito — ${problemas.length ? "ha avisos que nao sao contagens (corrigir a mao primeiro)" : "o texto corrigido nao ficou consistente"}.\n`);

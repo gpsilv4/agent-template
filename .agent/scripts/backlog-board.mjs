@@ -16,9 +16,10 @@
  * um `git add -A` publicava-a. O `--vigiar` volta a confirma-lo antes de cada escrita, e sai 2 sem escrever (#477).
  *
  * SAIDA: 0 gerada; 1 o backlog nao se leu (ou esta vazio): o motivo no stderr, e a vista anterior com a faixa de erro;
- * 1 tambem quando a vista nao se escreveu (o motivo no stderr, e a vista fica como estava); 2 um argumento ou o
- * `.gitignore`. Com o `--vigiar` o processo vive com o backlog estragado (diz o motivo no stderr) e, ao sair por um
- * sinal, sai 0 — salvo a recusa do `.gitignore`, que sai 2 (nao escreve a pagina final).
+ * 1 tambem quando a vista nao se escreveu (o motivo no stderr, e a vista fica como estava); 2 um argumento, o
+ * `.gitignore`, ou a lista de areas (`config/areas-do-backlog.mjs`, #465) partida — esta le-se so ao arrancar (mudada a
+ * lista, reiniciar o `--vigiar`). Com o `--vigiar` o processo vive com o backlog estragado (diz o motivo no stderr) e,
+ * ao sair por um sinal, sai 0 — salvo a recusa do `.gitignore`, que sai 2 (nao escreve a pagina final).
  */
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from "fs";
 import { spawnSync } from "child_process";
@@ -27,6 +28,7 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { leBacklog } from "./lib/backlog-itens.mjs";
 import { calcula, ehBacklogVazio } from "./lib/backlog-calculo.mjs";
+import { carregaAreas } from "./lib/backlog-areas.mjs";
 import { geraVista, faixaDeErro, FAIXA_RE } from "./lib/backlog-vista.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -85,6 +87,15 @@ function foraDoRepo() {
   }
   return {};
 }
+// A lista de areas (#465), no arranque e antes da primeira escrita: partida, sai 2 com o nome do ficheiro (o mesmo
+// codigo do `check-backlog`). O `--vigiar` nao a volta a ler.
+let AREAS;
+try {
+  AREAS = await carregaAreas();
+} catch (err) {
+  fatal(err instanceof Error ? err.message : String(err));
+}
+
 // Uma so verificacao, antes de CADA escrita (a primeira e a do arranque): o aviso diz-se uma vez, a recusa sai 2.
 let avisado = false;
 function confirmaForaDoRepo() {
@@ -142,7 +153,7 @@ function gera(vigiar) {
     } else {
       const archive = existsSync(ARCHIVE) ? readFileSync(ARCHIVE, "utf8") : null;
       const nomes = { ACTIVE: ".agent/context/backlog.md", ARCHIVE: ".agent/context/backlog-archive.md" };
-      html = geraVista(leBacklog(active, archive), calcula(active, archive, nomes), { agora: new Date(), vigiar, batida: BATIDA, chave: CHAVE });
+      html = geraVista(leBacklog(active, archive), calcula(active, archive, nomes, { areas: AREAS }), { agora: new Date(), vigiar, batida: BATIDA, chave: CHAVE });
       ultimaBoa = html;
     }
   } catch (err) {

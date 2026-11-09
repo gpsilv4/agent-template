@@ -51,11 +51,14 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 - `.agent/scripts/lib/nomes-proibidos.mjs`
 - `.agent/scripts/lib/agentes.mjs`
 - `.agent/scripts/lib/mapa-suites.mjs`: a tabela do template, **sem a mudar** (§3, passo 1).
-- `.agent/scripts/check-backlog.mjs`, com `.agent/scripts/lib/backlog-calculo.mjs`, `.agent/scripts/lib/backlog-itens.mjs`, `.agent/scripts/lib/backlog-regras.mjs` e `.agent/scripts/lib/backlog-corrige.mjs` (uma linha cada, abaixo).
+- `.agent/scripts/check-backlog.mjs`, com `.agent/scripts/lib/backlog-calculo.mjs`, `.agent/scripts/lib/backlog-itens.mjs`, `.agent/scripts/lib/backlog-regras.mjs`, `.agent/scripts/lib/backlog-corrige.mjs`, `.agent/scripts/lib/backlog-celulas.mjs`, `.agent/scripts/lib/backlog-areas.mjs` e a lista de areas (#465) (uma linha cada, abaixo).
 - `.agent/scripts/lib/backlog-calculo.mjs`
 - `.agent/scripts/lib/backlog-itens.mjs`
 - `.agent/scripts/lib/backlog-regras.mjs`
 - `.agent/scripts/lib/backlog-corrige.mjs`
+- `.agent/scripts/lib/backlog-celulas.mjs`
+- `.agent/scripts/lib/backlog-areas.mjs`
+- `.agent/scripts/config/areas-do-backlog.mjs`: **copiar se ausente** — e do projeto, como as outras `config/` (#465).
 - `.agent/scripts/minutos-ci.mjs`, com os dois modulos abaixo.
 - `.agent/scripts/lib/minutos-calculo.mjs`
 - `.agent/scripts/lib/repo-origin.mjs`
@@ -98,7 +101,8 @@ libs vem antes de quem as importa, e os testes (que nao estao ligados) no fim.
    `.gitignore` (o estado de runtime dos hooks). O `.claude/hooks/tests/` fica para o passo 4.
 4. **O resto da lista do §2**: as libs do runner do `test-hooks.mjs` (`registo`, `varredura-paralela`, `varredura-fatia`,
    `ordem-por-alvo`, `tmp-limpo`, o `harness/relatorio.mjs`) e so depois o `.claude/hooks/tests/`; o `check-backlog.mjs`
-   com as suas libs; e o `minutos-ci.mjs`.
+   com as suas libs (o `backlog-celulas.mjs` antes de quem o importa) e a `config/areas-do-backlog.mjs` se faltar; e o
+   `minutos-ci.mjs`.
 5. **O `.claude/settings.json`**, escrito pelo utilizador: a ligacao dos hooks e o `deny`/`ask` que o
    `simulate-upgrade --projeto` listou. Um hook copiado e nao ligado nunca dispara, e o `test-hooks` nao o ve: a lista
    dos hooks por ligar e a unica rede. Ela so diz o que **falta** ligar: um hook que o template passou a ligar noutro

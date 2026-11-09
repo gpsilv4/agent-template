@@ -208,6 +208,8 @@ if (ehDerivado((p) => ler(p))) {
     [".claude/agents/", "`.claude/agents`"],
     ["CONTRIBUTING.md", "`CONTRIBUTING.md`"],
     [".agent/scripts/tests/harness/relatorio.mjs", "`.agent/scripts/tests/harness/relatorio.mjs`"],
+    // O literal por extenso do `lib/backlog-areas.mjs` (#465): sem ele, a lista ficava verde com a `config/` invisivel.
+    [".agent/scripts/config/areas-do-backlog.mjs", "`.agent/scripts/config/areas-do-backlog.mjs`"],
   ]) {
     caso(`controlo fecho: sem \`${tira}\` na lista`, () => {
       const ps = problemasDoFecho(ROOT, (lista ?? []).filter((e) => e !== tira), ISENCOES);

@@ -424,6 +424,24 @@ caso("um ID em minusculas e o mesmo ticket: os avisos sao os do ID em maiusculas
     ...espera(JSON.stringify(avisos(ATIVO_RICO.replace(LINHA, LINHA.replace("B1", "B8")))) !== JSON.stringify(avisos(ATIVO_RICO)), "o B8 deu os mesmos avisos"),
   ];
 });
+const LINHA_B1_CAB = "| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina afetada |";
+const LINHA_B1 = "| B1 | Pendente | um bug | a.mjs | Alta | S | / |";
+caso("a Area (#465): pelo nome em qualquer posicao depois da descricao, `null` sem a coluna, e a descricao continua a 3.a", () => {
+  const com = (cab, linha) => leBacklog(ATIVO_RICO.replace(LINHA_B1_CAB, cab).replace(LINHA_B1, linha), ARQUIVO_RICO);
+  const quarta = com("| ID | Estado | Problema | Area | Ficheiro(s) | Severidade | Esforco | Pagina |", "| B1 | Pendente | um bug | Segurança, dados | a.mjs | Alta | S | / |");
+  const fim = com("| ID | Estado | Problema | Ficheiro(s) | Severidade | Esforco | Pagina | Area |", "| B1 | Pendente | um bug | a.mjs | Alta | S | / | dados |");
+  const linhaB1 = (l) => l.linhasPorTipo.find((x) => x.id === "B1");
+  return [
+    ...espera(ATIVO_RICO.includes(LINHA_B1_CAB) && ATIVO_RICO.includes(LINHA_B1), "a fixture mudou"),
+    ...igual(linhaB1(quarta)?.areas, [{ chave: "seguranca", rotulo: "Segurança" }, { chave: "dados", rotulo: "dados" }], "na 4.a"),
+    ...igual([linhaB1(fim)?.areas, linhaB1(fim)?.descricao, linhaB1(quarta)?.descricao], [[{ chave: "dados", rotulo: "dados" }], "um bug", "um bug"], "no fim, e a descricao"),
+    ...igual(quarta.tickets.get("B1")?.areas, linhaB1(quarta)?.areas, "o ticket leva as areas"),
+    // O nome da coluna lida, por secao (o contrato do PR 2): `area` pelo norm; `null` sem ela.
+    ...igual([quarta.cabecalhosPorTipo.find((c) => c.seccao === "Bugs")?.colunaArea, lido.cabecalhosPorTipo.find((c) => c.seccao === "Bugs")?.colunaArea], ["area", null], "colunaArea"),
+    // CONTROLO: sem a coluna, `null` (e nao `[]`, que e a celula vazia).
+    ...igual(linhaB1(lido)?.areas, null, "sem a coluna"),
+  ];
+});
 caso("o placeholder vazio do template nao da linhas", () => {
   const vazio = leBacklog("## 1. Bugs\n\n| ID | Estado | Problema |\n|---|---|---|\n| | | |\n\n### Sprint 1\n\n| Ordem | ID |\n|---|---|\n| | |\n", "");
   return [...espera(vazio.linhasPorTipo.length === 0, `linhas: ${vazio.linhasPorTipo.length}`), ...espera(vazio.blocos[0].linhas.length === 0, "o bloco vazio deu linhas"), ...espera(vazio.tickets.size === 0, "tickets")];

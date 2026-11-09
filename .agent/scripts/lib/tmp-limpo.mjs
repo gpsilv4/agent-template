@@ -157,6 +157,8 @@ export const PREFIXOS_DE_TESTE = [
   // Do `test-modo-upgrade.mjs` (#429): o template e o projeto de fixture onde o §4 do `upgrade.md` corre.
   "modo-upgrade-test-",
   "backlog-test-",
+  // Do `test-backlog-regras.mjs` (#465): a `config/` da lista de areas que o `carregaAreas` le.
+  "areas-test-",
   "t-limpo-",
   "sim-test-",
   "fuga-2b-",

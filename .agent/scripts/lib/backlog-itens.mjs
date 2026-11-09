@@ -14,24 +14,10 @@
  * `lib/backlog-regras.mjs`, e o `calcula` passa-as como avisos).
  */
 
-// Remove acentos e normaliza para comparar de forma resiliente.
-export function norm(s) {
-  // A enfase markdown sai ANTES do resto. Sem isto, um cabecalho escrito `| **Esforco** |`
-  // — forma corrente, e a que o proprio template usa na linha do Total — dava
-  // `indexOf("esforco") === -1`, e a validacao de Esforco **desligava-se em silencio** com
-  // exit 0. Falha-aberta no campo que decide o rigor de todo o `ticket-method`.
-  // Vale para as celulas tambem: um `| **Concluido** |` caia fora de OPEN_STATES da mesma forma.
-  return (s ?? "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[*`]/g, "")
-    // Espacos e `_` juntos, e numa so passagem: o `tableHeader` normaliza celulas NAO
-    // aparadas (`" _Esforco_ "`), e com o strip de `_` antes do `.trim()` sobrava
-    // `"_esforco_"` -> `indexOf("esforco") === -1` -> a validacao voltava a desligar-se em
-    // silencio. O negrito so ficou coberto por acaso: o strip de `*` e global.
-    .replace(/^[\s_]+|[\s_]+$/g, "")
-    .toLowerCase();
-}
+// O `norm` vive na folha das celulas (#465) e reexporta-se POR NOME (o fecho do `/upgrade` parcial nao ve um `export *`):
+// quem o importava daqui continua igual.
+import { norm, colunaDaArea, leAreas } from "./backlog-celulas.mjs";
+export { norm };
 
 /** O ID com a mesma tolerancia a enfase que o Estado e o Esforco ganharam. Sem isto,
  *  `| **B7** |` no ativo e `| B7 |` no arquivo eram duas chaves diferentes em `allIds` —
@@ -169,6 +155,8 @@ function linhasPorTipo(active) {
     const seccao = section(active, re);
     const cabecalho = tableHeader(seccao);
     const iEsforco = cabecalho ? cabecalho.indexOf("esforco") : -1;
+    // A Area pelo NOME, e so aqui (#465): `null` sem a coluna, `[]` com a celula vazia.
+    const { indice: iArea } = colunaDaArea(cabecalho);
     for (const cells of tableRows(seccao)) {
       out.push({
         seccao: key,
@@ -181,12 +169,21 @@ function linhasPorTipo(active) {
         esforco: iEsforco >= 0 ? norm(cells[iEsforco] ?? "") : null,
         esforcoCelula: iEsforco >= 0 ? cells[iEsforco] : null,
         descricao: cells[2] ?? "",
+        areas: iArea >= 0 ? leAreas(cells[iArea]) : null,
         colunas: colunasDe(cabecalho, cells),
       });
     }
   }
   return out;
 }
+
+/** O cabecalho de cada tabela por tipo (`null` sem a secao ou sem tabela), e o nome da coluna Area lida nela (`null`
+ *  sem ela): a regra le a posicao, e a vista (PR 2 do #465) tira essa coluna das colunas cruas. */
+const cabecalhosPorTipo = (active) =>
+  SECTIONS.map(({ key, re }) => {
+    const cabecalho = tableHeader(section(active, re));
+    return { seccao: key, cabecalho, colunaArea: colunaDaArea(cabecalho).nome };
+  });
 
 /** O `~~X~~`: o `id` NAO muda (um riscado nao casa o `ID_LIKE`, e a rede 2b e o `trackId` ficam iguais); `idLimpo` e so
  *  para a mensagem dizer qual e (#445 PR 2). */
@@ -323,7 +320,7 @@ const RE_PENDENTES = /^#{2,3}\s*(?:\d+\.\s*)?(?:\p{Extended_Pictographic}\S*\s*)
  *  com ele e sem linhas: "a secao foi renomeada" e "nao ha pendentes" pedem coisas diferentes (`TP2`). */
 function pendentes(active) {
   // Sem acentos, como o `section()` logo abaixo: os dois nao podem discordar sobre o mesmo titulo (#466).
-  if (!active.split("\n").some((l) => RE_PENDENTES.test(semAcentos(l)))) return { ps: null, temNota: false, temTabela: false };
+  if (!active.split("\n").some((l) => RE_PENDENTES.test(semAcentos(l)))) return { ps: null, temNota: false, temTabela: false, cabecalho: null };
   const seccao = section(active, RE_PENDENTES);
   const cabecalho = tableHeader(seccao);
   const ps = tableRows(seccao).map((cells) => {
@@ -331,7 +328,7 @@ function pendentes(active) {
     const e = parDe(cabecalho, cells, "esforco");
     return { id: id === null ? null : idDe(id), ...riscoDe(id), descricao: pelaColuna(cabecalho, cells, "descricao"), esforco: e.v, esforcoCelula: e.c, nota: pelaColuna(cabecalho, cells, "nota") };
   });
-  return { ps, temNota: (cabecalho ?? []).includes("nota"), temTabela: cabecalho !== null };
+  return { ps, temNota: (cabecalho ?? []).includes("nota"), temTabela: cabecalho !== null, cabecalho };
 }
 
 /** A linha `**Proximo:**` (#191): o texto, e o ID para onde aponta (so o PRIMEIRO da linha: o resto e texto livre). O
@@ -361,14 +358,14 @@ export function leBacklog(active, archiveRaw) {
   const porTipo = linhasPorTipo(active);
   const arquivo = fechados(archiveRaw);
   const { blocos: bs, semId, sprintSemOrdem } = blocos(active);
-  const { ps, temNota, temTabela } = pendentes(active);
+  const { ps, temNota, temTabela, cabecalho: cabecalhoPendentes } = pendentes(active);
   // A JUNCAO (o pedido do #445): um ticket por ID, a partir das tabelas por tipo. E um `Map` (a ordem e a das tabelas);
   // para embutir em JSON, `[...tickets.values()]` — o `JSON.stringify` de um `Map` da `{}`. Com um ID repetido fica a PRIMEIRA
   // linha: o duplicado e o `calcula` que o diz. Uma linha sem ID nao e um ticket.
   const tickets = new Map();
   for (const l of porTipo) {
     if (!l.id || tickets.has(l.id)) continue;
-    tickets.set(l.id, { id: l.id, seccao: l.seccao, estado: l.estado, esforco: l.esforco, descricao: l.descricao, colunas: l.colunas, bloco: null, ordem: null, prioridade: null, dependeDe: null, nota: null, noArquivo: false });
+    tickets.set(l.id, { id: l.id, seccao: l.seccao, estado: l.estado, esforco: l.esforco, descricao: l.descricao, areas: l.areas, colunas: l.colunas, bloco: null, ordem: null, prioridade: null, dependeDe: null, nota: null, noArquivo: false });
   }
   for (const b of bs) {
     for (const l of b.linhas) {
@@ -392,7 +389,9 @@ export function leBacklog(active, archiveRaw) {
     pendentes: ps,
     tickets,
     encontradas,
-    // O que so as regras leem (#445 PR 2).
+    // O que so as regras leem (#445 PR 2; a Area, #465).
+    cabecalhosPorTipo: cabecalhosPorTipo(active),
+    cabecalhoPendentes,
     semId,
     sprintSemOrdem,
     colunasEmFaltaNoHistorico: colunasEmFaltaNoHistorico(archiveRaw),

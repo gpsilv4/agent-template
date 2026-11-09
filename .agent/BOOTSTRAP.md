@@ -466,6 +466,11 @@ instrucoes citam, e uma pasta que nao exista e ignorada. `GUARDS`, `PARES_DO_PRO
 `SKIPS_DO_PROJETO` ficam vazios ate o projeto ter guards proprios; o cabecalho do ficheiro diz o
 formato de cada um (#176).
 
+**`.agent/scripts/config/areas-do-backlog.mjs`** — a lista de areas do backlog (#465), tambem do
+projeto (o `/upgrade` so a cria se faltar). Adaptar as chaves aos assuntos DESTE projeto (a base traz
+10; o cabecalho sugere outras, como `i18n` ou `pagamentos`), cada uma com uma definicao de uma frase.
+O `check-backlog` reprova uma Area fora da lista.
+
 ### 2.4 Configurar os Doc Guards
 
 O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 29 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), e o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le).
@@ -499,7 +504,7 @@ Correr antes de commit e apos merge de PRs do Dependabot. **Corre no CI** no job
 
 > O `.agent/scripts/check-codigo-morto.mjs` (imports que ninguem usa) tambem **nao precisa de configuracao**: le os `import` de cada `.mjs` da maquinaria e conta os usos sobre codigo, ignorando comentarios e strings. Correr antes de commit; **corre no CI** no job `guard-tests`.
 >
-> O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados; `--corrigir` reescreve os contadores, #431) **nao precisa de configuracao** — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; **corre no CI** no job `guard-tests`.
+> O `.agent/scripts/check-backlog.mjs` (valida contadores/barra de progresso e deteta IDs duplicados; `--corrigir` reescreve os contadores, #431) **nao precisa de configuracao** (salvo a lista de areas, opcional, acima) — funciona a partir da estrutura do `backlog.md`/`backlog-archive.md`. Correr antes de commit; **corre no CI** no job `guard-tests`.
 
 #### Adaptar o `check-test-surface.mjs` a stack
 
@@ -697,6 +702,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` em `.agent/scripts/config/bundles.mjs` atualizados (nao no verificador)?
 - [ ] `PASTAS_DE_SCRIPTS` em `.agent/scripts/config/guards-do-projeto.mjs` com as pastas de scripts do projeto?
+- [ ] `AREAS` em `.agent/scripts/config/areas-do-backlog.mjs` com os assuntos do projeto (#465)?
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?

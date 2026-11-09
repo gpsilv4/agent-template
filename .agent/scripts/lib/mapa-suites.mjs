@@ -40,6 +40,10 @@ export const SUITES = [
   // O leitor partilhado (#445): o calculo le por ele (as duas suites do checker), e a suite dele congela o resultado.
   // As libs do backlog vem no `/upgrade` parcial: um `import` novo muda o fecho, que e o `test-modo-upgrade` que mede.
   { re: /^\.agent\/scripts\/lib\/backlog-itens\.mjs$/, verifica: [S("test-backlog-itens.mjs"), S("test-backlog-regras.mjs"), S("test-backlog-board.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog" },
+  // A folha das celulas (#465: o `norm`, o vazio e a leitura da Area): o leitor importa-a, logo as suites do leitor.
+  { re: /^\.agent\/scripts\/lib\/backlog-celulas\.mjs$/, verifica: [S("test-backlog-itens.mjs"), S("test-backlog-regras.mjs"), S("test-backlog-board.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog" },
+  // A lista de areas e quem a carrega (#465): os dois CLIs, as regras, e o fecho do parcial (o literal da `config/`).
+  { re: /^\.agent\/scripts\/(?:lib\/backlog-areas|config\/areas-do-backlog)\.mjs$/, verifica: [S("test-backlog-regras.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog" },
   // As regras que nao sao contagens (#445 PR 2): a suite delas, o `CONGELADO` (no `test-backlog-itens`) e o caso de
   // ponta a ponta (no `test-backlog`); e o fecho do parcial, porque o `calcula` as importa.
   { re: /^\.agent\/scripts\/lib\/backlog-regras\.mjs$/, verifica: [S("test-backlog-regras.mjs"), S("test-backlog-itens.mjs"), S("test-backlog.mjs"), S("test-backlog-corrige.mjs"), S("test-modo-upgrade.mjs"), S("test-backlog-board.mjs"), S("test-backlog-board-cli.mjs")], only: "backlog" },

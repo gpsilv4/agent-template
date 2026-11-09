@@ -588,6 +588,26 @@ leitura, do `backlog.md` e do arquivo (os blocos, os cartoes, os filtros, os fec
 `.gitignore`, que no `/upgrade` e "diff e decidir". **Sem ela, o script recusa gerar**: o backlog tem detalhes do
 projeto, e um `git add -A` publicava-o. Num projeto parcial a vista nao vem; ver `upgrade-parcial.md`.
 
+## Porque o backlog ganhou uma coluna `Area`, opcional, com uma lista do projeto (#465)
+
+**O que muda.** O Tipo diz a especie de mudanca (Bug, UX, Divida Tecnica, Feature); a `Area` diz o assunto (seguranca,
+dados, testes…), e um ticket pode ter varias. Vive nas tabelas por tipo, depois da descricao, e cada valor tem de estar
+em `.agent/scripts/config/areas-do-backlog.mjs`, que o projeto adapta. O `check-backlog` e a vista leem a mesma lista.
+
+**O que isto pede a um derivado:**
+- **A coluna nao chega a um backlog que ja existe**: so o `backlog.md` de um projeto novo a traz (vazia). Para a usar,
+  acrescenta-la a mao, depois da descricao.
+- **A `config/` vem se faltar**, nos dois modos (no parcial, pelo fecho do `check-backlog`), e nunca se substitui.
+- **Uma coluna que o projeto ja tenha passa a ser lida ou avisada.** Uma `Area`/`Áreas` passa a ser verificada contra a
+  lista: um valor fora dela reprova (acrescenta-lo a `config/`, ou renomear a coluna se tiver outro sentido). Uma
+  `Tags`, `Etiquetas` ou `Area(s)` avisa "nao e lida". Uma `Area` num bloco ou nos Pendentes avisa: vive nas tabelas por
+  tipo.
+- **Uma `config/` partida** (sintaxe, ou sem `AREAS`) faz o `check-backlog` e o `backlog-board` sairem 2, com o nome do
+  ficheiro.
+
+**Porque uma lista, e nao texto livre:** sem ela, `segurança` e `seguranca` eram duas areas, e tudo o que agrupa por
+area partia-se em silencio. Pelo `norm` (sem acentos nem caixa) as duas casam; `seguransa` reprova.
+
 ## Porque o `repoDoOrigin` e o leitor do `concurrency:` saem do `marcas-yaml` (#455)
 
 **O problema.** O `lib/marcas-yaml.mjs` e o leitor das marcas do `check-test-surface` (modo completo), mas tinha

@@ -422,6 +422,8 @@ const PARES_DO_TEMPLATE = [
   { alvo: ".agent/scripts/lib/backlog-calculo.mjs", suite: ".agent/scripts/tests/test-backlog.mjs", sinal: /(?<![\w.$])warn\(/, neutro: "(() => {})(" },
   // As recusas do `--corrigir` (#431): desligada uma, ele escrevia com um aviso que nao e uma contagem.
   { alvo: ".agent/scripts/lib/backlog-corrige.mjs", suite: ".agent/scripts/tests/test-backlog-corrige.mjs", sinal: /(?<![\w.$])problemas\.push\(/, neutro: "(() => {})(" },
+  // A lista de areas (#465): uma `config/` partida recusa; o `test-backlog-regras` tem a sandbox que a parte.
+  { alvo: ".agent/scripts/lib/backlog-areas.mjs", suite: ".agent/scripts/tests/test-backlog-regras.mjs", sinal: /(?<![\w.$])throw new Error\(/, neutro: "(() => {})(" },
   // O CLI da vista (#446): as recusas dos argumentos e do `.gitignore` (sem esta, a vista ficava publicavel).
   { alvo: ".agent/scripts/backlog-board.mjs", suite: ".agent/scripts/tests/test-backlog-board-cli.mjs", sinal: /(?<![\w.$]|function )fatal\(/, neutro: "(() => {})(" },
   // A vista do backlog (#446): nao recusa, ESCAPA — como o `eh-main.mjs`, decide sem avisar, e errada abria a pagina a

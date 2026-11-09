@@ -15,7 +15,7 @@ import { dirname, resolve, join } from "path";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CHECKER = join(ROOT, ".agent/scripts/check-backlog.mjs");
 /** As libs do checker e do `--corrigir` (#431), e o leitor e as regras que o calculo usa (#445), copiadas para a sandbox. */
-const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs", "backlog-itens.mjs", "backlog-regras.mjs"];
+const LIBS = ["backlog-calculo.mjs", "backlog-corrige.mjs", "backlog-itens.mjs", "backlog-regras.mjs", "backlog-celulas.mjs", "backlog-areas.mjs"];
 
 // --- A fixture valida -------------------------------------------------------
 // Contas que ela codifica (o checker tem de chegar exatamente a estas):
@@ -118,7 +118,11 @@ function sandbox() {
 
 const f = (dir, p) => join(dir, p);
 const readF = (dir, p) => readFileSync(f(dir, p), "utf8");
-const writeF = (dir, p, c) => writeFileSync(f(dir, p), c);
+// Cria a pasta se faltar: a `config/` da lista de areas (#465) nao existe numa sandbox ate um caso a escrever.
+const writeF = (dir, p, c) => {
+  mkdirSync(dirname(f(dir, p)), { recursive: true });
+  writeFileSync(f(dir, p), c);
+};
 
 /** Corre o checker na sandbox; `args` sao os argumentos (o `--corrigir`, #431). */
 function run(dir, cwd, args = []) {

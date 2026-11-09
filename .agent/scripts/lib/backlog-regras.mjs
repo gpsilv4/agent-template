@@ -11,6 +11,7 @@
  * que nenhuma tabela por tipo cobre ja tem aviso no `calcula`; aqui nao se diz outra vez.
  */
 import { OPEN_STATES, norm } from "./backlog-itens.mjs";
+import { colunaDaArea, areaAntesDaDescricao } from "./backlog-celulas.mjs";
 
 /** A `Ordem` de uma linha de bloco: um inteiro, ou `null` (nao e um numero). Com a mesma tolerancia a enfase do ID e
  *  do Estado (`**1**`), e sem os `~~` de uma linha riscada (a regra 6 ja diz o riscado). */
@@ -22,9 +23,10 @@ const ordemDe = (celula) => {
 /**
  * @param {ReturnType<import("./backlog-itens.mjs").leBacklog>} lido
  * @param {{ ACTIVE: string, ARCHIVE: string }} nomes  os caminhos, para as mensagens
+ * @param {{ areas?: Record<string, string> | null }} [opcoes]  a lista de areas (as chaves ja pelo `norm`), ou `null`
  * @returns {string[]} as mensagens, pela ordem das regras
  */
-export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }) {
+export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }, { areas = null } = {}) {
   const problemas = [];
 
   // 1) O Historico: o heading, e as colunas que se leem pelo nome. Sem elas, o `calcula` nao valida linha a linha (um
@@ -134,5 +136,45 @@ export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }) {
     problemas.push(`${ACTIVE}: a tabela dos Pendentes sem Sprint nao tem a coluna \`Nota\` — a razao de estar parqueado vive nela (renomear a coluna)`);
   }
 
+  // 8) A Area (#465): so nas tabelas por tipo, depois da descricao, com valores da lista do projeto.
+  problemas.push(...regrasDaArea(lido, ACTIVE, areas));
+
+  return problemas;
+}
+
+/** A regra da Area (#465). As chaves da lista comparam-se pelo `norm` (uma chave `Segurança` casa `seguranca`). */
+function regrasDaArea(lido, ACTIVE, areas) {
+  const problemas = [];
+  const lista = areas === null ? null : new Set(Object.keys(areas).map(norm));
+  let comColuna = false;
+  for (const { seccao, cabecalho } of lido.cabecalhosPorTipo ?? []) {
+    const col = colunaDaArea(cabecalho);
+    // (d) Um nome parecido nao se le: sem o aviso, a verificacao desligava-se calada (`TP2`).
+    if (col.parecida) problemas.push(`${ACTIVE}: ${seccao}: a coluna "${col.parecida}" nao e lida — chamar-lhe \`Area\``);
+    if (col.indice < 0) continue;
+    comColuna = true;
+    // (b) Antes da descricao, a Area ocupava o lugar do Estado ou da descricao (que se leem por posicao).
+    if (areaAntesDaDescricao(cabecalho)) problemas.push(`${ACTIVE}: ${seccao}: a coluna Area esta antes da descricao — vem depois dela (o ID, o Estado e a descricao leem-se por posicao)`);
+  }
+  // (c) A coluna sem a lista: os valores nao foram verificados (um aviso so).
+  if (comColuna && lista === null) {
+    problemas.push(`${ACTIVE}: falta .agent/scripts/config/areas-do-backlog.mjs — os valores da Area nao foram verificados; trazer o do template`);
+  }
+  // (a) Um valor fora da lista.
+  if (lista !== null) {
+    for (const l of lido.linhasPorTipo) {
+      for (const a of l.areas ?? []) {
+        if (!lista.has(a.chave)) problemas.push(`${ACTIVE}: ${l.seccao}: ${l.id || "uma linha sem ID"} tem a Area "${a.rotulo}", que nao esta na lista — acrescenta-la a .agent/scripts/config/areas-do-backlog.mjs, ou renomear a coluna se "Area" tiver outro sentido neste projeto`);
+      }
+    }
+  }
+  // A Area so vive nas tabelas por tipo: num bloco ou nos Pendentes, ignora-la calada era o `TP2`.
+  const foraDoSitio = (onde, cab) => {
+    const col = colunaDaArea(cab);
+    const nome = col.nome ?? col.parecida;
+    if (nome) problemas.push(`${ACTIVE}: ${onde}: a coluna "${nome}" nao e lida aqui — a Area vive nas tabelas por tipo`);
+  };
+  for (const b of lido.blocos) foraDoSitio(`"${b.titulo}"`, b.cabecalho);
+  if (lido.cabecalhoPendentes) foraDoSitio("Pendentes sem Sprint", lido.cabecalhoPendentes);
   return problemas;
 }

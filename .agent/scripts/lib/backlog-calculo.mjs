@@ -12,6 +12,7 @@
 
 import { leBacklog, norm, semAcentos, idDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
 import { regrasDoBacklog } from "./backlog-regras.mjs";
+import { VAZIO_RE } from "./backlog-celulas.mjs";
 
 /**
  * Um backlog que nao existe (`null`) ou so com espacos: nao ha nada a validar, e e um erro (#477). Um so predicado para
@@ -34,8 +35,10 @@ const DERIVADO = true;
  * @param {string} active  o `backlog.md`
  * @param {string | null} archiveRaw  o `backlog-archive.md`, ou `null` se nao existe
  * @param {{ ACTIVE: string, ARCHIVE: string }} nomes  os caminhos, para as mensagens
+ * @param {{ areas?: Record<string, string> | null }} [opcoes]  a lista de areas do projeto (`lib/backlog-areas.mjs`), ou
+ *   `null` sem ela; em falta vale `null` (#465): esquecer de a passar faz barulho com a coluna presente, e nao desliga nada
  */
-export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
+export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }, { areas = null } = {}) {
   const avisos = [];
   const warn = (msg, derivado = false) => avisos.push({ msg, derivado });
 
@@ -69,7 +72,7 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
     if (l.esforco !== null && id) {
       // `-`, `—` e `n/a` sao a convencao markdown para "vazio", e a celula vazia ja era
       // tolerada de propósito. Reprovar a forma escrita e tolerar a vazia era incoerente.
-      const e = l.esforco.replace(/^(?:-+|–|—|n\/a|\?)$/, ""); // `norm` ja tira a enfase
+      const e = l.esforco.replace(VAZIO_RE, ""); // `norm` ja tira a enfase; a mesma lista da Area (#465)
       if (e && !ESFORCOS.includes(e)) {
         warn(`${key}: item "${id}" tem Esforco "${l.esforcoCelula}" — esperado S, M ou L (ver a legenda do backlog)`);
       }
@@ -166,7 +169,7 @@ export function calcula(active, archiveRaw, { ACTIVE, ARCHIVE }) {
 
   // 3b) As regras que nao sao contagens (#445 PR 2): a Ordem, o "Depende de", o arquivo, os riscados, os Pendentes.
   //     Todas reprovam, e nenhuma e `derivado`: o `--corrigir` nao lhes toca.
-  for (const msg of regrasDoBacklog(lido, { ACTIVE, ARCHIVE })) warn(msg);
+  for (const msg of regrasDoBacklog(lido, { ACTIVE, ARCHIVE }, { areas })) warn(msg);
 
   // --- Totais globais ---
   const g = { pendente: 0, "a fazer": 0, concluido: 0, cancelado: 0, total: 0 };

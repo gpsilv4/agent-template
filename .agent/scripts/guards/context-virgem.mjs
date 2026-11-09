@@ -75,7 +75,7 @@ export const digest = (src) => createHash("sha256").update(src.replace(/\r\n/g, 
  */
 export const PRISTINOS = {
   ".agent/context/backlog-archive.md": "895ce7e833e9a8df",
-  ".agent/context/backlog.md": "8171dd6537274918",
+  ".agent/context/backlog.md": "39345056c53dff81",
   ".agent/context/decisions-archive.md": "4688e54e1ec16db0",
   ".agent/context/decisions.md": "180e340de1cca452",
   ".agent/context/implementation_plan.md": "90b8d7d96b66b49f",

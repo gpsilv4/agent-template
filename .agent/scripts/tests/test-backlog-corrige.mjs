@@ -87,14 +87,18 @@ caso("idempotente: um ficheiro consistente fica igual", (dir) => {
 
 // So no TEMPLATE (o seu backlog esta vazio de proposito): num derivado os contadores sao dados dele, e o CI ja os
 // verifica pelo `check-backlog`; com o ficheiro em falta, nao ha nada a medir. Em ambos, SKIP com o nome.
+const CONFIG_AREAS = ".agent/scripts/config/areas-do-backlog.mjs";
 const NO_TEMPLATE = !ehDerivado((rel) => leOuNull(join(ROOT, rel))) && existsSync(join(ROOT, A)) && existsSync(join(ROOT, AR));
 if (!NO_TEMPLATE) console.log("  SKIP  o backlog.md real do template (num derivado, ou sem o ficheiro)");
 if (NO_TEMPLATE) caso("o backlog.md e o arquivo REAIS do template (placeholders, zeros) ficam iguais", (dir) => {
   const real = readFileSync(join(ROOT, A), "utf8");
   writeF(dir, A, real);
   writeF(dir, AR, readFileSync(join(ROOT, AR), "utf8"));
+  // O backlog do template tem a coluna Area (#465): com ela e sem a lista, o `check-backlog` avisava. A sandbox leva a
+  // lista REAL do template (so aqui, e so no template: nenhum outro caso fica preso a `config/` real).
+  writeF(dir, CONFIG_AREAS, readFileSync(join(ROOT, CONFIG_AREAS), "utf8"));
   const r = run(dir, undefined, ["--corrigir"]);
-  return [...(r.code === 0 ? [] : [`saiu ${r.code}`]), ...(readF(dir, A) === real ? [] : ["o ficheiro mudou"])];
+  return [...(r.code === 0 ? [] : [`saiu ${r.code}: ${r.out}`]), ...(readF(dir, A) === real ? [] : ["o ficheiro mudou"])];
 });
 
 caso("um merge que juntou uma linha SEM conflito (o Total ficou o antigo) corrige-se pelos numeros certos", (dir) => {
@@ -235,6 +239,38 @@ else caso("uma escrita que falha deixa o original, e nenhum temporario", (dir) =
     ...(readF(dir, A) === ERRADO ? [] : ["o original mudou"]),
     ...(readdirSync(pasta).some((n) => n.endsWith(".tmp")) ? ["ficou um temporario"] : []),
   ];
+});
+
+// A Area (#465), pelo CLI: a lista carrega-se da `config/` da sandbox, que cada caso escreve (nunca a real).
+const CFG = ".agent/scripts/config/areas-do-backlog.mjs";
+const comArea = (t) =>
+  t.replace("| ID | Estado | Problema | Ficheiro(s) |", "| ID | Estado | Problema | Area | Ficheiro(s) |")
+    .replace("|----|--------|---------|-------------|", "|----|--------|---------|------|-------------|")
+    .replace("| B1 | Pendente | algo | a.ts |", "| B1 | Pendente | algo | seguranca | a.ts |")
+    .replace("| B2 | A Fazer | outra coisa | b.ts |", "| B2 | A Fazer | outra coisa | | b.ts |");
+caso("Area: com a coluna e SEM a lista, o check-backlog sai 1 e o --corrigir nao escreve", (dir) => {
+  const t = errado(comArea(ACTIVE_OK));
+  writeF(dir, A, t);
+  const r = run(dir, undefined, ["--corrigir"]);
+  return [
+    ...(t.includes("| seguranca |") ? [] : ["a fixture nao ganhou a coluna"]),
+    ...(r.code === 1 && r.out.includes("falta .agent/scripts/config/areas-do-backlog.mjs") ? [] : [`${r.code}: ${r.out.slice(-300)}`]),
+    ...(readF(dir, A) === t ? [] : ["escreveu"]),
+  ];
+});
+caso("Area: com a coluna, COM a lista e os contadores errados, o --corrigir escreve e sai 0 (as duas chamadas do calcula levam a lista)", (dir) => {
+  writeF(dir, A, errado(comArea(ACTIVE_OK)));
+  writeF(dir, CFG, 'export const AREAS = { seguranca: "x" };\n');
+  const r = run(dir, undefined, ["--corrigir"]);
+  return [...(r.code === 0 ? [] : [`saiu ${r.code}: ${r.out.slice(-300)}`]), ...(readF(dir, A) === comArea(ACTIVE_OK) ? [] : ["o texto corrigido nao e o valido"])];
+});
+caso("Area: com a lista PARTIDA, sai 2 e nomeia o ficheiro, mesmo com o backlog vazio (a lista carrega-se antes)", (dir) => {
+  writeF(dir, CFG, "export const AREAS = {\n");
+  const cheio = run(dir);
+  writeF(dir, A, "  \n");
+  const vazio = run(dir);
+  const ok = (r) => r.code === 2 && r.out.includes("check-backlog: .agent/scripts/config/areas-do-backlog.mjs nao se le");
+  return [...(ok(cheio) ? [] : [`cheio: ${cheio.code}: ${cheio.out.slice(-200)}`]), ...(ok(vazio) ? [] : [`vazio: ${vazio.code}: ${vazio.out.slice(-200)}`])];
 });
 
 caso("o CI nunca chama o check-backlog com --corrigir", () => {

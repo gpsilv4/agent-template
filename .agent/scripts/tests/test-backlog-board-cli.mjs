@@ -14,7 +14,7 @@ import { join } from "path";
 import { ACTIVE_OK, ARCHIVE_OK } from "./harness/test-backlog-harness.mjs";
 
 const SCRIPTS = join(import.meta.dirname, "..");
-const LIBS = ["backlog-itens.mjs", "backlog-calculo.mjs", "backlog-regras.mjs", "backlog-vista.mjs", "backlog-vista-pecas.mjs", "backlog-vista-assets.mjs"];
+const LIBS = ["backlog-itens.mjs", "backlog-calculo.mjs", "backlog-regras.mjs", "backlog-celulas.mjs", "backlog-areas.mjs", "backlog-vista.mjs", "backlog-vista-pecas.mjs", "backlog-vista-assets.mjs"];
 const SAIDA = ".agent/backlog-board.html";
 
 let passed = 0;
@@ -199,6 +199,58 @@ await caso("uma vista que nao se escreve sai 1, com o motivo no stderr, e nao di
     return [
       ...espera(r.status === 1 && r.stderr.includes("backlog-board: nao consegui escrever a vista"), `${r.status}: ${r.stderr}`),
       ...espera(!r.stdout.includes("abrir no browser"), r.stdout),
+    ];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// A Area (#465): a vista carrega a MESMA lista e passa-a ao `calcula` — a contagem de avisos e a do `check-backlog`.
+const CFG = ".agent/scripts/config/areas-do-backlog.mjs";
+const COM_AREA = ACTIVE_OK.replace("| ID | Estado | Problema | Ficheiro(s) |", "| ID | Estado | Problema | Area | Ficheiro(s) |")
+  .replace("|----|--------|---------|-------------|", "|----|--------|---------|------|-------------|")
+  .replace("| B1 | Pendente | algo | a.ts |", "| B1 | Pendente | algo | seguranca | a.ts |")
+  .replace("| B2 | A Fazer | outra coisa | b.ts |", "| B2 | A Fazer | outra coisa | | b.ts |");
+const escreveCfg = (dir, texto) => {
+  mkdirSync(join(dir, ".agent/scripts/config"), { recursive: true });
+  writeFileSync(join(dir, CFG), texto);
+};
+/** Os avisos que a pagina diz ("O check-backlog tem N aviso(s)"; 0 sem a faixa) e os `WARN` do `check-backlog` real, na
+ *  MESMA sandbox (a paridade da Fase 0): o checker e a lib do `--corrigir` copiam-se so para este caso. */
+const paridade = (dir) => {
+  for (const f of ["check-backlog.mjs", "lib/backlog-corrige.mjs"]) cpSync(join(SCRIPTS, f), join(dir, ".agent/scripts", f));
+  const r = corre(dir);
+  const cb = spawnSync("node", [join(dir, ".agent/scripts/check-backlog.mjs")], { cwd: dir, encoding: "utf8", timeout: 15000 });
+  const naPagina = Number(/O check-backlog tem (\d+) aviso/.exec(vistaDe(dir))?.[1] ?? 0);
+  return { r, naPagina, noChecker: (cb.stdout.match(/^ {2}WARN {2}/gm) ?? []).length };
+};
+await caso("Area: a pagina conta os MESMOS avisos que o check-backlog na mesma sandbox, com a lista e sem ela", async () => {
+  const comLista = sandbox();
+  const semLista = sandbox();
+  try {
+    // Com a lista e um valor DELA: 0 avisos; sem a lista: 1, o (c). Uma vista que nao passasse a lista ao `calcula`
+    // dava 1 no primeiro contra o 0 do checker (com um valor fora da lista, os dois davam 1 por razoes diferentes, e a
+    // pagina so mostra o numero: o controlo desse desenho passava).
+    for (const d of [comLista, semLista]) writeFileSync(join(d, ".agent/context/backlog.md"), COM_AREA);
+    escreveCfg(comLista, 'export const AREAS = { seguranca: "x" };\n');
+    const [a, b] = [paridade(comLista), paridade(semLista)];
+    return [
+      ...espera(COM_AREA.includes("| algo | seguranca |"), "a fixture nao ganhou a coluna"),
+      ...espera(a.r.status === 0 && a.naPagina === a.noChecker && a.noChecker === 0, `com a lista: pagina ${a.naPagina}, checker ${a.noChecker}`),
+      ...espera(b.naPagina === b.noChecker && b.noChecker === 1, `sem a lista: pagina ${b.naPagina}, checker ${b.noChecker}`),
+    ];
+  } finally {
+    for (const d of [comLista, semLista]) rmSync(d, { recursive: true, force: true });
+  }
+});
+await caso("Area: com a lista PARTIDA, sai 2 sem gerar, e a mensagem nomeia o ficheiro (e nao o .gitignore, que tambem sai 2)", async () => {
+  const dir = sandbox();
+  try {
+    escreveCfg(dir, "export const AREAS = {\n");
+    const r = corre(dir);
+    return [
+      ...espera(r.status === 2 && r.stderr.includes("backlog-board: .agent/scripts/config/areas-do-backlog.mjs nao se le"), `${r.status}: ${r.stderr}`),
+      ...espera(!existsSync(join(dir, SAIDA)), "gerou"),
     ];
   } finally {
     rmSync(dir, { recursive: true, force: true });

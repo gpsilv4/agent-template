@@ -9,6 +9,12 @@ import { ACTIVE_OK, ARCHIVE_OK } from "./harness/test-backlog-harness.mjs";
 import { leBacklog } from "../lib/backlog-itens.mjs";
 import { regrasDoBacklog } from "../lib/backlog-regras.mjs";
 import { calcula } from "../lib/backlog-calculo.mjs";
+import { carregaAreas } from "../lib/backlog-areas.mjs";
+import { leAreas } from "../lib/backlog-celulas.mjs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { pathToFileURL } from "url";
 
 let passed = 0;
 const falhas = [];
@@ -142,6 +148,132 @@ caso("CONTROLO: o heading e tolerante (um emoji, `Pendente (sem sprint)`, numera
   ...calado({ ativo: [["## Pendentes sem Sprint", "## 📌 Pendentes sem Sprint"]] }),
   ...calado({ ativo: [["## Pendentes sem Sprint", "## Pendente (sem sprint)"]] }),
 ]);
+
+console.log("\n  8) A Area (#465)\n");
+// A tabela dos Bugs da fixture, com a coluna Area depois da descricao (a 4.a); a lista e INJETADA (nenhum caso le a
+// `config/` real, que cada projeto adapta).
+const LISTA = { seguranca: "x", dados: "y" };
+const comArea = (b1, b2, { nome = "Area", antes = false } = {}) => {
+  const cab = antes ? `| ID | Estado | ${nome} | Problema | Ficheiro(s) |` : `| ID | Estado | Problema | ${nome} | Ficheiro(s) |`;
+  const l1 = antes ? `| B1 | Pendente | ${b1} | algo | a.ts |` : `| B1 | Pendente | algo | ${b1} | a.ts |`;
+  const l2 = antes ? `| B2 | A Fazer | ${b2} | outra coisa | b.ts |` : `| B2 | A Fazer | outra coisa | ${b2} | b.ts |`;
+  return troca(ACTIVE_OK, [
+    ["| ID | Estado | Problema | Ficheiro(s) |", cab],
+    ["|----|--------|---------|-------------|", "|----|--------|---------|------|-------------|"],
+    ["| B1 | Pendente | algo | a.ts |", l1],
+    ["| B2 | A Fazer | outra coisa | b.ts |", l2],
+  ]);
+};
+/** As mensagens da Area (a 3.a forma de chamar: `areas` omitido, para o caso do `undefined`). */
+const daArea = (ativo, ...opcoes) => regrasDoBacklog(leBacklog(ativo, ARCHIVE_OK), NOMES, ...opcoes);
+function areaAvisa(fixture, areas, inclui) {
+  const msgs = areas === "omitido" ? daArea(fixture.t) : daArea(fixture.t, { areas });
+  const erros = fixture.naoCasou.map((d) => `a fixture nao tem: ${JSON.stringify(d)}`);
+  for (const frase of inclui) if (!msgs.some((m) => m.includes(frase))) erros.push(`faltou: ${frase}\n            tenho: ${JSON.stringify(msgs)}`);
+  if (msgs.length !== inclui.length) erros.push(`esperava ${inclui.length} aviso(s), tenho ${msgs.length}: ${JSON.stringify(msgs)}`);
+  return erros;
+}
+
+caso("(a) um valor da lista nao avisa; um fora dela avisa, e a mensagem nomeia-o e diz as duas saidas", () => [
+  ...areaAvisa(comArea("seguranca", "dados"), LISTA, []),
+  ...areaAvisa(comArea("seguransa", "dados"), LISTA, ['B1 tem a Area "seguransa", que nao esta na lista — acrescenta-la a .agent/scripts/config/areas-do-backlog.mjs, ou renomear a coluna']),
+]);
+caso("(a) pelo norm: `Segurança` e `**seguranca**` casam `seguranca`, e uma CHAVE `Segurança` casa `seguranca`", () => [
+  ...areaAvisa(comArea("Segurança", "**seguranca**"), LISTA, []),
+  ...areaAvisa(comArea("seguranca", "dados"), { "Segurança": "x", dados: "y" }, []),
+]);
+caso("(a) varias areas por virgula: `seguranca, dados` da duas e nenhum aviso; `seguranca, seguransa` da UM", () => [
+  ...areaAvisa(comArea("seguranca, dados", "—"), LISTA, []),
+  ...areaAvisa(comArea("seguranca, seguransa", "—"), LISTA, ['"seguransa"']),
+  ...(JSON.stringify(leAreas("Segurança, dados")) === JSON.stringify([{ chave: "seguranca", rotulo: "Segurança" }, { chave: "dados", rotulo: "dados" }]) ? [] : [`leAreas: ${JSON.stringify(leAreas("Segurança, dados"))}`]),
+]);
+caso("(a) o vazio escrito (`—`, `–`, `?`, `n/a`, `**N/A**`) e um fragmento vazio (`seguranca,`) nao contam", () => [
+  ...["—", "–", "?", "n/a", "**N/A**", ""].flatMap((v) => areaAvisa(comArea(v, "seguranca,"), LISTA, [])),
+  ...(leAreas("seguranca,").length === 1 ? [] : [`seguranca, deu ${leAreas("seguranca,").length} areas`]),
+  // CONTROLO: um valor que nao e o vazio escrito avisa (o filtro nao engole tudo).
+  ...areaAvisa(comArea("x", "—"), LISTA, ['"x"']),
+]);
+caso("(b) a Area antes da descricao (a 3.a coluna) avisa; depois dela (a 4.a), nao", () => [
+  ...areaAvisa(comArea("seguranca", "dados", { antes: true }), LISTA, ["Bugs: a coluna Area esta antes da descricao"]),
+  ...areaAvisa(comArea("seguranca", "dados"), LISTA, []),
+]);
+caso("(b) a Area na 2.a coluna: a regra avisa, e o Estado partido tambem (o calcula)", () => {
+  const f = troca(ACTIVE_OK, [
+    ["| ID | Estado | Problema | Ficheiro(s) |", "| ID | Area | Estado | Problema | Ficheiro(s) |"],
+    ["|----|--------|---------|-------------|", "|----|------|--------|---------|-------------|"],
+    ["| B1 | Pendente | algo | a.ts |", "| B1 | dados | Pendente | algo | a.ts |"],
+  ]);
+  const avisos = calcula(f.t, ARCHIVE_OK, NOMES, { areas: LISTA }).avisos.map((a) => a.msg);
+  return [
+    ...f.naoCasou.map((d) => `a fixture nao tem: ${d}`),
+    ...(avisos.some((m) => m.includes("a coluna Area esta antes da descricao")) ? [] : ["sem o aviso da posicao"]),
+    ...(avisos.some((m) => m.includes('"B1" tem Estado desconhecido ("dados")')) ? [] : [`sem o Estado partido: ${JSON.stringify(avisos)}`]),
+  ];
+});
+caso("(c) a coluna sem a lista da UM aviso (com `null` e com `areas` omitido); com a lista, ou sem a coluna, nenhum", () => [
+  ...areaAvisa(comArea("seguranca", "x"), null, ["falta .agent/scripts/config/areas-do-backlog.mjs — os valores da Area nao foram verificados"]),
+  ...areaAvisa(comArea("seguranca", "x"), "omitido", ["falta .agent/scripts/config/areas-do-backlog.mjs"]),
+  ...areaAvisa(comArea("seguranca", "dados"), LISTA, []),
+  ...areaAvisa({ t: ACTIVE_OK, naoCasou: [] }, null, []),
+]);
+caso("(d) `Areas` e `Área` leem-se (o valor fora da lista avisa); `Tags`, `Etiquetas` e `Area(s)` avisam que nao se leem", () => [
+  ...areaAvisa(comArea("seguransa", "dados", { nome: "Areas" }), LISTA, ['"seguransa"']),
+  ...areaAvisa(comArea("seguransa", "dados", { nome: "Área" }), LISTA, ['"seguransa"']),
+  ...["Tags", "Etiquetas", "Area(s)"].flatMap((n) => areaAvisa(comArea("seguransa", "dados", { nome: n }), LISTA, [`Bugs: a coluna "${n.toLowerCase()}" nao e lida — chamar-lhe \`Area\``])),
+]);
+caso("CONTROLO (d): uma coluna `Area afetada` (outro sentido) nem se le nem avisa", () => areaAvisa(comArea("seguransa", "dados", { nome: "Area afetada" }), LISTA, []));
+// Decidido (leitura independente do PR 1): com uma `Area` verdadeira, uma `Tags` ao lado e outra coluna do projeto, e o
+// "chamar-lhe Area" seria um conselho errado. So se avisa a parecida quando NAO ha a verdadeira.
+caso("(d) com uma Area verdadeira, uma `Tags` ao lado nao avisa (e outra coluna); a Area le-se", () =>
+  areaAvisa(troca(comArea("seguransa", "dados").t, [["| Problema | Area |", "| Problema | Area | Tags |"], ["|---------|------|", "|---------|------|-----|"], ["| algo | seguransa |", "| algo | seguransa | x |"], ["| outra coisa | dados |", "| outra coisa | dados | y |"]]), LISTA, ['"seguransa"']));
+caso("a Area num bloco ou nos Pendentes avisa (vive nas tabelas por tipo); o controlo e o (a), nas tabelas por tipo", () => [
+  ...areaAvisa(troca(ACTIVE_OK, [["| Ordem | ID | Descricao | Esforco | Depende de |", "| Ordem | ID | Descricao | Esforco | Depende de | Area |"]]), LISTA, ['"Sprint 2 — o que esta aberto": a coluna "area" nao e lida aqui — a Area vive nas tabelas por tipo']),
+  ...areaAvisa(troca(ACTIVE_OK, [["| ID | Descricao | Esforco | Nota |", "| ID | Descricao | Esforco | Nota | Tags |"]]), LISTA, ['Pendentes sem Sprint: a coluna "tags" nao e lida aqui']),
+]);
+
+console.log("\n  O carregaAreas (#465)\n");
+// Numa sandbox com a sua `config/` (o precedente do `tests-pares.mjs`): um ficheiro por caso, para a cache do `import`
+// nao devolver o primeiro modulo aos seguintes.
+{
+  const dir = mkdtempSync(join(tmpdir(), "areas-test-"));
+  const url = (nome, texto) => {
+    if (texto !== undefined) writeFileSync(join(dir, nome), texto);
+    return pathToFileURL(join(dir, nome));
+  };
+  const recusa = async (u) => {
+    try {
+      await carregaAreas(u);
+      return null;
+    } catch (err) {
+      return err instanceof Error ? err.message : String(err);
+    }
+  };
+  try {
+    const ausente = await carregaAreas(url("nao-existe.mjs"));
+    const presente = await carregaAreas(url("ok.mjs", 'export const AREAS = { "Segurança": "x", dados: "y" };\n'));
+    const sintaxe = await recusa(url("sintaxe.mjs", "export const AREAS = {\n"));
+    const outroNome = await recusa(url("outro-nome.mjs", 'export const AREA = { a: "x" };\n'));
+    const vazia = await recusa(url("vazia.mjs", 'export const AREAS = { a: "" };\n'));
+    const semAreas = await recusa(url("sem-areas.mjs", "export const AREAS = {};\n"));
+    const repetida = await recusa(url("repetida.mjs", 'export const AREAS = { "Segurança": "x", seguranca: "y" };\n'));
+    caso("ausente da `null`; presente devolve a lista com as chaves pelo norm", () => [
+      ...(ausente === null ? [] : [`ausente: ${JSON.stringify(ausente)}`]),
+      ...(JSON.stringify(presente) === JSON.stringify({ seguranca: "x", dados: "y" }) ? [] : [`presente: ${JSON.stringify(presente)}`]),
+    ]);
+    caso("partida (sintaxe; `AREA` em vez de `AREAS`; uma definicao vazia; `{}`; `Segurança` e `seguranca`) recusa, e nomeia o ficheiro", () =>
+      [["sintaxe", sintaxe], ["outro nome", outroNome], ["vazia", vazia], ["sem areas", semAreas], ["chave repetida pelo norm", repetida]].flatMap(([n, m]) => (m && m.includes(".agent/scripts/config/areas-do-backlog.mjs") ? [] : [`${n}: ${m}`])));
+    // A forma da `config/` REAL (decisao 3: sem o ficheiro, salta) — so a forma, nunca o conteudo.
+    const real = new URL("../config/areas-do-backlog.mjs", import.meta.url);
+    if (!existsSync(real)) console.log("  SKIP  a forma da config/areas-do-backlog.mjs real (o projeto nao a tem)");
+    else {
+      const lista = await carregaAreas(real);
+      caso("a `config/` real tem a forma: um objeto de textos nao vazios", () => (lista && Object.keys(lista).length ? [] : [`lista: ${JSON.stringify(lista)}`]));
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  caso("a sandbox do carregaAreas ficou apagada", () => (existsSync(dir) ? [`ficou: ${dir}`] : []));
+}
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
