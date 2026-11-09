@@ -279,6 +279,12 @@ test("backlog.md ausente reprova (nao SKIP silencioso)", (dir) => {
   rmSync(f(dir, ".agent/context/backlog.md"));
 }, { code: 1, includes: ["nao encontrado ou vazio — impossivel validar o backlog"] });
 
+// Um so predicado de vazio (#477, `ehBacklogVazio`): so com espacos, a mesma linha do ausente, e nao os avisos dos
+// cabecalhos em falta que o calculo daria sobre um texto sem nada.
+test("backlog.md so com espacos reprova como vazio (e nao como cabecalhos em falta)", (dir) => {
+  writeF(dir, ".agent/context/backlog.md", "\n  \n\t\n");
+}, { code: 1, includes: ["nao encontrado ou vazio — impossivel validar o backlog"], excludes: ["nao encontrei o cabecalho"] });
+
 test("backlog-archive.md ausente avisa (layout de dois ficheiros incompleto)", (dir) => {
   rmSync(f(dir, ".agent/context/backlog-archive.md"));
 }, { code: 1, includes: ["backlog-archive.md nao encontrado"] });

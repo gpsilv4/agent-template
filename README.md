@@ -211,7 +211,7 @@ not to* line, so every agent sees it.
 │   └── upgrade.md              <- /upgrade — Pull template improvements into a derived project
 └── scripts/                    <- 12 entry points at the root: what you INVOKE
     ├── check-doc-versions.mjs  <- Doc guards: entry point + doc-parity guards
-    ├── check-backlog.mjs       <- Backlog counters/progress + duplicate-ID checker
+    ├── check-backlog.mjs       <- Backlog counters/progress, duplicate IDs and the format rules; --corrigir (#431, #445)
     ├── backlog-board.mjs       <- A local, read-only HTML board of the backlog; --vigiar (#446)
     ├── check-bundle-sizes.mjs  <- Bundle size checker (Next.js) — logic only
     ├── check-test-surface.mjs  <- Was the test surface weakened since a baseline? (TP4)
@@ -461,8 +461,8 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Secret Scan | `gitleaks` — scans the commits of each PR and of each push for committed secrets (runs always, even on the bare template; #372) |
 | Doc Guards | `node .agent/scripts/check-doc-versions.mjs` — rules byte-budget, CLAUDE/GEMINI parity, workflow↔wrapper parity, CHANGELOG/version sync, banned terms — **runs on every PR and push** (†) in the `guard-tests` job |
 | Dead code | `node .agent/scripts/check-codigo-morto.mjs` — flags imports nobody uses, so dead code does not travel to derived projects — **runs on every PR and push** (†) in the `guard-tests` job |
-| Backlog | `node .agent/scripts/check-backlog.mjs` — validates counters/progress bar, detects duplicate IDs — **runs on every PR and push** (†) in the `guard-tests` job |
-| Backlog board | `node .agent/scripts/backlog-board.mjs [--vigiar]` — writes `.agent/backlog-board.html`, a local read-only view (blocks, cards, filters, the closed items); refuses when that file or its `.tmp` is not in `.gitignore` (#446). **Not run in CI**: you run it by hand |
+| Backlog | `node .agent/scripts/check-backlog.mjs [--corrigir]` — validates counters/progress bar, detects duplicate IDs and closed items left in the active file, and checks the format (each block's `Ordem`, "Depende de", struck-out rows, Pendentes sem Sprint, the Historico by column name) (#445); `--corrigir` rewrites only the derived counters, and nothing when another warning is present (#431) — **runs on every PR and push** (†) in the `guard-tests` job, always without `--corrigir` |
+| Backlog board | `node .agent/scripts/backlog-board.mjs [--vigiar]` — writes `.agent/backlog-board.html`, a local read-only view (blocks, cards, filters, the closed items); refuses when that file or its `.tmp` is not in `.gitignore` (#446), and `--vigiar` checks it again before each write (#477); exits 1 when the backlog cannot be read or is empty, or the board cannot be written, with the reason on stderr (#477). **Not run in CI**: you run it by hand |
 | Sweep plan | the `Plano da varredura` step: runs the BASE commit's `lib/plano-ci.mjs` on the PR's diff and writes `aplica=true\|false` for the `sweep` job's `if:` — first step of the `guard-tests` job, PR only (#347) |
 | Commit messages | `.githooks/commit-msg` over every commit message in the range, and over the PR title in a PR (Conventional Commits prefix, no AI attribution) — **runs on every PR and push** (†) in the `guard-tests` job |
 | Test surface | `node .agent/scripts/check-test-surface.mjs` against the PR's base — fails if the test surface shrank or a weakening mark appeared (no way out: fix the code, not the test); a change to a workflow's trigger or machinery steps, a new step before the suites that is not read-only (#362), or a step that skips on a literal `case` variable (#353) passes only with a `Test-Surface:` trailer in the PR's last commit that touches it — PR only, in the `guard-tests` job |

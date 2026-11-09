@@ -284,7 +284,9 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
   // A `chave` separa o que o browser guarda por projeto: duas vistas abertas do disco partilham o `localStorage`.
   const json = jsonSeguro({ cartoes: dados, geradaEm: agora.getTime(), vigiar, erro: Boolean(erro), batida, chave });
   const { script, hash } = scriptDaPagina([passaFiltro.toString(), vistaParou.toString(), comparaCelulas.toString(), JS_CORPO]);
-  const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'`;
+  // O `default-src` nao cobre o `base-uri` nem o `form-action` (#477): um `<base>` ou um `<form>` injetados mudavam os
+  // links ou mandavam dados para fora.
+  const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'`;
   // O recarregar e do JS (so com o `--vigiar`, e nao com o foco na pesquisa): um `meta refresh` perdia o que se escreve.
   const faixa = erro ? faixaDeErro(erro) : "";
   // O que o guarda acusa a vista nao esconde (`TP2`): um heading renomeado dava "Fechados (0)" e um quadro limpo.

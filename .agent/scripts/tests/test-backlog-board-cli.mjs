@@ -158,7 +158,9 @@ await caso("um backlog VAZIO e um erro de leitura (#471): a faixa diz-o, e nao '
     const r = corre(dir);
     const v = vistaDe(dir);
     return [
-      ...espera(r.status === 0 && v.includes("esta vazio — impossivel validar o backlog"), `${r.status}: ${v.slice(0, 200)}`),
+      // Sem o --vigiar, sai 1 e diz o motivo no stderr (#477): antes saia 0, e quem o corria de um script nao sabia.
+      ...espera(r.status === 1 && r.stderr.includes("backlog-board: nao consegui ler o backlog (.agent/context/backlog.md esta vazio"), `${r.status}: ${r.stderr}`),
+      ...espera(v.includes("esta vazio — impossivel validar o backlog"), v.slice(0, 200)),
       // A vista anterior (de uma fixture limpa) nao tinha a faixa de avisos; gerada do texto vazio, teria "N aviso(s)".
       ...espera(!v.includes("O check-backlog tem"), "a contagem de avisos de um backlog vazio"),
       ...espera((v.match(/class="erro"/g) ?? []).length === 1, "a faixa"),
@@ -176,10 +178,27 @@ await caso("sem uma vista anterior, a pagina e so o erro", async () => {
     const r = corre(dir);
     const v = vistaDe(dir);
     return [
-      ...espera(r.status === 0, `saiu ${r.status}`),
+      ...espera(r.status === 1 && /backlog-board: nao consegui ler o backlog \(.*EISDIR/.test(r.stderr), `saiu ${r.status}: ${r.stderr}`),
+      ...espera(!r.stdout.includes("abrir no browser"), "disse 'abrir no browser' de uma vista que falhou"),
       ...espera(v.includes("nao consegui ler o backlog") && !v.includes("quadro"), "a pagina"),
       // O charset (a mensagem pode ter acentos); e, gerada uma vez, sem refresh (o caso do --vigiar esta mais abaixo).
       ...espera(v.includes('<meta charset="utf-8">') && !v.includes("http-equiv"), `o esqueleto: ${v.slice(0, 160)}`),
+    ];
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+await caso("uma vista que nao se escreve sai 1, com o motivo no stderr, e nao diz 'abrir no browser' (#477)", async () => {
+  const dir = sandbox();
+  try {
+    // O temporario como PASTA: o `writeFileSync` da EISDIR (tambem como root). A propria vista como pasta nao servia:
+    // a leitura da vista anterior rebentava antes, fora do caminho da escrita.
+    mkdirSync(join(dir, `${SAIDA}.tmp`), { recursive: true });
+    const r = corre(dir);
+    return [
+      ...espera(r.status === 1 && r.stderr.includes("backlog-board: nao consegui escrever a vista"), `${r.status}: ${r.stderr}`),
+      ...espera(!r.stdout.includes("abrir no browser"), r.stdout),
     ];
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -282,6 +301,41 @@ await caso("a batida volta a gerar sem gravacoes (para a hora); com --batida=0, 
     () => {},
     200
   ));
+await caso("com o --vigiar e o backlog estragado, o processo vive e o stderr diz o motivo (#477)", async () =>
+  comVigia(
+    async (_dir, v) => [
+      ...espera(v.p.exitCode === null, `saiu ${v.p.exitCode}`),
+      ...espera(v.saida.includes("backlog-board: nao consegui ler o backlog"), `sem o motivo: ${v.saida}`),
+    ],
+    (dir) => writeFileSync(ctxDe(dir, "backlog.md"), "  \n")
+  ));
+await caso("ao sair por SIGINT com o backlog estragado, sai 0 (o sinal e o fim pedido, nao uma falha) (#477)", async () =>
+  comVigia(
+    async (_dir, v) => {
+      v.p.kill("SIGINT");
+      await ate(() => v.p.exitCode !== null, 10000);
+      return espera(v.p.exitCode === 0, `saiu ${v.p.exitCode} (${v.p.signalCode})`);
+    },
+    (dir) => writeFileSync(ctxDe(dir, "backlog.md"), "  \n")
+  ));
+await caso("com o --vigiar, a linha do .gitignore que sai e apanhada antes da escrita: sai 2 e nao escreve (#477)", async () =>
+  comVigia(async (dir, v) => {
+    const antes = vistaDe(dir);
+    writeFileSync(join(dir, ".gitignore"), `${SAIDA}.tmp\n`);
+    // Uma gravacao no backlog que mudava a vista (uma linha nova no fim): se a escrita acontecesse, a vista mudava.
+    const fim = Date.now() + PRAZO;
+    while (v.p.exitCode === null && Date.now() < fim) {
+      writeFileSync(ctxDe(dir, "backlog.md"), `${ACTIVE_OK}\n`);
+      await ate(() => v.p.exitCode !== null, ESPERA * 20);
+    }
+    return [
+      ...espera(v.p.exitCode === 2, `saiu ${v.p.exitCode}: ${v.saida}`),
+      ...espera(v.saida.includes(`${SAIDA} nao esta no .gitignore`) && v.saida.includes("parei sem escrever"), v.saida),
+      ...espera(vistaDe(dir) === antes, "escreveu a vista depois de a linha sair"),
+    ];
+  }));
+// O controlo do caso acima e o "gravar no sitio volta a gerar": com a linha, a mesma gravacao escreve.
+
 // Os dois sinais que o issue nomeia: o Ctrl+C (SIGINT) e o de quem fecha o terminal ou o processo (SIGTERM).
 for (const sinal of ["SIGTERM", "SIGINT"]) {
   await caso(`ao sair por ${sinal}, a pagina final ja nao recarrega ("gerada uma vez", e o JSON sem o --vigiar)`, async () =>

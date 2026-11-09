@@ -620,3 +620,11 @@ dados do JS vao num JSON com o `<` escapado, e uma CSP so deixa correr o script 
 antigo), volta a gerar de 30 em 30 s para a hora (o `--batida`), e a pagina diz "o --vigiar parou" passadas tres batidas (90 s por omissao). Recusa num repo git
 em que a vista nao esta no `.gitignore`: um `git add -A` publicava o backlog. Fica fora do `/upgrade` parcial.
 
+**Depois da auditoria da v0.63.1 (#477).** O `--vigiar` volta a confirmar o `.gitignore` antes de cada escrita: vive
+horas, e a linha pode sair entretanto (sai 2, sem escrever). Gerada uma vez, um backlog que nao se le ou vazio sai 1
+com o motivo no stderr — saia 0, e um script ou um hook nao sabia que a vista era a de ontem; com o `--vigiar` o
+processo continua (diz o motivo), e ao sair por um sinal sai 0 (salvo a recusa do `.gitignore`, que sai 2). Uma
+escrita falhada tambem sai 1. O "vazio" e o do `check-backlog` (`ehBacklogVazio`, um
+so predicado). A CSP diz `base-uri` e `form-action`, que o `default-src` nao cobre; e o texto da faixa de erro e da
+cor do fundo do tema (o `#fff` sobre o vermelho do tema escuro dava 2,5:1).
+

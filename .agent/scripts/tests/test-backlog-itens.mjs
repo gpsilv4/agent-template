@@ -407,6 +407,23 @@ caso("ehSprint: um titulo de Sprint com um numero, um emoji ou enfase antes; e a
   ...espera(!["Fala real — depois do Sprint 2", "Sprints Fechados", "Pendentes sem Sprint"].some(ehSprint), "um titulo que nao e Sprint foi reconhecido"),
   ...igual(leBacklog(ATIVO_RICO.replace("## Pendentes sem Sprint", "### 🚀 Sprint 9\n\n| ID | x |\n|----|---|\n| B9 | y |\n\n## Pendentes sem Sprint"), ARQUIVO_RICO).sprintSemOrdem.map((s) => s.titulo), ["🚀 Sprint 9"], "o Sprint com emoji e sem Ordem"),
 ]);
+// Um ID em minusculas (`b1`) e o mesmo ticket que o `B1`: o `idDe` poe-no em maiusculas, logo o duplicado com o
+// arquivo continua a ser acusado e a contagem nao muda (#477, achado da auditoria pre-tag: o comportamento, preso).
+caso("um ID em minusculas e o mesmo ticket: os avisos sao os do ID em maiusculas (#477)", () => {
+  const LINHA = "| B1 | Pendente | um bug | a.mjs | Alta | S | / |";
+  const avisos = (a) => calcula(a, ARQUIVO_RICO, NOMES).avisos.map((x) => x.msg);
+  const minusc = ATIVO_RICO.replace(LINHA, LINHA.replace("B1", "b1"));
+  return [
+    ...espera(ATIVO_RICO.includes(LINHA), "a fixture mudou: a linha do B1 ja nao esta la"),
+    ...igual(avisos(minusc), avisos(ATIVO_RICO), "os avisos com o b1"),
+    // O B1 tambem esta no bloco do Sprint (em maiusculas): a severidade so vem da tabela por tipo, logo prova que a
+    // linha `b1` se juntou ao B1, e nao que o B1 do bloco existe.
+    ...espera(!leBacklog(minusc, ARQUIVO_RICO).tickets.has("b1"), "ficou um ticket b1"),
+    ...igual([leBacklog(minusc, ARQUIVO_RICO).tickets.get("B1")?.colunas?.severidade, leBacklog(minusc, ARQUIVO_RICO).tickets.get("B1")?.estado], ["Alta", "pendente"], "a linha b1 nao se juntou ao B1"),
+    // CONTROLO: outro ID (B8) muda os avisos — a igualdade acima nao e a de dois textos que o calculo nao distingue.
+    ...espera(JSON.stringify(avisos(ATIVO_RICO.replace(LINHA, LINHA.replace("B1", "B8")))) !== JSON.stringify(avisos(ATIVO_RICO)), "o B8 deu os mesmos avisos"),
+  ];
+});
 caso("o placeholder vazio do template nao da linhas", () => {
   const vazio = leBacklog("## 1. Bugs\n\n| ID | Estado | Problema |\n|---|---|---|\n| | | |\n\n### Sprint 1\n\n| Ordem | ID |\n|---|---|\n| | |\n", "");
   return [...espera(vazio.linhasPorTipo.length === 0, `linhas: ${vazio.linhasPorTipo.length}`), ...espera(vazio.blocos[0].linhas.length === 0, "o bloco vazio deu linhas"), ...espera(vazio.tickets.size === 0, "tickets")];

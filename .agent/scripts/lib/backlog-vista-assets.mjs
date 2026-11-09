@@ -110,7 +110,8 @@ summary { cursor: pointer; font-weight: 600; }
 .ordena:hover { color: var(--texto); }
 th[aria-sort="ascending"] .ordena::after { content: " ▲"; } th[aria-sort="descending"] .ordena::after { content: " ▼"; }
 details input { margin: 10px 0; min-height: 34px; padding: 6px 10px; border: 1px solid var(--linha); border-radius: 8px; background: var(--cartao); color: var(--texto); font: inherit; width: min(360px, 100%); }
-.erro { background: var(--bloq); color: #fff; padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
+/* O texto na cor do fundo do tema: o #fff sobre o --bloq escuro dava 2,5:1 (#477; o teste mede os dois temas). */
+.erro { background: var(--bloq); color: var(--fundo); padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; }
 .aviso { border: 1px solid var(--curso); color: var(--curso); padding: 8px 12px; border-radius: 8px; margin: 0 0 12px; }
 @media (max-width: 640px) {
   body { padding: 14px 14px 32px; }
