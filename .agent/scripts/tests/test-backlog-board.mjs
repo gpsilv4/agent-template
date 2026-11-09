@@ -171,8 +171,44 @@ caso("a CSP exata, com o hash do script inline que la esta", () => {
   const html = vista();
   const script = /<script>([^]*?)<\/script>/i.exec(html)?.[1] ?? "";
   const hash = createHash("sha256").update(script, "utf8").digest("base64");
-  const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'`;
-  return espera(html.includes(`<meta http-equiv="Content-Security-Policy" content="${csp}">`), "a CSP nao e a esperada");
+  const csp = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src 'none'; base-uri 'none'; form-action 'none'`;
+  const meta = /<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html)?.[1] ?? "";
+  return [
+    ...espera(meta === csp, `a CSP nao e a esperada: ${meta}`),
+    // O `default-src` nao cobre o `base-uri` nem o `form-action` (#477): cada um dito a parte.
+    ...espera(/(?:^|; )base-uri 'none'(?:;|$)/.test(meta) && /(?:^|; )form-action 'none'(?:;|$)/.test(meta), "sem o base-uri ou o form-action"),
+  ];
+});
+
+/** O contraste WCAG entre duas cores `#rrggbb`. */
+function contraste(a, b) {
+  const lum = (hex) => {
+    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m);
+  return (x + 0.05) / (y + 0.05);
+}
+/** As variaveis de cada tema (o `:root` claro, e o escuro com o claro por baixo) e a cor de uma propriedade de `.erro`. */
+function coresDaFaixa(css) {
+  const vars = (bloco) => Object.fromEntries([...bloco.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{6})/g)].map((m) => [m[1], m[2]]));
+  const claro = vars(/^:root \{([^}]*)\}/m.exec(css)?.[1] ?? "");
+  const escuro = { ...claro, ...vars(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([^}]*)\}/.exec(css)?.[1] ?? "") };
+  const regra = /^\.erro \{([^}]*)\}/m.exec(css)?.[1] ?? "";
+  const valor = (prop, tema) => {
+    const v = new RegExp(`(?:^|;)\\s*${prop}:\\s*([^;]+)`).exec(regra)?.[1]?.trim() ?? "";
+    return /^var\(--([\w-]+)\)$/.exec(v) ? tema[/^var\(--([\w-]+)\)$/.exec(v)[1]] : v;
+  };
+  return [claro, escuro].map((tema) => [valor("color", tema), valor("background", tema)]);
+}
+caso("a faixa de erro le-se nos dois temas: contraste >= 4,5:1 (#477)", () => {
+  const medidas = coresDaFaixa(CSS).map(([cor, fundo]) => (/^#[0-9a-f]{6}$/i.test(cor ?? "") && /^#[0-9a-f]{6}$/i.test(fundo ?? "") ? contraste(cor, fundo) : 0));
+  // CONTROLO: o `#fff` de antes reprova no tema escuro (o medidor ve a diferenca).
+  const antes = coresDaFaixa(CSS.replace(/^(\.erro \{[^}]*color: )var\(--fundo\)/m, "$1#ffffff")).map(([c, f]) => contraste(c, f));
+  return [
+    ...espera(medidas.length === 2 && medidas.every((m) => m >= 4.5), `contraste claro/escuro: ${medidas.map((m) => m.toFixed(2)).join(" / ")}`),
+    ...espera(antes.some((m) => m < 4.5), `o controlo com o #fff passou: ${antes.map((m) => m.toFixed(2)).join(" / ")}`),
+  ];
 });
 
 console.log("\n  O resto\n");

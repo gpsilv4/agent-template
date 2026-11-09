@@ -13,7 +13,12 @@
  *        [--batida=<ms>]  volta a gerar sem eventos, para a hora (30000; 0 desliga)
  *
  * NUNCA SE PUBLICA: o backlog tem detalhes do projeto. Num repo git em que a vista NAO esta no `.gitignore`, recusa —
- * um `git add -A` publicava-a.
+ * um `git add -A` publicava-a. O `--vigiar` volta a confirma-lo antes de cada escrita, e sai 2 sem escrever (#477).
+ *
+ * SAIDA: 0 gerada; 1 o backlog nao se leu (ou esta vazio): o motivo no stderr, e a vista anterior com a faixa de erro;
+ * 1 tambem quando a vista nao se escreveu (o motivo no stderr, e a vista fica como estava); 2 um argumento ou o
+ * `.gitignore`. Com o `--vigiar` o processo vive com o backlog estragado (diz o motivo no stderr) e, ao sair por um
+ * sinal, sai 0 — salvo a recusa do `.gitignore`, que sai 2 (nao escreve a pagina final).
  */
 import { readFileSync, writeFileSync, renameSync, watch, existsSync } from "fs";
 import { spawnSync } from "child_process";
@@ -21,7 +26,7 @@ import { createHash } from "crypto";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { leBacklog } from "./lib/backlog-itens.mjs";
-import { calcula } from "./lib/backlog-calculo.mjs";
+import { calcula, ehBacklogVazio } from "./lib/backlog-calculo.mjs";
 import { geraVista, faixaDeErro, FAIXA_RE } from "./lib/backlog-vista.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -62,25 +67,31 @@ if (!VIGIAR && args.some((a) => /^--(espera|batida)=/.test(a))) fatal("o --esper
 // `git check-ignore -q`: 0 ignorado; 1 nao ignorado; 128 um erro (so gera se estiver mesmo fora de um repo). Sem git, gera.
 const LINHAS = [SAIDA_REL, `${SAIDA_REL}.tmp`];
 const dentroDeRepo = () => spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: ROOT, encoding: "utf8" }).stdout.trim() === "true";
-for (const rel of LINHAS) {
-  const ig = spawnSync("git", ["check-ignore", "-q", rel], { cwd: ROOT, encoding: "utf8" });
-  if (ig.error) {
-    console.error("backlog-board: sem git, nao confirmei que a vista fica fora do repo");
-    break;
-  }
-  if (ig.status === 0) continue;
-  if (ig.status === 128 && !dentroDeRepo()) break;
-  if (ig.status !== 1) {
+/** `{ erro }` quando a vista se publicava; `{ aviso }` quando nao deu para confirmar; `{}` quando esta fora do repo. */
+function foraDoRepo() {
+  for (const rel of LINHAS) {
+    const ig = spawnSync("git", ["check-ignore", "-q", rel], { cwd: ROOT, encoding: "utf8" });
+    if (ig.error) return { aviso: "sem git, nao confirmei que a vista fica fora do repo" };
+    if (ig.status === 0) continue;
+    if (ig.status === 128 && !dentroDeRepo()) return {};
     // Um estado que o git nao documenta para o check-ignore: avisa, e nao recusa (nao ha como o provocar num teste).
-    console.error(`backlog-board: o \`git check-ignore\` saiu ${ig.status}; nao confirmei que a vista fica fora do repo`);
-    break;
+    if (ig.status !== 1) return { aviso: `o \`git check-ignore\` saiu ${ig.status}; nao confirmei que a vista fica fora do repo` };
+    const seguido = spawnSync("git", ["ls-files", "--error-unmatch", rel], { cwd: ROOT }).status === 0;
+    return {
+      erro: seguido
+        ? `${rel} esta COMMITADO: tira-o do repo (\`git rm --cached ${rel}\`) — o backlog tem detalhes do projeto`
+        : `${rel} nao esta no .gitignore: acrescenta as linhas \`${LINHAS.join("` e `")}\` — sem elas, um \`git add -A\` publicava o backlog`,
+    };
   }
-  const seguido = spawnSync("git", ["ls-files", "--error-unmatch", rel], { cwd: ROOT }).status === 0;
-  fatal(
-    seguido
-      ? `${rel} esta COMMITADO: tira-o do repo (\`git rm --cached ${rel}\`) — o backlog tem detalhes do projeto`
-      : `${rel} nao esta no .gitignore: acrescenta as linhas \`${LINHAS.join("` e `")}\` — sem elas, um \`git add -A\` publicava o backlog`
-  );
+  return {};
+}
+// Uma so verificacao, antes de CADA escrita (a primeira e a do arranque): o aviso diz-se uma vez, a recusa sai 2.
+let avisado = false;
+function confirmaForaDoRepo() {
+  const r = foraDoRepo();
+  if (r.erro) fatal(`${r.erro} (parei sem escrever)`);
+  if (r.aviso && !avisado) console.error(`backlog-board: ${r.aviso}`);
+  avisado ||= Boolean(r.aviso);
 }
 
 /** Escreve a vista de forma atomica (um temporario e um rename): a pagina a recarregar nunca le um ficheiro a meio. */
@@ -110,15 +121,24 @@ function vistaDeErro(motivo, vigiar) {
   return base.replace(/<body>\n?/, (b) => `${b}${faixa}`);
 }
 
-/** Gera a vista; com um backlog que nao se le (ou vazio), a anterior fica, com uma faixa de erro. */
+/**
+ * Gera a vista; com um backlog que nao se le (ou vazio), a anterior fica, com uma faixa de erro. Devolve o motivo de uma
+ * falha (ler ou escrever), ou `null`: sem o `--vigiar`, quem chama sai 1 com ele (#477; antes saia 0, e um script ou um
+ * hook nao sabia que a vista era a de ontem).
+ */
 function gera(vigiar) {
+  // A vista so se escreve fora do repo, e o `--vigiar` vive horas: a linha do `.gitignore` pode sair entretanto (#477).
+  confirmaForaDoRepo();
   let html;
+  let motivo = null;
   try {
     const active = readFileSync(ACTIVE, "utf8");
     // Vazio: o `check-backlog` da um so aviso ("nao encontrado ou vazio") e para; a vista dizia "N avisos" (os
-    // cabecalhos, o Resumo...), um numero que ele nunca imprime (#471). E um erro de leitura como os outros.
-    if (!active.trim()) {
-      html = vistaDeErro(".agent/context/backlog.md esta vazio — impossivel validar o backlog", vigiar);
+    // cabecalhos, o Resumo...), um numero que ele nunca imprime (#471). E um erro de leitura como os outros, e o
+    // predicado e o do verificador (`ehBacklogVazio`, #477).
+    if (ehBacklogVazio(active)) {
+      motivo = ".agent/context/backlog.md esta vazio — impossivel validar o backlog";
+      html = vistaDeErro(motivo, vigiar);
     } else {
       const archive = existsSync(ARCHIVE) ? readFileSync(ARCHIVE, "utf8") : null;
       const nomes = { ACTIVE: ".agent/context/backlog.md", ARCHIVE: ".agent/context/backlog-archive.md" };
@@ -126,21 +146,27 @@ function gera(vigiar) {
       ultimaBoa = html;
     }
   } catch (err) {
-    html = vistaDeErro(err instanceof Error ? err.message : String(err), vigiar);
+    motivo = err instanceof Error ? err.message : String(err);
+    html = vistaDeErro(motivo, vigiar);
   }
+  if (motivo) console.error(`backlog-board: nao consegui ler o backlog (${motivo}); a vista ficou com a faixa de erro`);
   try {
     escreve(html);
   } catch (err) {
     // Uma escrita falhada (EACCES, disco cheio) nao mata o vigia: diz-se, e a proxima gravacao tenta de novo.
-    console.error(`backlog-board: nao consegui escrever a vista (${err instanceof Error ? err.message : String(err)})`);
-    return;
+    const msg = `nao consegui escrever a vista (${err instanceof Error ? err.message : String(err)})`;
+    console.error(`backlog-board: ${msg}`);
+    return msg;
   }
   geradas++;
   console.log(`gerada ${geradas}`);
+  return motivo;
 }
 
-gera(VIGIAR);
+const falhou = gera(VIGIAR);
 if (!VIGIAR) {
+  // O motivo ja saiu no stderr; o codigo diz-o a quem corre o CLI de um script.
+  if (falhou) process.exit(1);
   console.log(`vista: ${SAIDA_REL} (abrir no browser)`);
 } else {
   // Vigia a PASTA, e nao os ficheiros: um editor que grava por copia e rename deixava o watch no inode antigo, e um

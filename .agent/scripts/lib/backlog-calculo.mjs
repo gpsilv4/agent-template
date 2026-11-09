@@ -13,6 +13,14 @@
 import { leBacklog, norm, semAcentos, idDe, tableRows, section, SECTIONS, ID_LIKE, OPEN_STATES, CLOSED_STATES } from "./backlog-itens.mjs";
 import { regrasDoBacklog } from "./backlog-regras.mjs";
 
+/**
+ * Um backlog que nao existe (`null`) ou so com espacos: nao ha nada a validar, e e um erro (#477). Um so predicado para
+ * o `check-backlog` e a vista: com dois (`!active` e `!active.trim()`), um backlog so com espacos dava ao verificador
+ * oito avisos de cabecalhos em falta e a vista "esta vazio".
+ * @param {string | null | undefined} texto
+ */
+export const ehBacklogVazio = (texto) => !texto?.trim();
+
 // Vocabulario da barra, explicito. Acrescentar um glifo aqui e a forma suportada de o adotar.
 export const BLOCO_VAZIO = new Set(["_", " ", "\t", "-", "\u00b7", "\u2591", "\u2b1c", "\u25cb", "\u25fb", "\u25ab"]);
 // `\u2b1b` (⬛) e o PAR de `\u2b1c` (⬜), que ja estava nos vazios. Sem ele, quem usasse o

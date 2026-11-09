@@ -27,7 +27,7 @@
  */
 
 import { readFileSync, writeFileSync, renameSync, rmSync, lstatSync, statSync, chmodSync } from "fs";
-import { calcula } from "./lib/backlog-calculo.mjs";
+import { calcula, ehBacklogVazio } from "./lib/backlog-calculo.mjs";
 import { corrige } from "./lib/backlog-corrige.mjs";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
@@ -63,7 +63,7 @@ const CORRIGIR = ARGS.includes("--corrigir");
 console.log("\n=== Backlog Check ===\n");
 
 const active = read(ACTIVE);
-if (!active) {
+if (ehBacklogVazio(active)) {
   // NAO sair 0: este ficheiro e importado pelas rules e a sua ausencia impede a
   // verificacao por completo. Sair 0 aqui transformava o gate em decoracao.
   console.log(`  WARN  ${ACTIVE} nao encontrado ou vazio — impossivel validar o backlog.\n`);
