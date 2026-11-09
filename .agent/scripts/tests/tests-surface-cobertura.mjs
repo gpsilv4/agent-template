@@ -152,7 +152,7 @@ export function registar() {
       // com a regex da TABELA (e nao uma copia), sobre o texto sem as linhas de comentario: uma fixture numa string do
       // ficheiro real daria um vermelho falso aqui (na direccao segura), e e por isso que o caso o diz.
       const regex = new RegExp(CONTAGENS.find((c) => c.msg === MSG).re.source, "g");
-      for (const [suite, chamada] of [["test-commit-msg.mjs", "casosDaProsa(test);"], ["test-mutation-sweep.mjs", "casosDoList(test);"], ["test-mutation-sweep.mjs", "casosDoDiff(test);"], ["test-ci-exemplo.mjs", "casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });"], ["test-ci-exemplo.mjs", 'casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });']]) {
+      for (const [suite, chamada] of [["test-commit-msg.mjs", "casosDaProsa(test);"], ["test-mutation-sweep.mjs", "casosDoList(test);"], ["test-mutation-sweep.mjs", "casosDoDiff(test);"], ["test-ci-exemplo.mjs", "casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });"], ["test-ci-exemplo.mjs", 'casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml"), noTemplate });']]) {
         const real = readFileSync(join(ROOT, ".agent/scripts/tests", suite), "utf8");
         const n = (real.split("\n").filter((l) => !/^\s*(?:\/\/|\*|\/\*)/.test(l)).join("\n").match(regex) || []).length;
         test(`cobertura (modulos de casos): apagar \`${chamada}\` do ${suite} real avisa`, (dir) =>

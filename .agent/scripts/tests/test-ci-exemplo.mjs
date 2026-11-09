@@ -15,7 +15,8 @@
  *      ativa; pelo committer, a VARIANTE squash), com a tabela de verdade de cada uma; o ` #` que corta um `if:`
  *      numa linha simples; a descricao do PR (so na variante) e o `(deps` no titulo, com o shell corrido;
  *   5. o `cache-sem-maquinaria.yml`, o par que grava a cache sem o push do merge (`harness/casos-salto-cache.mjs`);
- *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template (`harness/casos-dependabot-exemplo.mjs`);
+ *   6. o `dependabot-privado.yml` (#440): mensal e sem rebase, e o resto igual ao do template — so no template; num
+ *      derivado essa comparacao e SKIP, #485 (`harness/casos-dependabot-exemplo.mjs`);
  *   7. os dois blocos MODO COMPLETO (#472, #477): (a) os passos so-node no job `ci`; (b) o job `guard-tests`, que so
  *      corre quando a maquinaria muda e e lido pelos leitores reais da 2b (`harness/casos-modo-completo.mjs`).
  * Cada propriedade tem o seu controlo: o exemplo mutado de UMA forma tem de dar o problema dessa forma. Os leitores
@@ -239,9 +240,11 @@ function correScope(corpo, dir, raiz, evento, path = process.env.PATH) {
 
 // --- Os casos ---
 
+// Uma vez (a leitura independente do #485): tres sitios faziam a mesma pergunta.
+const noTemplate = !ehDerivado((p) => leOuNull(join(ROOT, p)));
 const texto = ler(EXEMPLO);
 if (texto === null) {
-  if (ehDerivado((p) => leOuNull(join(ROOT, p)))) {
+  if (!noTemplate) {
     console.log(`  SKIP  ${EXEMPLO} nao existe neste projeto (derivado): o exemplo e do template.`);
     process.exit(0);
   }
@@ -464,8 +467,8 @@ for (const [nome, base, muda, tit, quer] of CASOS_DEPS) {
 casosDoCache(caso, { texto: ler(CACHE), ciTexto: texto });
 
 // --- O `dependabot.yml` de um privado (#440; os casos estao no `harness/casos-dependabot-exemplo.mjs`) ---
-casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml") });
-casosDoModoCompleto(caso, { texto, ciTemplate: ler(".github/workflows/ci.yml"), noTemplate: !ehDerivado((p) => leOuNull(join(ROOT, p))), problemas, correScope, repoDePR, comRepo });
+casosDoDependabot(caso, { exemplo: ler("src/docs/exemplos/dependabot-privado.yml"), template: ler(".github/dependabot.yml"), noTemplate });
+casosDoModoCompleto(caso, { texto, ciTemplate: ler(".github/workflows/ci.yml"), noTemplate, problemas, correScope, repoDePR, comRepo });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);

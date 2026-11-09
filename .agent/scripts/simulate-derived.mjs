@@ -17,7 +17,9 @@
  * O QUE FAZ, a espelhar a Fase 2 do `BOOTSTRAP.md`:
  *   1. copia o repo sem `.git` nem o que nao pertence a um clone novo;
  *   2. substitui os placeholders (`{{ ... }}`);
- *   3. cria as rules que o bootstrap GERA (sao o discriminador de "bootstrap concluido");
+ *   3. cria as rules que o bootstrap GERA (sao o discriminador de "bootstrap concluido"), e da ao derivado o Dependabot
+ *      de um repo PRIVADO: o `.github/dependabot.yml` passa a ser o exemplo mensal, como a 2.x manda (#485). O `ci.yml`
+ *      fica o do template: o CI de um job dos privados (`ci-sem-maquinaria.yml`) nao e simulado aqui (#487);
  *   4. corre os verificadores e as suites, e reprova se algum sair != 0.
  *
  * A lista de extensoes do passo 2 nao precisa de estar perfeita para o resultado ser de
@@ -327,6 +329,24 @@ queConfigurou({ dir, ok, fatal });
 await comFicheirosGrandes({ dir, ok, fatal });
 comoUmDerivadoReal({ dir, ok, fatal });
 comOptOuts({ dir, ok, fatal });
+
+// --- 3e'. o Dependabot de um derivado PRIVADO: o mensal (#485) ------------------------
+// O `BOOTSTRAP.md` manda um repo privado trocar o `.github/dependabot.yml` pelo exemplo mensal. A simulacao ficava com o
+// semanal (um derivado publico), e por isso nao viu que o `test-ci-exemplo` reprovava em TODO o derivado privado — os
+// derivados reais conhecidos sao privados, e foi um deles que o encontrou, no `/upgrade`. Simula-se o caso que custa.
+// SO o Dependabot: o `ci.yml` de um privado (o pacote de um job, com os blocos MODO COMPLETO) fica por simular (#487).
+{
+  const manda = (leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) ?? "").includes("src/docs/exemplos/dependabot-privado.yml");
+  const exemplo = leOuNull(join(dir, "src/docs/exemplos/dependabot-privado.yml"));
+  // O BOOTSTRAP manda e o exemplo falta: parar, em vez de seguir calado como um derivado publico.
+  if (manda && exemplo === null) fatal("o BOOTSTRAP manda trocar o dependabot.yml pelo src/docs/exemplos/dependabot-privado.yml, e ele nao existe");
+  if (manda) {
+    writeFileSync(join(dir, ".github/dependabot.yml"), exemplo);
+    ok("um derivado privado: o .github/dependabot.yml e o exemplo mensal (BOOTSTRAP, #440)");
+  } else {
+    ok("o BOOTSTRAP ja nao manda trocar o dependabot.yml num privado — fica o do template");
+  }
+}
 
 // --- 3f. apagar o BOOTSTRAP.md, que e o ULTIMO passo da checklist ------------------
 // O `ehDerivado()` tem dois sinais: o marcador presente **ou** este ficheiro ausente. Desde o

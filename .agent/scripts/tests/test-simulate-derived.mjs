@@ -241,6 +241,17 @@ test("derivado maduro: sem o ficheiro do template, o proximo e o MESMO", {}, {
 });
 
 // --- O derivado que CONFIGUROU: cada recusa recusa mesmo ----------------------
+// Um derivado PRIVADO (#485): o BOOTSTRAP manda trocar o `dependabot.yml` pelo exemplo mensal, e a simulacao faz-o.
+const MANDA_PRIVADO = "\nNum repo privado, substitui-lo pelo `src/docs/exemplos/dependabot-privado.yml`.\n";
+test("o BOOTSTRAP manda o Dependabot mensal e o exemplo falta: REPROVA, em vez de seguir como um derivado publico", { bootstrapExtra: MANDA_PRIVADO }, {
+  code: 1,
+  includes: ["o BOOTSTRAP manda trocar o dependabot.yml", "e ele nao existe"],
+});
+test("CONTROLO: com o exemplo, a copia passa a ter o Dependabot mensal", { bootstrapExtra: MANDA_PRIVADO, extra: { "src/docs/exemplos/dependabot-privado.yml": "mensal\n" } }, {
+  code: 0,
+  mostra: ["um derivado privado: o .github/dependabot.yml e o exemplo mensal"],
+});
+
 // A varredura de mutacao apontou os quatro `fatal()` dos blocos 3d/3e como NAO COBERTOS: eu
 // tinha escrito as defesas e nenhum teste notava se deixassem de disparar. Um patch que nao
 // aplica em silencio deixa a simulacao a medir o template por estrear — exactamente o que
