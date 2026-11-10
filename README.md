@@ -300,6 +300,7 @@ not to* line, so every agent sees it.
     │   ├── modo-upgrade.mjs    <- Full or partial /upgrade: the mark decides, the guard-tests job proposes (#429)
     │   ├── medida-upgrade-ci.mjs  <- ...and its notes on the SHAPE of ci.yml (each optional CI change, #347)
     │   ├── fronteira-upgrade.mjs  <- The boundary an upgrade changes, staged for the USER to copy (#304)
+    │   ├── origem-upgrade.mjs     <- The template of an upgrade is a clean clone at a tag, no downgrade (#490)
     │   ├── projeto-de-ontem.mjs   <- The consumer fixture the template-side simulation builds
     │   ├── tmp-limpo.mjs      <- tmpdir copies don't outlive their owner (swept at startup)
     │   ├── surface-patterns.mjs   <- Pattern tables: what can't drop, what can't appear

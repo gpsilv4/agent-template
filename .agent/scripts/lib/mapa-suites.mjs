@@ -102,7 +102,7 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/medida-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-ci-exemplo.mjs")], only: "upgrade" },
   { re: /^\.agent\/scripts\/lib\/(passo-paralelo|surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs")] },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade|origem-upgrade)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },

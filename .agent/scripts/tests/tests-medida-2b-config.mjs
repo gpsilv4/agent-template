@@ -353,12 +353,12 @@ export function registar() {
   test("uma edicao por commitar no projeto nao vira um cp, e diz-se (#304)", () =>
     exige(contraProjeto({ hoje: { ".claude/hooks/outro.mjs": "// novo\n" }, sujoNoProjeto: { [H]: "// edicao por commitar\n" } }),
       { codigo: 0, inclui: ["este projeto tem alteracoes por commitar na fronteira"], exclui: [`'${H}'   # muda`] }));
-  // O template sujo na fronteira: o staging leva-o, e a marca grava so o commit.
-  test("o template com alteracoes por commitar na fronteira diz-se (#304)", () =>
+  // O template sujo RECUSA, antes da copia e da bateria (#490): a nota do #304 nao impediu o R10-3.
+  test("o template com alteracoes por commitar recusa antes de medir (#490)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { ".claude/hooks/sujo.mjs": "// sujo\n" } }),
-      { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
-  test("o template limpo na fronteira nao o diz (#304)", () =>
-    exige(contraProjeto({ hoje: { [H]: "// novo\n" } }), { codigo: 0, exclui: ["o template tem alteracoes por commitar"] }));
+      { codigo: 1, inclui: ["tem 1 alteracao(oes) por commitar (.claude/hooks/sujo.mjs)", "um upgrade le um clone limpo numa tag"], exclui: ["copia deste projeto (HEAD)", "estado actual", ", limpo"] }));
+  test("o template limpo numa tag mede, e di-lo (#490)", () =>
+    exige(contraProjeto({ hoje: { [H]: "// novo\n" } }), { codigo: 0, inclui: ["template: v2.0.0, limpo", "copia deste projeto (HEAD)", "estado actual"], exclui: ["por commitar ("] }));
   // A fachada do nome: um ficheiro do staging com "EsteProjeto" diz-se (funcao pura).
   test("comFachada apanha a fachada do nome no staging (#304)", () => {
     const st = mkdtempSync(join(tmpdir(), "sim-up-fachada-"));
@@ -422,9 +422,10 @@ export function registar() {
     });
     return exige(r, { codigo: 0, inclui: ["este projeto tem alteracoes por commitar na fronteira"] });
   });
-  test("um agente por commitar no TEMPLATE tambem e avisado (#304)", () =>
+  // Um ficheiro NAO SEGUIDO tambem conta (#490): o `--untracked-files=all`.
+  test("um agente novo nao seguido no TEMPLATE tambem recusa (#490)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { [AG]: "---\nname: leitor\ntools: Read\n---\n" } }),
-      { codigo: 0, inclui: ["o template tem alteracoes por commitar na fronteira"] }));
+      { codigo: 1, inclui: [`alteracao(oes) por commitar (${AG})`], exclui: ["estado actual"] }));
   // As suites em PARALELO (#337): o `ci.yml` corre-as atraves de um despachante, uma por linha. A 2b le cada
   // suite, e NAO o despachante — sozinho, sem argumentos, so sabe reprovar, e a bateria ficava vermelha.
   test("o despachante das suites em paralelo nao entra na bateria; as suites dele, sim (#337)", () => {

@@ -83,6 +83,19 @@ export function repo({ comTag = null, comMarca = false, semBootstrap = false } =
  *  `sobrepoe` troca modulos de `lib/` DEPOIS da copia (`{ "upgrade-mecanico.mjs": src }`): e
  *  como se injecta um motor avariado, para medir o que o simulador apanha quando o motor erra. */
 export function corre(dir, args = [], sobrepoe = {}, env = undefined) {
+  copiaSimulador(dir, sobrepoe);
+  try {
+    const opts = { cwd: dir, encoding: "utf8", ...(env ? { env: { ...process.env, ...env } } : {}) };
+    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], opts) };
+  } catch (err) {
+    return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
+  }
+}
+
+/** A copia do simulador e da `lib/` real para `dir`, a parte do `corre` (#490): o `contraProjeto`
+ *  commita-a ANTES da tag, para o template ficar limpo numa tag como a 2b exige — e a varredura
+ *  continua a medir a `lib/`, porque o mutante e copiado e commitado antes de correr. */
+export function copiaSimulador(dir, sobrepoe = {}) {
   mkdirSync(join(dir, ".agent", "scripts", "lib"), { recursive: true });
   mkdirSync(join(dir, ".agent", "scripts", "guards"), { recursive: true });
   // A `lib/` INTEIRA, e nao os modulos nomeados um a um. A lista a mao era uma segunda copia
@@ -99,16 +112,10 @@ export function corre(dir, args = [], sobrepoe = {}, env = undefined) {
     writeFileSync(join(dir, para), readFileSync(de, "utf8"));
   }
   for (const [f, src] of Object.entries(sobrepoe)) writeFileSync(join(dir, ".agent/scripts/lib", f), src);
-  try {
-    const opts = { cwd: dir, encoding: "utf8", ...(env ? { env: { ...process.env, ...env } } : {}) };
-    return { code: 0, out: execFileSync(process.execPath, [join(dir, ".agent/scripts/simulate-upgrade.mjs"), ...args], opts) };
-  } catch (err) {
-    return { code: err.status ?? -1, out: (err.stdout ?? "") + (err.stderr ?? "") };
-  }
 }
 
 /**
- * Monta um TEMPLATE sintetico (tagado, com um commit a seguir) e, a partir da tag, um PROJETO
+ * Monta um TEMPLATE sintetico (tag `v1.0.0`, e o "hoje" num commit a seguir com a tag `v2.0.0`, #490) e, a partir da tag, um PROJETO
  * derivado com marca — e corre o modo `--projeto` do simulador, que mede a seccao 2b.
  *
  * O simulador corre do lado do TEMPLATE, apontado ao projeto: a copia que um derivado tem e
@@ -121,7 +128,9 @@ export function corre(dir, args = [], sobrepoe = {}, env = undefined) {
  * @param {string} o.naMarca  linhas a acrescentar a marca por omissao (ex.: `modo: parcial\n`, #429)
  * @param {object} o.ontem   ficheiros do template JA na tag (o projeto herda-os intactos)
  */
-export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, naMarca = "", base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {}, tmp } = {}) {
+// `marca` pode ser uma FUNCAO `({ tpl, sha })` (#490): monta no template o que a marca cita (um commit
+// fora das tags). `tagHoje: null` deixa o "hoje" sem tag; `extra` sao argumentos a mais (o `--keep`).
+export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = undefined, naMarca = "", base = tmpdir(), fronteiraEm, sujoNoTemplate = {}, sujoNoProjeto = {}, tmp, tagHoje = "v2.0.0", extra = [] } = {}) {
   const tpl = registaTmp(mkdtempSync(join(base, "sim-up-tpl-")));
   const proj = registaTmp(mkdtempSync(join(base, "sim-up-proj-")));
   const escreve = (base, ficheiros) => {
@@ -139,6 +148,9 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   git(tpl, ["init", "-q", "-b", "main"]);
   git(tpl, ["config", "user.email", "t@t"]);
   git(tpl, ["config", "user.name", "t"]);
+  // O `.gitignore` GLOBAL de quem corre nao entra (`TP3`): os casos de recusa contam ficheiros nao
+  // seguidos, que um `.gitignore` global (ex.: com a pasta do agente) escondia nessa maquina e so nela.
+  git(tpl, ["config", "core.excludesFile", "/dev/null"]);
   git(tpl, ["add", "-A"]);
   git(tpl, ["commit", "-qm", "ontem"]);
   git(tpl, ["tag", "v1.0.0"]);
@@ -150,7 +162,8 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   escreve(proj, projeto);
   rmSync(join(proj, ".agent/BOOTSTRAP.md"), { force: true });
   if (marca !== null) {
-    writeFileSync(join(proj, ".agent/.template-version"), marca ?? `template: ${tpl}\ncommit: ${sha}\ndata: 2026-01-01\n${naMarca}`);
+    const m = typeof marca === "function" ? marca({ tpl, sha }) : marca;
+    writeFileSync(join(proj, ".agent/.template-version"), m ?? `template: ${tpl}\ncommit: ${sha}\ndata: 2026-01-01\n${naMarca}`);
   }
   git(proj, ["init", "-q", "-b", "main"]);
   git(proj, ["config", "user.email", "t@t"]);
@@ -164,11 +177,16 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   // chegar a medir. Sem ele o `git` abortava o commit vazio, o harness rebentava com "Command
   // failed" e quatro controlos negativos ficavam vermelhos por uma razao que nada tem a ver com
   // o que afirmam. Um erro de fixture lido como um defeito e pior do que nenhum teste.
+  //
+  // O "hoje" fica LIMPO NUMA TAG (#490): e o que a 2b exige do template. A copia do simulador entra
+  // antes do commit (a real esmaga a `lib/` falsa do `templateSintetico`, como sempre).
   escreve(tpl, hoje);
+  copiaSimulador(tpl);
   git(tpl, ["add", "-A"]);
   git(tpl, ["commit", "-q", "--allow-empty", "-m", "hoje"]);
+  if (tagHoje !== null) git(tpl, ["tag", tagHoje]);
 
-  // Alteracoes POR COMMITAR (#304): a fronteira compara com o commit, e diz o que esta por commitar.
+  // Alteracoes POR COMMITAR: no template, a 2b recusa-as (#490); no projeto, a fronteira di-lo (#304).
   escreve(tpl, sujoNoTemplate);
   escreve(proj, sujoNoProjeto);
 
@@ -178,7 +196,7 @@ export function contraProjeto({ ontem = {}, hoje = {}, projeto = {}, marca = und
   // os casos de recusa que apontam para dentro do projeto que so aqui existe (#317).
   const fronteira =
     fronteiraEm === undefined ? registaTmp(mkdtempSync(join(base, "sim-up-fronteira-"))) : typeof fronteiraEm === "function" ? fronteiraEm({ proj, tpl }) : fronteiraEm;
-  const args = [`--projeto=${proj}`, ...(fronteira === null ? [] : [`--fronteira-em=${fronteira}`])];
+  const args = [`--projeto=${proj}`, ...(fronteira === null ? [] : [`--fronteira-em=${fronteira}`]), ...extra];
   // `tmp`: o TMPDIR do simulador, para um teste do staging por omissao o apagar sem tocar no de mais ninguem.
   // Uma FUNCAO recebe `{ proj }`: o TMPDIR dentro do projeto, que so existe a esta altura (#317).
   const t = typeof tmp === "function" ? tmp({ proj }) : tmp;
@@ -214,7 +232,11 @@ export const BASE = {
  *  sairia VAZIA, que se le como "nada saiu" (`TP2`). */
 /** `prepara(dir)`: mexe na copia do consumidor depois de escrita e antes do motor — o que um mapa
  *  `{caminho: conteudo}` nao exprime (um symlink, #290). */
-export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir(), tag = "v1.0.0", prepara = null }) {
+/** `origem` (#490): por omissao o "hoje" e commitado e tagueado `v2.0.0`, e o motor confirma que o
+ *  `root` esta limpo numa tag. `"disco"` deixa-o por commitar e pede ao motor que leia o disco — so
+ *  para os casos que medem o disco ou uma falha do git dentro do motor. `motor` separa as duas metades
+ *  (o "hoje" por commitar, e o motor com `"ref"`): e o controlo de que o `"disco"` e o que deixa medir. */
+export function cenario({ ontem, hoje, consumidor = null, constantes = [], base = tmpdir(), tag = "v1.0.0", prepara = null, origem, motor = origem }) {
   ontem = { ...BASE, ...ontem };
   hoje = { ...BASE, ...hoje };
   if (consumidor) consumidor = { ...BASE, ...consumidor };
@@ -248,6 +270,11 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
       mkdirSync(dirname(join(root, rel)), { recursive: true });
       writeFileSync(join(root, rel), c);
     }
+    if (origem !== "disco") {
+      git(root, ["add", "-A"]);
+      git(root, ["commit", "-q", "--allow-empty", "-m", "hoje"]);
+      git(root, ["tag", "v2.0.0"]);
+    }
 
     for (const [rel, c] of Object.entries(consumidor ?? ontem)) {
       if (c === null) continue;
@@ -271,6 +298,7 @@ export function cenario({ ontem, hoje, consumidor = null, constantes = [], base 
       },
       substituto: "Consumidor",
       constantes,
+      ...(motor === undefined ? {} : { origem: motor }),
     });
     return { dir, root, medido, razoes, ler: (rel) => (existsSync(join(dir, rel)) ? readFileSync(join(dir, rel), "utf8") : null) };
   } catch (err) {

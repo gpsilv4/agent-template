@@ -32,6 +32,7 @@ import { regrasEmFalta } from "./permissoes.mjs";
 import { fronteiraDa2b, validaFronteiraEm, notasDaLigacaoParcial } from "./fronteira-upgrade.mjs";
 import { notasDaFormaDoCi } from "./medida-upgrade-ci.mjs";
 import { modoDoProjeto, mensagemDoModo } from "./modo-upgrade.mjs";
+import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "./origem-upgrade.mjs";
 
 /** A fronteira de permissoes (#301, R7B-1): o que o `settings.json` do template tem e o do projeto nao. O motor nao
  *  toca no `settings.json` (e do projeto), e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
@@ -319,6 +320,9 @@ export async function adapta2bGuard17({ dir, fatal }) {
  */
 export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fatal, fronteiraEm = null }) {
   validaFronteiraEm(fronteiraEm, [raiz, template], fatal);
+  // O $TPL limpo numa tag ANTES de ler o disco dele, e antes da recusa do Modo B (#490): quem le essa
+  // recusa copia a mao do $TPL, e tem de saber ja que ele nao serve.
+  ok(`template: ${confirmaTemplateLimpoNumaTag(template, fatal).tag}, limpo`);
   const refs = versaoDeOrigem(raiz);
   if (refs.length === 0) {
     fatal(
@@ -353,9 +357,10 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   if (ref === undefined) {
     fatal(
       `a marca deste projeto aponta para ${refs.join(" / ")}, que nao existe no template em ${template} — ` +
-        "num clone raso falta `git fetch --unshallow`"
+        "num clone raso falta `git fetch --unshallow`; um commit de um branch fundido por squash nao existe — por a tag de onde saiu em `commit:`"
     );
   }
+  confirmaSemDowngrade(template, ref, fatal);
 
   let erro = null;
   try {

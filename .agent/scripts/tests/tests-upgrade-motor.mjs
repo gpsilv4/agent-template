@@ -397,7 +397,8 @@ export function registar() {
   test('tag ilegivel para o git REPROVA em vez de dizer que nada saiu', () => {
     let c;
     try {
-      c = cenario({ ontem: {}, hoje: {}, tag: 'nao-existe-esta-tag' });
+      // `"disco"` (#490): a guarda da origem recusava a tag antes, por outra razao — e este `fatal` ficava por alcancar.
+      c = cenario({ ontem: {}, hoje: {}, tag: 'nao-existe-esta-tag', origem: 'disco' });
       return ['devia ter reprovado'];
     } catch (err) {
       if (!err.message.startsWith('__fatal__')) return [`rebentou por outra razao: ${err.message}`];

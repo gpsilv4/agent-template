@@ -59,6 +59,14 @@ export const PARES_DOS_SIMULADORES = [
     neutro: "(() => {})(",
   },
   {
+    // A ORIGEM do upgrade (#490): as guardas que o motor e a 2b chamam antes de ler o template. Um
+    // `recusa(` que deixe de disparar deixava passar um template sujo, ou um downgrade, em silencio.
+    alvo: ".agent/scripts/lib/origem-upgrade.mjs",
+    suite: ".agent/scripts/tests/test-simulate-upgrade.mjs",
+    sinal: /(?<![\w.$])(?:fatal|recusa)\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O INSTRUMENTO da seccao 2b, dos dois lados. Cada `fatal()` daqui e uma condicao em que a
     // medicao NAO pode ser feita — e uma medicao que nao acontece tem de o dizer, nunca devolver
     // uma lista vazia que se le como "nada a reportar" (`TP2`). E precisamente por um desses
