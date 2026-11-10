@@ -247,6 +247,9 @@ prescreve.
 
 ## Porque o cabecalho do `anti-patterns.md` nao se traz inteiro
 
+> A linha da tabela, por extenso (condensada no #490 para pagar bytes): os `TPn` sao iguais em todos os projetos, e as
+> citacoes `TPn` copiam-se como estao; o cabecalho customizado integra-se a mao.
+
 A tabela do `/upgrade` dizia, sem ressalva: *"o **cabecalho** e prosa do template e traz-se"*. Uma
 instrucao mecanica e para ser cumprida a letra, e cumprida a letra esta poe um consumidor maduro
 **acima do tecto**.
@@ -930,3 +933,42 @@ continua a funcionar sem os nomes, e um novo sem a lib recusa com a razao — nu
 - **O `simulate-upgrade --projeto` explica e sai != 0** num projeto parcial: um 0 que nao mediu nada era um portao a
   passar sobre nada. Medir de facto o modo parcial e um simulador novo, que so vale a pena com um segundo derivado
   assim.
+
+## Porque o template de um upgrade e um clone limpo numa tag (#490)
+
+- **O que aconteceu.** O motor (`lib/upgrade-mecanico.mjs`) le o lado NOVO do disco do template (`arvoreNoDisco`,
+  `trazerDoHead`), e a §1 e a §4 liam o branch do `$TPL`. Um derivado correu-o com o template num branch de trabalho,
+  com alteracoes por commitar, e recebeu esse trabalho sob uma marca que dizia uma tag (o R10-3). A nota do #304
+  ("o template tem alteracoes por commitar na fronteira") estava la, e nao o impediu: um aviso le-se depois do facto.
+- **A regra.** O `$TPL` e um clone limpo numa tag `v*` (com varias no mesmo commit, a maior estavel: o clone traz
+  todas, e recusar era um beco), e essa tag descende da ref de onde o projeto saiu.
+  O motor e a 2b recusam o resto (`lib/origem-upgrade.mjs`), antes de copiar ou medir. O motor recusa por omissao; so
+  o simulador do proprio template pede `origem: "disco"`, explicito — e o unico que mede trabalho por commitar de
+  proposito. Nao ha variavel para saltar a guarda: um upgrade e para uma release, e uma correcao urgente e uma tag de
+  correcao.
+- **A reversao do #304.** A nota do template sujo saiu da fronteira: com a guarda, um template sujo ja nao chega la. Os
+  seus testes passaram a afirmar a recusa. A nota do PROJETO sujo fica (e outro caso: o `cp` esmaga-lhe trabalho).
+- **Sem recurso ao `versao:` num downgrade.** Um `commit:` que existe no template e nao descende da tag pode ter
+  conteudo posterior a ela (um branch fundido por squash): recusa, com as tags que o contem e a correcao (por na marca
+  a tag de onde o projeto saiu). O `versao:` dessas marcas esta velho (a §4 larga-o desde o #429). Um `commit:` que
+  nao existe continua no caminho de antes (o `versao:`), e a mensagem diz as duas causas: um clone raso ou um squash.
+- **Onde clonar.** Fora do `TMPDIR` (`~/.cache/agent-template/<tag>`), porque a fronteira da 2b recusa um template
+  dentro dele. Com `git clone --branch <tag> <url>`: o `origin` do clone e o URL (a marca grava-o), sem `--shared`
+  (que depende dos objetos do repo de origem, e um `gc` nele parte o clone). Num sandbox que so escreve no `TMPDIR`, a
+  segunda via: clonar la e passar sempre `--fronteira-em` a 2b. A §1 manual nao verifica o downgrade; quem o faz e a 2b.
+- **A §1, o Modo B e a §4 a mao.** A §1 para sem tag com a guarda DENTRO do argumento (`"${T:?...}"`): numa shell
+  interativa, um `: "${T:?}"` sozinho so abortava a sua linha, e o `git log` seguinte corria com o `T` vazio (`SHA..HEAD`,
+  o diff do branch de trabalho). O Modo B corre as duas primeiras linhas da §4 ANTES de copiar (a 2b recusa-se nele, e
+  ninguem mais verificava o clone). A §4 so grava de um clone limpo numa tag. **Assimetria aceite:** a §4 a mao nao ve o
+  que a lib ve (sparse, `skip-worktree`, uma subpasta de outro repo); quem mede e a 2b, que corre antes. Os `exit 1` da
+  §4 fecham uma shell interativa, como ja faziam antes do #490.
+
+### A linha `.github/workflows/*` da tabela, por extenso
+
+Saiu da tabela para pagar os bytes do #490 (o `upgrade.md` tem tecto):
+
+- **A varredura ligada:** o `sweep` e o `guard-gate` vem juntos; o `guard-gate` herda o `name:` do `guard-tests` (o
+  check exigido), e este muda de nome. Desligada, nenhum dos dois.
+- **Passo movido ou substituido:** o antigo sai, senao corre 2x (a 2b ve-o: "Um passo que o template moveu de job").
+- **Nao substituir o CI do projeto:** nos passos que ja tem, as flags novas e o trailer `Test-Surface:`.
+- **Pacote de 1 job** (#477): so as suites.

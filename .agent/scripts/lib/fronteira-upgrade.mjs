@@ -366,7 +366,7 @@ function imprimeFronteira({ raiz, template, ref, fronteiraEm, git, ok, note, fat
     // Um caracter de controlo num caminho partia o `# cp` comentado em duas linhas — a segunda corria.
     const estranho = [raiz, ...(fronteiraEm === null ? [] : [fronteiraEm]), ...fronteira.map(({ rel }) => rel)].find((c) => CONTROLO.test(c));
     if (estranho !== undefined) fatal(`um caminho da fronteira tem caracteres de controlo (${JSON.stringify(estranho)}) — nao gero comandos para ele`);
-    if (fronteira.length && fronteiraEm === null && !foraDeTodas(tmpdir(), [raiz, template])) fatal(`o tmpdir ${tmpdir()}: ${RECUSA_FORA}`);
+    if (fronteira.length && fronteiraEm === null && !foraDeTodas(tmpdir(), [raiz, template])) fatal(`o tmpdir ${tmpdir()}: ${RECUSA_FORA} — com o template no tmpdir (um sandbox), passar --fronteira-em=<pasta vazia fora dos dois>`);
     console.log("\n  --- A FRONTEIRA: passo do UTILIZADOR, fora do agente ---\n");
     if (fronteira.length) {
       const staging = fronteiraEm === null ? mkdtempSync(join(tmpdir(), "agent-template-fronteira-")) : resolve(fronteiraEm);
@@ -386,7 +386,7 @@ function imprimeFronteira({ raiz, template, ref, fronteiraEm, git, ok, note, fat
     }
     for (const n of ligacao) note(n);
     if (fronteira.length && estado(raiz)) note("este projeto tem alteracoes por commitar na fronteira: os cp/rm acima ESMAGAM-nas onde o template tambem mudou — guardar antes (commit ou stash) o que for do projeto; o que ja esta igual ao staging conta como aplicado");
-    if (fronteira.length && estado(template)) note("o template tem alteracoes por commitar na fronteira — o staging leva-as, e a marca da secao 4 grava so o commit");
+    // O template sujo ja nao chega aqui: a 2b recusa-o antes (#490, a reversao da nota do #304).
     console.log("");
   }
   if (!temClaude) ok("este projeto nao tem a camada Claude (nada em .claude/): os hooks e os agentes nao se aplicam");

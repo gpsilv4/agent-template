@@ -57,7 +57,7 @@ export function registar() {
   test("marca a apontar para um commit que o template nao tem -> REPROVA", () =>
     exige(contraProjeto({ marca: "template: x\ncommit: 0000000000000000000000000000000000000000\n" }), {
       codigo: 1,
-      inclui: ["nao existe no template"],
+      inclui: ["nao existe no template", "fundido por squash"],
     }));
 
   // "Use this template" (M6 do #195): o `commit:` e do PROJETO e o template nao o tem, mas o

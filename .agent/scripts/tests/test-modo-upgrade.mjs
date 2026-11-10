@@ -105,17 +105,29 @@ function git(cwd, ...args) {
 }
 const MARCA_ANTIGA = "template: /um/caminho/antigo\ncommit: 1111111\ndata: 2026-01-01\nversao: v0.62.0\nmodo: parcial\nnota: abc1234\n";
 
+/** O template SEM `origin`, num caminho com uma palavra hex E uma versao: o `template:` da marca e esse caminho.
+ *  Como fica um `git clone --branch <tag>` (#490): numa tag, com o HEAD destacado. `estado`: `"depois"` poe o HEAD
+ *  num commit a seguir a tag; `"sujo"` deixa um ficheiro por commitar. */
+function montaTpl(raiz, estado = "tag") {
+  const tpl = join(raiz, "tpl-abc1234def-v9.9.9");
+  mkdirSync(tpl);
+  writeFileSync(join(tpl, "a.md"), "a\n");
+  git(tpl, "init", "-q", "-b", "main");
+  git(tpl, "config", "core.excludesFile", "/dev/null");
+  git(tpl, "add", "-A");
+  git(tpl, "commit", "-q", "-m", "tpl");
+  git(tpl, "tag", "v9.9.9");
+  git(tpl, "switch", "-q", "--detach", "v9.9.9");
+  if (estado === "depois") git(tpl, "commit", "-q", "--allow-empty", "-m", "depois");
+  if (estado === "sujo") writeFileSync(join(tpl, "por-commitar.md"), "x\n");
+  return tpl;
+}
+
 /** Corre o `bloco` do §4 num projeto de fixture e devolve `{ marca, sha, lido }`, ou `{ erro }`. */
-function corre4(bloco, texto = UPGRADE) {
+function corre4(bloco, texto = UPGRADE, estado = "tag") {
   const raiz = mkdtempSync(join(tmpdir(), "modo-upgrade-test-"));
   try {
-    // O template SEM `origin`, num caminho com uma palavra hex E uma versao: o `template:` da marca e esse caminho.
-    const tpl = join(raiz, "tpl-abc1234def-v9.9.9");
-    mkdirSync(tpl);
-    writeFileSync(join(tpl, "a.md"), "a\n");
-    git(tpl, "init", "-q", "-b", "main");
-    git(tpl, "add", "-A");
-    git(tpl, "commit", "-q", "-m", "tpl");
+    const tpl = montaTpl(raiz, estado);
     const sha = git(tpl, "rev-parse", "HEAD");
     const proj = join(raiz, "proj");
     mkdirSync(join(proj, ".agent"), { recursive: true });
@@ -164,6 +176,8 @@ const MUTACOES_4 = [
   { nome: "o `template:` antes do `commit:`", troca: (b) => b.replace(PRINTF_NOVO, `printf 'template: %s\\ncommit: %s\\ndata: %s\\n%s\\n' \\\n  $1 "$SHA" "$(date +%F)" "$M"`), espera: "o §1 leu" },
   { nome: "as linhas mantidas antes do `commit:`", troca: (b) => b.replace(PRINTF_NOVO, `printf '%s\\ncommit: %s\\ntemplate: %s\\ndata: %s\\n' "$M" "$SHA" \\\n  $1 "$(date +%F)"`), espera: "o §1 leu" },
   { nome: "manter so o `modo:`", troca: (b) => b.replace(/^M=\$\(grep -vE '\^\(template\|commit\|data\|versao\):'/m, "M=$(grep -E '^modo:'"), espera: "perdeu `nota: abc1234`" },
+  // O `BR=` de antes do #490: num HEAD destacado (o clone da tag) o `symbolic-ref` falha, e a §4 nao grava nada.
+  { nome: "o `BR=` antigo, num clone da tag", troca: (b) => b.replace(/^T=.*$/m, 'BR=$(git -C "$TPL" symbolic-ref --short HEAD) || { echo "FALHOU"; exit 1; }').replace('"$T^{commit}"', '"$BR^{commit}"'), espera: "o §4 saiu 1" },
   { nome: "manter o `versao:` velho", troca: (b) => b.replace("'^(template|commit|data|versao):'", "'^(template|commit|data):'"), espera: "manteve o `versao:` velho" },
 ];
 caso("controlo §1: o `V=` antigo (a 1.a versao da marca) le a do caminho do template", () => {
@@ -181,6 +195,48 @@ for (const m of MUTACOES_4) {
     return ps.some((p) => p.includes(m.espera)) ? [] : [`esperava "${m.espera}"; deu: ${ps.join(" | ") || "nenhum"}`];
   });
 }
+
+// O §4 so grava de um clone LIMPO numa tag (#490): o HEAD depois da tag, ou um ficheiro por commitar, saem sem gravar.
+// Cada um com o seu controlo: a mutacao que tira a guarda faz gravar.
+const sai = (bloco, estado) => corre4(bloco, UPGRADE, estado).erro ?? "";
+caso("§4: com o HEAD depois da tag, sai sem gravar a marca (#490)", () => (sai(BLOCO ?? "", "depois").includes("o §4 saiu 1") ? [] : [`gravou, ou saiu por outra razao: ${sai(BLOCO ?? "", "depois") || "gravou"}`]));
+caso("controlo §4: o `describe` sem `--exact-match` grava a tag anterior com o HEAD noutro sitio (#490)", () => {
+  const m = (BLOCO ?? "").replace("describe --exact-match --tags", "describe --abbrev=0 --tags");
+  return m === BLOCO ? ["a mutacao nao se aplicou"] : sai(m, "depois") === "" ? [] : [`devia gravar: ${sai(m, "depois")}`];
+});
+caso("§4: com o template sujo, sai sem gravar a marca (#490)", () => (sai(BLOCO ?? "", "sujo").includes("o §4 saiu 1") ? [] : [`gravou, ou saiu por outra razao: ${sai(BLOCO ?? "", "sujo") || "gravou"}`]));
+caso("controlo §4: sem a linha do `status`, um template sujo grava (#490)", () => {
+  const m = (BLOCO ?? "").replace(/^\[ -z "\$\(git -C "\$TPL" status .*\n/m, "");
+  return m === BLOCO ? ["a mutacao nao se aplicou"] : sai(m, "sujo") === "" ? [] : [`devia gravar: ${sai(m, "sujo")}`];
+});
+// O `T=` do §1 tambem para sem tag: vazio, o `"$SHA".."$T"` era `"$SHA"..HEAD` — o diff do branch de trabalho. A guarda
+// vive DENTRO do argumento (`"${T:?...}"`): numa shell interativa, um `: "${T:?}"` sozinho so abortava a sua linha.
+const tDo1 = UPGRADE.split("\n").find((l) => /^T=\$\(git -C "\$TPL" describe /.test(l) && !l.includes("||")) ?? null;
+const logDo1 = UPGRADE.split("\n").find((l) => /^git -C "\$TPL" log --oneline "\$SHA"\.\./.test(l)) ?? null;
+const correT1 = (log, estado) => {
+  const raiz = mkdtempSync(join(tmpdir(), "modo-upgrade-test-"));
+  try {
+    const tpl = montaTpl(raiz, estado);
+    const SHA = git(tpl, "rev-parse", "v9.9.9");
+    return spawnSync("bash", ["-c", `TPL=${JSON.stringify(tpl)}\nSHA=${SHA}\n${tDo1}\n${log}\nprintf 'T=%s' "$T"`], { encoding: "utf8" });
+  } finally {
+    rmSync(raiz, { recursive: true, force: true });
+  }
+};
+caso("§1: o `T=` le a tag, e sem tag o `log` para (#490)", () => {
+  if (tDo1 === null || logDo1 === null) return ["nao encontrei o `T=` e o `git log` do §1"];
+  if (!logDo1.includes('"${T:?')) return [`o \`log\` do §1 nao tem a guarda dentro do argumento: ${logDo1}`];
+  const [naTag, depois] = [correT1(logDo1, "tag"), correT1(logDo1, "depois")];
+  return [
+    ...espera(naTag.status === 0 && naTag.stdout.endsWith("T=v9.9.9"), `numa tag devia dar v9.9.9: ${naTag.status} ${naTag.stdout}${naTag.stderr}`),
+    ...espera(depois.status !== 0, `sem tag devia parar, deu ${depois.status} "${depois.stdout}"`),
+  ];
+});
+caso("controlo §1: o `log` sem a guarda segue com o T vazio (#490)", () => {
+  if (logDo1 === null) return ["sem o `git log` do §1"];
+  const r = correT1(logDo1.replace(/\$\{T:\?[^}]*\}/, "$T"), "depois");
+  return r.status === 0 && r.stdout.endsWith("T=") ? [] : [`devia seguir com T vazio: ${r.status} "${r.stdout}"`];
+});
 
 // --- 3 e 4. O doc ---
 

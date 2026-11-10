@@ -115,7 +115,8 @@ export function registar() {
   // do template, e um filtro que perguntasse "esta commitado?" em vez de "esta ignorado?"
   // deixava de o trazer — e o `arvoreNoDisco` dava-o como removido.
   test("ficheiro NOVO por commitar e nao ignorado CONTINUA a ser copiado", () =>
-    mede({ ontem: {}, hoje: { ".gitignore": "outra-coisa.md\n", ".agent/scripts/novo.mjs": "// novo\n", ".agent/rules/nova.md": "# nova\n" } }, (c) => {
+    // `"disco"` (#490): so o simulador do template le trabalho por commitar; commitado, este caso ficava verde sem medir (`TP1`).
+    mede({ origem: "disco", ontem: {}, hoje: { ".gitignore": "outra-coisa.md\n", ".agent/scripts/novo.mjs": "// novo\n", ".agent/rules/nova.md": "# nova\n" } }, (c) => {
       const p = [];
       if (c.ler(".agent/scripts/novo.mjs") === null) p.push(".agent/scripts/novo.mjs nao chegou");
       if (c.ler(".agent/rules/nova.md") === null) p.push(".agent/rules/nova.md nao chegou");
@@ -218,6 +219,8 @@ function aplicaAqui(dir, root) {
       root,
       tag: "v1.0.0",
       substituto: "Consumidor",
+      // `"disco"` (#490): mede a falha do git DENTRO do motor; a guarda da origem recusava antes, por outra razao.
+      origem: "disco",
       fatal: (m) => {
         throw new Error(`__fatal__: ${m}`);
       },
@@ -234,7 +237,7 @@ function aplicaNumFilho(dir, root, env) {
     `const { aplicaUpgradeMecanico } = await import(${JSON.stringify(pathToFileURL(UPGRADE).href)});`,
     "const [dir, root] = process.argv.slice(1);",
     "try {",
-    '  aplicaUpgradeMecanico({ dir, root, tag: "v1.0.0", substituto: "Consumidor", fatal: (m) => { throw new Error(`__fatal__: ${m}`); } });',
+    '  aplicaUpgradeMecanico({ dir, root, tag: "v1.0.0", substituto: "Consumidor", origem: "disco", fatal: (m) => { throw new Error(`__fatal__: ${m}`); } });',
     "  console.log(JSON.stringify({ passou: true }));",
     "} catch (err) { console.log(JSON.stringify({ msg: err.message })); }",
   ].join("\n");

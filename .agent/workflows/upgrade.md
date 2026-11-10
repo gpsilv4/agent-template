@@ -19,9 +19,9 @@ Mostrar: o que se traz, o que se ignora, e o diff do que ja existe. Repo **priva
 cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 ```
 
-> **`$TPL` e um clone local** (um diretorio, nao uma URL): `git clone <url> /tmp/tpl && TPL=/tmp/tpl`.
+> **`$TPL` e um clone limpo numa TAG** (#490; o resto recusa) fora do `TMPDIR`: `git clone -q --branch <tag> <url> ~/.cache/agent-template/<tag>` (a ultima: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'`). Num sandbox: no `TMPDIR`, a 2b com `--fronteira-em`.
 
-Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem `modo:` nem o job `guard-tests`, propoe-se): o
+Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem ela nem o job `guard-tests`, propoe-se): o
 **modo parcial**, variante do Modo A — `src/docs/upgrade-parcial.md`. No Modo B, esta pergunta vem primeiro.
 
 ### Modo A — com marca (`.agent/.template-version` existe)
@@ -36,9 +36,9 @@ V=$(sed -n 's/^versao: *\(v[^[:space:]]*\).*/\1/p' .agent/.template-version | he
 git -C "$TPL" cat-file -e "${SHA:-x}^{commit}" 2>/dev/null || SHA=$(git -C "$TPL" rev-parse -q --verify "${V:-x}^{commit}")
 # Sem baseline NAO se faz diff: e o Modo B, e nao um diff contra `HEAD` por acidente.
 : "${SHA:?marca ilegivel — usar o Modo B}"
-BR=$(git -C "$TPL" symbolic-ref --short HEAD)
-git -C "$TPL" log --oneline "$SHA".."$BR"          # o que mudou desde entao
-git -C "$TPL" diff --stat "$SHA".."$BR"            # e em que ficheiros
+T=$(git -C "$TPL" describe --exact-match --tags --match 'v[0-9]*' HEAD)
+git -C "$TPL" log --oneline "$SHA".."${T:?sem tag v*}"   # o que mudou desde entao
+git -C "$TPL" diff --stat "$SHA".."${T:?sem tag v*}"     # e em que ficheiros
 ```
 
 Trabalhar **so** sobre esses ficheiros: o que o projeto tem e o template nao mudou fica de fora.
@@ -52,6 +52,7 @@ Em vez disso, **detetar capacidades**: o que o template tem e este projeto nao, 
 
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
+# 0. ANTES de copiar: as linhas `[ -z` e `T=` da §4
 # 1. Que ficheiros o template tem que este projeto nao tem?
 (cd "$TPL" && git ls-files) | while read -r f; do [ -e "$f" ] || echo "AUSENTE: $f"; done
 # 2. Os scripts de cada lado
@@ -75,17 +76,17 @@ existe nos dois decide-se por categoria na tabela da secao 2, nunca por overwrit
 | Categoria | O que fazer | Porque |
 |-----------|-------------|--------|
 | `.agent/context/*`, `src/docs/CHANGELOG.md` | **NUNCA tocar** | O estado e a historia deste projeto, so existem aqui |
-| **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards proprios deste projeto. **Ausente nao e o mesmo que teu**: quem vem de uma versao anterior a esta pasta nao a tem, e a logica nova importa-a — ver `upgrade-why.md` |
+| **`.agent/scripts/config/**`** | **NUNCA substituir; copiar se AUSENTE** | A configuracao e os guards deste projeto. **Ausente nao e o mesmo que teu**: a logica nova importa-a (`upgrade-why.md`) |
 | `.agent/scripts/**/*.mjs` (inclui `guards/`, **excepto `config/`**) e `.github/scripts/` (so os do template) | Copia limpa, **preservando** as constantes que `CONSTANTES_DO_PROJETO` (`lib/upgrade-categorias.mjs`) nomeia. Substituir os placeholders | Os verificadores sao genericos; so a configuracao e do projeto (`upgrade-why.md`) |
 | **Ficheiros que SAIRAM do template** | **Propor apagar**, com aprovacao (os da fronteira: a 2b da o `rm`) | O upgrade **nunca apaga**: um renomeado fica ao lado do novo. So entra o que **estava na tag**: o do projeto nunca esteve. Ver `upgrade-why.md` |
 | O que o git do `$TPL` **ignora**, e nomes de segredo | **Nunca copiar** | Nao e do template. A mao, so o que `git -C "$TPL" ls-files` lista (`upgrade-why.md`) |
 | `.agent/rules/` com conteudo de dominio (`business-logic`, `pages-architecture`) | **Nunca copiar.** Sao 100% deste projeto | Gerados no bootstrap |
-| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro, placeholders incluidos** (senao o Guard 13 reprova): os `TPn` sao iguais em todos os projetos. `anti-patterns.md`: as **entradas** (`APn`) nunca se tocam; o **cabecalho** intacto vem novo, customizado integra-se a mao so a **regra duravel** (`upgrade-why.md`). As citacoes `TPn` copiam-se como estao | Os prefixos tornam isto copia, nao reescrita a mao |
+| `.agent/rules/anti-patterns*.md` (os DOIS) | `anti-patterns-template.md`: **substituir por inteiro**, placeholders incluidos (Guard 13). `anti-patterns.md`: as **entradas** (`APn`) nunca se tocam; o **cabecalho** intacto vem novo, customizado so a **regra duravel** (`upgrade-why.md`) | Os prefixos tornam isto copia |
 | `.agent/rules/` de processo (`core-rules`, `process-rules`, `sync-docs`, `ticket-method`) | **Diff obrigatorio.** Nao customizadas, copia; customizadas, integrar a mao | Misturam regra generica com decisoes do projeto |
 | `.agent/workflows/*` + os dois wrappers | Copia se nao customizados; diff se sim. Ao **acrescentar** um workflow, propagar como manda a matriz (wrappers + tabelas) | Pasta de wrappers ausente e opt-out (Guard 6): nao criar |
 | Pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `copilot-instructions.md`, `.cursor/rules/*.mdc`) | Diff. Preservar a stack e a descricao; trazer estrutura e tabelas | Cabecalho e do projeto, corpo e do template |
 | **So do template**: o job `simulators`, `codeql.yml`, `.github/codeql/`, o `BOOTSTRAP.md` (o bootstrap apaga-o) | **Nunca copiar** (modo A ou B); apagar o que os cita nos trazidos (`$TPL/.agent/BOOTSTRAP.md` §2.7) | So servem o repo do template |
-| `.github/workflows/*` | **So os jobs em falta**, contra o ficheiro do **TEMPLATE** (passo **comentado** = AUSENTE). Passo **movido** ou **substituido**: o antigo sai, senao 2x. A varredura ligada: `sweep` e `guard-gate` juntos, o `guard-gate` herda o `name:` do `guard-tests` (o check exigido) e este muda; desligada, nenhum dos dois. Um workflow AUSENTE copia-se inteiro. Nao substituir o CI do projeto; nos passos que ja tem, as flags novas e o trailer `Test-Surface:`. **Pacote de 1 job**: so as suites (#477) | O CI tem passos do projeto |
+| `.github/workflows/*` | **So os jobs em falta**, contra o ficheiro do **TEMPLATE** (passo **comentado** = AUSENTE; **movido** ou **substituido**: o antigo sai). Workflow AUSENTE: inteiro. Nos passos que ja tem, as flags novas e o trailer `Test-Surface:`. A varredura, o `guard-gate` e o pacote de 1 job: `upgrade-why.md` § "A linha `.github/workflows/*`" | O CI tem passos do projeto |
 | `.claude/settings.json` | **Do UTILIZADOR** (o `deny` proibe-o ao agente): o `deny`/`ask` em falta e o `allow` da maquinaria (2b lista; Guard 11 avisa), os hooks novos | O agente propoe o texto |
 | `.claude/agents/*` | Como a fronteira (linha abaixo). Os customizados: o `tools:` novo por `Edit` (a 2b lista-os; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
 | `.claude/hooks/*`, `.githooks/*` | **Aprovados um a um pelo utilizador**: os comandos da 2b (o staging ja traz os placeholders e as constantes), ou `Edit`/`Write` com aprovacao, nunca `cp` do `$TPL`. Por `Edit` (e no Modo B): substituir os placeholders, manter `CONSTANTES_DO_PROJETO` e o `protegidos.json` | Fronteira (`upgrade-why.md`) |
@@ -110,7 +111,7 @@ contrario: a copia daqui e a antiga e nao conhece o modo (porque: `upgrade-why.m
 a reprovar aqui (menos o que ja falhava), o que sobra **depois** das adaptacoes mecanicas (a decidir)
 e, por ultimo, a **fronteira**. Fachada `"EsteProjeto"`: editar no staging antes do `cp`.
 
-> Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md` § "O que a medicao da 2b faz, e nao faz"). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela). No parcial tambem recusa (sai != 0).
+> Nao toca neste projeto, e sai `0` com lista cheia (`upgrade-why.md`). Sem `.agent/.template-version` recusa-se: e o **Modo B** (a mao, com a tabela). No parcial tambem recusa (sai != 0).
 
 ## 3. Verificar — e e aqui que o upgrade se prova
 
@@ -138,8 +139,9 @@ Windows, confirmar num clone com CRLF.
 ```bash
 TPL=<caminho-para-um-CLONE-LOCAL-do-template>
 # O `--verify ...^{commit}` e obrigatorio (porque: `upgrade-why.md` § "Porque o `--verify ...^{commit}` e obrigatorio ao gravar a marca").
-BR=$(git -C "$TPL" symbolic-ref --short HEAD)                # nao assumir `main`
-SHA=$(git -C "$TPL" rev-parse --verify "$BR^{commit}") || { echo "FALHOU: sem commit em $BR"; exit 1; }
+[ -z "$(git -C "$TPL" status --porcelain --untracked-files=all)" ] || { echo "FALHOU: sujo"; exit 1; }
+T=$(git -C "$TPL" describe --exact-match --tags --match 'v[0-9]*' HEAD) || { echo "FALHOU: sem tag"; exit 1; }
+SHA=$(git -C "$TPL" rev-parse --verify "$T^{commit}") || { echo "FALHOU: sem commit em $T"; exit 1; }
 M=$(grep -vE '^(template|commit|data|versao):' .agent/.template-version 2>/dev/null)  # o resto fica
 printf 'commit: %s\ntemplate: %s\ndata: %s\n%s\n' "$SHA" \
   "$(git -C "$TPL" remote get-url origin 2>/dev/null || echo "$TPL")" "$(date +%F)" "$M" | grep . > .agent/.template-version
@@ -153,4 +155,4 @@ Sem isto, o proximo `/upgrade` cai no Modo B. So com a fronteira aplicada: senao
 
 O relatorio diz o que foi trazido **por categoria**, o que foi deliberadamente ignorado e
 porque, os conflitos que exigiram integracao a mao, e o resultado dos verificadores da secao
-3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou. Aplicada, **apagar o staging** (o caminho vem na 2b).
+3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou. Aplicada, **apagar o staging** (o caminho vem na 2b) e o clone da tag.

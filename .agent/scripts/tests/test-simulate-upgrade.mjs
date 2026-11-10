@@ -17,7 +17,8 @@
  * arranque (em `tests-upgrade-guardas.mjs`), o MOTOR de `lib/upgrade-mecanico.mjs` e as categorias dele em
  * `lib/upgrade-categorias.mjs` (em `tests-upgrade-motor.mjs`), a
  * fixture `lib/projeto-de-ontem.mjs`, o instrumento da seccao 2b em `lib/medida-upgrade.mjs` e `lib/medida-upgrade-ci.mjs`
- * e a fronteira em `lib/fronteira-upgrade.mjs` (em `tests-medida-2b*.mjs`), o filtro em `lib/fora-do-template.mjs`
+ * e a fronteira em `lib/fronteira-upgrade.mjs` (em `tests-medida-2b*.mjs`), a origem em `lib/origem-upgrade.mjs`
+ * (em `tests-upgrade-origem.mjs`, #490), o filtro em `lib/fora-do-template.mjs`
  * (em `tests-upgrade-fora-do-template.mjs`), o ADOTADO (`tests-upgrade-adotado.mjs`), os wrappers do Gemini (`tests-upgrade-wrappers.mjs`), e — pelo motor — as listas de `lib/saida-upgrade.mjs`
  * e a comparacao de `lib/intacto.mjs`, que tem tambem os seus casos puros no `tests-intacto.mjs`.
  * O `lib/mapa-suites.mjs` manda verificar estes modulos com esta suite.
@@ -39,6 +40,7 @@ import { registar as registarPlaceholders } from "./tests-upgrade-placeholders.m
 import { registar as registarConstantes } from "./tests-upgrade-constantes.mjs";
 import { registar as registarWrappers } from "./tests-upgrade-wrappers.mjs";
 import { registar as registarGuardas } from "./tests-upgrade-guardas.mjs";
+import { registar as registarOrigem } from "./tests-upgrade-origem.mjs";
 import { contaLinhas, LIMITE } from "../guards/sizes.mjs";
 
 /** O par (ficheiro, constante) que o simulador customiza na fixture — DERIVADO da mesma lista
@@ -56,6 +58,7 @@ registarPlaceholders();
 registarConstantes();
 registarWrappers();
 registarGuardas();
+registarOrigem();
 
 // --- O simulador de ponta a ponta, sobre um template SINTETICO --------------------
 // Os casos de cima saem cedo, nos guardas. Estes montam um template completo o bastante para

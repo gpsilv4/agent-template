@@ -176,7 +176,7 @@ if (bootstrapCorreu) {
   // O `SKIP` tem de dizer o que correr A SEGUIR. Sem esta linha, quem seguia a seccao 2b do
   // `/upgrade` via um salto, lia-o como "nada a medir" e avancava — que foi exactamente como o
   // #75 passou para um consumidor. Um salto que nao aponta para a alternativa e um beco.
-  console.log("\n        Para medir a seccao 2b DESTE projeto, correr do CLONE do template:");
+  console.log("\n        Para medir a seccao 2b DESTE projeto, correr de um clone LIMPO NUMA TAG do template (#490):");
   console.log("          node <clone>/.agent/scripts/simulate-upgrade.mjs --projeto=$PWD\n");
   process.exit(0);
 }
@@ -264,8 +264,9 @@ if (contextoAntes === null) {
 // --- 3. FASE 1: o upgrade MECANICO -----------------------------------------------
 // As categorias que a tabela do `/upgrade` resolve sem julgamento. O motor vive em
 // `lib/upgrade-mecanico.mjs` — e a parte que escreve por cima dos ficheiros do consumidor, e
-// num modulo proprio pode ser exercitada sem montar a simulacao inteira.
-const medido = aplicaUpgradeMecanico({ dir, root: ROOT, tag, fatal, substituto: SUBSTITUTO });
+// num modulo proprio pode ser exercitada sem montar a simulacao inteira. O `"disco"` (#490): aqui
+// mede-se o trabalho por commitar do template, de proposito; um upgrade real le um clone numa tag.
+const medido = aplicaUpgradeMecanico({ dir, root: ROOT, tag, fatal, substituto: SUBSTITUTO, origem: "disco" });
 ok(
   `upgrade mecanico aplicado: ${medido.repostas} constante(s) customizada(s) preservada(s), ` +
     `${medido.trazidos} doc(s) nao customizado(s) actualizado(s), ${medido.placeholders} com placeholders substituidos`

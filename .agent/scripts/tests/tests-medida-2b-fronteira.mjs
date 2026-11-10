@@ -49,10 +49,10 @@ export function registar({ H, P, cpDe }) {
   test("a mesma ligacao dos dois lados nao se diz (#317)", () =>
     exige(contraProjeto({ ontem: { [SET]: liga([["Stop", null, H]]) }, hoje: { [SET]: liga([["Stop", null, H]]), "NOVO.md": "# doc\n" } }),
       { codigo: 0, exclui: ["a LIGACAO mudou"] }));
-  // O settings de HOJE e o da arvore do template, como o staging e o deny/ask da mesma 2b (leitura do #317).
-  test("um hook novo ligado so no settings por commitar do template diz onde (#317)", () =>
+  // O settings por commitar do template ja nao se le: a 2b recusa o template antes (#490).
+  test("um settings por commitar no template recusa, e nao se le (#490)", () =>
     exige(contraProjeto({ hoje: { ".claude/hooks/novo.mjs": "// novo\n" }, sujoNoTemplate: { [SET]: liga([["Stop", null, ".claude/hooks/novo.mjs"]]) } }),
-      { codigo: 0, inclui: [".claude/hooks/novo.mjs -> Stop"] }));
+      { codigo: 1, inclui: [`alteracao(oes) por commitar (${SET})`], exclui: [".claude/hooks/novo.mjs -> Stop"] }));
   test("a ligacao que o projeto JA fez nao se pede outra vez (#317)", () =>
     exige(contraProjeto({ ontem: { [SET]: liga([["Stop", null, H]]) }, hoje: { [SET]: liga([["SessionStart", "compact", H]]) }, projeto: { [SET]: liga([["SessionStart", "compact", H]]) } }),
       { codigo: 0, exclui: ["a LIGACAO mudou"], inclui: ["nada a pedir ao utilizador"] }));
