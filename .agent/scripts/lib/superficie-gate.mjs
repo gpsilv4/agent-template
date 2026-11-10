@@ -28,7 +28,8 @@
  * `Test-Surface: <ficheiro> — <porque>` no ULTIMO commit do PR que mexe nesse ficheiro. O aviso
  * passa a nota, com o motivo a vista. Num commit anterior nao conta: um trailer no commit 1 nao pode
  * cobrir o `paths-ignore` que o commit 5 acrescenta. Os avisos antigos (contagens que descem, testes
- * apagados) continuam sem saida.
+ * apagados) continuam sem saida. A mesma leitura (`motivoDoTrailer`) e a saida da marca `if:` de um workflow (#491,
+ * `check-test-surface.mjs`); as outras marcas (`continue-on-error`, `|| true`, um `if: false`) nao tem nenhuma.
  *
  * LIMITES ASSUMIDOS, escritos para nao serem descobertos: sem parser de YAML (os scripts nao tem
  * dependencias), logo um `on:` ou um passo montados por ancoras/aliases (`<<: *base`, `- *gate`) e
@@ -206,9 +207,33 @@ export function aceites(mensagem) {
   return m;
 }
 
+/** Se um workflow CORRE TESTES: um runner como comando, ou um passo da maquinaria. A excecao da marca `if:` num
+ *  workflow NOVO (#491) so vale para um que nao corre nenhum (o `cache.yml` do exemplo de um job): mover um passo de
+ *  testes para um ficheiro novo, debaixo de um `if:`, nao pode passar calado (a leitura independente do #491). */
+export const correTestes = (texto) => RUNNER.test(texto ?? "") || (texto ?? "").split("\n").some((l) => MAQUINARIA.test(semComentario(l)));
+
+/**
+ * O motivo do trailer `Test-Surface: <f> — <porque>` no ULTIMO commit do PR que mexe em `f` (ou no destino `para` de
+ * uma renomeacao), ou `null`. Uma so leitura para o gate e para as marcas de um workflow (#491): duas que concordassem
+ * a mao eram o `TP8`. Sem o log, `null` — sem saida, o aviso fica (falha fechada).
+ * @param {{ f: string, para?: string, base: string, git: (args: string[]) => string }} o
+ * @returns {string | null}
+ */
+export function motivoDoTrailer({ f, para, base, git }) {
+  try {
+    // Numa renomeacao o ultimo commit pode tocar so no DESTINO: procura-se nos dois, e o trailer
+    // pode nomear qualquer dos dois (segunda leitura: o da origem num commit antigo cobria o destino).
+    const caminhos = para === undefined ? [f] : [f, para];
+    const m = aceites(git(["log", "-1", "--format=%B", `${base}..HEAD`, "--", ...caminhos]));
+    return caminhos.map((c) => m.get(c)).find(Boolean) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** O GitHub so corre os workflows da raiz: `apps/x/.github/workflows/` e ignorado, e editar um
  *  desses nao mexe em gate nenhum. */
-const WORKFLOW_DA_RAIZ = /^\.github\/workflows\/[^/]+\.ya?ml$/i;
+export const WORKFLOW_DA_RAIZ = /^\.github\/workflows\/[^/]+\.ya?ml$/i;
 /** Um workflow que corre testes sem um `node ...test` (o que as CONTAGENS veem) — o `e2e.yml` deste
  *  repo e um. O runner como COMANDO (`npm test`, `npm run test:e2e`, `go test`, ...), e nao a palavra
  *  algures na linha: `npm i -D @playwright/test` nao corre testes. A lista esta no `CONTRIBUTING.md`. */
@@ -365,16 +390,7 @@ export function verificaGate({ f, antes, origem, antesOrigem, agora, para, conta
   }
   sinais.splice(0, sinais.length, ...new Set(sinais)); // dois passos iguais perdidos davam a mesma linha duas vezes
   if (sinais.length === 0) return estrutura.length > 0;
-  let motivo = null;
-  try {
-    // Numa renomeacao o ultimo commit pode tocar so no DESTINO: procura-se nos dois, e o trailer
-    // pode nomear qualquer dos dois (segunda leitura: o da origem num commit antigo cobria o destino).
-    const caminhos = para === undefined ? [f] : [f, para];
-    const m = aceites(git(["log", "-1", "--format=%B", `${base}..HEAD`, "--", ...caminhos]));
-    motivo = caminhos.map((c) => m.get(c)).find(Boolean) ?? null;
-  } catch {
-    motivo = null; // sem o log, sem saida: o aviso fica (falha fechada)
-  }
+  const motivo = motivoDoTrailer({ f, para, base, git });
   if (motivo) {
     note(`${f}: ${sinais.join("; ")} — aceite (Test-Surface: ${motivo})`);
     return estrutura.length > 0;

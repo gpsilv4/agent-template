@@ -386,4 +386,50 @@ export function registar() {
     muda(dir, `${base}  deploy:\n    needs: x\n    runs-on: y\n    steps:\n      - run: ./deploy.sh\n`,
       `${base}  deploy:\n    needs: x\n    if: always()\n    runs-on: y\n    steps:\n      - run: ./deploy.sh\n`),
   { code: 1, includes: [IF] });
+
+  // --- #491: as MARCAS de um workflow tem a mesma saida que o gate, e um workflow novo nao conta `if:` ---------------
+  // O PR que adota o CI de um job (com o modo completo) traz dezenas de `if:` que sao o desenho dele, e um `cache.yml`
+  // que a base nao tinha: sem isto, o proprio passo `Test surface` do CI novo reprovava-o, sem saida (R10-4).
+  const CI_COM_IF = comJob("${{ !cancelled() && steps.scope.outputs.app == 'true' }}");
+  const TRAILER = `ci: o CI de um job\n\nTest-Surface: ${CI} — adotar o CI de um job do exemplo`;
+  test("#491: um `if:` acrescentado a um workflow que existia avisa sem o trailer (o controlo da saida)", (dir) =>
+    muda(dir, comJob(null), CI_COM_IF),
+  { code: 1, includes: [`${CI}: ${IF} acrescentado(s)`] });
+  test("#491: com o trailer no ultimo commit, as marcas do workflow passam a NOTE, com o motivo a vista", (dir) =>
+    muda(dir, comJob(null), CI_COM_IF, { msg: TRAILER }),
+  { code: 0, includes: [`${CI}: ${IF} acrescentado(s)`, "aceite (Test-Surface: adotar o CI de um job do exemplo)"], excludes: [`${CI} alterado, sem marcas`] });
+  test("#491: o trailer de OUTRO ficheiro nao cobre as marcas deste", (dir) =>
+    muda(dir, comJob(null), CI_COM_IF, { msg: "ci: x\n\nTest-Surface: .github/workflows/outro.yml — outro" }),
+  { code: 1, includes: [`${CI}: ${IF} acrescentado(s)`] });
+  // Como o `cache.yml` do exemplo: so instala e grava a cache, sem testes.
+  const CACHE = "name: Cache\non:\n  schedule:\n    - cron: '0 3 * * 1'\njobs:\n  cache:\n    runs-on: y\n    steps:\n      - uses: actions/checkout@v7\n      - if: ${{ steps.c.outputs.cache-hit != 'true' }}\n        run: npm ci\n";
+  test("#491: um workflow NOVO sem testes, com `if:`, nao avisa (nao estreita uma superficie que nao existia)", (dir) =>
+    muda(dir, null, CACHE, { ficheiro: ".github/workflows/cache.yml" }),
+  { code: 0, excludes: [IF] });
+  // A leitura independente do #491: mover um passo de testes para um workflow NOVO, debaixo de um `if:`, nao pode passar.
+  test("#491: um workflow NOVO que corre testes conta os `if:` (o controlo da excecao)", (dir) =>
+    muda(dir, null, "name: T\non: [pull_request]\njobs:\n  t:\n    runs-on: y\n    steps:\n      - if: ${{ github.actor == 'x' }}\n        run: node .agent/scripts/tests/test-guards.mjs\n", { ficheiro: ".github/workflows/testes.yml" }),
+  { code: 1, includes: [`${IF} acrescentado(s)`] });
+  // As marcas SEM saida: o trailer so cobre a `if:`.
+  test("#491: um `if: false` num workflow novo, COM trailer, reprova (sem saida)", (dir) =>
+    muda(dir, null, "name: T\non: [pull_request]\njobs:\n  t:\n    runs-on: y\n    steps:\n      - if: false\n        run: node .agent/scripts/tests/test-guards.mjs\n",
+      { ficheiro: ".github/workflows/testes.yml", msg: "t\n\nTest-Surface: .github/workflows/testes.yml — movido" }),
+  { code: 1, includes: ["literalmente falsa acrescentado(s)"] });
+  test("#491: um `if: false` num workflow que existia, COM trailer, reprova", (dir) =>
+    muda(dir, comJob(null), comJob("false"), { msg: TRAILER }),
+  { code: 1, includes: ["literalmente falsa acrescentado(s)"] });
+  test("#491: um `continue-on-error: true` acrescentado, COM trailer, reprova (o trailer so cobre a `if:`)", (dir) =>
+    muda(dir, comJob(null), comJob(null).replace("      - run: node b-test.mjs\n", "      - run: node b-test.mjs\n        continue-on-error: true\n"), { msg: TRAILER }),
+  { code: 1, includes: ["continue-on-error"] });
+  // So workflows: num ficheiro de TESTE, um `.skip` acrescentado continua sem saida, com trailer ou sem ele.
+  test("#491: um `.skip` acrescentado a um teste continua WARN com um trailer para esse ficheiro", (dir) => {
+    const T = ".agent/scripts/tests/test-x.mjs";
+    mkdirSync(join(dir, ".agent/scripts/tests"), { recursive: true });
+    writeFileSync(join(dir, T), "it('a', () => {});\n");
+    commit(dir, "antes");
+    const ref = git(dir, ["rev-parse", "HEAD"]);
+    writeFileSync(join(dir, T), "it.skip('a', () => {});\n");
+    commit(dir, `t\n\nTest-Surface: ${T} — saltar este`);
+    return ref;
+  }, { code: 1, includes: ["test-x.mjs", "acrescentado(s)"] });
 }

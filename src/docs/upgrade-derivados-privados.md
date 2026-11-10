@@ -86,8 +86,11 @@ Ao adotar:
   `Guard Tests` (o portao do CI de 10 jobs, que o pacote tira) passa a exigir o `CI` E o `Guard Suites`. Sem o
   `Guard Tests` fora, cada PR fica pendente para sempre; so com o `CI`, as suites vermelhas de um PR de upgrade nao
   bloqueiam o merge.
-- **O trailer.** O commit que troca o `ci.yml` tira jobs com maquinaria: leva o trailer
-  `Test-Surface: .github/workflows/ci.yml — <porque>` (o `check-test-surface` reprova sem ele).
+- **O trailer.** O commit que troca o `ci.yml` tira jobs com maquinaria e traz os `if:` do exemplo: leva o trailer
+  `Test-Surface: .github/workflows/ci.yml — <porque>` (o `check-test-surface` reprova sem ele). O trailer cobre o gate
+  **e os `if:`** acrescentados (nao as outras marcas, como um `continue-on-error`); o `cache.yml`, novo, nao precisa de
+  trailer: um `if:` num workflow que a base nao tinha, e que nao corre testes, nao conta (#491, que o derivado B
+  encontrou no PR do upgrade).
 - **O que a 2b do `/upgrade` diz com o pacote.** Sai a nota "CI do pacote de um job": as notas da forma do CI de 10
   jobs (o plano da varredura, o salto do merge e o titulo no portao) nao se aplicam, e nao aparecem. Saem tambem duas
   notas esperadas sobre o `mutation-sweep.mjs`, que fica no CI do template de proposito: "o template corre 1
