@@ -376,7 +376,13 @@ const MARCAS = [
   // nao sabe de que job e a linha, e num `deploy` a jusante dos testes o `always()` e enfraquecimento.
   // Vive no `paraMarcas` (`lib/marcas-yaml.mjs`, `agregadoresSempre`), que so o neutraliza num job que
   // le `needs.<X>.result`.
-  { re: /^([ \t]*)if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#]))/m, msg: "condicao `if:`", cru: true },
+  { re: /^([ \t]*)if:[ \t]*(?![ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?github\.event_name[ \t]*==[ \t]*'pull_request'[ \t]*(?:\}\})?[ \t]*\2[ \t]*(?:#[^\n]*)?$(?!(?:\r?\n[ \t]*)*\r?\n\1[ \t]+[^\s#]))/m, msg: "condicao `if:`", cru: true, workflowNovoNaoConta: true, trailerCobre: true },
+  // `workflowNovoNaoConta` (#491): num workflow que a baseline NAO tinha, e que nao corre testes, um `if:` nao estreita
+  // uma superficie que nao existia (o `cache.yml` do exemplo de um job tem tres). `trailerCobre`: o `Test-Surface:` do
+  // workflow aceita-a (adotar o CI de um job traz 22 `if:` que sao o desenho dele). So esta marca tem as duas.
+  // Um `if:` LITERALMENTE falso num workflow (#491): a forma canonica de desligar um passo, sem saida nenhuma — nem o
+  // trailer, nem a excecao do workflow novo. A marca acima tambem o conta; esta e a que nao se cala.
+  { re: /^[ \t]*-?[ \t]*if:[ \t]*(["']?)[ \t]*(?:\$\{\{[ \t]*)?(?:false|0)[ \t]*(?:\}\})?[ \t]*\1[ \t]*(?:#[^\n]*)?$/m, msg: "condicao `if:` literalmente falsa", cru: true, so: /(^|\/)\.github\/workflows\/[^/]+\.ya?ml$/i },
   // Uma condicao literalmente falsa na superficie congelada e sabotagem, nao codigo: e a
   // forma canonica de desligar um veredicto sem apagar nada.
   { re: /\b(?:if|while)\s*\(\s*(?:false|0)\s*\)/, msg: "condicao literalmente falsa" },

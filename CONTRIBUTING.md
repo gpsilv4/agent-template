@@ -63,7 +63,9 @@ touches that file, with the file and the reason (`—`, `--` or ` - ` as the sep
 Test-Surface: .github/workflows/ci.yml — the release branch needs the gate too
 ```
 
-The warning becomes a note that shows the reason. A trailer with no reason does not count, it
+The warning becomes a note that shows the reason. In a workflow, the trailer also covers an added `if:` (as when adopting the
+one-job CI example), but not the other weakening marks (`continue-on-error`, `|| true`, an `if: false`), which have no
+way out; and an `if:` in a new workflow that runs no tests is not counted at all (#491). A trailer with no reason does not count, it
 only covers that file, and a trailer in an earlier commit does not cover a later change to it.
 The trailer is read from the commits, so an uncommitted change always warns locally. Removing
 tests or lowering a count has no such exit, and neither have the `package.json` test scripts (`test`,

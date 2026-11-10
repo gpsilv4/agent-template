@@ -33,7 +33,7 @@ import { resolveBaseline, exigeSuperficie } from "./lib/baseline-superficie.mjs"
 import { ehDerivado } from "./lib/derivado.mjs";
 import { SO_DO_TEMPLATE, paraMarcas, gateDesteRepo } from "./lib/marcas-yaml.mjs";
 import { repoDoOrigin } from "./lib/repo-origin.mjs";
-import { verificaGate } from "./lib/superficie-gate.mjs";
+import { verificaGate, motivoDoTrailer, WORKFLOW_DA_RAIZ, correTestes } from "./lib/superficie-gate.mjs";
 import { CONFIG_CONTAVEIS } from "./lib/superficie-contaveis.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -245,10 +245,14 @@ if (tocados.length === 0) {
     // `ls-tree` e nao `cat-file -e`: o `-e` resolve o caminho **e** verifica o blob, logo
     // falhava nas duas situacoes e nao as separava. O `ls-tree` le so a arvore — responde
     // "o caminho existia na baseline?" sem depender de o conteudo estar disponivel.
+    // `naoLi`: o `ls-tree` falhou. Fica "ausente" como antes (falha fechada para as contagens), mas NAO vale como
+    // "ficheiro novo" para a excecao do #491 — "nao consegui ler" nao e "nao existia" (`TP2`).
+    let naoLi = false;
     const existeNaBaseline = (() => {
       try {
         return git(["ls-tree", "--name-only", base, "--", f]).trim() !== "";
       } catch {
+        naoLi = true;
         return false;
       }
     })();
@@ -313,7 +317,8 @@ if (tocados.length === 0) {
     // RECOLHER agora, DECIDIR depois. A decisao por ficheiro nao pode ser tomada aqui porque
     // depende de um numero que so existe depois de ler a superficie toda: o TOTAL. Ver o
     // bloco de veredicto abaixo.
-    medidos.push({ f, antes, antesMarcas, origem, agora, config, conta });
+    // `novo`: nem na baseline nem o destino de uma renomeacao (#491, a marca `if:` de um workflow novo).
+    medidos.push({ f, antes, antesMarcas, origem, agora, config, conta, novo: !existiaAntes && !naoLi && origem === undefined });
   }
 
   // --- Totais da superficie: distinguir o que se PERDEU do que se MOVEU -------------
@@ -344,7 +349,7 @@ if (tocados.length === 0) {
     return [c.msg, c.zero ? a > 0 && d === 0 : d < a];
   }));
 
-  for (const { f, antes, antesMarcas, origem, agora, config, conta, migrado, para } of medidos) {
+  for (const { f, antes, antesMarcas, origem, agora, config, conta, migrado, para, novo } of medidos) {
     // As MARCAS nao se aplicam ao ficheiro que as DEFINE. Nele, cada entrada e uma definicao e
     // nao uma diretiva: um `xit` ali nao desativa nada, nao ha testes naquele ficheiro. E nao
     // e uma hipotese — os padroes com alternacao casam-se a si mesmos (ver a nota em
@@ -359,7 +364,7 @@ if (tocados.length === 0) {
       ? []
       : ((gate) => {
           const [a, d] = [gate(paraMarcas(f, antesMarcas)), gate(paraMarcas(f, agora))];
-          return MARCAS.filter((m) => (!m.so || m.so.test(f)) && conta(d, m.re, m.cru) > conta(a, m.re, m.cru));
+          return MARCAS.filter((m) => (!m.so || m.so.test(f)) && !(novo && m.workflowNovoNaoConta && WORKFLOW_DA_RAIZ.test(f) && !correTestes(agora) && !CONTAGENS.some((c) => conta(agora, c.re, c.cru) > 0)) && conta(d, m.re, m.cru) > conta(a, m.re, m.cru));
         })(SO_DO_TEMPLATE.has(f) ? semGateDesteRepo : (t) => t);
     const desceram = CONTAGENS.filter((c) => {
       const a = conta(antes, c.re, c.cru);
@@ -384,8 +389,16 @@ if (tocados.length === 0) {
     // apareceu noutro ficheiro, logo foi movido. So o primeiro caso e enfraquecimento.
     const perdidas = desceram.filter((c) => totalDesceu.get(c.msg));
     const movidas = desceram.filter((c) => !totalDesceu.get(c.msg));
+    // As MARCAS de um workflow da raiz tem a mesma saida que o gate (#491): o trailer `Test-Surface:` no ultimo commit que
+    // mexe nele passa-as a NOTE, com o motivo a vista — adotar o CI de um job traz 22 `if:` que sao o desenho dele. So em
+    // workflows: num ficheiro de teste, um `.skip` acrescentado continua sem saida.
+    // So as marcas com `trailerCobre` (a `if:`): um `continue-on-error`, um `|| true` ou um `if: false` acrescentados
+    // continuam sem saida. Num destino de renomeacao, o trailer pode nomear a origem (como no gate).
+    const cobertas = WORKFLOW_DA_RAIZ.test(f) ? achadas.filter((a) => a.trailerCobre) : [];
+    const motivoMarcas = cobertas.length ? motivoDoTrailer({ f, para: para ?? origem, base, git }) : null;
+    if (motivoMarcas) note(`${f}: ${cobertas.map((a) => `${a.msg} acrescentado(s)`).join("; ")} desde ${base} — aceite (Test-Surface: ${motivoMarcas})`);
     const notas = [
-      ...achadas.map((a) => `${a.msg} acrescentado(s)`),
+      ...achadas.filter((a) => !(motivoMarcas && cobertas.includes(a))).map((a) => `${a.msg} acrescentado(s)`),
       // A mensagem tem de contar com as MESMAS flags com que a decisao foi tomada. Sem o
       // `d.cru`, uma entrada que decide sobre o texto cru reportava numeros do texto
       // normalizado — podia dizer "2 -> 2" numa linha que acabou de sinalizar. Latente
@@ -419,7 +432,7 @@ if (tocados.length === 0) {
       // ja anunciado (MIGRADO) ao recolher, e nada desceu NESTE ficheiro
     } else if (config && !contavel) {
       warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
-    } else if (!gateAvisou) {
+    } else if (!gateAvisou && !motivoMarcas) {
       ok(`${f} alterado, sem marcas de enfraquecimento`);
     }
   }
