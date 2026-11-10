@@ -219,7 +219,7 @@ caso("(c) a coluna sem a lista da UM aviso (com `null` e com `areas` omitido); c
 caso("(d) `Areas` e `Área` leem-se (o valor fora da lista avisa); `Tags`, `Etiquetas` e `Area(s)` avisam que nao se leem", () => [
   ...areaAvisa(comArea("seguransa", "dados", { nome: "Areas" }), LISTA, ['"seguransa"']),
   ...areaAvisa(comArea("seguransa", "dados", { nome: "Área" }), LISTA, ['"seguransa"']),
-  ...["Tags", "Etiquetas", "Area(s)"].flatMap((n) => areaAvisa(comArea("seguransa", "dados", { nome: n }), LISTA, [`Bugs: a coluna "${n.toLowerCase()}" nao e lida — chamar-lhe \`Area\``])),
+  ...["Tags", "Etiquetas", "Area(s)"].flatMap((n) => areaAvisa(comArea("seguransa", "dados", { nome: n }), LISTA, [`Bugs: a coluna "${n.toLowerCase()}" nao e lida — chamar-lhe \`Area\` se for o assunto do ticket, ou renomea-la se tiver outro sentido`])),
 ]);
 caso("CONTROLO (d): uma coluna `Area afetada` (outro sentido) nem se le nem avisa", () => areaAvisa(comArea("seguransa", "dados", { nome: "Area afetada" }), LISTA, []));
 // Decidido (leitura independente do PR 1): com uma `Area` verdadeira, uma `Tags` ao lado e outra coluna do projeto, e o
@@ -228,7 +228,12 @@ caso("(d) com uma Area verdadeira, uma `Tags` ao lado nao avisa (e outra coluna)
   areaAvisa(troca(comArea("seguransa", "dados").t, [["| Problema | Area |", "| Problema | Area | Tags |"], ["|---------|------|", "|---------|------|-----|"], ["| algo | seguransa |", "| algo | seguransa | x |"], ["| outra coisa | dados |", "| outra coisa | dados | y |"]]), LISTA, ['"seguransa"']));
 caso("a Area num bloco ou nos Pendentes avisa (vive nas tabelas por tipo); o controlo e o (a), nas tabelas por tipo", () => [
   ...areaAvisa(troca(ACTIVE_OK, [["| Ordem | ID | Descricao | Esforco | Depende de |", "| Ordem | ID | Descricao | Esforco | Depende de | Area |"]]), LISTA, ['"Sprint 2 — o que esta aberto": a coluna "area" nao e lida aqui — a Area vive nas tabelas por tipo']),
-  ...areaAvisa(troca(ACTIVE_OK, [["| ID | Descricao | Esforco | Nota |", "| ID | Descricao | Esforco | Nota | Tags |"]]), LISTA, ['Pendentes sem Sprint: a coluna "tags" nao e lida aqui']),
+  ...areaAvisa(troca(ACTIVE_OK, [["| ID | Descricao | Esforco | Nota |", "| ID | Descricao | Esforco | Nota | Area |"]]), LISTA, ['Pendentes sem Sprint: a coluna "area" nao e lida aqui']),
+]);
+// Uma `Tags` num bloco ou nos Pendentes nao avisa: ali nao ha nada para ler, e e de quem a usa para outra coisa.
+caso("uma coluna `Tags` num bloco ou nos Pendentes nao avisa (so uma `Area` verdadeira); o controlo e o caso acima", () => [
+  ...areaAvisa(troca(ACTIVE_OK, [["| Ordem | ID | Descricao | Esforco | Depende de |", "| Ordem | ID | Descricao | Esforco | Depende de | Tags |"]]), LISTA, []),
+  ...areaAvisa(troca(ACTIVE_OK, [["| ID | Descricao | Esforco | Nota |", "| ID | Descricao | Esforco | Nota | Etiquetas |"]]), LISTA, []),
 ]);
 
 console.log("\n  O carregaAreas (#465)\n");

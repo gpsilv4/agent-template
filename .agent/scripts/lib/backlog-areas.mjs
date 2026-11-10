@@ -26,7 +26,7 @@ export async function carregaAreas(url = CONFIG) {
   try {
     mod = await import(url.href);
   } catch (err) {
-    throw new Error(`${NOME} nao se le (${err instanceof Error ? err.message : String(err)}) — corrigir o ficheiro, ou apaga-lo para nao verificar a Area`);
+    throw new Error(`${NOME} nao se le (${err instanceof Error ? err.message : String(err)}) — corrigir o ficheiro (apaga-lo so serve sem a coluna \`Area\` no backlog: com ela, a lista em falta tambem reprova)`);
   }
   const a = mod.AREAS;
   const valido = a !== null && typeof a === "object" && !Array.isArray(a) && Object.keys(a).length > 0 && Object.entries(a).every(([k, v]) => norm(k) && typeof v === "string" && v.trim());

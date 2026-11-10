@@ -600,8 +600,9 @@ em `.agent/scripts/config/areas-do-backlog.mjs`, que o projeto adapta. O `check-
 - **A `config/` vem se faltar**, nos dois modos (no parcial, pelo fecho do `check-backlog`), e nunca se substitui.
 - **Uma coluna que o projeto ja tenha passa a ser lida ou avisada.** Uma `Area`/`Áreas` passa a ser verificada contra a
   lista: um valor fora dela reprova (acrescenta-lo a `config/`, ou renomear a coluna se tiver outro sentido). Uma
-  `Tags`, `Etiquetas` ou `Area(s)` avisa "nao e lida". Uma `Area` num bloco ou nos Pendentes avisa: vive nas tabelas por
-  tipo.
+  `Tags`, `Etiquetas` ou `Area(s)` numa tabela por tipo (sem uma `Area` ao lado) **reprova** "nao e lida": chamar-lhe
+  `Area` se for o assunto, ou renomea-la se tiver outro sentido. Uma `Area` num bloco ou nos Pendentes reprova: vive nas
+  tabelas por tipo (uma `Tags` ali nao conta).
 - **Uma `config/` partida** (sintaxe, ou sem `AREAS`) faz o `check-backlog` e o `backlog-board` sairem 2, com o nome do
   ficheiro.
 

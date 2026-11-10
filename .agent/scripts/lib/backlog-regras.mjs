@@ -150,7 +150,8 @@ function regrasDaArea(lido, ACTIVE, areas) {
   for (const { seccao, cabecalho } of lido.cabecalhosPorTipo ?? []) {
     const col = colunaDaArea(cabecalho);
     // (d) Um nome parecido nao se le: sem o aviso, a verificacao desligava-se calada (`TP2`).
-    if (col.parecida) problemas.push(`${ACTIVE}: ${seccao}: a coluna "${col.parecida}" nao e lida — chamar-lhe \`Area\``);
+    // As duas saidas (a terceira leitura do PR 1): uma `Tags` com outro sentido nao se chama `Area` — renomeia-se.
+    if (col.parecida) problemas.push(`${ACTIVE}: ${seccao}: a coluna "${col.parecida}" nao e lida — chamar-lhe \`Area\` se for o assunto do ticket, ou renomea-la se tiver outro sentido`);
     if (col.indice < 0) continue;
     comColuna = true;
     // (b) Antes da descricao, a Area ocupava o lugar do Estado ou da descricao (que se leem por posicao).
@@ -171,7 +172,9 @@ function regrasDaArea(lido, ACTIVE, areas) {
   // A Area so vive nas tabelas por tipo: num bloco ou nos Pendentes, ignora-la calada era o `TP2`.
   const foraDoSitio = (onde, cab) => {
     const col = colunaDaArea(cab);
-    const nome = col.nome ?? col.parecida;
+    // So uma `Area` verdadeira: uma `Tags` num bloco ou nos Pendentes nao tem nada para ler ali, e avisar era ruido
+    // para quem a usa para outra coisa (a terceira leitura do PR 1).
+    const nome = col.nome;
     if (nome) problemas.push(`${ACTIVE}: ${onde}: a coluna "${nome}" nao e lida aqui — a Area vive nas tabelas por tipo`);
   };
   for (const b of lido.blocos) foraDoSitio(`"${b.titulo}"`, b.cabecalho);
