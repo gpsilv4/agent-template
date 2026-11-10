@@ -13,7 +13,7 @@ import { pathToFileURL } from "url";
 import { join } from "path";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
-import { exige, contraProjeto, test } from "./harness/test-upgrade-harness.mjs";
+import { exige, contraProjeto, test, SEM_JOB } from "./harness/test-upgrade-harness.mjs";
 import { comModoCompleto } from "./harness/expressoes-ci.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -27,7 +27,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-simulate-upgrade.mjs";
 
-const SEM_JOB = { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" };
 // O job INTEIRO comentado: o leitor da 2b deita fora as linhas comentadas, logo conta como ausente.
 const JOB_COMENTADO = { ".github/workflows/ci.yml": "jobs:\n#  guard-tests:\n#    steps:\n#      - run: node .agent/scripts/stub.mjs\n  outro:\n    steps: []\n" };
 // O job presente e SEM comandos: o completo que nao deriva nada (a recusa antiga, que fica para este caso).

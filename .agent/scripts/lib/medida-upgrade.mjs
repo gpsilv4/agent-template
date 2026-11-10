@@ -330,17 +330,6 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
         "categoria, com julgamento), e o Modo B nao se mede: mede-se o que e mecanico"
     );
   }
-  // O modo (#429) so se le com uma marca utilizavel: o parcial e uma variante do Modo A. Sai != 0 nos dois casos, porque
-  // um 0 que nao mediu nada era um portao a passar sobre nada.
-  const modo = modoDoProjeto({ marca: leOuNull(join(raiz, ".agent/.template-version")), temGuardTests: comandosDoCI(raiz) !== null });
-  if (modo.modo !== "completo") {
-    // O `deny`/`ask` vem na mesma: e a fronteira, e no parcial so isto o compara (o Guard 11 nao vem, e um `node -e` a
-    // mao que cite o `settings.json` e negado pelo proprio hook). O `allow` em falta e o da maquinaria: nao conta.
-    notasDasPermissoes({ raiz, template, note, listas: ["deny", "ask"] });
-    // A ligacao dos hooks (#454), so no PARCIAL: as notas citam os passos do `upgrade-parcial.md`, e na contradicao nao se sabe o modo.
-    if (modo.modo === "parcial") notasDaLigacaoParcial({ raiz, template, note });
-    fatal(mensagemDoModo(modo));
-  }
   // A referencia tem de existir NO TEMPLATE. Sem esta recusa, o motor lia `git show <ref>:x` a
   // falhar em todos os ficheiros, interpretava cada falha como "nao existia na tag" e concluia
   // que o template inteiro e novo — uma lista enorme e completamente errada, sem um unico erro
@@ -360,7 +349,19 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
         "num clone raso falta `git fetch --unshallow`; um commit de um branch fundido por squash nao existe — por a tag de onde saiu em `commit:`"
     );
   }
+  // ANTES da recusa do modo (#509): no parcial o `diff <marca>..<tag>` faz-se a mao, e um downgrade la passava em silencio.
   confirmaSemDowngrade(template, ref, fatal);
+  // O modo (#429) so se le com uma marca utilizavel: o parcial e uma variante do Modo A. Sai != 0 nos dois casos, porque
+  // um 0 que nao mediu nada era um portao a passar sobre nada.
+  const modo = modoDoProjeto({ marca: leOuNull(join(raiz, ".agent/.template-version")), temGuardTests: comandosDoCI(raiz) !== null });
+  if (modo.modo !== "completo") {
+    // O `deny`/`ask` vem na mesma: e a fronteira, e no parcial so isto o compara (o Guard 11 nao vem, e um `node -e` a
+    // mao que cite o `settings.json` e negado pelo proprio hook). O `allow` em falta e o da maquinaria: nao conta.
+    notasDasPermissoes({ raiz, template, note, listas: ["deny", "ask"] });
+    // A ligacao dos hooks (#454), so no PARCIAL: as notas citam os passos do `upgrade-parcial.md`, e na contradicao nao se sabe o modo.
+    if (modo.modo === "parcial") notasDaLigacaoParcial({ raiz, template, note });
+    fatal(mensagemDoModo(modo));
+  }
 
   let erro = null;
   try {

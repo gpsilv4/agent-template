@@ -21,7 +21,7 @@ cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 
 > **`$TPL` e um clone limpo numa TAG** (#490; o resto recusa) fora do `TMPDIR`: `git clone -q --branch <tag> <url> ~/.cache/agent-template/<tag>` (a ultima: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'`). Num sandbox: no `TMPDIR`, a 2b com `--fronteira-em`.
 
-Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem ela nem o job `guard-tests`, propoe-se): o
+Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem `modo:` nem o job `guard-tests`, propoe-se): o
 **modo parcial**, variante do Modo A — `src/docs/upgrade-parcial.md`. No Modo B, esta pergunta vem primeiro.
 
 ### Modo A — com marca (`.agent/.template-version` existe)

@@ -12,7 +12,7 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "../lib/origem-upgrade.mjs";
 import { aplicaUpgradeMecanico } from "../lib/upgrade-mecanico.mjs";
-import { git, cenario, limpa, contraProjeto, exige, test } from "./harness/test-upgrade-harness.mjs";
+import { git, cenario, limpa, contraProjeto, exige, test, SEM_JOB } from "./harness/test-upgrade-harness.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error("tests-upgrade-origem.mjs nao e um entry point. Correr `node .agent/scripts/tests/test-simulate-upgrade.mjs`.");
@@ -261,6 +261,25 @@ export function registar() {
     };
     return exige(contraProjeto({ marca }), { codigo: 1, inclui: ["tags que o contem: nenhuma"], exclui: ["copia deste projeto (HEAD)", "estado actual"] });
   });
+  // #509: no PARCIAL o downgrade tambem se verifica, antes da recusa do modo (o `diff <marca>..<tag>` faz-se a mao).
+  test("2b: no modo parcial, a marca num commit fora das tags recusa pelo downgrade, e nao pelo modo (#509)", () => {
+    const marca = ({ tpl }) => {
+      git(tpl, ["switch", "-q", "-c", "lado"]);
+      git(tpl, ["commit", "-q", "--allow-empty", "-m", "lado"]);
+      const fora = git(tpl, ["rev-parse", "HEAD"]).trim();
+      git(tpl, ["switch", "-q", "main"]);
+      return `template: ${tpl}\ncommit: ${fora}\ndata: 2026-01-01\nmodo: parcial\n`;
+    };
+    return exige(contraProjeto({ marca, projeto: SEM_JOB }), { codigo: 1, inclui: ["tags que o contem: nenhuma"], exclui: ["projeto sem a maquinaria: modo parcial"] });
+  });
+  test("2b: no modo parcial, uma marca com um commit que o template nao tem recusa por isso, e nao pelo modo (#509)", () =>
+    exige(contraProjeto({ marca: "template: x\ncommit: 0000000000000000000000000000000000000000\nmodo: parcial\n", projeto: SEM_JOB }), {
+      codigo: 1,
+      inclui: ["nao existe no template"],
+      exclui: ["projeto sem a maquinaria: modo parcial"],
+    }));
+  test("controlo: no modo parcial com a marca numa tag, a recusa e a do modo (#509)", () =>
+    exige(contraProjeto({ naMarca: "modo: parcial\n", projeto: SEM_JOB }), { codigo: 1, inclui: ["projeto sem a maquinaria: modo parcial"], exclui: ["tags que o contem"] }));
   // R4: com `--keep` a copia fica, e o que a guarda recusou nao chegou la.
   test("2b: com --keep, a copia de um template recusado nao tem o trabalho por commitar (#490)", () => {
     const meu = mkdtempSync(join(tmpdir(), "sim-up-keep-"));

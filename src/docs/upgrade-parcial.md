@@ -25,10 +25,12 @@ disco nao distingue "decidiu nao a trazer" de "perdeu-a por engano", e por isso 
 
 Um job **comentado** conta como ausente. A regra vive em `.agent/scripts/lib/modo-upgrade.mjs`.
 
-Com a resposta, escrever a linha na marca (`modo: parcial` ou `modo: completo`). O §4 do `upgrade.md` mantem-na nos
+Com a resposta, escrever a linha na marca (`modo: parcial` ou `modo: completo`, sozinho na linha: um comentario vai
+noutra, senao a linha nao se le, #508). O §4 do `upgrade.md` mantem-na nos
 upgrades seguintes (reescreve `commit`/`template`/`data`, larga o `versao:` velho, e mantem o resto).
 
-O `simulate-upgrade --projeto` nao mede um projeto parcial: lista o `deny`/`ask` do `settings.json` do template que o
+O `simulate-upgrade --projeto` nao mede um projeto parcial. Antes de o dizer, recusa um template sujo ou fora de uma
+tag (#490), e uma marca que o template nao tem ou num commit que a tag nao contem (#509). Depois, lista o `deny`/`ask` do `settings.json` do template que o
 projeto nao tem e os hooks que o template liga e ele nao (por evento e matcher; #454), diz se o projeto nao tem o
 `settings.json`, explica e sai != 0 (um 0 que nao mediu nada era um portao a passar sobre nada). No projeto, as tres
 verificacoes a mao do §3 substituem o resto.

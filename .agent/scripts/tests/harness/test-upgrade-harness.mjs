@@ -213,6 +213,10 @@ export const exige = ({ code, out }, { codigo, inclui = [], exclui = [] }) => {
 };
 
 console.log("\n=== Testes do simulador de /upgrade ===\n");
+/** O `ci.yml` de um projeto PARCIAL de verdade: sem o job `guard-tests` (#429). Uma so definicao, para os casos do modo
+ *  (`tests-medida-2b-modo.mjs`) e os da origem (`tests-upgrade-origem.mjs`, #509). */
+export const SEM_JOB = { ".github/workflows/ci.yml": "jobs:\n  outro:\n    steps: []\n" };
+
 export const BASE = {
   ".agent/scripts/x.mjs": "// script\n",
   ".claude/hooks/h.mjs": "// hook\n",

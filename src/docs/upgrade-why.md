@@ -304,7 +304,7 @@ este ficheiro.
 
 ### 1. Um passo COMENTADO conta como AUSENTE
 
-A categoria `.github/workflows/*` diz *"so os jobs em falta, nao substituir o CI do projeto"*.
+A categoria `.github/workflows/*` dizia *"so os jobs em falta, nao substituir o CI do projeto"* (desde o #490, o "nao substituir" esta em § "A linha `.github/workflows/*` da tabela, por extenso").
 Um consumidor aplicou-a correctamente e mesmo assim ficou **seis rondas** com a varredura de
 mutacao desligada: ela estava **comentada** no `ci.yml` dele, com uma justificacao escrita.
 
@@ -955,7 +955,8 @@ continua a funcionar sem os nomes, e um novo sem a lib recusa com a razao — nu
 - **Onde clonar.** Fora do `TMPDIR` (`~/.cache/agent-template/<tag>`), porque a fronteira da 2b recusa um template
   dentro dele. Com `git clone --branch <tag> <url>`: o `origin` do clone e o URL (a marca grava-o), sem `--shared`
   (que depende dos objetos do repo de origem, e um `gc` nele parte o clone). Num sandbox que so escreve no `TMPDIR`, a
-  segunda via: clonar la e passar sempre `--fronteira-em` a 2b. A §1 manual nao verifica o downgrade; quem o faz e a 2b.
+  segunda via: clonar la e passar sempre `--fronteira-em` a 2b. A §1 manual nao verifica o downgrade; quem o faz e a 2b,
+  tambem no modo parcial (#509: antes da recusa do modo).
 - **A §1, o Modo B e a §4 a mao.** A §1 para sem tag com a guarda DENTRO do argumento (`"${T:?...}"`): numa shell
   interativa, um `: "${T:?}"` sozinho so abortava a sua linha, e o `git log` seguinte corria com o `T` vazio (`SHA..HEAD`,
   o diff do branch de trabalho). O Modo B corre as duas primeiras linhas da §4 ANTES de copiar (a 2b recusa-se nele, e
