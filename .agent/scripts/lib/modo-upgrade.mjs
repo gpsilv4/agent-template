@@ -20,12 +20,16 @@
  * NAO e um entry point, e nao recusa: decide. O `PARES` muta cada `resultado(` (a suite `test-modo-upgrade.mjs`).
  */
 
-/** O valor da linha `modo:` da marca, ou `null` sem ela. */
+/** O valor da linha `modo:` da marca (tudo o que vem depois, aparado), ou `null` sem ela. A linha INTEIRA, e nao so
+ *  uma palavra (#508): um `modo: parcial (porque)` lido como "sem `modo:`" era o `TP2`; lido inteiro, nao e
+ *  `parcial` nem `completo`, e cai na contradicao, que diz a linha e como a corrigir. */
 export function modoDaMarca(marca) {
-  return /^modo:[ \t]*(\S+)[ \t]*$/m.exec(marca ?? "")?.[1] ?? null;
+  // `trim()` e nao `[ \t]*`: um espaco nao separavel colado de um editor (U+00A0) nao vira um valor que parece valido.
+  return /^modo:(.*)$/m.exec(marca ?? "")?.[1]?.trim() ?? null;
 }
 
-const resultado = (modo, porque) => ({ modo, porque });
+// `soMarca`: o disco nao entra na contradicao — a linha `modo:` nao se le (#508); corrige-se so a marca.
+const resultado = (modo, porque, soMarca = false) => ({ modo, porque, soMarca });
 
 /**
  * @param {{ marca: string | null, temGuardTests: boolean }} p
@@ -39,13 +43,13 @@ export function modoDoProjeto({ marca, temGuardTests }) {
   if (m === "parcial") return resultado("parcial", `a marca diz \`modo: parcial\` (e o ci.yml ${job})`);
   if (m === "completo" && temGuardTests) return resultado("completo", `a marca diz \`modo: completo\` (e o ci.yml ${job})`);
   if (m === "completo") return resultado("contradicao", `a marca diz \`modo: completo\` e o ci.yml ${job}`);
-  if (m !== null) return resultado("contradicao", `a marca diz \`modo: ${m}\`, que nao e \`parcial\` nem \`completo\``);
+  if (m !== null) return resultado("contradicao", `a marca diz \`modo: ${m}\`, que nao e \`parcial\` nem \`completo\` (sozinho na linha: um comentario vai noutra)`, true);
   if (temGuardTests) return resultado("completo", `a marca nao tem \`modo:\` e o ci.yml ${job}`);
   return resultado("parcial", `a marca nao tem \`modo:\` e o ci.yml ${job}: propor o modo parcial, e perguntar antes de o escrever`);
 }
 
 /** O que o `simulate-upgrade --projeto` diz quando nao mede (o modo nao e `completo`). Sai != 0 nos dois. */
-export function mensagemDoModo({ modo, porque }) {
+export function mensagemDoModo({ modo, porque, soMarca = false }) {
   if (modo === "parcial") {
     return (
       `projeto sem a maquinaria: modo parcial, nada medido aqui (${porque}). Se o projeto traz a maquinaria, o job ` +
@@ -54,5 +58,6 @@ export function mensagemDoModo({ modo, porque }) {
       "`node .agent/scripts/check-backlog.mjs`"
     );
   }
+  if (soMarca) return `a linha \`modo:\` da marca nao se le: ${porque}. Corrigir SO a marca (o ci.yml nao entra) — ver \`src/docs/upgrade-parcial.md\``;
   return `a marca e o disco contradizem-se: ${porque}. Corrigir a marca (\`modo:\`) ou o ci.yml antes de medir — ver \`src/docs/upgrade-parcial.md\``;
 }

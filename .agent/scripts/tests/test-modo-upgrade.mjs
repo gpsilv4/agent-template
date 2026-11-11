@@ -59,6 +59,11 @@ const LINHAS = [
   ["", true, "completo"],
   ["", false, "parcial"],
   ["modo: outro\n", true, "contradicao"],
+  // #508: uma linha `modo:` que existe e nao se le e uma contradicao, e nao "sem `modo:`" (`TP2`). Os controlos sao as
+  // linhas `modo: parcial` acima, e o `modo: parcial  ` com espacos no fim do caso a seguir.
+  ["modo: parcial (sem a maquinaria — decisao de out)\n", false, "contradicao"],
+  ["modo: parcial (sem a maquinaria — decisao de out)\n", true, "contradicao"],
+  ["modo:\n", false, "contradicao"],
 ];
 for (const [extra, temGuardTests, quer] of LINHAS) {
   caso(`regra: ${extra.trim() || "sem modo:"} + ${temGuardTests ? "com" : "sem"} o job -> ${quer}`, () => {
@@ -70,7 +75,22 @@ caso("regra: o `modo:` le-se da sua linha (espacos no fim; nao de outra linha qu
   ...espera(modoDaMarca("commit: x\nmodo: parcial  \n") === "parcial", "com espacos no fim"),
   ...espera(modoDaMarca("nota: o modo: parcial e daqui a um mes\n") === null, "leu o modo do meio de outra linha"),
   ...espera(modoDaMarca(null) === null, "sem marca"),
+  ...espera(modoDaMarca("modo: parcial (porque)\n") === "parcial (porque)", "a linha com texto a seguir devia ler-se inteira (#508)"),
 ]);
+caso("regra: uma linha `modo:` que nao se le diz a linha, e manda corrigir SO a marca, nunca o ci.yml (#508)", () => {
+  const r = modoDoProjeto({ marca: "commit: abc1234\nmodo: parcial (porque)\n", temGuardTests: false });
+  const msg = mensagemDoModo(r);
+  return [
+    ...espera(r.porque.includes("`modo: parcial (porque)`") && r.porque.includes("um comentario vai noutra"), `porque: ${r.porque}`),
+    ...espera(msg.includes("Corrigir SO a marca") && !msg.includes("ou o ci.yml"), `mensagem: ${msg}`),
+  ];
+});
+caso("controlo: uma contradicao verdadeira (marca contra disco) continua a nomear o ci.yml (#508)", () => {
+  const msg = mensagemDoModo(modoDoProjeto({ marca: "commit: abc1234\nmodo: parcial\n", temGuardTests: true }));
+  return espera(msg.includes("contradizem-se") && msg.includes("ou o ci.yml"), `mensagem: ${msg}`);
+});
+caso("regra: um espaco nao separavel colado depois do valor nao vira contradicao (#508)", () =>
+  espera(modoDaMarca("modo: parcial\u00a0\n") === "parcial", `leu ${JSON.stringify(modoDaMarca("modo: parcial\u00a0\n"))}`));
 caso("regra: a mensagem do parcial nomeia o doc e as duas verificacoes a mao; a da contradicao diz-se", () => {
   const p = mensagemDoModo({ modo: "parcial", porque: "x" });
   const c = mensagemDoModo({ modo: "contradicao", porque: "y" });

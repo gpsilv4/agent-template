@@ -25,7 +25,7 @@ export const ONDE_CLONAR = "~/.cache/agent-template";
 export const comoClonar = (tag = "<tag>") =>
   `git clone -q --branch ${tag} <url-do-template> ${ONDE_CLONAR}/${tag}` +
   (tag === "<tag>" ? " (a mais recente: `git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`)" : "") +
-  ` — e correr dali (num sandbox que so escreve no TMPDIR: clonar la e passar --fronteira-em=<pasta fora do template>)`;
+  ` — e correr dali (num sandbox que so escreve no TMPDIR: clonar la e passar --fronteira-em=<pasta vazia fora do projeto e do template>)`;
 
 // `column.ui=never`: com colunas ligadas na config do utilizador, duas tags saiam numa so linha.
 const git = (root, args) =>
