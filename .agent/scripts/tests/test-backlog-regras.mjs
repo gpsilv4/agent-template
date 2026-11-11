@@ -143,5 +143,17 @@ caso("CONTROLO: o heading e tolerante (um emoji, `Pendente (sem sprint)`, numera
   ...calado({ ativo: [["## Pendentes sem Sprint", "## Pendente (sem sprint)"]] }),
 ]);
 
+console.log("\n  O formato do ID (#515)\n");
+// Um sub-ID como o `U15p1` de um derivado real: o `calcula` saltava-o e a vista dava-o como invalido. O controlo e a
+// fixture valida (todos os IDs no formato) ficar calada — e um ID valido mais comprido (`UX15`) tambem.
+caso("um ID fora do formato no Historico avisa (#515)", () => avisa({ arquivo: [["| F1 | Feature", "| F1p1 | Feature"]] }, ['Historico: o ID "F1P1" nao tem o formato de um ID']));
+caso("um ID fora do formato numa tabela por tipo avisa (#515)", () => avisa({ ativo: [["| B1 | Pendente |", "| B1p1 | Pendente |"]] }, ['o ID "B1P1" nao tem o formato de um ID']));
+caso("um ID fora do formato nos Pendentes sem Sprint avisa (#515)", () =>
+  avisa({ ativo: [["## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| | | | |", "## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| B1p1 | parte | S | depende do B1 |"]] }, ['Pendentes sem Sprint: o ID "B1P1" nao tem o formato de um ID']));
+caso("um ID valido mais comprido (UX15) nao avisa; um riscado tem a sua regra, e nao esta (#515)", () => [
+  ...calado({ arquivo: [["| F1 | Feature", "| UX15 | Feature"]] }),
+  ...avisa({ ativo: [["| B1 | Pendente |", "| ~~B1~~ | Pendente |"]] }, ["a linha de B1 esta riscada"]),
+]);
+
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
