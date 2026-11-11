@@ -145,6 +145,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Guard 22 (#488): os runners do CI do template num so rotulo. Um `warn(` que deixe de disparar deixava um
+    // `ubuntu-latest` voltar sem ninguem ver — a classe que o #400 ja pagou num derivado.
+    alvo: ".agent/scripts/guards/runners.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     alvo: ".agent/scripts/guards/mcp.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,

@@ -62,6 +62,8 @@ const COMUNS = [
   // Listas de opt-in vazias: nem termos banidos proprios nem servidor MCP.
   { chave: "Guard 4 (termos banidos) — lista BANNED vazia", vezes: 1 },
   { chave: "Guard 16 (politica MCP) — nenhum servidor configurado", vezes: 1 },
+  // A fixture nao copia os workflows: no template salta por isso, num derivado salta antes (os workflows sao dele).
+  { chave: "Guard 22 (runner fixo) —", vezes: 1 },
 ];
 
 /** O 12e salta num derivado em que NENHUM ficheiro cita o numero de workflows. E legitimo: a

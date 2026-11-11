@@ -28,7 +28,7 @@ jobs:
   # Detects package.json AFTER checkout (job-level hashFiles is unreliable — runs pre-checkout).
   detect:
     name: Detect Project
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       has_pkg: ${{ steps.check.outputs.has_pkg }}
@@ -42,7 +42,7 @@ jobs:
 
   e2e:
     name: E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: detect
     if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 15
@@ -104,7 +104,7 @@ jobs:
 
   security:
     name: Security Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: detect
     if: needs.detect.outputs.has_pkg == 'true'
     timeout-minutes: 10

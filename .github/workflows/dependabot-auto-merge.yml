@@ -60,7 +60,7 @@ jobs:
     # fizer push para o branch do Dependabot, o actor passa a ser essa pessoa e o
     # auto-merge NAO dispara.
     if: github.actor == 'dependabot[bot]' && contains(github.event.pull_request.labels.*.name, 'automerge')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Dependabot metadata

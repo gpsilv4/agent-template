@@ -78,6 +78,7 @@ codigo. **Fica** o que nomeia a causa, ou o mais completo; o texto do outro entr
 
 - As dependencias **reais**: ficheiros partilhados, um que bloqueia outro, um que ja nao bloqueia.
 - A ordem do sprint ainda e a mais logica? Um sprint com mais de 9 items pede divisao (`backlog-method.md`).
+- **No template:** o `actions/runner-images` ja anuncia o fim da imagem fixada em `guards/runners.mjs`, ou ha uma LTS nova estavel? Se sim, e um ticket (subir o `RUNNER` e os `runs-on:` num PR, #488).
 - Num item parqueado: o que o desbloqueia (a `Nota`) **ja aconteceu**? Se sim: ATUALIZAR a
   `Nota` e propor REORDENAR para um sprint (qual, e porque). Se nao, fica, e diz-se. Um
   parqueado **sem** `Nota`, ou com uma que nao diz o que o desbloqueia ("quando houver folga"),
