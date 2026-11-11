@@ -8,8 +8,14 @@
 
 O audit de producao ficou vermelho no PR do upgrade, por uma advisory que nao veio do upgrade.
 
-- **Um PR a parte, so com o lockfile, mergeado ANTES do upgrade.** Misturados, o vermelho do audit parece do upgrade, e
-  o upgrade espera por uma correcao que nao e dele.
+- **Antes do push do upgrade:** `npm audit --omit=dev --audit-level=high` no `main`. A regra depende do CI que o `main`
+  ainda tem (#506, R10-6 do derivado B):
+  - **o CI ja e o de um job:** um PR a parte, so com o lockfile, mergeado ANTES do upgrade. Misturados, o vermelho do
+    audit parece do upgrade, e o upgrade espera por uma correcao que nao e dele;
+  - **o upgrade TROCA para o CI de um job:** subir essas dependencias **no proprio PR do upgrade**, com `,deps` no
+    titulo (senao o primeiro passo do CI reprova; um re-run le o titulo antigo: um push novo, ou fechar e reabrir). O
+    PR a parte correria o CI ANTIGO (medido: a varredura ~73 min, e um teste que reprova com o git da imagem nova). O PR
+    do Dependabot que as trazia fecha-se sozinho depois do merge (o "`@dependabot rebase`" deixa de se aplicar).
 - `npm update <pacote>` mexe noutras entradas do lockfile (ex.: os campos `libc`). Editar so a entrada do pacote, e
   validar com `npm ci`.
 

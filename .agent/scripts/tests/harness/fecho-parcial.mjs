@@ -75,8 +75,14 @@ export function literaisDe(src) {
     while (i < src.length && src[i] !== "\n") {
       const c = src[i];
       if (c === "\\") i += 2;
-      else if (c === "[") (classe = true), i++;
-      else if (c === "]") (classe = false), i++;
+      // Um bloco, e nao o operador virgula: o lint de um derivado Next (`no-unused-expressions`) avisava (#506, R10-5).
+      else if (c === "[") {
+        classe = true;
+        i++;
+      } else if (c === "]") {
+        classe = false;
+        i++;
+      }
       else if (c === "/" && !classe) break;
       else i++;
     }
