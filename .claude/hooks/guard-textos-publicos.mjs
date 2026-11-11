@@ -28,7 +28,7 @@
  * bloqueia trabalho legitimo (o CI e o `check-textos-publicos.mjs` continuam a ver).
  */
 import { spawnSync } from "child_process";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { dirname, isAbsolute, join, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -81,7 +81,18 @@ try {
   const cmd = payload?.tool_input?.command;
   if (typeof cmd !== "string" || !/\b(?:gh|git)\b/.test(cmd)) process.exit(0);
   const cwd = payload?.cwd && isAbsolute(payload.cwd) ? payload.cwd : process.cwd();
-  const lidos = textosDoComando(cmd, { cwd, home: homedir(), ler: lerFicheiro });
+  // A raiz do repo (#511), preguicosa: so a exceção de um script que so le a pergunta, e custa um `git`. Os dois lados
+  // resolvidos (`realpath`): o `git` devolve o caminho real, e o `cwd` pode vir por um symlink (`/var` e `/private/var`).
+  const real = (p) => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  let raizMemo;
+  const raiz = () => (raizMemo === undefined ? (raizMemo = ((r) => (r ? real(r) : null))(repoDe(cwd))) : raizMemo);
+  const lidos = textosDoComando(cmd, { cwd, home: homedir(), ler: lerFicheiro, raiz, real });
   // Antes do "publica" e da lista: um `git config` nao publica, e o interruptor vale com ou sem lista (#397, M4).
   if (lidos.interruptor) {
     negar("Este comando le ou muda o interruptor dos nomes proibidos (`agent-template.nomesProibidos`). Desligar ou ligar a verificacao num repo e decisao do utilizador, a mao e fora do agente (`git config --local`; `src/docs/upgrade-why.md`).");

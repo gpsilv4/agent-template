@@ -243,6 +243,48 @@ export function registar({ test }) {
     // Depois de um `cd` que nao se resolve, so o filtro dos descritores impede o `2>&1` de contar como escrita de tudo.
     afirma(corre(`cd "$X" && gh issue comment 3 --body-file ~/pr.md 2>&1`, { ficheiros: { "~/pr.md": "texto limpo\n" } }), DEIXA);
   });
+  // #511: o `commit-msg` do template so LE a mensagem — valida-la e fazer o commit no mesmo comando passa. UM CASO POR
+  // CONDICAO da isencao (as duas leituras independentes do #511): cada um fica vermelho sozinho quando a sua cai.
+  test("textos-publicos: o commit-msg do template a validar o -F do mesmo comando passa (#511)", () => {
+    for (const c of [`node .githooks/commit-msg pr.md && git commit -F pr.md`, `node ./.githooks/commit-msg pr.md && git add -A && git commit -qF pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), DEIXA);
+  });
+  test("textos-publicos: so o script exato e isento — outro script, outro caminho, ou um node com opcoes nega (#511)", () => {
+    for (const c of [`node outro.mjs pr.md && git commit -F pr.md`, `node x/.githooks/commit-msg pr.md && git commit -F pr.md`,
+      `node --input-type=module .githooks/commit-msg pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  test("textos-publicos: a isencao nao tira as redireccoes nem os pipelines do proprio comando (#511)", () => {
+    for (const c of [`node .githooks/commit-msg pr.md > pr.md && git commit -F pr.md`, `node .githooks/commit-msg pr.md | tee pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  // O `sub/pr.md` existe e esta limpo: a negacao so pode vir da escrita (corria o `commit-msg` do `sub`).
+  test("textos-publicos: noutra pasta (depois de um cd) a isencao nao vale (#511)", () =>
+    afirma(corre(`cd sub && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: { ...LIMPOS, "sub/pr.md": "texto limpo\n" } }), ESCRITO));
+  test("textos-publicos: com atribuicoes antes do node (NODE_OPTIONS corre outro codigo) a isencao nao vale (#511)", () =>
+    afirma(corre(`NODE_OPTIONS=--import=./w.mjs node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  test("textos-publicos: um ./node qualquer nao e o node (#511)", () =>
+    afirma(corre(`./node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  test("textos-publicos: reescrever o script (ou a lib dele) no mesmo comando tira a isencao (#511)", () => {
+    for (const c of [`cp x.mjs .githooks/commit-msg && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `cp x.mjs .githooks/lib/commit-msg.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  // A premissa do #511 tem rede: o `commit-msg` do template LE a mensagem e nao lhe toca (um hook que a normalizasse
+  // passava a escrever o ficheiro, e a isencao a mentir). Corre-se o verdadeiro, e os bytes ficam iguais.
+  test("textos-publicos: o commit-msg do template nao escreve o ficheiro que valida (a premissa do #511)", () => {
+    const raizRepo = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+    const dir = mkdtempSync(join(tmpdir(), "textos-hook-test-"));
+    try {
+      const f = join(dir, "msg.txt");
+      const antes = "feat(x): uma mensagem\n\n# um comentario que um hook que normaliza tiraria\n";
+      writeFileSync(f, antes);
+      spawnSync(process.execPath, [join(raizRepo, ".githooks/commit-msg"), f], { cwd: raizRepo, encoding: "utf8", env: SEM_GIT() });
+      return readFileSync(f, "utf8") === antes ? [] : ["o commit-msg reescreveu o ficheiro: a isencao do #511 deixa de ser verdade"];
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 
   // --- O que passa -----------------------------------------------------------------------------------
   test("textos-publicos: um texto limpo passa", () => afirma(corre(`gh pr create --title "feat: x" --body "projetos secretos em geral"`), DEIXA));
