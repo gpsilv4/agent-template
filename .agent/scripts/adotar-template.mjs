@@ -4,10 +4,10 @@
  *
  * Corre-se do CLONE do template, dentro do projeto (#288):
  *
- *   git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template
+ *   git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template-<tag>
  *   (a ultima tag: git ls-remote --tags --refs --sort=-v:refname https://github.com/gpsilv4/agent-template 'v*')
- *   node ../agent-template/.agent/scripts/adotar-template.mjs            # copia
- *   node ../agent-template/.agent/scripts/adotar-template.mjs --simular  # so lista
+ *   node ../agent-template-<tag>/.agent/scripts/adotar-template.mjs            # copia
+ *   node ../agent-template-<tag>/.agent/scripts/adotar-template.mjs --simular  # so lista
  *
  * PORQUE UM SCRIPT, e nao um ciclo de shell no README: a primeira versao do procedimento era
  * shell, e uma leitura independente encontrou quatro defeitos altos que o texto nao mostrava —
@@ -51,9 +51,12 @@ export const PERGUNTAR = ["LICENSE"];
 export const MANIFESTO = ".agent/adocao.json";
 /** A instrucao da recusa da guarda, para quem ADOTA (#512): o clone fica ao lado do projeto (o bootstrap le-o ate ao
  *  fim, logo nao no TMPDIR), e este script nao tem `--fronteira-em` (e da 2b do upgrade). */
+// Numa pasta POR TAG (#524): a recusa tipica e a de um `../agent-template` ja clonado da `main` (o que o README mandava
+// ate a v0.63.4), e clonar por cima dele falhava ("destination path already exists").
 const CLONAR_A_TAG = (tag = "<tag>") =>
-  `git clone --depth 1 --branch ${tag} https://github.com/gpsilv4/agent-template ../agent-template` +
-  (tag === "<tag>" ? " (a ultima: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'`)" : "");
+  `git clone --depth 1 --branch ${tag} <url-do-template> ../agent-template-${tag}, e correr, a partir do projeto, ` +
+  `\`node ../agent-template-${tag}/.agent/scripts/adotar-template.mjs\`` +
+  (tag === "<tag>" ? " — a ultima tag: `git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`" : "");
 
 const lerOuNull = (raiz, rel) => {
   try {

@@ -13,7 +13,9 @@
  * o que parte. A pergunta "ja ha uma LTS nova estavel, ou o fim da fixada foi anunciado?" vive no `/backlog-review`.
  *
  * NUM DERIVADO NAO CORRE (SKIP visivel): os workflows sao dele, e a escolha do runner tambem. Um derivado com
- * `ubuntu-latest` nao fica vermelho por um `/upgrade`.
+ * `ubuntu-latest` nao fica vermelho por um `/upgrade`. Numa ADOCAO em curso (o `.agent/adocao.json` existe e a marca
+ * ainda nao, #524) verifica SO os ficheiros que o manifesto diz que vieram do template (`copiados` e `iguais`): os
+ * outros sao do projeto. Um manifesto ilegivel avisa, em vez de desligar o guard.
  */
 
 /** O rotulo fixo. Mudar aqui e nos `runs-on:` de uma vez (o guard reprova o meio-termo). */
@@ -37,16 +39,40 @@ export function guardRunners({ read, warn, ok, skip, listDir, ehDerivado }) {
     skip("Guard 22 (runner fixo) — num derivado os workflows sao dele, e o runner tambem");
     return 0;
   }
+  // Uma ADOCAO em curso (#524): o `adotar-template.mjs` copiou o `BOOTSTRAP.md` e o §2.0 ainda nao gravou a marca, logo
+  // o `ehDerivado` diz "template" — mas so os workflows que o manifesto lista vieram do template; os outros sao do
+  // PROJETO. Pelo CONTEUDO do manifesto, e nao por ele existir: um `adocao.json` esquecido no template desligava o guard
+  // inteiro, com o CI verde (leitura independente do #524).
+  let doTemplate = null;
+  const manifesto = read(".agent/adocao.json");
+  if (manifesto !== null) {
+    let m = null;
+    try {
+      m = JSON.parse(manifesto);
+    } catch {
+      m = null;
+    }
+    if (!Array.isArray(m?.copiados) || !Array.isArray(m?.iguais)) {
+      warn("Guard 22 (runner fixo) — o `.agent/adocao.json` e ilegivel (JSON invalido, ou sem `copiados`/`iguais`): nao sei que workflows vieram do template");
+      return 1;
+    }
+    doTemplate = new Set([...m.copiados, ...m.iguais]);
+  }
   const achados = [];
   let ficheiros = 0;
   for (const pasta of ONDE) {
     for (const ext of [".yml", ".yaml"]) {
       for (const nome of listDir(pasta, ext) ?? []) {
         const f = `${pasta}/${nome}${ext}`;
+        if (doTemplate && !doTemplate.has(f)) continue;
         ficheiros++;
         for (const r of runsOnDe(read(f))) achados.push({ f, ...r });
       }
     }
+  }
+  if (ficheiros === 0 && doTemplate) {
+    skip("Guard 22 (runner fixo) — adocao em curso: nenhum workflow nem exemplo veio do template (os do projeto sao dele)");
+    return 0;
   }
   if (ficheiros === 0) {
     // Sem workflows nem exemplos nao ha o que verificar — dito, e nao calado (uma fixture minima).

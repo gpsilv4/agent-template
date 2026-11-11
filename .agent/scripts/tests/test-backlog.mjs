@@ -181,6 +181,12 @@ test("ID em **negrito** e o mesmo ID (duplicado continua a avisar)", (dir) => {
   writeF(dir, ".agent/context/backlog.md", ACTIVE_OK.replace("| B1 | Pendente |", "| **B3** | Pendente |"));
 }, { code: 1, includes: ['ID duplicado "B3"'] });
 
+// Um ID riscado no Historico (`~~B1~~`) e o B1 (#524): aberto no ativo e fechado no arquivo e um duplicado. Com o `id`
+// cru no leitor, as duas chaves eram distintas e nada avisava (leitura independente do #524).
+test("um ID aberto no ativo e RISCADO no Historico e duplicado (#524)", (dir) => {
+  writeF(dir, ".agent/context/backlog-archive.md", ARCHIVE_OK.replace("| T1 | Tecnica |", "| ~~B1~~ | Bug | fechado e reaberto | Concluido | S1 | v0.1.0 | 2026-01-01 |\n| T1 | Tecnica |"));
+}, { code: 1, includes: ['ID duplicado "B1"'] });
+
 test("Estado em **negrito** conta como o mesmo estado", (dir) => {
   // Se o `*` sobreviver ao `norm`, "**Pendente**" cai fora de OPEN_STATES e o item some dos
   // contadores — que passam a discordar do Resumo. Aqui nada muda de facto: tem de passar.

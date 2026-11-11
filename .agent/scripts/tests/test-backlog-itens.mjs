@@ -312,7 +312,7 @@ caso("o Esforco: `null` sem a coluna, `\"\"` com a celula vazia, e o par normali
 caso("fechados: os campos do Historico, e as linhas sem ID tambem", () => {
   const t9 = lido.fechados.find((f) => f.id === "T9");
   return [
-    ...igual(t9, { id: "T9", idCelula: "T9", tipo: "tecnica", tipoCelula: "Tecnica", descricao: "fechado", estado: "concluido", estadoCelula: "Concluido", sprint: "S1", versao: "v1", data: "2026-01-02" }, "T9"),
+    ...igual(t9, { id: "T9", idCelula: "T9", riscado: false, idLimpo: "T9", tipo: "tecnica", tipoCelula: "Tecnica", descricao: "fechado", estado: "concluido", estadoCelula: "Concluido", sprint: "S1", versao: "v1", data: "2026-01-02" }, "T9"),
     ...espera(lido.fechados.filter((f) => f.id === "").length === 2, "as linhas do Historico sem ID nao vieram"),
     ...espera(lido.fechados.length === 6, `6 linhas no Historico, e nao o indice de sprints: ${lido.fechados.length}`),
   ];
@@ -367,7 +367,7 @@ caso("dependeDe e idsDe: os IDs, o `Bloqueado:` (com enfase, sem motivo, e nao `
 caso("pendentes: a Nota pelo nome; e `null` (com `encontradas.pendentes` falso) sem o heading", () => {
   const sem = leBacklog(ATIVO_RICO.replace("## Pendentes sem Sprint", "## Parqueados"), ARQUIVO_RICO);
   return [
-    ...igual(lido.pendentes, [{ id: "F1", riscado: false, idLimpo: "F1", descricao: "uma feature", esforco: "m", esforcoCelula: "M", nota: "precisa de dados" }], "os pendentes"),
+    ...igual(lido.pendentes, [{ id: "F1", idCelula: "F1", riscado: false, idLimpo: "F1", descricao: "uma feature", esforco: "m", esforcoCelula: "M", nota: "precisa de dados" }], "os pendentes"),
     ...igual([sem.pendentes, sem.encontradas.pendentes, lido.encontradas.pendentes], [null, false, true], "a secao renomeada nao e uma secao vazia"),
     ...igual([lido.encontradas.historico, leBacklog(ATIVO_RICO, "# Arquivo\n").encontradas.historico], [true, false], "o Historico"),
   ];
