@@ -26,6 +26,8 @@ concurrency:
 permissions:
   contents: read
 
+# Os runners fixos em `ubuntu-24.04`, e nao `ubuntu-latest` (que muda de imagem quando o GitHub quer, #488): subir de
+# imagem e mudar o `RUNNER` de `.agent/scripts/guards/runners.mjs` e todos os `runs-on:` num PR (o Guard 22 verifica).
 jobs:
   # A APP num so job (#347): o `detect`, o `quality`, o `unit-tests` e o `security-audit` eram 4 jobs, e num repo
   # privado cada job e cobrado ARREDONDADO ao minuto — medido em outubro, 5 dos 8 jobs de um PR duravam menos de
@@ -44,7 +46,7 @@ jobs:
     # (`Guard Tests`) recalcula o salto no shell dele e verifica a mensagem do merge. Limites: um PR mergeado
     # vermelho, um commit pela UI web no `main` e um committer forjado tambem saltam (`scripts-guide-why.md`).
     if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Os tres jobs da app tinham 15 + 15 + 10 min; em serie, o tecto soma-os.
     timeout-minutes: 30
     steps:
@@ -187,7 +189,7 @@ jobs:
     name: Guard Suites
     # O mesmo salto do `quality` (#347, PR B).
     if: github.event_name == 'pull_request' || !github.event.repository.private || github.event.head_commit.committer.username != 'web-flow'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Sem a varredura (#308): as suites e os verificadores, ~3 min no template e num derivado. A
     # varredura de mutacao vive no job `sweep`, em paralelo — o tecto dela e o historico dele estao la.
     timeout-minutes: 20
@@ -398,7 +400,7 @@ jobs:
   # metade do tempo de parede da perna completa.
   sweep:
     name: Mutation sweep (${{ matrix.modo }} ${{ matrix.shard }}/${{ matrix.de }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Depois das SUITES: com elas vermelhas o gate ja esta condenado, e as pernas faturavam ~40
     # min num privado a medir para nada (antes, um passo vermelho saltava o da varredura). Custa ~3
     # min de parede; o paralelismo das pernas, que e o ganho, fica.
@@ -510,7 +512,7 @@ jobs:
   # que nao existe invalida o workflow inteiro.
   guard-gate:
     name: Guard Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [guard-tests, sweep]
     # `always()`: sem ele, uma dependencia vermelha SALTAVA este job — e um check saltado conta como
     # passado para a protecao.
@@ -627,7 +629,7 @@ jobs:
   # tem o job dela, `sweep` (#308).
   simulators:
     name: Simuladores
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Tambem ao nivel do JOB, e nao so nos passos: num `push` o job arrancava, fazia o checkout
     # completo e o setup, saltava os dois passos e ficava VERDE sem ter medido nada (`TP2`). Assim
     # aparece como `skipped`, que e o que aconteceu.
@@ -694,7 +696,7 @@ jobs:
   # the committer `web-flow`, which a web-UI commit also has, and nothing would ever scan that commit again.
   secret-scan:
     name: Secret Scan
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # gitleaks-action v3 lista os commits do PR (evento pull_request) via API -> precisa
     # de pull-requests: read. Permissions de job SUBSTITUEM as do topo, por isso repor

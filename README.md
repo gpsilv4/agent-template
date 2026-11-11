@@ -248,7 +248,8 @@ not to* line, so every agent sees it.
     │   ├── mcp.mjs             <- Guard 16: MCP policy + no literal secrets in MCP config
     │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
     │   ├── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
-    │   └── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
+    │   ├── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
+    │   └── runners.mjs         <- Guard 22: the template's CI runners on one pinned label, not ubuntu-latest (#488)
     │
     ├── lib/                    <- Shared modules. No entry point, no discovery: imported
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted

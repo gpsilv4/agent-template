@@ -35,6 +35,7 @@ import { dirname, resolve, join } from "path";
 import { guardSettings } from "./guards/settings.mjs";
 import { guardChangelogVersion, guardDependencyVersions, guardTemplateVersion } from "./guards/versions.mjs";
 import { guardDerivedCounts } from "./guards/derived-counts.mjs";
+import { guardRunners } from "./guards/runners.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardContextVirgem } from "./guards/context-virgem.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
@@ -422,6 +423,9 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
 guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+
+// --- Guard 22: os runners do CI do template num so rotulo fixo (#488) ---
+guardsRun += guardRunners({ read, warn, ok, skip, listDir, ehDerivado });
 
 // --- Guard 21: no TEMPLATE, `.agent/context/` esta por estrear ---
 // O par do Guard 13, e o inverso dele: aquele so corre DEPOIS do bootstrap, este so ANTES.
