@@ -10,7 +10,7 @@
  * NAO REPETE O QUE JA SE DIZ: um Estado desconhecido, um `Concluido` no ativo, um ID duplicado ou um ID dos Pendentes
  * que nenhuma tabela por tipo cobre ja tem aviso no `calcula`; aqui nao se diz outra vez.
  */
-import { OPEN_STATES, norm } from "./backlog-itens.mjs";
+import { ID_LIKE, OPEN_STATES, norm } from "./backlog-itens.mjs";
 
 /** A `Ordem` de uma linha de bloco: um inteiro, ou `null` (nao e um numero). Com a mesma tolerancia a enfase do ID e
  *  do Estado (`**1**`), e sem os `~~` de uma linha riscada (a regra 6 ja diz o riscado). */
@@ -124,6 +124,15 @@ export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }) {
   for (const b of lido.blocos) for (const l of b.linhas) if (l.riscado) problemas.push(riscada(`"${b.titulo}"`, l.idLimpo));
   for (const p of lido.pendentes ?? []) if (p.riscado) problemas.push(riscada("Pendentes sem Sprint", p.idLimpo));
   for (const l of lido.linhasPorTipo) if (l.riscado && OPEN_STATES.includes(l.estado)) problemas.push(riscada(l.seccao, l.idLimpo));
+
+  // 8) O formato do ID (#515): um ID que nao casa o `ID_LIKE` (letras e depois algarismos) fica FORA das verificacoes de
+  //    IDs — o `calcula` salta-o (nem o repetido se ve) e a vista mostra-o como invalido. Dize-lo, e nao calar (`TP2`). Os
+  //    riscados tem a regra 6; uma linha sem ID (a do modelo vazio) nao conta. Nao se renomeia: e decisao do projeto.
+  const formato = (onde, id) =>
+    `${onde}: o ID "${id}" nao tem o formato de um ID (letras e depois algarismos, ex. U47) — fica fora das verificacoes de IDs; dar-lhe um ID novo (uma sub-parte de outro ticket leva um ID proprio)`;
+  for (const l of lido.linhasPorTipo) if (l.id && !l.riscado && !ID_LIKE.test(l.id)) problemas.push(formato(`${ACTIVE}: ${l.seccao}`, l.id));
+  for (const p of lido.pendentes ?? []) if (p.id && !p.riscado && !ID_LIKE.test(p.id)) problemas.push(formato(`${ACTIVE}: Pendentes sem Sprint`, p.id));
+  for (const f of lido.fechados) if (f.id && !f.riscado && !ID_LIKE.test(f.id)) problemas.push(formato(`${ARCHIVE}: Historico`, f.id));
 
   // 7) Os Pendentes: o heading (sem ele, a regra 4 dos Pendentes desligava-se calada) e a coluna `Nota`.
   if (!lido.encontradas.pendentes) {
