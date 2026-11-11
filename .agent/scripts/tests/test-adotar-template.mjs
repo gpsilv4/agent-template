@@ -82,9 +82,16 @@ try {
   cpSync(join(SCRIPTS, "lib/derivado.mjs"), join(tpl, ".agent/scripts/lib/derivado.mjs"));
   // O que o `adotar-template.mjs` importa tem de vir com ele (#373: a guarda de entry point partilhada).
   cpSync(join(SCRIPTS, "lib/eh-main.mjs"), join(tpl, ".agent/scripts/lib/eh-main.mjs"));
+  cpSync(join(SCRIPTS, "lib/origem-upgrade.mjs"), join(tpl, ".agent/scripts/lib/origem-upgrade.mjs"));
   git(tpl, "init", "-q", "-b", "main");
+  // O `.gitignore` GLOBAL de quem corre nao entra (`TP3`): o caso do ficheiro nao seguido (#512) conta com que o git o
+  // veja, e um `.gitignore` global que o apanhasse punha a suite verde sem medir nessa maquina.
+  git(tpl, "config", "core.excludesFile", "/dev/null");
   git(tpl, "add", "-A");
   git(tpl, "commit", "-q", "-m", "template");
+  // Numa TAG (#512): a adocao copia de um clone limpo numa tag. DIFERENTE do `TEMPLATE_VERSION` (v9.9.9) de proposito:
+  // o caso do manifesto prova que o `versao:` vem da tag, e nao do ficheiro (que entre duas tags diz a anterior).
+  git(tpl, "tag", "v9.10.0");
   git(tpl, "remote", "add", "origin", "https://example.invalid/agent-template");
   const commitTpl = git(tpl, "rev-parse", "HEAD").trim();
 
@@ -178,7 +185,7 @@ try {
     return [
       ...espera(template.origem === "https://example.invalid/agent-template", `origem: ${template.origem}`),
       ...espera(template.commit === commitTpl, `commit: ${template.commit}`),
-      ...espera(template.versao === "v9.9.9", `versao: ${template.versao}`),
+      ...espera(template.versao === "v9.10.0", `versao: ${template.versao} — devia ser a tag, e nao o TEMPLATE_VERSION (#512)`),
       ...espera(template.caminho === realpathSync(tpl), `caminho: ${template.caminho}`),
     ];
   });
@@ -360,10 +367,68 @@ try {
     escreve(tpl, "README.md", "# Template mexido\n");
     try {
       const r = recusa(() => planear(tpl, projeto()));
-      return espera(r !== null && /alteracoes locais/.test(r), `deu: ${r}`);
+      return espera(r !== null && /alteracao\(oes\) por commitar \(README\.md\)/.test(r), `deu: ${r}`);
     } finally {
       git(tpl, "checkout", "--", "README.md");
     }
+  });
+  // #512: um clone da `main` entre duas tags recusa, e diz como clonar a tag. O controlo e o resto da suite (numa tag).
+  test("recusa: um clone do template num commit sem tag (#512)", () => {
+    const outro = join(sandbox, "tpl-sem-tag");
+    git(sandbox, "clone", "-q", tpl, outro);
+    git(outro, "config", "user.email", "t@t");
+    git(outro, "config", "user.name", "t");
+    git(outro, "commit", "-q", "--allow-empty", "-m", "depois da tag");
+    const r = recusa(() => planear(outro, projeto()));
+    return [
+      ...espera(r !== null && /nao esta numa tag de release/.test(r) && r.includes("--branch v9.10.0") && r.includes("../agent-template"), `deu: ${r}`),
+      // A instrucao e a da ADOCAO: sem o `~/.cache` nem o `--fronteira-em` do upgrade, que este script recusa.
+      ...espera(r !== null && !r.includes("--fronteira-em") && !r.includes("~/.cache"), `a recusa deu a instrucao do upgrade: ${r}`),
+    ];
+  });
+  // Um ficheiro NAO SEGUIDO no clone tambem recusa (#512, a guarda do #490): copia-se do disco. Antes passava.
+  test("recusa: um ficheiro nao seguido no clone do template (#512)", () => {
+    escreve(tpl, "rascunho.md", "x\n");
+    try {
+      const r = recusa(() => planear(tpl, projeto()));
+      return espera(r !== null && /\(rascunho\.md\)/.test(r), `deu: ${r}`);
+    } finally {
+      rmSync(join(tpl, "rascunho.md"), { force: true });
+    }
+  });
+  // O comando do README: um clone RASO de uma tag ANOTADA (como as releases), por `file://` (o raso precisa dele).
+  test("um clone raso de uma tag anotada adota, e o manifesto grava essa tag (#512)", () => {
+    const anotado = join(sandbox, "tpl-anotado");
+    git(sandbox, "clone", "-q", tpl, anotado);
+    git(anotado, "config", "user.email", "t@t");
+    git(anotado, "config", "user.name", "t");
+    git(anotado, "tag", "-a", "v9.11.0", "-m", "release");
+    const raso = join(sandbox, "tpl-raso");
+    git(sandbox, "clone", "-q", "--depth", "1", "--branch", "v9.11.0", `file://${anotado}`, raso);
+    const m = planear(raso, projeto());
+    return espera(m.template?.versao === "v9.11.0", `versao: ${m.template?.versao}`);
+  });
+  // A retoma de uma adocao feita ANTES desta regra (o manifesto num commit sem tag): retoma-se no commit dele, sem a
+  // guarda da tag — exigi-la era um ciclo sem saida (leitura independente do #512). Limpo, continua a exigir-se.
+  test("na retoma, um manifesto num commit sem tag retoma-se nesse commit; sujo, recusa (#512)", () => {
+    const antigo = join(sandbox, "tpl-antigo");
+    git(sandbox, "clone", "-q", tpl, antigo);
+    git(antigo, "config", "user.email", "t@t");
+    git(antigo, "config", "user.name", "t");
+    git(antigo, "commit", "-q", "--allow-empty", "-m", "main entre tags");
+    const p = projeto();
+    const commit = git(antigo, "rev-parse", "HEAD").trim();
+    escreve(p, MANIFESTO, JSON.stringify({ estado: "a copiar", copiados: [], colisoes: [], iguais: [], perguntar: [], template: { commit, versao: "v9.9.9" } }));
+    const passa = (() => {
+      try {
+        return planear(antigo, p).retomar === true;
+      } catch {
+        return false;
+      }
+    })();
+    escreve(antigo, "README.md", "# mexido\n");
+    const sujo = recusa(() => planear(antigo, p));
+    return [...espera(passa, "a retoma de uma adocao antiga num commit sem tag devia passar"), ...espera(sujo !== null && /alteracoes locais/.test(sujo), `sujo: ${sujo}`)];
   });
 
   test("um projeto alcancado por um symlink PARA DENTRO do template e sobreposicao", () => {
