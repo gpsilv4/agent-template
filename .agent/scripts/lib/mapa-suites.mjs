@@ -99,10 +99,12 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/saida-upgrade\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")], only: "upgrade" },
   // As tres libs com regex do runner ou do caminho de uma suite (#374a): o `tests-regex-runner.mjs`, do `test-guards`,
   // prende-as umas as outras, logo mexer numa corre tambem o `test-guards`. Antes dos grupos: a primeira regra vence.
+  // A guarda da origem (#490) decide tambem a adocao (#512): mexer nela obriga a correr as duas suites.
+  { re: /^\.agent\/scripts\/lib\/origem-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-adotar-template.mjs")], only: "upgrade" },
   { re: /^\.agent\/scripts\/lib\/medida-upgrade\.mjs$/, verifica: [S("test-simulate-upgrade.mjs"), S("test-guards.mjs"), S("test-ci-exemplo.mjs")], only: "upgrade" },
   { re: /^\.agent\/scripts\/lib\/(passo-paralelo|surface-patterns)\.mjs$/, verifica: [S("test-test-surface.mjs"), S("test-guards.mjs")] },
   {
-    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade|origem-upgrade)\.mjs)$/,
+    re: /^\.agent\/scripts\/(simulate-upgrade\.mjs|lib\/(?:upgrade-mecanico|upgrade-categorias|projeto-de-ontem|fronteira-upgrade)\.mjs)$/,
     verifica: [S("test-simulate-upgrade.mjs")],
     only: "upgrade",
   },

@@ -63,7 +63,8 @@ cd my-project
 > bootstrap reads it until the end):
 >
 > ```bash
-> git clone --depth 1 https://github.com/gpsilv4/agent-template ../agent-template
+> git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template
+> # the latest tag: git ls-remote --tags --refs --sort=-v:refname https://github.com/gpsilv4/agent-template 'v*'
 > node ../agent-template/.agent/scripts/adotar-template.mjs --simular   # what it would copy/collide
 > node ../agent-template/.agent/scripts/adotar-template.mjs
 > ```

@@ -4,7 +4,8 @@
  *
  * Corre-se do CLONE do template, dentro do projeto (#288):
  *
- *   git clone --depth 1 https://github.com/gpsilv4/agent-template ../agent-template
+ *   git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template
+ *   (a ultima tag: git ls-remote --tags --refs --sort=-v:refname https://github.com/gpsilv4/agent-template 'v*')
  *   node ../agent-template/.agent/scripts/adotar-template.mjs            # copia
  *   node ../agent-template/.agent/scripts/adotar-template.mjs --simular  # so lista
  *
@@ -43,10 +44,16 @@ import { dirname, join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { ehMain } from "./lib/eh-main.mjs";
+import { confirmaTemplateLimpoNumaTag } from "./lib/origem-upgrade.mjs";
 
 /** O que nunca se copia sem decisao do utilizador: uma licenca nao se herda por omissao. */
 export const PERGUNTAR = ["LICENSE"];
 export const MANIFESTO = ".agent/adocao.json";
+/** A instrucao da recusa da guarda, para quem ADOTA (#512): o clone fica ao lado do projeto (o bootstrap le-o ate ao
+ *  fim, logo nao no TMPDIR), e este script nao tem `--fronteira-em` (e da 2b do upgrade). */
+const CLONAR_A_TAG = (tag = "<tag>") =>
+  `git clone --depth 1 --branch ${tag} https://github.com/gpsilv4/agent-template ../agent-template` +
+  (tag === "<tag>" ? " (a ultima: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'`)" : "");
 
 const lerOuNull = (raiz, rel) => {
   try {
@@ -109,9 +116,6 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
   if (agent && (agent.isSymbolicLink() || !agent.isDirectory())) {
     throw new Error("o .agent do projeto nao e uma pasta real (e um symlink ou um ficheiro) — o manifesto sairia do projeto");
   }
-  if (git(["status", "--porcelain", "--untracked-files=no"]).trim()) {
-    throw new Error(`o clone do template (${rTpl}) tem alteracoes locais — o manifesto atribuia ao commit dele um conteudo que nao e o dele`);
-  }
   const anterior = lerOuNull(rProj, MANIFESTO);
   if (anterior !== null) {
     const m = (() => {
@@ -131,6 +135,11 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
     if (m.template?.commit !== git(["rev-parse", "HEAD"]).trim()) {
       throw new Error(`a adocao interrompida era do commit ${m.template?.commit} e o clone esta noutro — repoe o clone nesse commit`);
     }
+    // Na retoma nao se exige a tag (o commit do manifesto manda), mas o clone tem de estar LIMPO nesse commit: o
+    // resto copia-se do disco.
+    if (git(["status", "--porcelain", "--untracked-files=all"]).trim()) {
+      throw new Error(`o clone do template (${rTpl}) tem alteracoes locais — a retoma copiava um conteudo que nao e o do commit ${m.template.commit}`);
+    }
     // Um ficheiro que a corrida interrompida copiou e que agora DIFERE do template: uma copia
     // cortada a meio, ou uma edicao entre as duas corridas. Passa-lo a `colisoes` em silencio era
     // chamar "do projeto" a um ficheiro do template — o Passo 4 propunha funde-lo.
@@ -141,6 +150,13 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
     // O caminho e o do clone ATUAL: o anterior pode ja nao existir (o mesmo commit, noutra pasta).
     return { ...m, template: { ...m.template, caminho: rTpl }, tpl: rTpl, proj: rProj, retomar: true };
   }
+  // O clone limpo numa TAG (#512), com a mesma guarda do `/upgrade` (#490): copia-se do disco, e um clone da `main`
+  // entre duas tags (ou com trabalho por commitar) entrava no projeto sob uma marca que o `/upgrade` seguinte recusa.
+  // DEPOIS da retoma: uma adocao interrompida retoma-se no commit do manifesto, que pode ser de antes desta regra (um
+  // clone da `main`); exigir-lhe uma tag era um ciclo sem saida (leitura independente do #512).
+  const { tag } = confirmaTemplateLimpoNumaTag(rTpl, (m) => {
+    throw new Error(m);
+  }, { quem: "uma adocao (#512)", instrucao: CLONAR_A_TAG });
   const ficheiros = git(["ls-files", "-z"]).split("\0").filter(Boolean);
   if (ficheiros.length === 0) throw new Error(`${rTpl} nao tem ficheiros no git — e um clone do template?`);
   const plano = { estado: "a copiar", copiados: [], colisoes: [], iguais: [], perguntar: [] };
@@ -168,7 +184,8 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
     caminho: rTpl,
     origem,
     commit: git(["rev-parse", "HEAD"]).trim(),
-    versao: lerOuNull(rTpl, ".agent/TEMPLATE_VERSION")?.trim() ?? null,
+    // A tag que a guarda confirmou, e nao o `TEMPLATE_VERSION`: entre duas tags, o ficheiro diz a anterior (#512).
+    versao: tag,
   };
   return { ...plano, tpl: rTpl, proj: rProj };
 }

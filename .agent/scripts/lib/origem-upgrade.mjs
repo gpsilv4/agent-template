@@ -42,12 +42,13 @@ const linhas = (t) => t.split("\n").filter(Boolean);
  * (a) o `root` e a raiz do seu repo, sem alteracoes seguidas ou nao (os ignorados nao contam: o motor
  * exclui-os), e sem nada escondido do `status` (sparse, `skip-worktree`, `assume-unchanged`); (b) o
  * `HEAD` numa tag `v*` — com duas, a maior estavel (o clone traz as duas: recusar era um beco). `fatal`
- * recebe a razao e NAO retorna.
+ * recebe a razao e NAO retorna. `quem`/`instrucao`: o texto da recusa de quem chama (#512) — a adocao clona para
+ * `../agent-template` e nao tem `--fronteira-em`; dar-lhe a instrucao do upgrade mandava-a para um beco.
  *
  * @returns {{tag: string}}
  */
-export function confirmaTemplateLimpoNumaTag(root, fatal) {
-  const recusa = (porque, tag) => fatal(`o template em ${root} ${porque} — um upgrade le um clone limpo numa tag (#490): ${comoClonar(tag)}`);
+export function confirmaTemplateLimpoNumaTag(root, fatal, { quem = "um upgrade", instrucao = comoClonar } = {}) {
+  const recusa = (porque, tag) => fatal(`o template em ${root} ${porque} — ${quem} le um clone limpo numa tag (#490): ${instrucao(tag)}`);
   let r;
   // Tudo num so `try`: qualquer pergunta que falhe e a mesma recusa (`TP2`), nunca "limpo".
   try {

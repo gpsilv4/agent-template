@@ -356,7 +356,7 @@ export function registar() {
   // O template sujo RECUSA, antes da copia e da bateria (#490): a nota do #304 nao impediu o R10-3.
   test("o template com alteracoes por commitar recusa antes de medir (#490)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" }, sujoNoTemplate: { ".claude/hooks/sujo.mjs": "// sujo\n" } }),
-      { codigo: 1, inclui: ["tem 1 alteracao(oes) por commitar (.claude/hooks/sujo.mjs)", "um upgrade le um clone limpo numa tag"], exclui: ["copia deste projeto (HEAD)", "estado actual", ", limpo"] }));
+      { codigo: 1, inclui: ["tem 1 alteracao(oes) por commitar (.claude/hooks/sujo.mjs)", "le um clone limpo numa tag"], exclui: ["copia deste projeto (HEAD)", "estado actual", ", limpo"] }));
   test("o template limpo numa tag mede, e di-lo (#490)", () =>
     exige(contraProjeto({ hoje: { [H]: "// novo\n" } }), { codigo: 0, inclui: ["template: v2.0.0, limpo", "copia deste projeto (HEAD)", "estado actual"], exclui: ["por commitar ("] }));
   // A fachada do nome: um ficheiro do staging com "EsteProjeto" diz-se (funcao pura).
