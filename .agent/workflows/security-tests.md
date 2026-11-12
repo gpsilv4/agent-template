@@ -1,6 +1,6 @@
 # /security-tests — Testes de Seguranca
 
-> **Quando usar:** antes de releases com alteracoes em auth, formularios ou APIs · **Quando NAO usar:** alteracao so visual, sem rotas nem inputs novos (#246).
+> **Quando usar:** ao acrescentar uma rota, um formulario, um header, uma tabela ou uma dependencia, e antes de uma release que os traz · **Quando NAO usar:** alteracao so visual, sem rotas nem inputs novos (#246).
 
 Levar a suite de seguranca a um **veredicto**, e manter honesta a lista do que ela cobre.
 Valida headers HTTP, flags de cookies, XSS/injection, bypass de autenticacao e isolamento de
@@ -9,7 +9,7 @@ dados.
 ## 0. Entrada e saida
 
 **Corre quando**: acrescentaste uma rota, um formulario, um header, uma tabela ou uma
-dependencia; e antes de qualquer release.
+dependencia; e antes de uma release que acrescentou algum deles (a suite em si corre em todas, no `/deploy` §6).
 
 **Esta feito quando** as quatro forem verdade:
 

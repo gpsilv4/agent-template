@@ -22,10 +22,9 @@ Follow the workflows in `.agent/workflows/`:
 | Bug fix | `/debug` -> implement -> `/review` |
 | Refactor | `/refactor` -> implement -> `/review` |
 | UI change | its type's flow, then `/design-review` after `/review` |
-| Full sprint | implement all -> `/review` -> `/deploy` |
-| Milestone (end of sprint, pre-release) | `/audit` -> backlog proposals, approved first |
+| Closing a sprint (a release) | implement all -> `/review` -> `/audit` -> `/security-tests` (if it applies) -> fix the Critical/High findings, or give them a written destination (a new ID, approved first) -> closing report -> `/deploy` -> `/backlog-review` (each if present) |
 | Product strategy | `/market-scan` -> backlog proposals, approved first |
-| Opening a sprint, or after a release | `/backlog-review` -> backlog proposals, approved first |
+| Opening a sprint | `/backlog-review` (if present) -> backlog proposals, approved first |
 
 ## Dependencies and the lockfile
 
