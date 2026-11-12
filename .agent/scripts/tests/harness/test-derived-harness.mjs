@@ -34,6 +34,16 @@ const ciYml = (comandos) =>
   "name: CI\non:\n  push:\n\njobs:\n  guard-tests:\n    runs-on: ubuntu-latest\n    steps:\n" +
   comandos.map((c) => `      - name: ${c}\n        run: node ${c}\n`).join("");
 
+/** O pacote de um job de um derivado privado (#487), minimo: o job `ci` com o bloco MODO COMPLETO (a) e o job
+ *  `guard-tests` comentado no bloco (b), com estes comandos. O simulador descomenta-os (`comModoCompleto`). */
+export const pacoteCi = (comandos) =>
+  "name: CI\non:\n  pull_request:\n\njobs:\n  ci:\n    runs-on: ubuntu-24.04\n    steps:\n" +
+  "      # --- MODO COMPLETO (a) inicio: os guards dos docs\n      # - name: guards\n      #   run: node .agent/scripts/check-doc-versions.mjs\n      # --- MODO COMPLETO (a) fim ---\n" +
+  "      - name: app\n        run: npm test\n\n" +
+  "  # --- MODO COMPLETO (b) inicio: o job da maquinaria\n  # guard-tests:\n  #   runs-on: ubuntu-24.04\n  #   steps:\n" +
+  comandos.map((c) => `  #     - name: ${c}\n  #       run: node ${c}\n`).join("") +
+  "  # --- MODO COMPLETO (b) fim ---\n";
+
 
 /** Repo minimo, limpo por construcao: um placeholder para substituir, uma seccao 2.2 no
  *  BOOTSTRAP para derivar, e um stub por cada comando que o simulador chama. */

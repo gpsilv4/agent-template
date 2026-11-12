@@ -290,6 +290,7 @@ not to* line, so every agent sees it.
     │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
     │   ├── superficie-gate.mjs <- The CI gate in the test surface: `on:`/`env:`/`defaults:`, machinery steps, the `Test-Surface:` trailer (#285)
     │   ├── estrutura-workflow.mjs <- The CI gate's structure: a job/step reader (used by the two below), `needs:`, aggregators, shape defects, cross-workflow check names (#374b, #355, #362)
+    │   ├── exemplo-ci.mjs      <- The one-job CI example with its MODO COMPLETO blocks uncommented: a private derived project's ci.yml (#487)
     │   ├── saltos-variavel.mjs <- A step that skips on a `case` variable whose value stopped deciding (#353)
     │   ├── passos-novos.mjs    <- A new step before the suites that is not read-only (#362)
     │   ├── gate-modos.mjs      <- Reads the sweep modes from the matrix and from the gate's command

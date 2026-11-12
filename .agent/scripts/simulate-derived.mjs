@@ -18,8 +18,9 @@
  *   1. copia o repo sem `.git` nem o que nao pertence a um clone novo;
  *   2. substitui os placeholders (`{{ ... }}`);
  *   3. cria as rules que o bootstrap GERA (sao o discriminador de "bootstrap concluido"), e da ao derivado o Dependabot
- *      de um repo PRIVADO: o `.github/dependabot.yml` passa a ser o exemplo mensal, como a 2.x manda (#485). O `ci.yml`
- *      fica o do template: o CI de um job dos privados (`ci-sem-maquinaria.yml`) nao e simulado aqui (#487);
+ *      de um repo PRIVADO: o `.github/dependabot.yml` passa a ser o exemplo mensal, como a 2.x manda (#485). Com
+ *      `SIMULATE_PRIVADO=1`, tambem o `ci.yml` de um privado: o pacote de um job no modo completo, com a cache e
+ *      `modo: completo` na marca (#487); sem ele, o `ci.yml` fica o do template (o estado do bootstrap);
  *   4. corre os verificadores e as suites, e reprova se algum sair != 0.
  *
  * A lista de extensoes do passo 2 nao precisa de estar perfeita para o resultado ser de
@@ -35,6 +36,7 @@
  *   node .agent/scripts/simulate-derived.mjs             # corre tudo
  *   node .agent/scripts/simulate-derived.mjs --keep      # nao apaga a copia (para inspeccionar)
  *   node .agent/scripts/simulate-derived.mjs --skips     # e a varredura --skips no derivado maduro (#308; no CI, SIMULATE_SKIPS=1)
+ *   SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs   # o derivado privado, com o CI de um job (#487)
  *   node .agent/scripts/simulate-derived.mjs --only=check-doc-versions,test-guards
  */
 
@@ -47,6 +49,7 @@ import { criaTmp, limpaTmpsAntigos, limpaFixturesDeTeste } from "./lib/tmp-limpo
 import { leOuNull } from "./lib/ficheiros.mjs";
 import { foraDoTemplate } from "./lib/fora-do-template.mjs";
 import { comandosDoCI, correNaBateria } from "./lib/medida-upgrade.mjs";
+import { comModoCompleto } from "./lib/exemplo-ci.mjs";
 import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "./lib/derivado-maduro.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -143,6 +146,12 @@ const comSkips = args.includes("--skips") || process.env.SIMULATE_SKIPS === "1";
 // SAI do ambiente logo aqui (leitor do #308): herdada, a suite do simulador que a bateria corre lancava
 // simuladores de fixture tambem com a `--skips`, sem varredura nenhuma neles — o passo ficava vermelho.
 delete process.env.SIMULATE_SKIPS;
+// `SIMULATE_PRIVADO=1` (#487): o derivado PRIVADO com a maquinaria, com o `ci.yml` do pacote de um job (o 3e''). Por
+// omissao fica o estado que o BOOTSTRAP produz, com o `ci.yml` do template: as duas formas existem nos derivados reais,
+// e o CI corre as duas (leitor do #487: com o pacote sempre, o caso por omissao deixava de ser medido). Sai tambem do
+// ambiente, pela razao da `--skips`.
+const comPrivado = process.env.SIMULATE_PRIVADO === "1";
+delete process.env.SIMULATE_PRIVADO;
 if (comSkips) selecionados.push([".agent/scripts/mutation-sweep.mjs", "--skips"]);
 
 console.log("\n=== Simulacao de projeto derivado ===\n");
@@ -334,7 +343,7 @@ comOptOuts({ dir, ok, fatal });
 // O `BOOTSTRAP.md` manda um repo privado trocar o `.github/dependabot.yml` pelo exemplo mensal. A simulacao ficava com o
 // semanal (um derivado publico), e por isso nao viu que o `test-ci-exemplo` reprovava em TODO o derivado privado — os
 // derivados reais conhecidos sao privados, e foi um deles que o encontrou, no `/upgrade`. Simula-se o caso que custa.
-// SO o Dependabot: o `ci.yml` de um privado (o pacote de um job, com os blocos MODO COMPLETO) fica por simular (#487).
+// O `ci.yml` de um privado (o pacote de um job, com os blocos MODO COMPLETO) vem a seguir, no 3e'' (#487).
 {
   const manda = (leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) ?? "").includes("src/docs/exemplos/dependabot-privado.yml");
   const exemplo = leOuNull(join(dir, "src/docs/exemplos/dependabot-privado.yml"));
@@ -345,6 +354,31 @@ comOptOuts({ dir, ok, fatal });
     ok("um derivado privado: o .github/dependabot.yml e o exemplo mensal (BOOTSTRAP, #440)");
   } else {
     ok("o BOOTSTRAP ja nao manda trocar o dependabot.yml num privado — fica o do template");
+  }
+
+  // --- 3e''. o CI de um derivado PRIVADO com a maquinaria (#487) ---------------------------------------------------
+  // Um privado usa o pacote de um job (`upgrade-derivados-privados.md` §6) com os dois blocos MODO COMPLETO
+  // descomentados, e a marca diz `modo: completo`. Com o `ci.yml` do template, as suites que leem o `ci.yml` real nunca
+  // viam a forma de um privado — a familia do defeito do #485. So com `SIMULATE_PRIVADO=1`, e com a ordem do
+  // Dependabot no BOOTSTRAP (sem ela, nao ha privado a simular: dize-lo, e nao correr o publico como se fosse).
+  if (comPrivado && !manda) fatal("SIMULATE_PRIVADO=1 e o BOOTSTRAP ja nao manda nada a um repo privado: nao ha derivado privado a simular");
+  if (!comPrivado) ok("o ci.yml fica o do template (o estado do bootstrap); o de um privado simula-se com SIMULATE_PRIVADO=1");
+  if (comPrivado) {
+    const pacote = leOuNull(join(dir, "src/docs/exemplos/ci-sem-maquinaria.yml"));
+    const cache = leOuNull(join(dir, "src/docs/exemplos/cache-sem-maquinaria.yml"));
+    if (pacote === null || cache === null) fatal("um derivado privado usa o src/docs/exemplos/ci-sem-maquinaria.yml e o cache-sem-maquinaria.yml, e um deles nao existe");
+    const completo = comModoCompleto(pacote);
+    if (completo === null) fatal("o ci-sem-maquinaria.yml nao tem os dois blocos MODO COMPLETO (a) e (b) como o comModoCompleto os le");
+    writeFileSync(join(dir, ".github/workflows/ci.yml"), completo);
+    writeFileSync(join(dir, ".github/workflows/cache.yml"), cache);
+    writeFileSync(join(dir, ".agent/.template-version"), `${readFileSync(join(dir, ".agent/.template-version"), "utf8")}modo: completo\n`);
+    // O que se corre continua a ser o `guard-tests` do template (e o que se mede); o do pacote tem de ser o mesmo, senao
+    // um derivado privado corria menos do que esta simulacao diz que corre.
+    const doPacote = comandosDoCI(dir)?.filter(correNaBateria) ?? [];
+    const so = (a, b) => a.filter((c) => !b.some((d) => String(d) === String(c))).map(String);
+    const diff = [...so(COMANDOS, doPacote).map((c) => `so no template: ${c}`), ...so(doPacote, COMANDOS).map((c) => `so no pacote: ${c}`)];
+    if (diff.length) fatal(`o guard-tests do pacote nao e o do template (${diff.join("; ")})`);
+    ok(`um derivado privado: o ci.yml e o pacote de um job no modo completo, com a cache e \`modo: completo\` na marca (${doPacote.length} comandos, os do template)`);
   }
 }
 

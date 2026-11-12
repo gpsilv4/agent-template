@@ -660,10 +660,13 @@ jobs:
       # da maquinaria conta), mas lido por linha: um nome que o git poe entre aspas (com `"`, `\` ou um caracter de
       # controlo) escapa ao prefixo AQUI — limite aceite, porque so desliga a `--skips` sobre o derivado; quem
       # decide a varredura e o plano (#347, C2).
+      # Primeiro o derivado PRIVADO (#487): o `ci.yml` do pacote de um job no modo completo, a forma que os derivados
+      # privados reais usam. Depois o do bootstrap, com o `ci.yml` do template. ~+1 min; o template e publico.
       - name: Projeto derivado — o template funciona depois do bootstrap
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
+          SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs
           tocados="$(git -c core.quotePath=false diff --name-only --no-renames "$(git rev-parse HEAD^1)..HEAD")"
           rc=0
           grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?

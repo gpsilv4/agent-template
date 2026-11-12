@@ -66,8 +66,10 @@ export const SUITES = [
   // O CI de um job e lido tambem pela 2b de ponta a ponta (#477: o modo completo do pacote, no `tests-medida-2b-modo`).
   { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/(?:casos-salto-cache|casos-dependabot-exemplo|casos-modo-completo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
-  // O `comModoCompleto` serve tambem o caso de ponta a ponta da 2b (#477).
-  { re: /^\.agent\/scripts\/tests\/harness\/expressoes-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/expressoes-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
+  // O `comModoCompleto` (#487: saiu do harness para o simulador o poder importar) serve o exemplo, o caso de ponta a ponta
+  // da 2b (#477) e o derivado privado do `simulate-derived` (#487): os tres leem-no.
+  { re: /^\.agent\/scripts\/lib\/exemplo-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs")] },
   // O `dependabot-privado.yml` tem de ser o do template com duas diferencas: mexer no do template corre a suite (#440).
   // O Guard 13 tambem le o `dependabot.yml` (os placeholders): mexer nele pede os dois.
   { re: /^\.github\/dependabot\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("check-doc-versions.mjs")] },
