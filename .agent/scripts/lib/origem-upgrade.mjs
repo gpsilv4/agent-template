@@ -43,7 +43,7 @@ const linhas = (t) => t.split("\n").filter(Boolean);
  * exclui-os), e sem nada escondido do `status` (sparse, `skip-worktree`, `assume-unchanged`); (b) o
  * `HEAD` numa tag `v*` — com duas, a maior estavel (o clone traz as duas: recusar era um beco). `fatal`
  * recebe a razao e NAO retorna. `quem`/`instrucao`: o texto da recusa de quem chama (#512) — a adocao clona para
- * `../agent-template` e nao tem `--fronteira-em`; dar-lhe a instrucao do upgrade mandava-a para um beco.
+ * `../agent-template-<tag>` e nao tem `--fronteira-em`; dar-lhe a instrucao do upgrade mandava-a para um beco.
  *
  * @returns {{tag: string}}
  */

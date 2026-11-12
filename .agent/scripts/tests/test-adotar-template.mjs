@@ -381,7 +381,7 @@ try {
     git(outro, "commit", "-q", "--allow-empty", "-m", "depois da tag");
     const r = recusa(() => planear(outro, projeto()));
     return [
-      ...espera(r !== null && /nao esta numa tag de release/.test(r) && r.includes("--branch v9.10.0") && r.includes("../agent-template"), `deu: ${r}`),
+      ...espera(r !== null && /nao esta numa tag de release/.test(r) && r.includes("--branch v9.10.0") && r.includes("--branch v9.10.0 <url-do-template> ../agent-template-v9.10.0"), `deu: ${r}`),
       // A instrucao e a da ADOCAO: sem o `~/.cache` nem o `--fronteira-em` do upgrade, que este script recusa.
       ...espera(r !== null && !r.includes("--fronteira-em") && !r.includes("~/.cache"), `a recusa deu a instrucao do upgrade: ${r}`),
     ];

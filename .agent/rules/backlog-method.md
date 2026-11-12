@@ -48,8 +48,10 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 4. No sprint correspondente, remover a linha do item cancelado
 5. Items cancelados nao contam para o progresso (barra de progresso ignora-os)
 
+**Ao renomear o ID de um item ja fechado** (um ID fora do formato no Historico, #524): o ID novo verifica-se nos DOIS ficheiros (um ID nunca se reutiliza), muda-se em todos os sitios que o citam, e o commit e so isso, com o ID antigo na mensagem — e o que liga a historia de antes a de depois.
+
 **Ao adicionar um novo item:**
-1. Usar o proximo ID disponivel na seccao (ex: se B6 e o ultimo bug, o novo e B7). So letras e depois algarismos: uma sub-parte de outro ticket (`U15p1`) leva um ID proprio — o `check-backlog` reprova o resto (#515)
+1. Usar o proximo ID disponivel na seccao (ex: se B6 e o ultimo bug, o novo e B7). So 1 a 4 letras e depois algarismos: uma sub-parte de outro ticket (`U15p1`) leva um ID proprio — o `check-backlog` reprova o resto (#515)
 2. Nunca reutilizar um ID de um item concluido ou cancelado — verificar tanto `backlog.md` como `backlog-archive.md` (grep/Read) antes de escolher o ID
 3. Adicionar a tabela da seccao correta (Bug, UX, Tecnica, Feature)
 4. Decidir com o utilizador em que sprint colocar (ou num sprint futuro)

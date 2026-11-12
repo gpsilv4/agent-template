@@ -46,6 +46,7 @@ export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }) {
 
   // As definicoes, uma vez. Aberto: nas tabelas por tipo, Pendente ou A Fazer. Fechado: no Historico (vence o aberto:
   // um ID nos dois ja tem o aviso de duplicado). Inexistente: em nenhum dos dois.
+  // Um riscado do Historico ja vem pelo ID limpo do leitor (#524): `~~F1~~` fechou o F1.
   const fechados = new Set(lido.fechados.map((f) => f.id).filter(Boolean));
   const existentes = new Set([...lido.linhasPorTipo.map((l) => l.id), ...fechados].filter(Boolean));
   const abertos = new Set(lido.linhasPorTipo.filter((l) => l.id && OPEN_STATES.includes(l.estado) && !fechados.has(l.id)).map((l) => l.id));
@@ -125,14 +126,21 @@ export function regrasDoBacklog(lido, { ACTIVE, ARCHIVE }) {
   for (const p of lido.pendentes ?? []) if (p.riscado) problemas.push(riscada("Pendentes sem Sprint", p.idLimpo));
   for (const l of lido.linhasPorTipo) if (l.riscado && OPEN_STATES.includes(l.estado)) problemas.push(riscada(l.seccao, l.idLimpo));
 
-  // 8) O formato do ID (#515): um ID que nao casa o `ID_LIKE` (letras e depois algarismos) fica FORA das verificacoes de
-  //    IDs — o `calcula` salta-o (nem o repetido se ve) e a vista mostra-o como invalido. Dize-lo, e nao calar (`TP2`). Os
-  //    riscados tem a regra 6; uma linha sem ID (a do modelo vazio) nao conta. Nao se renomeia: e decisao do projeto.
-  const formato = (onde, id) =>
-    `${onde}: o ID "${id}" nao tem o formato de um ID (letras e depois algarismos, ex. U47) — fica fora das verificacoes de IDs; dar-lhe um ID novo (uma sub-parte de outro ticket leva um ID proprio)`;
-  for (const l of lido.linhasPorTipo) if (l.id && !l.riscado && !ID_LIKE.test(l.id)) problemas.push(formato(`${ACTIVE}: ${l.seccao}`, l.id));
-  for (const p of lido.pendentes ?? []) if (p.id && !p.riscado && !ID_LIKE.test(p.id)) problemas.push(formato(`${ACTIVE}: Pendentes sem Sprint`, p.id));
-  for (const f of lido.fechados) if (f.id && !f.riscado && !ID_LIKE.test(f.id)) problemas.push(formato(`${ARCHIVE}: Historico`, f.id));
+  // 8) O formato do ID (#515): um ID que nao casa o `ID_LIKE` (1 a 4 letras e depois algarismos) fica FORA das
+  //    verificacoes de IDs — o `calcula` salta-o (nem o repetido se ve) e a vista mostra-o como invalido. Dize-lo, e nao
+  //    calar (`TP2`). Os riscados tem a regra 6; uma linha sem ID (a do modelo vazio) nao conta. Nao se renomeia: e decisao
+  //    do projeto. O ID na mensagem e o do FICHEIRO (`U15p1`, e nao o normalizado `U15P1`): e o que um `grep` encontra (#524).
+  const FORMATO = "nao tem o formato de um ID (1 a 4 letras e depois algarismos, ex. U47) — fica fora das verificacoes de IDs";
+  // Sem a enfase, mas com as maiusculas do ficheiro (o `norm` passa a minusculas).
+  const tal = (x) => String(x.idCelula ?? x.id).trim().replace(/^[*_`]+|[*_`]+$/g, "");
+  const noAtivo = (onde, x) => `${onde}: o ID "${tal(x)}" ${FORMATO}; dar-lhe um ID novo (uma sub-parte de outro ticket leva um ID proprio)`;
+  // No arquivo o ID ja e historia (#524): renomear e reescreve-la, e nao um "ID novo" sem mais — o novo verifica-se nos dois
+  // ficheiros (um ID nunca se reutiliza), num commit proprio que diga o antigo.
+  const noArquivo = (x) =>
+    `${ARCHIVE}: Historico: o ID "${tal(x)}" ${FORMATO}; um item ja fechado renomeia-se num commit proprio que diga o ID antigo, com o novo verificado no backlog e no arquivo (backlog-method.md, "Ao renomear")`;
+  for (const l of lido.linhasPorTipo) if (l.id && !l.riscado && !ID_LIKE.test(l.id)) problemas.push(noAtivo(`${ACTIVE}: ${l.seccao}`, l));
+  for (const p of lido.pendentes ?? []) if (p.id && !p.riscado && !ID_LIKE.test(p.id)) problemas.push(noAtivo(`${ACTIVE}: Pendentes sem Sprint`, p));
+  for (const f of lido.fechados) if (f.id && !ID_LIKE.test(f.id)) problemas.push(noArquivo(f));
 
   // 7) Os Pendentes: o heading (sem ele, a regra 4 dos Pendentes desligava-se calada) e a coluna `Nota`.
   if (!lido.encontradas.pendentes) {

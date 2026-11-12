@@ -422,10 +422,15 @@ caso("a gaveta Sprints aceita '🚀 Sprint', '1. Sprint' e '**Sprint**' (#471)",
   const emSprints = titulos.filter((t) => /id="g-sprints"/.test(vista(troca(ACTIVE_OK, [["### Sprint 2 — o que esta aberto", `### ${t} — o que esta aberto`]]))));
   return espera(emSprints.length === 3, `so estes foram para Sprints: ${emSprints}`);
 });
-caso("um ID invalido no Historico fica uma linha so de texto nos Fechados (e o total continua a bater)", () => {
+// Um riscado (`~~B3~~`) ja nao e invalido (#524): o leitor da-o como o B3, que fechou. O invalido e um ID fora do formato.
+caso("um riscado no Historico e o ID limpo nos Fechados, com link (#524)", () => {
   const html = vista(ACTIVE_OK, troca(ARCHIVE_OK, [["| B3 | Bug | bug fechado |", "| ~~B3~~ | Bug | bug fechado |"]]));
+  return espera(/<td><a href="#f-B3">B3<\/a><\/td>/.test(html) && !/class="invalido"/.test(html), "o ~~B3~~ devia ser a linha do B3");
+});
+caso("um ID invalido no Historico fica uma linha so de texto nos Fechados (e o total continua a bater)", () => {
+  const html = vista(ACTIVE_OK, troca(ARCHIVE_OK, [["| B3 | Bug | bug fechado |", "| B-3 | Bug | bug fechado |"]]));
   return [
-    ...espera(/<tr data-busca="[^"]*" class="invalido"><td colspan="7">~~B3~~ bug fechado <small>/.test(html), "a linha do ~~B3~~"),
+    ...espera(/<tr data-busca="[^"]*" class="invalido"><td colspan="7">B-3 bug fechado <small>/.test(html), "a linha do B-3"),
     // O mesmo total da fixture limpa (B3, T1, F1): a linha invalida nao sumiu.
     ...espera(/<summary>Fechados \(\d+\)/.exec(html)?.[0] === /<summary>Fechados \(\d+\)/.exec(vista())?.[0], `o total: ${/<summary>Fechados \(\d+\)/.exec(html)?.[0]}`),
     // CONTROLO: com o ID valido, nenhuma linha invalida.

@@ -227,9 +227,14 @@ function fechados(archive) {
     const tipo = pelaColuna(cab, cells, "tipo");
     const estado = pelaColuna(cab, cells, "estado");
     const id = pelaColuna(cab, cells, "id") ?? "";
+    const risco = riscoDe(id);
     return {
-      id: idDe(id),
+      // O `~~X~~` no arquivo (#524) e o X: uma linha riscada movida para o Historico (o `backlog-method.md` manda move-la
+      // ao fechar) FECHOU o X. Normalizado AQUI, e nao em cada leitor: com o `id` cru, o `calcula` nao via o X aberto no
+      // ativo e fechado no arquivo como duplicado, e a vista dava-o como invalido (leitura independente do #524).
+      id: risco.riscado ? risco.idLimpo : idDe(id),
       idCelula: id,
+      ...risco,
       tipo: tipo === null ? null : norm(tipo),
       tipoCelula: tipo,
       descricao: pelaColuna(cab, cells, "descricao") ?? "",
@@ -329,7 +334,7 @@ function pendentes(active) {
   const ps = tableRows(seccao).map((cells) => {
     const id = pelaColuna(cabecalho, cells, "id");
     const e = parDe(cabecalho, cells, "esforco");
-    return { id: id === null ? null : idDe(id), ...riscoDe(id), descricao: pelaColuna(cabecalho, cells, "descricao"), esforco: e.v, esforcoCelula: e.c, nota: pelaColuna(cabecalho, cells, "nota") };
+    return { id: id === null ? null : idDe(id), idCelula: id, ...riscoDe(id), descricao: pelaColuna(cabecalho, cells, "descricao"), esforco: e.v, esforcoCelula: e.c, nota: pelaColuna(cabecalho, cells, "nota") };
   });
   return { ps, temNota: (cabecalho ?? []).includes("nota"), temTabela: cabecalho !== null };
 }

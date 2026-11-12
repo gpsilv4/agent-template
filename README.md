@@ -63,10 +63,10 @@ cd my-project
 > bootstrap reads it until the end):
 >
 > ```bash
-> git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template
+> git clone --depth 1 --branch <tag> https://github.com/gpsilv4/agent-template ../agent-template-<tag>
 > # the latest tag: git ls-remote --tags --refs --sort=-v:refname https://github.com/gpsilv4/agent-template 'v*'
-> node ../agent-template/.agent/scripts/adotar-template.mjs --simular   # what it would copy/collide
-> node ../agent-template/.agent/scripts/adotar-template.mjs
+> node ../agent-template-<tag>/.agent/scripts/adotar-template.mjs --simular   # what it would copy/collide
+> node ../agent-template-<tag>/.agent/scripts/adotar-template.mjs
 > ```
 >
 > It copies only the files you don't have, never overwrites, leaves `LICENSE` for you to decide, and
@@ -74,7 +74,7 @@ cd my-project
 > bootstrap reads it: Phase 0-R skips the copied files and merges the collisions with the clone's copy.
 > If you already had a `CLAUDE.md`, `AGENTS.md` or `GEMINI.md`, the AI won't find the template's
 > instructions on its own: start it with *"Read .agent/BOOTSTRAP.md and configure the project"*.
-> Delete `../agent-template` once the bootstrap is committed.
+> Delete `../agent-template-<tag>` once the bootstrap is committed.
 
 ### 2. Open AI and let BOOTSTRAP.md guide you
 

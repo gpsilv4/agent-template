@@ -146,10 +146,20 @@ caso("CONTROLO: o heading e tolerante (um emoji, `Pendente (sem sprint)`, numera
 console.log("\n  O formato do ID (#515)\n");
 // Um sub-ID como o `U15p1` de um derivado real: o `calcula` saltava-o e a vista dava-o como invalido. O controlo e a
 // fixture valida (todos os IDs no formato) ficar calada — e um ID valido mais comprido (`UX15`) tambem.
-caso("um ID fora do formato no Historico avisa (#515)", () => avisa({ arquivo: [["| F1 | Feature", "| F1p1 | Feature"]] }, ['Historico: o ID "F1P1" nao tem o formato de um ID']));
-caso("um ID fora do formato numa tabela por tipo avisa (#515)", () => avisa({ ativo: [["| B1 | Pendente |", "| B1p1 | Pendente |"]] }, ['o ID "B1P1" nao tem o formato de um ID']));
+caso("um ID fora do formato no Historico avisa (#515)", () => avisa({ arquivo: [["| F1 | Feature", "| F1p1 | Feature"]] }, ['Historico: o ID "F1p1" nao tem o formato de um ID', "renomeia-se num commit proprio", "(backlog-method.md, \"Ao renomear\")"], { soEstas: false }));
+caso("um ID fora do formato numa tabela por tipo avisa (#515)", () => avisa({ ativo: [["| B1 | Pendente |", "| B1p1 | Pendente |"]] }, ['o ID "B1p1" nao tem o formato de um ID', "dar-lhe um ID novo"], { soEstas: false }));
 caso("um ID fora do formato nos Pendentes sem Sprint avisa (#515)", () =>
-  avisa({ ativo: [["## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| | | | |", "## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| B1p1 | parte | S | depende do B1 |"]] }, ['Pendentes sem Sprint: o ID "B1P1" nao tem o formato de um ID']));
+  avisa({ ativo: [["## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| | | | |", "## Pendentes sem Sprint\n\n| ID | Descricao | Esforco | Nota |\n|----|-----------|---------|------|\n| B1p1 | parte | S | depende do B1 |"]] }, ['Pendentes sem Sprint: o ID "B1p1" nao tem o formato de um ID']));
+// #524: uma linha riscada movida para o arquivo (o `backlog-method.md` manda move-la ao fechar) nao e um ID fora do formato.
+// #524: o formato e "1 a 4 letras": um ID com 5 letras (`BUGFX1`) avisa, e a mensagem di-lo.
+caso("um ID com mais de 4 letras avisa, e a mensagem diz '1 a 4 letras' (#524)", () => avisa({ ativo: [["| B1 | Pendente |", "| BUGFX1 | Pendente |"]] }, ['o ID "BUGFX1"', "1 a 4 letras"], { soEstas: false }));
+caso("um ID riscado no Historico nao avisa pelo formato (#524)", () => calado({ arquivo: [["| F1 | Feature", "| ~~F1~~ | Feature"]] }));
+// A regra 5 com um riscado (#524): uma tabela do arquivo FORA do Historico cita o F1, e o Historico fecha-o riscado.
+const CITA_F1 = ["| S1 | primeiro | v0.1.0 |\n", "| S1 | primeiro | v0.1.0 |\n\n## Sprint 1 (fechado)\n\n| ID | Descricao |\n|----|-----------|\n| F1 | a feature do sprint |\n"];
+caso("regra 5: um ~~F1~~ no Historico conta como fechado para o resto do arquivo (#524)", () => calado({ arquivo: [["| F1 | Feature", "| ~~F1~~ | Feature"], CITA_F1] }));
+// A mensagem tira so a enfase das PONTAS (#524): um `_` no meio e do ID, e o que um grep encontra.
+caso("o ID na mensagem mantem um `_` do meio (UX_15, e nao UX15, que e outro ID valido)", () => avisa({ arquivo: [["| F1 | Feature", "| UX_15 | Feature"]] }, ['o ID "UX_15" nao tem o formato']));
+caso("CONTROLO regra 5: sem o F1 no Historico, a citacao avisa", () => avisa({ arquivo: [["| F1 | Feature", "| F9 | Feature"], CITA_F1] }, ["cita F1, que nao esta no Historico"]));
 caso("um ID valido mais comprido (UX15) nao avisa; um riscado tem a sua regra, e nao esta (#515)", () => [
   ...calado({ arquivo: [["| F1 | Feature", "| UX15 | Feature"]] }),
   ...avisa({ ativo: [["| B1 | Pendente |", "| ~~B1~~ | Pendente |"]] }, ["a linha de B1 esta riscada"]),

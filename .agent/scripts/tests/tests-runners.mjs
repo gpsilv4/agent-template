@@ -60,7 +60,27 @@ export function registar() {
   // --- O que o verificador completo nao alcanca -------------------------------------
   const derivado = correDireto(guardRunners, { ehDerivado: () => true, listDir: () => ["ci"], read: () => job("ubuntu-latest") });
   registarResultado("G22: num derivado salta, com SKIP visivel, mesmo com um ubuntu-latest", derivado.includes("SKIP  Guard 22") && !derivado.includes("WARN") ? [] : [`saiu: ${derivado}`]);
-  const semRunsOn = correDireto(guardRunners, { ehDerivado: () => false, listDir: (p, ext) => (p === ".github/workflows" && ext === ".yml" ? ["ci"] : null), read: () => "jobs: {}\n" });
+  // #524: numa ADOCAO em curso (o manifesto existe, a marca ainda nao), so os ficheiros que o manifesto diz que vieram do
+  // template se verificam. O controlo e o mesmo sem o manifesto (o template), que reprova.
+  const comManifesto = (manifesto) =>
+    correDireto(guardRunners, {
+      ehDerivado: () => false,
+      read: (f) => (f === ".agent/adocao.json" ? manifesto : job("ubuntu-latest")),
+      listDir: (p, ext) => (p === ".github/workflows" && ext === ".yml" ? ["ci"] : null),
+    });
+  const adocao = comManifesto(JSON.stringify({ estado: "a copiar", copiados: [".agent/BOOTSTRAP.md"], colisoes: [".github/workflows/ci.yml"], iguais: [], perguntar: [] }));
+  registarResultado("G22: numa adocao, um workflow do PROJETO (nao listado como do template) nao se verifica — SKIP visivel (#524)", adocao.includes("SKIP  Guard 22 (runner fixo) — adocao em curso") && !adocao.includes("WARN") ? [] : [`saiu: ${adocao}`]);
+  const doTpl = comManifesto(JSON.stringify({ copiados: [".github/workflows/ci.yml"], iguais: [] }));
+  registarResultado("G22: numa adocao, um workflow que VEIO do template verifica-se, e o ubuntu-latest reprova (#524)", doTpl.includes("WARN") && doTpl.includes(".github/workflows/ci.yml") ? [] : [`saiu: ${doTpl}`]);
+  const ilegivel = comManifesto("{}");
+  registarResultado("G22: um adocao.json ilegivel (ou esquecido, sem as listas) avisa, em vez de desligar o guard (#524)", ilegivel.includes("WARN") && ilegivel.includes("adocao.json` e ilegivel") && !ilegivel.includes("SKIP") ? [] : [`saiu: ${ilegivel}`]);
+  const semAdocao = correDireto(guardRunners, {
+    ehDerivado: () => false,
+    read: (f) => (f === ".agent/adocao.json" ? null : job("ubuntu-latest")),
+    listDir: (p, ext) => (p === ".github/workflows" && ext === ".yml" ? ["ci"] : null),
+  });
+  registarResultado("G22: controlo — o mesmo sem o manifesto da adocao reprova (#524)", semAdocao.includes("WARN") ? [] : [`saiu: ${semAdocao}`]);
+  const semRunsOn = correDireto(guardRunners, { ehDerivado: () => false, listDir: (p, ext) => (p === ".github/workflows" && ext === ".yml" ? ["ci"] : null), read: (f) => (f === ".agent/adocao.json" ? null : "jobs: {}\n") });
   // Um workflow que so chama outros (`uses:` no job) nao tem `runs-on:`: salta, e di-lo (nao "estao todos certos", TP2).
   registarResultado("G22: workflows sem nenhum runs-on saltam com SKIP visivel, sem avisar", semRunsOn.includes("SKIP  Guard 22 (runner fixo) — 1 workflow(s) e nenhum `runs-on:`") && !semRunsOn.includes("WARN") ? [] : [`saiu: ${semRunsOn}`]);
   // O leitor: o valor sem aspas e sem o comentario; uma linha que so menciona `runs-on` noutro sitio nao conta.
