@@ -187,4 +187,35 @@ export function registarPorPr({ caso, espera, cli, conta, ITEM, run, job }) {
     ...espera(!temGuardTests("jobs:\n  ci:\n    runs-on: x\n  guard-tests:"), "sem corpo, no fim"),
     ...espera(!temGuardTests(null), "sem ci.yml"),
   ]);
+
+  // --- #535 (o `/audit` pre-tag da v0.63.5) ---
+  caso("CONTROLO #535: uma data valida no passado passa nas recusas (e o --todos mede)", () => {
+    const r = cli(DOIS, ["--desde", "2020-02-29", "--ate", "2020-03-01", "--todos"]);
+    return espera(r.status === 0 && !/que exista|no futuro/.test(r.err), `saiu ${r.status}: ${r.err}`);
+  });
+  // Um privado SO com minutos de macOS: a mesma lista nos dois modos (#535).
+  const MAC = { ...MES_PR, [`${U}#1`]: { usageItems: [ITEM("priv", 50), ITEM("mac", 5, "Actions macOS")] }, "repos/eu/mac#1": { private: true }, "repos/eu/mac/actions/runs#1": { total_count: 0, workflow_runs: [] } };
+  caso("um privado so com minutos de macOS aparece no --por-pr e no --todos (a mesma lista, #535)", () => {
+    const p = cli(MAC, ["--quota", "--por-pr", "--mes", "2020-01"]);
+    const t = cli(MAC, ["--desde", "2020-01-01", "--ate", "2020-01-31", "--todos"]);
+    return [...espera(/^ {2}mac \(modo sem marca\)$/m.test(p.out), `--por-pr: ${p.out} ${p.err}`), ...espera(/=== eu\/mac ===/.test(t.out), `--todos: ${t.out} ${t.err}`)];
+  });
+  caso("CONTROLO #535: um publico continua fora das duas listas", () => {
+    const pub = { ...MES_PR, [`${U}#1`]: { usageItems: [ITEM("priv", 50), ITEM("pub", 5)] }, "repos/eu/pub#1": { private: false } };
+    const p = cli(pub, ["--quota", "--por-pr", "--mes", "2020-01"]);
+    return espera(!/^ {2}pub \(/m.test(p.out) && !/repos\/eu\/pub\/actions/.test(p.log), `saida: ${p.out}`);
+  });
+  caso("--todos so com repos publicos: 'nenhum repo privado com minutos', com os meses (#535)", () => {
+    const r = cli({ ...conta([ITEM("pub", 5)], { pub: false }) }, ["--desde", "2020-01-01", "--ate", "2020-01-31", "--todos"]);
+    return espera(r.status === 0 && /nenhum repo privado com minutos de 2020-01 a 2020-01/.test(r.out) && !/undefined/.test(r.out), `saida: ${r.out} ${r.err}`);
+  });
+  caso("--todos com um repo que ja nao existe (404): a linha FORA, e nao lhe le os runs (#535)", () => {
+    const r = cli({ ...DOIS, [`${U}#1`]: { usageItems: [ITEM("priv", 5), ITEM("foi", 5)] } }, ["--desde", "2020-01-01", "--ate", "2020-01-31", "--todos"]);
+    return [...espera(/FORA: eu\/foi tem minutos na faturacao e nao o encontrei/.test(r.out), `saida: ${r.out} ${r.err}`), ...espera(!/repos\/eu\/foi\/actions/.test(r.log), "leu os runs de um repo 404")];
+  });
+  caso("--por-pr: um run de PR sem numero e sem PR do branch fica 'sem o numero do PR', nas colunas de fora (#535)", () => {
+    const m = { ...MES_PR, [`${RP}#1`]: { total_count: 1, workflow_runs: [run(2, "pull_request", { pull_requests: [], head_branch: "perdido", actor: { login: "eu" } })] }, "repos/eu/priv/pulls#1": [] };
+    const r = cli(m, ["--quota", "--por-pr", "--mes", "2020-01"]);
+    return espera(/fora das colunas: sem o numero do PR 1 run\(s\), 1 min/.test(r.out), `saida: ${r.out} ${r.err}`);
+  });
 }

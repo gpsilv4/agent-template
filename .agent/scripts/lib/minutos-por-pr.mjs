@@ -8,7 +8,7 @@
  *
  * NAO e um entry point e nao recusa (so contas): as recusas ficam no script, num `fatal(` (a licao do #439).
  */
-import { mediana } from "./minutos-calculo.mjs";
+import { ehDoDependabot, mediana } from "./minutos-calculo.mjs";
 
 /** A marca que o `/upgrade` grava (§4): um PR que lhe mexe e um upgrade. Deterministico; pelo titulo era adivinhar. */
 export const MARCA = ".agent/.template-version";
@@ -28,7 +28,7 @@ const doBot = (run) => run.actor?.login === "dependabot[bot]";
  * @param {string[] | null} ficheiros  os ficheiros do PR (so precisa deles um PR que nao e do Dependabot)
  */
 export function tipoDoRun(run, numero, ficheiros) {
-  if (run.event === "dynamic") return "dynamic";
+  if (ehDoDependabot(run)) return "dynamic";
   if (run.event !== "pull_request") return null;
   if (doBot(run)) return "dependabot";
   if (!numero) return "sem-pr";
