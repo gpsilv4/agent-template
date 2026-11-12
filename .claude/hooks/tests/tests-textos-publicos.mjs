@@ -11,7 +11,7 @@
  * NAO e um entry point. O `test-hooks.mjs` descobre-o e chama `registar()`.
  */
 import { execFileSync, spawnSync } from "child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -270,6 +270,51 @@ export function registar({ test }) {
       `cp x.mjs .githooks/lib/commit-msg.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`])
       afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
   });
+  // #536 (o `/audit` pre-tag da v0.63.5, M3): as OUTRAS tres formas de tocar no que o script corre, um caso cada.
+  test("textos-publicos: uma escrita num alvo que nao se resolve tira a isencao (#536)", () =>
+    afirma(corre(`echo x > "$F" && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  test("textos-publicos: copiar PARA a propria pasta .githooks tira a isencao (#536)", () =>
+    afirma(corre(`cp -r d .githooks && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  // A mensagem FORA da pasta copiada (`~/pr.md`): com ela dentro, a copia para `.` ja a tapava e o caso negava sem a
+  // condicao (um controlo do #536 mostrou-o).
+  test("textos-publicos: uma copia para a pasta que CONTEM o .githooks tira a isencao (#536)", () =>
+    afirma(corre(`cp -r outro/.githooks . && node .githooks/commit-msg ~/pr.md && git commit -F ~/pr.md`, { ficheiros: { "~/pr.md": "texto limpo\n" } }), ESCRITO));
+  test("textos-publicos: escrever numa lib que o commit-msg importa (.agent/scripts/lib/) tira a isencao (#536)", () =>
+    afirma(corre(`cp x.mjs .agent/scripts/lib/prefixo-commit.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  test("textos-publicos: um node mudado noutro comando (export NODE_OPTIONS/PATH, uma funcao node) tira a isencao (#536)", () => {
+    for (const c of [`export NODE_OPTIONS=--import=./w.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `export PATH=./bin:$PATH && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `NODE_PATH=./m; node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `declare -x NODE_OPTIONS=--require=./w.cjs && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `node() { ./outro.sh; }; node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `function node { ./outro.sh; }; node .githooks/commit-msg pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  test("textos-publicos: CONTROLO — exportar outra variavel, ou escrever fora do que o script corre, deixa a isencao (#536)", () => {
+    for (const c of [`export FOO=1 && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `cp x.mjs .agent/scripts/outro.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `cp x.mjs .git-hooks-velhos && node .githooks/commit-msg pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), DEIXA);
+    // A pasta `.git` nao CONTEM o `.githooks` (o separador, #536): sem ele, `<raiz>/.githooks` comecava por `<raiz>/.git`.
+    afirma(corre(`cp -r x .git && node .githooks/commit-msg ~/pr.md && git commit -F ~/pr.md`, { ficheiros: { "~/pr.md": "texto limpo\n" } }), DEIXA);
+  });
+  // O realpath da isencao (#511) so se provava no macOS (`/var` e `/private/var`): aqui o `cwd` entra por um symlink.
+  test("textos-publicos: com o cwd a entrar por um symlink para o repo, a isencao vale na mesma (#536)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "textos-hook-test-"));
+    try {
+      const repo = join(dir, "repo");
+      mkdirSync(repo, { recursive: true });
+      const env = { ...SEM_GIT(), GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", HOME: join(dir, "home"), NOMES_PROIBIDOS_FICHEIRO: join(dir, "lista") };
+      mkdirSync(env.HOME, { recursive: true });
+      writeFileSync(join(dir, "lista"), LISTA);
+      execFileSync("git", ["init", "-q"], { cwd: repo, env });
+      writeFileSync(join(repo, "pr.md"), "texto limpo\n");
+      symlinkSync(repo, join(dir, "atalho"));
+      return afirma(chama(HOOK, `node .githooks/commit-msg pr.md && git commit -F pr.md`, join(dir, "atalho"), env), DEIXA);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
   // A premissa do #511 tem rede: o `commit-msg` do template LE a mensagem e nao lhe toca (um hook que a normalizasse
   // passava a escrever o ficheiro, e a isencao a mentir). Corre-se o verdadeiro, e os bytes ficam iguais.
   test("textos-publicos: o commit-msg do template nao escreve o ficheiro que valida (a premissa do #511)", () => {
@@ -279,7 +324,10 @@ export function registar({ test }) {
       const f = join(dir, "msg.txt");
       const antes = "feat(x): uma mensagem\n\n# um comentario que um hook que normaliza tiraria\n";
       writeFileSync(f, antes);
-      spawnSync(process.execPath, [join(raizRepo, ".githooks/commit-msg"), f], { cwd: raizRepo, encoding: "utf8", env: SEM_GIT() });
+      // Com uma HOME temporaria (a lista da maquina fica de fora) e o `status` afirmado (#536): um `commit-msg` que nem
+      // corresse (um import partido) deixava os bytes iguais, e o caso verde sem provar nada.
+      const r = spawnSync(process.execPath, [join(raizRepo, ".githooks/commit-msg"), f], { cwd: raizRepo, encoding: "utf8", env: { ...SEM_GIT(), HOME: dir } });
+      if (r.status !== 0) return [`o commit-msg saiu ${r.status} com uma mensagem valida (nao correu ate ao fim?): ${r.stderr}`];
       return readFileSync(f, "utf8") === antes ? [] : ["o commit-msg reescreveu o ficheiro: a isencao do #511 deixa de ser verdade"];
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -95,9 +95,15 @@ test("cada verificador traz os ficheiros que o motivam", () => {
 // O CONTRA-CASO do anterior: sem ele, um mapa que devolvesse SEMPRE todos os verificadores
 // passava os dois testes de cima.
 test("um ficheiro so leva ao SEU verificador, nao a todos", () => {
+  // Exatamente as suites da regra DELE (desde o #536 sao duas: o `test-commit-msg` e o `test-hooks`, que assenta em o
+  // `commit-msg` so LER), e nao todas as do mapa.
   const { porVerificador } = verificadoresDe([".githooks/commit-msg"]);
-  const chaves = [...porVerificador.keys()];
-  return chaves.length === 1 && chaves[0].endsWith("test-commit-msg.mjs") ? [] : [`levou a ${JSON.stringify(chaves)}`];
+  const chaves = [...porVerificador.keys()].sort();
+  const daRegra = [...(regraDe(".githooks/commit-msg")?.verifica ?? [])].sort();
+  const todas = new Set(SUITES.flatMap((r) => r.verifica));
+  return chaves.length > 0 && chaves.length < todas.size && JSON.stringify(chaves) === JSON.stringify(daRegra) && chaves.some((c) => c.endsWith("test-commit-msg.mjs"))
+    ? []
+    : [`levou a ${JSON.stringify(chaves)}; a regra dele diz ${JSON.stringify(daRegra)}`];
 });
 
 // O `ci.yml` do template e lido pelo Guard 17 e pelas listas das suites (`test-guards`), e pela 2b de ponta a ponta

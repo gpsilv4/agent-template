@@ -147,6 +147,22 @@ function defineGhRepo(ws) {
   return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
 }
 
+/** As variaveis que mudam o que um `node` corre (#536): o `NODE_OPTIONS=--import` corre outro codigo antes do script, um
+ *  `PATH` com outra pasta a frente traz outro `node`, e os outros `NODE_*` mudam onde ele procura os modulos. */
+const MUDA_O_NODE = /^(?:NODE_[A-Z0-9_]*|PATH)$/;
+/** O comando muda o `node` de quem vem depois (#536): uma dessas variaveis numa atribuicao (solta, ou como argumento de
+ *  `export`/`declare`/`env`), ou uma funcao chamada `node`. Na posicao de atribuicao, e nunca dentro de um texto — a
+ *  mesma forma do `defineGhRepo`. */
+function mudaONode(ws) {
+  if (cabeca(ws).atribuicoes.some((a) => MUDA_O_NODE.test(a))) return true;
+  // `function node { ... }` (a forma `node() {` ve-se em `textosDoComando`: o lexer tira o `()`, e sobra um `node`
+  // sozinho seguido de um `{`).
+  if (ws[0]?.texto === "function" && ws[1]?.texto === "node") return true;
+  const k = ws.findIndex((w) => MUDA_O_NODE.test(w.texto.split("=")[0]) && w.texto.includes("="));
+  const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+}
+
 /**
  * Os pares `[flag, palavra-do-valor]` de `ws` (desde `ini`) para as flags de `nomes`, e os indices que eles e os
  * `comValor` consumiram. Le `--f v`, `--f=v`, `-f v`, `-fv` e um GRUPO curto (`-am msg`, `-aF/tmp/x`, `-dt titulo`):
@@ -210,6 +226,11 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
   const emCiclo = cmds.some((c) => { const { i } = cabeca(c.argv); return c.argv.slice(0, i < 0 ? c.argv.length : i + 1).some((w) => CICLO.has(w.texto)); });
   // Um interior (`$(...)`) vem no fim da lista do lexer: a sua ordem e o seu pipeline sao os do comando que o contem.
   const dono = (c) => (c.dentro && c.dono && cmds.includes(c.dono) ? dono(c.dono) : c);
+  // #536: um `export NODE_OPTIONS=...`/`PATH=...` (ou uma funcao `node`) em QUALQUER comando do texto muda o `node` dos
+  // outros — sem ordem, como o `GH_REPO` (#399): falhar fechado custa pouco. So o prefixo do proprio `node` era visto.
+  // A forma `node() { ... }`: o lexer tira o `()`, e fica um comando so `node`, seguido de um que abre com `{`.
+  const defineFuncaoNode = (c, k) => c.argv.length === 1 && c.argv[0].texto === "node" && cmds[k + 1]?.argv[0]?.texto === "{";
+  const nodeMudado = cmds.some((c, k) => mudaONode(c.argv) || defineFuncaoNode(c, k));
   let mudouDir = false;
   /** As escritas de `cmd`, com a pasta em vigor nesse ponto. Um interior corre onde esta, mas e lido no fim: depois
    *  de um `cd`, o seu caminho relativo nao se sabe. */
@@ -239,9 +260,11 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     // script), os argumentos voltam a contar (no fim, `isentos`).
     // A raiz por ultimo: custa um `git` (preguicosa, no hook), e so se pergunta a um candidato. Sem `base` (um interior
     // depois de um `cd`, ou um `cd` que nao se resolve) nao ha isencao.
-    const isento = base !== null && ws[h].texto === nome && cabeca(ws).atribuicoes.length === 0 &&
+    const isento = base !== null && ws[h].texto === nome && cabeca(ws).atribuicoes.length === 0 && !nodeMudado &&
       (LEITORES_POR_SCRIPT[nome]?.includes(ws[h + 1]?.texto ?? "") ?? false) && ((r) => r !== null && real(base) === r)(raiz());
-    if (isento) isentos.push({ contaArgs, hooks: `${base}${sep}.githooks` });
+    // O que o script corre: o `.githooks/` e as libs que o `commit-msg` importa de `.agent/scripts/lib/` (#536; a pasta
+    // inteira, e nao so as duas de hoje: uma lib nova importada nao reabria o buraco calada).
+    if (isento) isentos.push({ contaArgs, protegidos: [`${base}${sep}.githooks`, `${base}${sep}.agent${sep}scripts${sep}lib`] });
     else contaArgs();
   };
   /** Um caminho escrito, resolvido e NORMALIZADO (`/tmp/` e `/tmp/./x` sao `/tmp` e `/tmp/x`): `~`, absoluto, ou
@@ -379,11 +402,15 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
       for (const [f, w] of valores(ws, i + 1, GIT.ficheiro, [...GIT.texto, ...comValor]).pares) { out.publica = true; doFicheiro(cmd, w, base, `git ${sub} ${f}`); }
     }
   }
-  // #511: um comando que escreve em `.githooks/` (o script isento, ou a lib dele), ou num alvo que nao se resolve, pode
-  // ter trocado o que corre: os argumentos dos isentos voltam a contar como escrita.
+  // #511: um comando que escreve no que o script isento corre (`protegidos`: o `.githooks/` e as libs que ele importa,
+  // #536), ou num alvo que nao se resolve, pode ter trocado o que corre: os argumentos dos isentos voltam a contar como
+  // escrita. Quatro formas, cada uma com o seu caso (#536): o alvo por resolver; a propria pasta (`cp -r d .githooks`);
+  // dentro dela; e a pasta de uma copia que a CONTEM (`cp -r outro/.githooks .`) — com o separador, senao `<raiz>/.git`
+  // tambem a continha.
   // A pasta na forma das escritas (a `base` do isento, que e a raiz), e nao a do `git`, que vem resolvida.
-  for (const { contaArgs, hooks } of isentos) {
-    if (escritas.some((e) => e.p === null || e.p === hooks || e.p.startsWith(hooks + sep) || (e.pasta && hooks.startsWith(e.p)))) contaArgs();
+  for (const { contaArgs, protegidos } of isentos) {
+    const toca = (e, d) => e.p === d || e.p.startsWith(d + sep) || (e.pasta && d.startsWith(e.p + sep));
+    if (escritas.some((e) => e.p === null || protegidos.some((d) => toca(e, d)))) contaArgs();
   }
   const ordem = (c) => cmds.indexOf(dono(c));
   for (const l of lidos) {
