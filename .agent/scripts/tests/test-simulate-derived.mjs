@@ -19,9 +19,9 @@
  */
 
 import { execFileSync } from "child_process";
-import { rmSync, existsSync } from "fs";
+import { rmSync, existsSync, readFileSync } from "fs";
 import { aplica } from "../lib/patch.mjs";
-import { COMANDOS, ap, fixture } from "./harness/test-derived-harness.mjs";
+import { COMANDOS, ap, fixture, pacoteCi } from "./harness/test-derived-harness.mjs";
 import { join } from "path";
 
 let passed = 0;
@@ -247,9 +247,68 @@ test("o BOOTSTRAP manda o Dependabot mensal e o exemplo falta: REPROVA, em vez d
   code: 1,
   includes: ["o BOOTSTRAP manda trocar o dependabot.yml", "e ele nao existe"],
 });
-test("CONTROLO: com o exemplo, a copia passa a ter o Dependabot mensal", { bootstrapExtra: MANDA_PRIVADO, extra: { "src/docs/exemplos/dependabot-privado.yml": "mensal\n" } }, {
+// E o CI dele (#487): o pacote de um job no modo completo (descomentado pelo `comModoCompleto` de `lib/exemplo-ci.mjs`),
+// a cache, e `modo: completo` na marca.
+const DEPENDABOT = { "src/docs/exemplos/dependabot-privado.yml": "mensal\n" };
+const CACHE = { "src/docs/exemplos/cache-sem-maquinaria.yml": "name: Cache\n" };
+const PRIVADO = (pacote, cache = CACHE) => ({ bootstrapExtra: MANDA_PRIVADO, extra: { ...DEPENDABOT, ...cache, ...(pacote === null ? {} : { "src/docs/exemplos/ci-sem-maquinaria.yml": pacote }) } });
+test("CONTROLO: com o exemplo, a copia passa a ter o Dependabot mensal", PRIVADO(pacoteCi(COMANDOS)), {
   code: 0,
   mostra: ["um derivado privado: o .github/dependabot.yml e o exemplo mensal"],
+});
+const PRIV = { SIMULATE_PRIVADO: "1" };
+test("um derivado privado sem o pacote de CI: REPROVA, em vez de correr com o ci.yml do template (#487)", PRIVADO(null), {
+  env: PRIV,
+  code: 1,
+  includes: ["usa o src/docs/exemplos/ci-sem-maquinaria.yml e o cache-sem-maquinaria.yml, e um deles nao existe"],
+});
+test("um derivado privado sem a cache do pacote: REPROVA (#487)", PRIVADO(pacoteCi(COMANDOS), {}), {
+  env: PRIV,
+  code: 1,
+  includes: ["e um deles nao existe"],
+});
+test("o pacote sem os blocos MODO COMPLETO: REPROVA (#487)", PRIVADO(pacoteCi(COMANDOS).replaceAll("MODO COMPLETO (b)", "MODO X")), {
+  env: PRIV,
+  code: 1,
+  includes: ["nao tem os dois blocos MODO COMPLETO"],
+});
+test("o guard-tests do pacote com um comando a mais: REPROVA, e diz qual (#487)", PRIVADO(pacoteCi([...COMANDOS, ".agent/scripts/test-delta.mjs"])), {
+  env: PRIV,
+  code: 1,
+  includes: ["o guard-tests do pacote nao e o do template", "so no pacote: .agent/scripts/test-delta.mjs"],
+});
+test("o guard-tests do pacote com um comando a menos: REPROVA, e diz qual (#487)", PRIVADO(pacoteCi(COMANDOS.slice(1))), {
+  env: PRIV,
+  code: 1,
+  includes: [`so no template: ${COMANDOS[0]}`],
+});
+test("SIMULATE_PRIVADO=1 sem a ordem do BOOTSTRAP a um privado: REPROVA, em vez de simular o publico (#487)", { extra: { "src/docs/exemplos/ci-sem-maquinaria.yml": pacoteCi(COMANDOS) } }, {
+  env: PRIV,
+  code: 1,
+  includes: ["nao ha derivado privado a simular"],
+});
+test("CONTROLO: a copia de um privado tem o pacote descomentado, a cache e `modo: completo` (#487)", PRIVADO(pacoteCi(COMANDOS)), {
+  args: ["--keep"],
+  env: PRIV,
+  code: 0,
+  mostra: [`o ci.yml e o pacote de um job no modo completo, com a cache e \`modo: completo\` na marca (${COMANDOS.length} comandos, os do template)`],
+  copia: (c) => {
+    const p = [];
+    const ci = readFileSync(join(c, ".github/workflows/ci.yml"), "utf8");
+    if (!/^  guard-tests:$/m.test(ci) || ci.includes("MODO COMPLETO")) p.push("o ci.yml da copia devia ser o pacote com os blocos descomentados");
+    if (!existsSync(join(c, ".github/workflows/cache.yml"))) p.push("a copia devia ter o .github/workflows/cache.yml");
+    if (!/^modo: completo$/m.test(readFileSync(join(c, ".agent/.template-version"), "utf8"))) p.push("a marca devia dizer `modo: completo`");
+    return p;
+  },
+});
+// O caso por omissao (leitor do #487): o BOOTSTRAP manda sempre o Dependabot a um privado, logo um sinal so dele trocava
+// o ci.yml em TODAS as corridas, e o derivado com o CI do template deixava de ser medido.
+test("CONTROLO: sem SIMULATE_PRIVADO, mesmo com a ordem e o pacote, o ci.yml fica o do template (#487)", PRIVADO(pacoteCi(COMANDOS)), {
+  args: ["--keep"],
+  code: 0,
+  mostra: ["o ci.yml fica o do template (o estado do bootstrap)"],
+  excludes: ["o pacote de um job no modo completo"],
+  copia: (c) => (/^modo:/m.test(readFileSync(join(c, ".agent/.template-version"), "utf8")) || existsSync(join(c, ".github/workflows/cache.yml")) ? ["sem SIMULATE_PRIVADO, nem o pacote, nem a cache, nem `modo:`"] : []),
 });
 
 // A varredura de mutacao apontou os quatro `fatal()` dos blocos 3d/3e como NAO COBERTOS: eu

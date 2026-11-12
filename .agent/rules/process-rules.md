@@ -128,7 +128,7 @@ e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, 
   simulador do upgrade mede o delta entre a ULTIMA TAG e o `HEAD`, logo sem commits nao ha nada a
   medir e ele salta):
   `node .agent/scripts/simulate-upgrade.mjs` (~3 min),
-  `node .agent/scripts/simulate-derived.mjs` (~2 min) e
+  `node .agent/scripts/simulate-derived.mjs` (~2 min; e com `SIMULATE_PRIVADO=1`, o derivado privado, #487) e
   `node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD)"` (~1s).
   Medem coisas diferentes, e e por isso que sao tres: um contra a **ultima tag** (onde aparece o
   que so um consumidor ve), outro contra um projeto **bootstrapado de raiz**, o terceiro compara a

@@ -7,6 +7,7 @@
  * `harness/casos-salto-cache.mjs` importam. Sem sitios de recusa: so le.
  */
 import { jobsDe, passosDe, indent, semComentario } from "../../lib/estrutura-workflow.mjs";
+import { descomenta } from "../../lib/exemplo-ci.mjs";
 
 // --- As expressoes de um `if:` ---
 
@@ -231,9 +232,7 @@ export function eventos(texto) {
   return filhos.filter((l) => indent(l) === ind).map((l) => l.trim().replace(/[ \t]*:.*$/, ""));
 }
 
-// --- As variantes comentadas ---
-
-const descomenta = (l) => l.replace(/^([ \t]*)# ?/, "$1").replace(/^[ \t]+$/, "");
+// --- As variantes comentadas (o modo completo vive em `lib/exemplo-ci.mjs`, #487) ---
 
 /** O exemplo com o bloco CACHE trocado pelo bloco OPCIONAL T80 descomentado. */
 export function comT80(texto) {
@@ -247,22 +246,6 @@ export function comT80(texto) {
   // A segunda edicao que o comentario do T80 pede: nas verificacoes, a pasta da cache vale como instalacao.
   return [...ls.slice(0, ci), ...t80, ...ls.slice(cf + 1, ti), ...ls.slice(tf + 1)].join("\n")
     .replaceAll("steps.install.conclusion == 'success'", "(steps.install.conclusion == 'success' || steps.nmcache.outputs.cache-hit == 'true')");
-}
-
-/** O exemplo com os dois blocos MODO COMPLETO (#472, #477) descomentados no lugar: o derivado com a maquinaria do
- *  template. O (a) e um passo do job `ci` (desde o `# - name:`); o (b) e o job `guard-tests` (desde o `# guard-tests:`
- *  a dois espacos). `null` sem os marcadores, com eles fora de ordem, ou sem o inicio do passo ou do job. */
-export function comModoCompleto(texto) {
-  let ls = texto.split("\n");
-  for (const [bloco, inicio] of [["a", /^[ \t]*# - name:/], ["b", /^  # guard-tests:/]]) {
-    const i = ls.findIndex((l) => l.includes(`# --- MODO COMPLETO (${bloco}) inicio`));
-    const f = ls.findIndex((l) => l.includes(`# --- MODO COMPLETO (${bloco}) fim ---`));
-    if (i < 0 || f < i) return null;
-    const p0 = ls.findIndex((l, k) => k > i && k < f && inicio.test(l));
-    if (p0 < 0) return null;
-    ls = [...ls.slice(0, i), ...ls.slice(p0, f).map(descomenta), ...ls.slice(f + 1)];
-  }
-  return ls.join("\n");
 }
 
 /** O texto sem o job `id` (do cabecalho dele ate ao job seguinte, ou ao fim): o job `ci` do modo completo, sozinho,

@@ -12,7 +12,8 @@
 import { chmodSync, writeFileSync, mkdirSync } from "fs";
 import { spawnSync } from "child_process";
 import { join } from "path";
-import { comModoCompleto, conjuntos, passosDoExemplo, semJob } from "./expressoes-ci.mjs";
+import { conjuntos, passosDoExemplo, semJob } from "./expressoes-ci.mjs";
+import { comModoCompleto } from "../../lib/exemplo-ci.mjs";
 import { defeitosDeEstrutura, jobsDe, passosDe } from "../../lib/estrutura-workflow.mjs";
 import { comandosPorJob } from "../../lib/medida-upgrade.mjs";
 import { notasDaFormaDoCi } from "../../lib/medida-upgrade-ci.mjs";

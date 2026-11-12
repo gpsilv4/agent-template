@@ -14,7 +14,7 @@ import { join } from "path";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 import { exige, contraProjeto, test, SEM_JOB } from "./harness/test-upgrade-harness.mjs";
-import { comModoCompleto } from "./harness/expressoes-ci.mjs";
+import { comModoCompleto } from "../lib/exemplo-ci.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
