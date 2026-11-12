@@ -134,7 +134,7 @@ Um run ainda em curso fica fora da soma, listado.
 `user` da tambem escrita no perfil, e fica no token de todos os `gh` do agente: retira-lo depois de medir
 (`gh auth refresh -h github.com --remove-scopes user`), ou usar um token so para isto (`GH_TOKEN=<token> node …`).
 
-**Dois comandos, duas perguntas:**
+**Dois comandos, duas perguntas** (e dois que os detalham, abaixo da tabela: o custo por PR e o run a run de todos):
 
 | | `minutos-ci.mjs --quota` | `minutos-ci.mjs --desde AAAA-MM-DD --repo dono/repo` |
 |---|---|---|
@@ -145,7 +145,14 @@ Um run ainda em curso fica fora da soma, listado.
 ```bash
 node .agent/scripts/minutos-ci.mjs --quota                  # o mes corrente: os privados contra os 2000, e a projecao
 node .agent/scripts/minutos-ci.mjs --quota --mes 2026-10    # um mes passado; --limite 3000 no Pro
+node .agent/scripts/minutos-ci.mjs --quota --por-pr         # e quanto custa um PR em cada privado, por tipo e modo (#517)
+node .agent/scripts/minutos-ci.mjs --desde 2026-11-01 --todos  # o run a run de TODOS os privados, um bloco cada (#517)
 ```
+
+O `--por-pr` le os runs, os jobs e os ficheiros de cada PR (minutos, e nao segundos). O **upgrade** e o PR que mexe
+no `.agent/.template-version`; um PR so de `.md` fica fora do **normal**; o **PR Dependabot** e o CI dos PRs dele; o
+**Dependabot (dynamic)** mostra o total e as tentativas falhadas. Cada celula e a mediana do cobrado por run, com o `n`
+("sem amostra" sem runs). O modo e a linha `modo:` da marca (sem ela, o job `guard-tests`).
 
 A faturacao traz tambem os repos PUBLICOS, e os montantes nao os distinguem (medido a 5 nov 2026): o `--quota`
 pergunta a visibilidade de cada repo, e soma so os privados (um repo que ja nao existe conta). Uma linha

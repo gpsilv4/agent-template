@@ -31,7 +31,7 @@ import { agentesDesatualizados } from "./agentes.mjs";
 import { regrasEmFalta } from "./permissoes.mjs";
 import { fronteiraDa2b, validaFronteiraEm, notasDaLigacaoParcial } from "./fronteira-upgrade.mjs";
 import { notasDaFormaDoCi } from "./medida-upgrade-ci.mjs";
-import { modoDoProjeto, mensagemDoModo } from "./modo-upgrade.mjs";
+import { modoDoProjeto, mensagemDoModo, textoDoJob } from "./modo-upgrade.mjs";
 import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "./origem-upgrade.mjs";
 
 /** A fronteira de permissoes (#301, R7B-1): o que o `settings.json` do template tem e o do projeto nao. O motor nao
@@ -78,10 +78,8 @@ export function comandosPorJob(raiz) {
 /** O texto de cada job da 2b, ou `null` sem `guard-tests`. */
 function textosDosJobs(raiz) {
   const ci = leOuNull(join(raiz, ".github/workflows/ci.yml"));
-  // So ate ao job SEGUINTE: o `split` sozinho levava todos os jobs que vem depois.
-  // Um comentario na linha do job (`  guard-tests:   # suites`) nao a desfaz — nem a do job seguinte,
-  // senao os comandos dele eram atribuidos a este (leitura independente do #308).
-  const doJob = (nome) => ci?.split(new RegExp(`^  ${nome}:[ \t]*(?:#.*)?$`, "m"))[1]?.split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
+  // O leitor de um job vive no `modo-upgrade.mjs` (#517): o `minutos-ci --por-pr` le o modo pela mesma regra.
+  const doJob = (nome) => textoDoJob(ci, nome);
   if (!doJob("guard-tests")) return null;
   return Object.fromEntries(JOBS_DA_2B.map((n) => [n, doJob(n) ?? ""]));
 }

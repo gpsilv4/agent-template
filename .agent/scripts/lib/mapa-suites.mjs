@@ -53,9 +53,12 @@ export const SUITES = [
   // Os minutos de CI (#429): a CLI e as contas puras dela. A CLI tem par na varredura (as recusas).
   { re: /^\.agent\/scripts\/minutos-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")], only: "minutos-ci" },
   { re: /^\.agent\/scripts\/lib\/minutos-calculo\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
+  // O custo por PR (#517): vem no modo parcial com o `minutos-ci`, e o `test-modo-upgrade` calcula o fecho.
+  { re: /^\.agent\/scripts\/lib\/minutos-por-pr\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-minutos-por-pr\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
   // O modo parcial do `/upgrade` (#429): a regra (os casos no `test-modo-upgrade`, a ponta no `test-simulate-upgrade`),
   // o fecho (o `harness/fecho-parcial.mjs`, do `test-modo-upgrade`) e o doc, cuja ordem e lista a suite verifica.
-  { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")], only: "modo-upgrade" },
+  { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs"), S("test-minutos-ci.mjs")], only: "modo-upgrade" },
   { re: /^\.agent\/scripts\/tests\/harness\/fecho-parcial\.mjs$/, verifica: [S("test-modo-upgrade.mjs")] },
   { re: /^src\/docs\/upgrade-parcial\.md$/, verifica: [S("test-modo-upgrade.mjs"), S("check-doc-versions.mjs")] },
   // O §4 e corrido pela suite, e o §1 tambem (a extracao do SHA).

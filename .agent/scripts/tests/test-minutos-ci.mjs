@@ -12,7 +12,10 @@
  *   - as recusas: cada uma pela SUA mensagem, nunca com "COBRADO 0" — sem `gh`/sessao, nao-JSON, mais de 1000 runs,
  *     uma resposta sem a lista ou sem `total_count`, uma lista mais curta do que o `total_count`, sem repo, argumentos;
  *   - o `--quota` (#442): so os privados (um publico fora, um repo que ja nao existe DENTRO), so o Linux (os outros
- *     SKUs listados fora da soma), a projecao no mes corrente, as linhas `QUOTA:`, e as suas recusas (o scope `user`).
+ *     SKUs listados fora da soma), a projecao no mes corrente, as linhas `QUOTA:`, e as suas recusas (o scope `user`);
+ *   - o `--por-pr` e o `--todos` (#517, no `harness/casos-minutos-por-pr.mjs`): o tipo de cada run (a marca faz o
+ *     upgrade, e nao o titulo), o numero do PR pelo branch quando o run o nao traz, o modo de cada privado, um repo 404
+ *     fora, os meses do intervalo na faturacao, e as recusas.
  *
  *   node .agent/scripts/tests/test-minutos-ci.mjs
  */
@@ -22,6 +25,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
 import { repoDoOrigin } from "../lib/repo-origin.mjs";
+import { registarPorPr } from "./harness/casos-minutos-por-pr.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -110,7 +114,8 @@ function cli(mapa, args, { semGh = false, cwd = null } = {}) {
     writeFileSync(join(raiz, "log"), "");
     // Sem `gh` no PATH: so o binario do node e o `git` (o PATH real traria o `gh` verdadeiro).
     const path = semGh ? bin : `${bin}:${process.env.PATH}`;
-    const r = spawnSync(process.execPath, [CLI, ...args], { cwd: cwd ?? raiz, encoding: "utf8", env: { ...process.env, PATH: path, FAKE_GH: join(raiz, "mapa.json"), FAKE_GH_LOG: join(raiz, "log") } });
+    // Com um teto: um ciclo que nao acaba (os meses do `--todos`) fica vermelho, e nao pendurado ate ao timeout do job.
+    const r = spawnSync(process.execPath, [CLI, ...args], { cwd: cwd ?? raiz, encoding: "utf8", timeout: 60000, env: { ...process.env, PATH: path, FAKE_GH: join(raiz, "mapa.json"), FAKE_GH_LOG: join(raiz, "log") } });
     return { status: r.status, out: r.stdout ?? "", err: r.stderr ?? "", log: readFileSync(join(raiz, "log"), "utf8") };
   } finally {
     rmSync(raiz, { recursive: true, force: true });
@@ -368,12 +373,19 @@ for (const [nome, args, frase] of [
   ["o --limite sem o --quota", ["--desde", "2026-11-01", "--limite", "3000"], "so com o `--quota`"],
   ["um --mes mal formado", ["--quota", "--mes", "2026-13"], "--mes quer AAAA-MM"],
   ["um --limite que nao e um inteiro", ["--quota", "--limite", "2k"], "--limite quer um inteiro"],
+  ["o --por-pr sem o --quota", ["--desde", "2026-11-01", "--por-pr"], "o `--por-pr` so com o `--quota`"],
+  ["o --todos com o --repo", ["--desde", "2026-11-01", "--todos", "--repo", "o/r"], "nao se junta com `--repo`"],
+  ["o --todos com o --quota", ["--quota", "--todos"], "nem `--todos`"],
+  ["um --ate antes do --desde (um intervalo sem runs)", ["--desde", "2026-11-05", "--ate", "2026-11-01", "--todos"], "vem antes do --desde"],
 ]) {
   caso(`recusa --quota: argumentos — ${nome}`, () => {
     const r = cli({}, args);
     return [...NAO_TOTAL(r), ...espera(r.err.includes(frase), `stderr: ${r.err}`), ...espera(r.log === "", "chamou o gh antes de validar os argumentos")];
   });
 }
+
+// --- O custo por PR e o `--todos` (#517): no harness, pelo tamanho desta suite ---
+registarPorPr({ caso, espera, cli, conta, ITEM, run, job });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
