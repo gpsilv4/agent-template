@@ -22,6 +22,8 @@ Producao (main branch + {{BACKEND}} PROD)
 
 ## 0. O sprint esta completo?
 
+> **No template** (sem sprints nem backlog): o sprint e o issue do plano — os items dele fechados, e o relatorio de fecho num comentario dele.
+
 - [ ] **Todos os items do sprint fechados** — o `/deploy` corre por sprint, nao por ticket
   (`process-rules.md`, "Fluxo de Trabalho por Tipo"). Um item fechado **sai** do `backlog.md`:
   verificar que nenhum item do sprint ficou la aberto, que estao todos no Historico do
