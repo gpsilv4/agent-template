@@ -140,7 +140,7 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 3. /review    -> antes de fazer commit (build, logica, mobile, seguranca)
 4. commit + git push -> Preview URL (se o hosting a gerar por branch)
 5. /e2e-tests -> correr testes E2E contra a Preview URL, ou localmente
-6. /security-tests -> correr testes de seguranca
+6. /security-tests -> se o §0 dele se aplica (uma rota, um formulario, um header, uma tabela ou uma dependencia novos)
 ```
 
 > O ticket **acaba no `/review`**. O `/deploy` e sprint-level — ver abaixo.
@@ -160,14 +160,18 @@ O backlog e o documento central de trabalho pendente, organizado por prioridade:
 2. /review    -> antes de commit
 ```
 
-### Sprint completo (o unico fluxo com `/deploy`)
+### Fechar um sprint (uma release; o unico fluxo com `/deploy`)
 
 ```
 1. (todos os tickets do sprint feitos, cada um ate ao /review)
-2. relatorio de fecho de sprint (6 pontos — ver backlog-method.md, "Ao concluir um sprint")
-3. /deploy    -> checklist completo + gate de CI antes de mergear
-4. merge para main -> deploy de producao
-5. verificacao manual em prod + tag da versao
+2. /audit           -> (se existir) scoped desde a ultima tag do projeto; sem ela, perguntar
+3. /security-tests  -> (se existir) se o §0 dele se aplica
+4. os Criticos/Altos corrigidos ou com destino escrito (ID novo fora deste sprint, com aprovacao)
+5. relatorio de fecho de sprint (6 pontos — ver backlog-method.md, "Ao concluir um sprint")
+6. /deploy          -> checklist completo + gate de CI antes de mergear
+7. merge para main -> deploy de producao
+8. verificacao manual em prod + tag da versao
+9. /backlog-review  -> (se existir) o backlog contra o codigo
 ```
 
 ### Onboarding (novo developer)

@@ -76,10 +76,9 @@ O Agente segue automaticamente o fluxo correcto, pedindo aprovacao antes de cada
 | Ticket `L`, ou `M` ambiguo | `/grill` -> `/plan` -> implementar -> `/review` |
 | Ticket refactor | `/refactor` -> implementar -> `/review` |
 | Ticket com UI | o fluxo do tipo dele, e `/design-review` depois do `/review` |
-| Sprint completo | implementar todos -> `/review` -> `/deploy` |
-| Milestone (fim de sprint, pre-release) | `/audit` -> propostas de backlog, com aprovacao |
+| Fechar um sprint (o milestone: uma release) | implementar todos -> `/review` -> `/audit` scoped -> `/security-tests` (se o §0 dele se aplica) -> os Criticos/Altos corrigidos ou com destino escrito (ID novo fora deste sprint, com aprovacao; um advisory como no `/security-tests` §0) -> relatorio de fecho -> `/deploy` (testes, PR de release, tag) -> `/backlog-review`. O `/audit`, o `/security-tests` e o `/backlog-review` correm **se existirem**. No template: o relatorio e os achados num comentario do issue do plano, e cada Critico/Alto um issue novo, com aprovacao |
 | Estrategia de produto | `/market-scan` -> propostas de backlog, com aprovacao |
-| Abrir um sprint, ou depois de uma release | `/backlog-review` -> propostas de backlog, com aprovacao |
+| Abrir um sprint | `/backlog-review`, se existir (o do fecho anterior serve, se nada mudou desde ele) -> propostas de backlog, com aprovacao |
 
 - O `/deploy` so corre quando o sprint esta completo — tickets individuais fazem commit no branch mas nao deploy
 

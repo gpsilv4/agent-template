@@ -27,7 +27,7 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 - **O "Depende de"** so tem IDs, em maiusculas (um `b2` nao conta). Cada ID tem de existir, e se esta aberto tem de vir ANTES: num bloco anterior, ou no mesmo com `Ordem` menor. Uma dependencia fechada nao conta.
 - **Bloqueado** (a espera de algo de fora, como a versao de um pacote) escreve-se no "Depende de", `T58; Bloqueado: <motivo>`, e os IDs do motivo nao contam. **Condicional** (fazer se ou quando algo acontecer) escreve-se na `Nota`, e nao e um bloqueio.
 - **Dois tickets "num so PR":** so a linha de DEPOIS cita a de antes, por exemplo `UX122 (num so PR)`. A de antes nao cita a de depois, senao uma das duas depende de algo que vem depois.
-- **Debaixo do `> Objetivo:`** (o resultado do bloco), uma linha `> Fecho: /audit → /backlog-review` (o processo de o fechar) e opcional, e o guarda nao a le.
+- **Debaixo do `> Objetivo:`** (o resultado do bloco), uma linha `> Fecho: /audit → /deploy → /backlog-review` (o processo de o fechar) e opcional, e o guarda nao a le.
 - **Os Pendentes sem Sprint** tem a coluna `Nota`, com esse nome.
 - **Uma linha riscada** (`~~X~~`) num bloco, nos Pendentes ou numa tabela por tipo e um fecho a meio: fechar move a linha para o arquivo.
 
@@ -73,7 +73,7 @@ o caso que o `/debug` e o `/refactor` mandam registar):
 4. Atualizar a linha **Proximo:** com o item seguinte do sprint
 
 **Ao iniciar um sprint:**
-- Se existir o `/backlog-review` (`.agent/workflows/backlog-review.md`; o Modo minimo remove-o), propo-lo primeiro: rever o backlog contra o codigo antes de explicar os items
+- Se existir o `/backlog-review` (`.agent/workflows/backlog-review.md`; o Modo minimo remove-o), propo-lo primeiro: rever o backlog contra o codigo antes de explicar os items (o do fecho anterior serve, se nada mudou desde ele)
 - O agente deve ler o sprint ativo no `backlog.md` e **avaliar o tamanho**:
   - Se o sprint tem **mais de 9 items**, sugerir divisao em sprints menores (7-9 items cada) e aguardar aprovacao
   - Verificar se novos tickets foram adicionados ao sprint desde o planeamento original
@@ -82,11 +82,12 @@ o caso que o `/debug` e o `/refactor` mandam registar):
 - So avancar para implementacao apos aprovacao
 
 **Ao concluir um sprint (todos os items feitos):**
+- O `/audit` scoped e o `/security-tests` (os que existirem; o segundo se o §0 dele se aplica) correm antes deste relatorio; a ordem e o destino dos achados estao em `process-rules.md`, Fluxo de Trabalho por Tipo
 - **ANTES de pedir commit/PR**, o Agente deve apresentar um relatorio com:
-  1. Tabela de verificacao (tsc, lint, build, bundles, E2E, security)
+  1. Tabela de verificacao (tsc, lint, build, bundles, E2E, security — a suite de security corre-se aqui mesmo sem o `/security-tests`)
   2. Tabela de items com estado final
   3. **Desvios do plano**: para cada item que diferiu da explicacao pre-implementacao, descrever o que mudou e porque
-  4. **Problemas encontrados**: erros, bugs ou dificuldades tecnicas e como foram resolvidos
+  4. **Problemas encontrados**: erros, bugs ou dificuldades tecnicas e como foram resolvidos; e as licoes de PROCESSO (retrabalho, CI vermelho, um passo esquecido) -> proposta de regra ou de ticket, com aprovacao (os anti-padroes do codigo sao do `/audit` §5, se existir; sem ele, entram aqui)
   5. **Testes**: por item, avaliar se justifica teste novo (unit/E2E/security) e perguntar
   6. **Trabalho nao planeado**: listar o que NAO estava no sprint e criar tickets com IDs antes do commit
 - So depois perguntar: _"Queres que atualize a documentacao, faca commit e crie o PR?"_

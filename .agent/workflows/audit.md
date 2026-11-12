@@ -9,7 +9,7 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
 
 ## 1. Ambito & Guards
 
-- **Ambito**: perguntar ao utilizador — auditoria **completa** (todo o repo) ou **scoped** (so o que mudou desde a ultima tag/release: `git diff <ultima-tag>..HEAD --stat` + `git log <ultima-tag>..HEAD` — o `git diff <tag>` sozinho compara com a working tree e ignora untracked). Scoped e mais barato para milestones frequentes.
+- **Ambito**: no fecho de um sprint (`process-rules.md`), **scoped** desde a ancora do `/backlog-review` §1 (so uma tag do PROJETO conta; sem ela, perguntar). Noutra altura, perguntar ao utilizador — auditoria **completa** (todo o repo) ou **scoped** (so o que mudou desde a ultima tag/release: `git diff <ultima-tag>..HEAD --stat` + `git log <ultima-tag>..HEAD` — o `git diff <tag>` sozinho compara com a working tree e ignora untracked). Scoped e mais barato para milestones frequentes.
 - Correr os **guards deterministicos** primeiro e incluir o resultado. O workflow que se
   anuncia como o mais abrangente era o que corria **menos** verificacao automatica — o
   `/review` §10 e o `/deploy` §1 ja exigiam mais do que isto:
@@ -65,7 +65,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 1. **Estado por lente** (severidade dominante + resumo curto)
 2. **Top achados** (todas as lentes) com `ficheiro:linha`, severidade, CONFIRMADO/PLAUSIVEL e correcao
 3. **Delta** vs auditoria anterior, se existir (novos / resolvidos por severidade)
-4. **Proposta de backlog** — cada achado por resolver vira item candidato (ID, seccao, esforco); aguardar aprovacao antes de adicionar
+4. **Proposta de backlog** — cada achado por resolver vira item candidato (ID, seccao, esforco); aguardar aprovacao antes de adicionar (no fecho de um sprint, um Critico/Alto e corrigido antes do relatorio de fecho do sprint — `backlog-method.md`, "Ao concluir um sprint" —, ou recebe destino escrito — ID novo fora deste sprint, com aprovacao; no template, um issue novo, com aprovacao — `process-rules.md`, Fluxo de Trabalho por Tipo)
 5. **Anti-padroes** — achados recorrentes -> propor entrada em `anti-patterns.md`
 6. **Guardar o relatorio datado** (resumo por lente + severidades) — por defeito, para servir de **baseline** ao delta da proxima auditoria em **`.agent/context/audit-history.md`** — ficheiro **acumulado e NAO importado**, criado a
    primeira vez que correres o `/audit`. **Nao usar o `session.md`**: ele declara-se substituido
@@ -74,7 +74,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
    > nao existe aqui de proposito — `.agent/context/` e o andaime que cada derivado herda, e um
    > historico de auditorias do template nasceria dentro de todos eles. O **Guard 21** reprova
    > um ficheiro sem entrada em `PRISTINOS`, e a resposta certa e **nao o criar**, nao congelar
-   > o hash. O relatorio vai para um issue. Ver `process-rules.md`.
+   > o hash. O relatorio vai para um issue (no fecho de um sprint, um comentario no issue do plano). Ver `process-rules.md`.
 
 ## Sessao (Handoff)
 
