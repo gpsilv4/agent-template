@@ -7,7 +7,9 @@
  * do proprio template nao. Fixar sem rede nao chega: o proximo workflow novo voltava ao `-latest` sem ninguem ver.
  *
  * O QUE VERIFICA: todo o `runs-on:` dos workflows do template (`.github/workflows/`) e dos exemplos dos derivados
- * (`src/docs/exemplos/`) e o rotulo `RUNNER`. Um `-latest`, ou um rotulo diferente dos outros, reprova.
+ * (`src/docs/exemplos/`) e o rotulo `RUNNER`. Um `-latest`, ou um rotulo diferente dos outros, reprova. Nos exemplos,
+ * tambem o `runs-on:` COMENTADO dentro de um bloco `MODO COMPLETO (x) inicio ... fim` (#534): e o que um derivado
+ * privado descomenta (o job `guard-tests` do `ci-sem-maquinaria.yml`), e uma subida que o esquecesse passava verde.
  *
  * SUBIR DE IMAGEM e uma decisao com PR: muda-se o `RUNNER` aqui e os `runs-on:` todos de uma vez, e o CI do PR mostra
  * o que parte. A pergunta "ja ha uma LTS nova estavel, ou o fim da fixada foi anunciado?" vive no `/backlog-review`.
@@ -17,6 +19,7 @@
  * ainda nao, #524) verifica SO os ficheiros que o manifesto diz que vieram do template (`copiados` e `iguais`): os
  * outros sao do projeto. Um manifesto ilegivel avisa, em vez de desligar o guard.
  */
+import { descomenta } from "../lib/exemplo-ci.mjs";
 
 /** O rotulo fixo. Mudar aqui e nos `runs-on:` de uma vez (o guard reprova o meio-termo). */
 export const RUNNER = "ubuntu-24.04";
@@ -24,11 +27,16 @@ export const RUNNER = "ubuntu-24.04";
 /** Onde se procuram os `runs-on:`. */
 export const ONDE = [".github/workflows", "src/docs/exemplos"];
 
-/** Os `runs-on:` de um texto YAML: `{ linha, valor }`, o valor sem aspas nem comentario. */
-export function runsOnDe(texto) {
+/** Os `runs-on:` de um texto YAML: `{ linha, valor }`, o valor sem aspas nem comentario. Com `modoCompleto`, as linhas
+ *  comentadas DENTRO de um bloco `MODO COMPLETO` leem-se descomentadas (o `descomenta` de `lib/exemplo-ci.mjs`, a
+ *  definicao unica): a linha fica a do ficheiro. Fora dos blocos, um comentario continua a nao contar. */
+export function runsOnDe(texto, { modoCompleto = false } = {}) {
   const out = [];
+  let dentro = false;
   (texto ?? "").split("\n").forEach((l, i) => {
-    const m = /^\s*runs-on:\s*(.*?)\s*(?:#.*)?$/.exec(l);
+    if (modoCompleto && /# --- MODO COMPLETO \([^)]*\) inicio/.test(l)) dentro = true;
+    else if (modoCompleto && /# --- MODO COMPLETO \([^)]*\) fim ---/.test(l)) dentro = false;
+    const m = /^\s*runs-on:\s*(.*?)\s*(?:#.*)?$/.exec(dentro ? descomenta(l) : l);
     if (m) out.push({ linha: i + 1, valor: m[1].replace(/^(['"])(.*)\1$/, "$2") });
   });
   return out;
@@ -66,13 +74,15 @@ export function guardRunners({ read, warn, ok, skip, listDir, ehDerivado }) {
         const f = `${pasta}/${nome}${ext}`;
         if (doTemplate && !doTemplate.has(f)) continue;
         ficheiros++;
-        for (const r of runsOnDe(read(f))) achados.push({ f, ...r });
+        for (const r of runsOnDe(read(f), { modoCompleto: pasta === "src/docs/exemplos" })) achados.push({ f, ...r });
       }
     }
   }
+  // Um manifesto que nao lista NENHUM workflow nem exemplo do disco nao e uma adocao real (nela, os exemplos de
+  // `src/docs/exemplos/` vem sempre do template): e um `adocao.json` esquecido, que desligava o guard em SKIP (#534).
   if (ficheiros === 0 && doTemplate) {
-    skip("Guard 22 (runner fixo) — adocao em curso: nenhum workflow nem exemplo veio do template (os do projeto sao dele)");
-    return 0;
+    warn("Guard 22 (runner fixo) — o `.agent/adocao.json` nao lista nenhum workflow nem exemplo que esteja no disco: numa adocao os exemplos vem do template; no template, um manifesto esquecido — apaga-lo");
+    return 1;
   }
   if (ficheiros === 0) {
     // Sem workflows nem exemplos nao ha o que verificar — dito, e nao calado (uma fixture minima).
