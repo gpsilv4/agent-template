@@ -377,6 +377,10 @@ for (const [nome, args, frase] of [
   ["o --todos com o --repo", ["--desde", "2026-11-01", "--todos", "--repo", "o/r"], "nao se junta com `--repo`"],
   ["o --todos com o --quota", ["--quota", "--todos"], "nem `--todos`"],
   ["um --ate antes do --desde (um intervalo sem runs)", ["--desde", "2026-11-05", "--ate", "2026-11-01", "--todos"], "vem antes do --desde"],
+  ["um --desde no futuro (um zero que nao mediu nada, #535)", ["--desde", "2999-01-01", "--todos"], "esta no futuro"],
+  ["um --desde com o mes 13 (#535)", ["--desde", "2026-13-01", "--todos"], "que exista"],
+  ["um --ate a 30 de fevereiro (#535)", ["--desde", "2026-02-01", "--ate", "2026-02-30", "--repo", "o/r"], "que exista"],
+  ["o --todos com o --run (#535)", ["--todos", "--run", "1"], "nao se junta com `--repo` nem `--run`"],
 ]) {
   caso(`recusa --quota: argumentos — ${nome}`, () => {
     const r = cli({}, args);

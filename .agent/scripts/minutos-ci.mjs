@@ -40,7 +40,7 @@
  * por data: estreitar), ou menos runs/jobs lidos do que a API diz haver. Um zero falso e pior do que nenhum numero.
  */
 import { execFileSync } from "child_process";
-import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, projecaoDoMes, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, privadosDoMes, projecaoDoMes, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
 import { repoDoOrigin } from "./lib/repo-origin.mjs";
 import { MARCA, TIPOS, celula, custoPorTipo, prDoRun, precisaDosFicheiros, tipoDoRun } from "./lib/minutos-por-pr.mjs";
 import { modoDoProjeto, temGuardTests } from "./lib/modo-upgrade.mjs";
@@ -77,7 +77,12 @@ if (opt.mes && !/^\d{4}-(0[1-9]|1[0-2])$/.test(opt.mes)) erros.push(`--mes quer 
 if (opt.mes && opt.mes > new Date().toISOString().slice(0, 7)) erros.push(`--mes ${opt.mes} esta no futuro (em UTC): nao ha faturacao para medir`);
 if (opt.limite && !/^[1-9]\d*$/.test(opt.limite)) erros.push(`--limite quer um inteiro positivo (deu ${opt.limite})`);
 if (!opt.quota && !opt.run === !opt.desde) erros.push("da exatamente um de `--run <id>` ou `--desde AAAA-MM-DD` (ou o `--quota`)");
-for (const k of ["desde", "ate"]) if (opt[k] && !/^\d{4}-\d{2}-\d{2}$/.test(opt[k])) erros.push(`--${k} quer AAAA-MM-DD (deu ${opt[k]})`);
+// Uma data REAL (#535): a forma so deixava passar um `2026-13-01` ou um `2026-02-30`, e o `--todos` ficava sem meses.
+const dataReal = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+for (const k of ["desde", "ate"]) if (opt[k] && !dataReal(opt[k])) erros.push(`--${k} quer uma data AAAA-MM-DD que exista (deu ${opt[k]})`);
+// Um `--desde` no futuro nao tem runs nem faturacao: "nenhum repo" seria um zero que nao mediu nada (`TP2`, #535) — a
+// mesma regra do `--mes`.
+if (opt.desde && dataReal(opt.desde) && opt.desde > new Date().toISOString().slice(0, 10)) erros.push(`--desde ${opt.desde} esta no futuro (em UTC): nao ha runs para medir`);
 // Um intervalo ao contrario nao tem runs: "nenhum repo" ou "0 min" seriam um zero que nao mediu nada (`TP2`).
 if (opt.desde && opt.ate && opt.ate < opt.desde) erros.push(`--ate ${opt.ate} vem antes do --desde ${opt.desde}`);
 if (opt.run && !/^\d+$/.test(opt.run)) erros.push(`--run quer o id numerico de um run (deu ${opt.run})`);
@@ -251,9 +256,8 @@ function todos() {
     m = n === 12 ? `${a + 1}-01` : `${a}-${String(n + 1).padStart(2, "0")}`;
   }
   const itens = meses.flatMap((m) => faturacao(eu, ...m.split("-").map(Number)));
-  const vis = visibilidadeDe(eu, itens);
-  const privados = [...vis].filter(([, v]) => v === "privado").map(([n]) => n).sort();
-  for (const [n, v] of vis) if (v === "desconhecido") console.log(`FORA: ${eu}/${n} tem minutos na faturacao e nao o encontrei (apagado ou renomeado): os runs dele nao se leem`);
+  const { privados, desconhecidos } = privadosDoMes(visibilidadeDe(eu, itens));
+  for (const n of desconhecidos) console.log(`FORA: ${eu}/${n} tem minutos na faturacao e nao o encontrei (apagado ou renomeado): os runs dele nao se leem`);
   if (!privados.length) {
     console.log(`nenhum repo privado com minutos de ${meses[0]} a ${meses.at(-1)}`);
     return;
@@ -360,8 +364,10 @@ function quota() {
   if (nivel === "esgotada") console.log(`QUOTA: ESGOTADA — ${m(q.total)} de ${limite} min: com o limite de gastos a 0, o CI para ate ao dia 1 (src/docs/upgrade-derivados-privados.md §6)`);
   if (nivel === "aviso") console.log(`QUOTA: AVISO — ${pct}% de ${limite} min${proj !== null && proj > limite ? `, e a projecao (~${m(proj)}) passa o limite` : ""}`);
   // Os desconhecidos (404) contam na quota, mas os runs deles nao se leem: ficam fora do custo por PR, e di-lo.
+  // A MESMA lista do `--todos` (#535): os privados com minutos de qualquer SO (a quota soma so o Linux, o custo por PR nao).
   if (opt.porPr) {
-    porPr(eu, q.porRepo.map(([r]) => r).filter((r) => visibilidade.get(r) === "privado"), ano, mes);
-    for (const r of q.desconhecidos) console.log(`  FORA: ${r} (nao o encontrei: os runs dele nao se leem)`);
+    const { privados, desconhecidos } = privadosDoMes(visibilidade);
+    porPr(eu, privados, ano, mes);
+    for (const r of desconhecidos) console.log(`  FORA: ${r} (nao o encontrei: os runs dele nao se leem)`);
   }
 }

@@ -93,6 +93,14 @@ export function quotaDoMes(itens, visibilidade) {
   };
 }
 
+/** Os repos de um mes, pela visibilidade (`repo -> "privado" | "publico" | "desconhecido"`, de todos os itens em minutos,
+ *  de qualquer SO): `{ privados, desconhecidos }`, por nome. UMA lista para o `--todos` e o `--por-pr` (#535): partiam de
+ *  listas diferentes, e um privado so com minutos de macOS aparecia num e faltava no outro. */
+export function privadosDoMes(visibilidade) {
+  const com = (v) => [...visibilidade].filter(([, x]) => x === v).map(([n]) => n).sort();
+  return { privados: com("privado"), desconhecidos: com("desconhecido") };
+}
+
 /** Os dias de um mes (`mes` de 1 a 12), em UTC. */
 export const diasDoMes = (ano, mes) => new Date(Date.UTC(ano, mes, 0)).getUTCDate();
 
