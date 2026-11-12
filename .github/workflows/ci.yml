@@ -634,10 +634,11 @@ jobs:
     # completo e o setup, saltava os dois passos e ficava VERDE sem ter medido nada (`TP2`). Assim
     # aparece como `skipped`, que e o que aconteceu.
     if: github.event_name == 'pull_request'
-    # 30 da ~2x sobre o que os passos medem num PR de maquinaria, que e o mais longo: com a `--skips`
-    # do derivado maduro (#308, parte 3) o job chega aos ~13-17 min, e os 15 de antes nao davam folga
-    # (o tempo de cada passo esta no comentario dele, e nao repetido aqui — `TP8`).
-    timeout-minutes: 30
+    # 45 da ~1,5x sobre o que os passos medem num PR de maquinaria, que e o mais longo: desde o #487 o
+    # job corre DOIS derivados (o privado e o do bootstrap) mais a `--skips` do derivado maduro (#308,
+    # parte 3), e chegou aos 27-30 min (medido nos PRs #527, #528 e #541; este ultimo cortado aos 30,
+    # #537). O tempo de cada passo esta no comentario dele, e nao repetido aqui — `TP8`.
+    timeout-minutes: 45
     steps:
       # `fetch-depth: 0`: o `simulate-upgrade` monta um derivado da ULTIMA TAG, e um clone raso
       # nao as traz — ele reprova a dizer que nao mediu, em vez de passar em silencio.

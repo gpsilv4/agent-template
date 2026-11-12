@@ -59,7 +59,9 @@ function test(nome, opcoes, expect) {
     try {
       out = execFileSync("node", [join(dir, ".agent/scripts/simulate-derived.mjs"), ...(expect.args ?? [])], {
         cwd: dir,
-        env: { ...process.env, ...(expect.env ?? {}) },
+        // Hermetica (#537): as variaveis do simulador saem do ambiente herdado — um `SIMULATE_PRIVADO=1` exportado na
+        // shell punha todos os casos sem a ordem do BOOTSTRAP a reprovar. So os do proprio caso entram.
+        env: { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^SIMULATE_(?:PRIVADO|SKIPS)$/.test(k))), ...(expect.env ?? {}) },
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -439,6 +441,12 @@ test("sem --skips: a varredura nao corre", { extra: VARREDURA('console.log("  FA
 test("SIMULATE_SKIPS=1 liga a --skips e nao passa aos comandos da bateria", {
   extra: { ...VARREDURA(SKIPS_COM_GIT), [COMANDOS[0]]: 'if (process.env.SIMULATE_SKIPS) { console.log("  FAIL  herdou SIMULATE_SKIPS"); process.exit(1); }\nconsole.log("ok");\n' },
 }, { env: { SIMULATE_SKIPS: "1" }, code: 0, includes: ["mutation-sweep.mjs"] });
+// O espelho para o `SIMULATE_PRIVADO` (#537): sai do ambiente, e os comandos da bateria nao o herdam (a suite do
+// simulador, corrida na copia, lancava simuladores de fixture tambem no modo privado).
+test("SIMULATE_PRIVADO=1 nao passa aos comandos da bateria (#537)", (() => {
+  const p = PRIVADO(pacoteCi(COMANDOS));
+  return { ...p, extra: { ...p.extra, [COMANDOS[0]]: 'if (process.env.SIMULATE_PRIVADO) { console.log("  FAIL  herdou SIMULATE_PRIVADO"); process.exit(1); }\nconsole.log("ok");\n' } };
+})(), { env: { SIMULATE_PRIVADO: "1" }, code: 0, mostra: ["o pacote de um job no modo completo"] });
 // Vermelha, a varredura diz QUAL sitio: a linha tem de aparecer no output do simulador.
 test("--skips vermelha: o sitio por cobrir aparece", {
   extra: VARREDURA('console.log("  INCOMPLETA  x.mjs: 0/1 sitios cobertos");\nconsole.log("              L12: skip(\\"x\\")");\nprocess.exit(1);\n'),

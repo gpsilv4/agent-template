@@ -123,18 +123,20 @@ e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, 
 - So executar os comandos Git no terminal apos o utilizador analisar o codigo e dar explicitamente "Luz Verde".
 - **NUNCA** atribuir o trabalho a uma IA na mensagem de commit (`Co-Authored-By`, "Generated with", emoji de robo); co-autor humano passa. **Verificado** pelo hook `.githooks/commit-msg` — ligar com `git config core.hooksPath .githooks`.
 - Apos merge de PRs, **perguntar ao utilizador** se deve eliminar o branch ou mante-lo.
-- **Depois do commit e antes do `push`, correr os TRES que apanham de facto** (a ordem importa: o
+- **Depois do commit e antes do `push`, correr os QUATRO que apanham de facto** (a ordem importa: o
   simulador do upgrade mede o delta entre a ULTIMA TAG e o `HEAD`, logo sem commits nao ha nada a
   medir e ele salta):
   `node .agent/scripts/simulate-upgrade.mjs` (~3 min),
-  `node .agent/scripts/simulate-derived.mjs` (~2 min; e com `SIMULATE_PRIVADO=1`, o derivado privado, #487) e
+  `node .agent/scripts/simulate-derived.mjs` (~2 min),
+  `SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs` (~2 min) e
   `node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD)"` (~1s).
-  Medem coisas diferentes, e e por isso que sao tres: um contra a **ultima tag** (onde aparece o
-  que so um consumidor ve), outro contra um projeto **bootstrapado de raiz**, o terceiro compara a
+  Medem coisas diferentes, e e por isso que sao quatro: um contra a **ultima tag** (onde aparece o
+  que so um consumidor ve), dois contra um projeto **bootstrapado de raiz** (com o `ci.yml` do template, e o de um
+  derivado PRIVADO, o pacote de um job, como o CI os corre, #487), o quarto compara a
   **superficie contra a base do branch**. Numa sessao com **cinco** reprovacoes de CI, foram estes
   que as apanharam todas — nenhuma foi apanhada pela varredura de mutacao.
   O `simulate-derived` entrou depois de a sua ausencia deixar passar um PR vermelho: a bateria
-  local estava verde e o CI reprovou num defeito que so aparece num derivado. Custam ~5 min
+  local estava verde e o CI reprovou num defeito que so aparece num derivado. Custam ~7 min
   juntos; cada reprovacao de CI custa ~25.
 - **CI Gate**: Antes de mergear para main, confirmar que **todos os CI checks passaram** (TypeScript, lint, build, tests, audit). Nunca mergear com checks vermelhos.
 - **PRs**: Usar o template de PR (`.github/pull_request_template.md`) que impoe checklist alinhada com o workflow `/review`.
