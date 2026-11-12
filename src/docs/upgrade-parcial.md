@@ -58,8 +58,10 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 - `.agent/scripts/lib/backlog-itens.mjs`
 - `.agent/scripts/lib/backlog-regras.mjs`
 - `.agent/scripts/lib/backlog-corrige.mjs`
-- `.agent/scripts/minutos-ci.mjs`, com os dois modulos abaixo.
+- `.agent/scripts/minutos-ci.mjs`, com os quatro modulos abaixo.
 - `.agent/scripts/lib/minutos-calculo.mjs`
+- `.agent/scripts/lib/minutos-por-pr.mjs`
+- `.agent/scripts/lib/modo-upgrade.mjs`
 - `.agent/scripts/lib/repo-origin.mjs`
 - `.agent/scripts/lib/registo.mjs`: o runner do `test-hooks.mjs`, com os quatro abaixo e o harness.
 - `.agent/scripts/lib/varredura-paralela.mjs`

@@ -28,6 +28,14 @@ export function modoDaMarca(marca) {
   return /^modo:(.*)$/m.exec(marca ?? "")?.[1]?.trim() ?? null;
 }
 
+/** O texto do job `nome` de um `ci.yml`: do cabecalho dele ao job SEGUINTE (o `split` sozinho levava os que vem
+ *  depois), ou `undefined`. Um comentario na linha do job (`  guard-tests:   # suites`) nao a desfaz — nem a do job
+ *  seguinte (leitura independente do #308). Uma so leitura (#517): a 2b do `/upgrade` e o `minutos-ci --por-pr`. */
+export const textoDoJob = (ci, nome) => ci?.split(new RegExp(`^  ${nome}:[ \t]*(?:#.*)?$`, "m"))[1]?.split(/^  [\w-]+:[ \t]*(?:#.*)?$/m)[0];
+
+/** O `ci.yml` tem o job `guard-tests`, com corpo? O sinal do disco do modo (a tabela acima). */
+export const temGuardTests = (ci) => Boolean(textoDoJob(ci, "guard-tests"));
+
 // `soMarca`: o disco nao entra na contradicao — a linha `modo:` nao se le (#508); corrige-se so a marca.
 const resultado = (modo, porque, soMarca = false) => ({ modo, porque, soMarca });
 

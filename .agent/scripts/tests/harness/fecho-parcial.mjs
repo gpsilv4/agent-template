@@ -226,6 +226,8 @@ export const ISENCOES = [
   { ficheiro: ".claude/hooks/stop-verify.mjs", literal: ".claude/state/stop-verify.last", porque: "estado de runtime, criado pelo proprio hook" },
   { ficheiro: ".claude/hooks/guard-textos-publicos.mjs", literal: ".claude/state/textos-publicos.sessao", porque: "estado de runtime, criado pelo proprio hook" },
   { ficheiro: ".agent/scripts/check-backlog.mjs", literal: ".agent/context/backlog.md", porque: "o backlog e do projeto (e o que se verifica)" },
+  { ficheiro: ".agent/scripts/lib/minutos-por-pr.mjs", literal: ".agent/.template-version", porque: "le-se de OUTRO repo, pela API (#517): e o nome da marca num PR, nao um ficheiro do disco" },
+  { ficheiro: ".agent/scripts/minutos-ci.mjs", literal: ".github/workflows/ci.yml", porque: "le-se de OUTRO repo, pela API (#517): o modo de cada privado, nao um ficheiro do disco" },
   { ficheiro: ".agent/scripts/check-backlog.mjs", literal: ".agent/context/backlog-archive.md", porque: "o arquivo e do projeto" },
   { ficheiro: ".claude/hooks/reinject-fronteiras.mjs", literal: "CLAUDE.md", porque: "o ponto de entrada e do projeto (o hook le as Fronteiras DELE)" },
   { ficheiro: ".agent/scripts/lib/mapa-suites.mjs", literal: ".agent/scripts/", porque: "dados da tabela (as suites que cada regra nomeia), e nao uma leitura" },

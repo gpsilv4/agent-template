@@ -223,7 +223,8 @@ not to* line, so every agent sees it.
     ├── mutation-sweep.mjs      <- Proves the suites assert: disables each warning, demands red
     ├── minutos-ci.mjs          <- CI minutes per run, billed (each job rounded up) vs real, step times,
     │                              the PR median vs 120 s; --quota: the account's private repos against the free
-    │                              quota, with a month-end projection (#442); fails loud, never a false 0 (#429)
+    │                              quota, with a month-end projection (#442); --por-pr: what a PR costs, by type
+    │                              and mode; --todos: every private repo run by run (#517); fails loud, never a false 0 (#429)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │
@@ -277,6 +278,7 @@ not to* line, so every agent sees it.
     │   ├── backlog-vista-pecas.mjs <- The board's pure pieces: text to HTML, card titles, filter and sort decisions (#468)
     │   ├── backlog-vista-assets.mjs <- The board's inline CSS and JS (#446)
     │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
+    │   ├── minutos-por-pr.mjs  <- What a PR costs, by type (upgrade, normal, Dependabot, dynamic), pure (#517)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── repo-origin.mjs     <- The owner/repo of a GitHub `origin` URL (#455)
     │   ├── concurrency-ci.mjs  <- A workflow's top-level `concurrency:` block, and what it lacks (#427, #455)
@@ -477,7 +479,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch, and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **own job, in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
-| CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (#429); the merge-push skip, the `(deps`/`,deps` step and the PR-description check run in fixtures, the `cache-sem-maquinaria.yml` example (#439) and the private `dependabot-privado.yml` (#440) (both in the `guard-tests` job) |
+| CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0; the cost per PR by type and mode, `--por-pr`, and every private repo run by run, `--todos`, #517); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (#429); the merge-push skip, the `(deps`/`,deps` step and the PR-description check run in fixtures, the `cache-sem-maquinaria.yml` example (#439) and the private `dependabot-privado.yml` (#440) (both in the `guard-tests` job) |
 | Partial Upgrade Tests | `node .agent/scripts/tests/test-modo-upgrade.mjs` — the mode rule (mark decides, the `guard-tests` job proposes), `/upgrade` §4 run for real (the mark keeps `modo:` and drops the stale `versao:`, and §1 reads the new SHA), the order of `upgrade-parcial.md`, and its "what comes" list against the import closure of the hooks, `commit-msg`, `check-backlog` and `minutos-ci` (in the `guard-tests` job, #429) |
 | Public Text Tests | `node .agent/scripts/tests/test-textos-publicos.mjs` — fixture readers, no network: exit 0/1/2, tag messages reported as known, a read cut at the limit is never "clean" (runs in the `guard-tests` job). The scan itself, `check-textos-publicos.mjs`, needs your list (`~/.config/agent-template/nomes-proibidos`, outside the repo) and `gh`, so you run it **by hand**; with no list the `commit-msg` stays silent, and only the scan and the Claude Code hook (`guard-textos-publicos`, once a session) say so. In a PRIVATE repo where the names are legitimate, the USER can switch it off for that repo (`src/docs/upgrade-why.md`, never an agent; #375) |
 | Sweep Tests | `node .agent/scripts/tests/test-mutation-sweep.mjs` — fake checker + fake suite with known behaviour; asserts the sweep detects an untested warning site and fails on every failure path (runs in the `guard-tests` job) |
