@@ -90,8 +90,11 @@ try {
       return p;
     }
   };
-  let raizMemo;
-  const raiz = () => (raizMemo === undefined ? (raizMemo = ((r) => (r ? real(r) : null))(repoDe(cwd))) : raizMemo);
+  // Um so `git rev-parse` por comando (#536): a raiz real (para a isencao do #511) e o repo cru (para a lista) saem da
+  // mesma chamada, preguicosa — so a faz quem pergunta.
+  let repoMemo;
+  const repoUmaVez = () => (repoMemo ??= { v: repoDe(cwd) }).v;
+  const raiz = () => ((r) => (r ? real(r) : null))(repoUmaVez());
   const lidos = textosDoComando(cmd, { cwd, home: homedir(), ler: lerFicheiro, raiz, real });
   // Antes do "publica" e da lista: um `git config` nao publica, e o interruptor vale com ou sem lista (#397, M4).
   if (lidos.interruptor) {
@@ -108,7 +111,7 @@ try {
   // Num comando que publica NOUTRO repo, o interruptor deste nao conta: a lista arma.
   // Fora de um repo (`null`) a lib nao procura "dentro do repo"; sem saber (`undefined`), o `cwd` serve de raiz. Um
   // `cwd` que ja nao existe fazia a lib lancar, e o `catch` de fora PERMITIA (leitura 1 do #397, ja no `main`): nega.
-  const repo = repoDe(cwd);
+  const repo = repoUmaVez();
   if (repo === undefined && !existsSync(cwd)) negar("A pasta deste comando ja nao existe, logo nao consigo saber se a lista de nomes proibidos esta dentro do repo. Correr o comando a partir de uma pasta que exista.");
   const lista = nomes.carregaLista({ raiz: repo === undefined ? cwd : repo, ...(lidos.alvoExterno ? { desligado: () => false } : {}) });
   if (lista.estado === "sem-lista" || lista.estado === "desligado") {
