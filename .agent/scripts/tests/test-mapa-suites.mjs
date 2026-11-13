@@ -95,15 +95,26 @@ test("cada verificador traz os ficheiros que o motivam", () => {
 // O CONTRA-CASO do anterior: sem ele, um mapa que devolvesse SEMPRE todos os verificadores
 // passava os dois testes de cima.
 test("um ficheiro so leva ao SEU verificador, nao a todos", () => {
-  // Exatamente as suites da regra DELE (desde o #536 sao duas: o `test-commit-msg` e o `test-hooks`, que assenta em o
-  // `commit-msg` so LER), e nao todas as do mapa.
+  // Exatamente as DUAS suites dele, escritas aqui por extenso (#545): o `test-commit-msg` e o `test-hooks`, que assenta
+  // em o `commit-msg` so LER (#536). Comparar com a propria regra nao prendia nada: tirar uma das duas do mapa ficava
+  // verde. E nao todas as do mapa.
   const { porVerificador } = verificadoresDe([".githooks/commit-msg"]);
-  const chaves = [...porVerificador.keys()].sort();
-  const daRegra = [...(regraDe(".githooks/commit-msg")?.verifica ?? [])].sort();
-  const todas = new Set(SUITES.flatMap((r) => r.verifica));
-  return chaves.length > 0 && chaves.length < todas.size && JSON.stringify(chaves) === JSON.stringify(daRegra) && chaves.some((c) => c.endsWith("test-commit-msg.mjs"))
-    ? []
-    : [`levou a ${JSON.stringify(chaves)}; a regra dele diz ${JSON.stringify(daRegra)}`];
+  // Os caminhos completos, e nao so os nomes: um `test-hooks.mjs` na pasta errada nao corria nada.
+  const nomes = [...porVerificador.keys()].sort();
+  const esperado = [".agent/scripts/tests/test-commit-msg.mjs", ".claude/hooks/tests/test-hooks.mjs"];
+  return JSON.stringify(nomes) === JSON.stringify(esperado) ? [] : [`levou a ${JSON.stringify(nomes)}; esperado ${JSON.stringify(esperado)}`];
+});
+
+// O Guard 22 le o exemplo REAL (#545): o `test-import` de baixo so ve `import`, nao uma leitura de ficheiro.
+test("o `ci-sem-maquinaria.yml` leva ao `test-guards` (#545)", () => {
+  const verifica = regraDe("src/docs/exemplos/ci-sem-maquinaria.yml")?.verifica ?? [];
+  return ["test-ci-exemplo.mjs", "test-simulate-upgrade.mjs", "test-guards.mjs"].filter((s) => !verifica.some((v) => v.endsWith(s))).map((s) => `falta ${s}`);
+});
+
+// O `exemplo-ci` serve o exemplo, a 2b (#477), o derivado privado (#487) e o Guard 22 (#534): mexer-lhe corre os quatro (#545).
+test("o `lib/exemplo-ci.mjs` leva as quatro suites que o leem (#534, #545)", () => {
+  const verifica = regraDe(".agent/scripts/lib/exemplo-ci.mjs")?.verifica ?? [];
+  return ["test-ci-exemplo.mjs", "test-simulate-upgrade.mjs", "test-simulate-derived.mjs", "test-guards.mjs"].filter((s) => !verifica.some((v) => v.endsWith(s))).map((s) => `falta ${s}`);
 });
 
 // O `ci.yml` do template e lido pelo Guard 17 e pelas listas das suites (`test-guards`), e pela 2b de ponta a ponta

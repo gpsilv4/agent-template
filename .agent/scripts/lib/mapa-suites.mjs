@@ -67,11 +67,13 @@ export const SUITES = [
   // O par do `cache.yml` (#439) e os leitores e casos que sairam da suite pelo tamanho, tambem.
   { re: /^src\/docs\/exemplos\/(?:cache-sem-maquinaria|dependabot-privado)\.yml$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O CI de um job e lido tambem pela 2b de ponta a ponta (#477: o modo completo do pacote, no `tests-medida-2b-modo`).
-  { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs")] },
+  // O `test-guards` le-o tambem (#545): o Guard 22 tem de ler os `runs-on:` dos blocos MODO COMPLETO do exemplo REAL.
+  { re: /^src\/docs\/exemplos\/ci-sem-maquinaria\.yml$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/(?:casos-salto-cache|casos-dependabot-exemplo|casos-modo-completo)\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/expressoes-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs")] },
   // O `comModoCompleto` (#487: saiu do harness para o simulador o poder importar) serve o exemplo, o caso de ponta a ponta
-  // da 2b (#477) e o derivado privado do `simulate-derived` (#487): os tres leem-no.
+  // da 2b (#477), o derivado privado do `simulate-derived` (#487) e o Guard 22 (#534, os marcadores desde o #545): os
+  // quatro leem-no.
   { re: /^\.agent\/scripts\/lib\/exemplo-ci\.mjs$/, verifica: [S("test-ci-exemplo.mjs"), S("test-simulate-upgrade.mjs"), S("test-simulate-derived.mjs"), S("test-guards.mjs")] },
   // O `dependabot-privado.yml` tem de ser o do template com duas diferencas: mexer no do template corre a suite (#440).
   // O Guard 13 tambem le o `dependabot.yml` (os placeholders): mexer nele pede os dois.

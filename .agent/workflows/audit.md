@@ -21,6 +21,7 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
     hooks**; custa dezenas de minutos, e e o unico instrumento que mede se um aviso NOVO fica
     vermelho quando desligado
   - **No template** (num derivado dao `SKIP`): `node .agent/scripts/simulate-derived.mjs` — o template ainda funciona depois do bootstrap
+  - **No template:** `SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs` — e num derivado PRIVADO, com o pacote de um job como o CI o corre (#487)
   - **No template:** `node .agent/scripts/simulate-upgrade.mjs` — e ainda funciona num projeto que ja existia (monta um derivado da ultima tag e atualiza-o). A FASE 1 dele e a lista do que este upgrade faz reprovar num consumidor — ler, nao saltar
   - `npm run build`, `npx tsc --noEmit`, `npm run lint`, `npm audit --audit-level=high` (se aplicavel)
 
