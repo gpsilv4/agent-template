@@ -95,8 +95,8 @@ function corre(corpo, env, o, { semE = false } = {}) {
 /** Um PR com a varredura a correr (plano `true` no job e shards verdes), e um em que ela saltou (plano `false`). */
 const PR = { SUITES: "success", VARREDURA: "success", PLANO_JOB: "true", EVENTO: "pull_request", PRIVADO: "false", COMMITTER: "" };
 const PR_SALTOU = { ...PR, VARREDURA: "skipped", PLANO_JOB: "false" };
-/** O texto do job `id` do `ci.yml`, ate ao job SEGUINTE, qualquer que seja (#372 A8, `TP15`): ate ao `simulators:`
- *  assumia a ordem do template, e num derivado (sem esse job) ia ate ao fim do ficheiro. Sem o job: `""`. */
+/** O texto do job `id` do `ci.yml`, ate ao job SEGUINTE, qualquer que seja (#372 A8, `TP15`): ate ao job dos
+ *  simuladores assumia a ordem do template, e num derivado (sem esse job) ia ate ao fim do ficheiro. Sem o job: `""`. */
 export function fatiaDoJob(ci, id) {
   const ini = ci.indexOf(`\n  ${id}:\n`);
   if (ini < 0) return "";
@@ -181,10 +181,10 @@ export function registar() {
   ];
   // O `fetch-depth: 2` do checkout do portao: tira-lo dava vermelho no CI (o `HEAD^1`), mas nunca aqui (a fixture
   // tem a historia toda) — fica fixado pelo texto (leitura 1 do C1).
-  // O controlo da fatia: num `ci.yml` sem `simulators` (a forma de um derivado), o `fetch-depth` do job SEGUINTE nao
-  // pode contar como o do `guard-gate` — a fatia antiga, ate ao `simulators:`, ia ate ao fim e encontrava-o.
+  // O controlo da fatia: num `ci.yml` sem os simuladores (a forma de um derivado), o `fetch-depth` do job SEGUINTE nao
+  // pode contar como o do `guard-gate` — a fatia antiga, ate ao job dos simuladores, ia ate ao fim e encontrava-o.
   const sintetico = "jobs:\n  guard-gate:\n    steps:\n      - uses: actions/checkout@v7\n  secret-scan:\n    steps:\n      - uses: actions/checkout@v7\n        with:\n          fetch-depth: 2\n";
-  registarResultado("portao: a fatia do `guard-gate` acaba no job seguinte, sem `simulators` (#372)", [
+  registarResultado("portao: a fatia do `guard-gate` acaba no job seguinte, sem os simuladores (#372)", [
     ...(/fetch-depth/.test(fatiaDoJob(sintetico, "guard-gate")) ? ["a fatia apanhou o `fetch-depth` do job seguinte"] : []),
     ...(checkoutTrazBase(sintetico) === null ? ["o leitor do checkout apanhou o `fetch-depth` do job seguinte"] : []),
   ]);

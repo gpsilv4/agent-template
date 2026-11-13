@@ -77,7 +77,7 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 `.agent/backlog-board.html.tmp` (o CLI recusa sem qualquer uma delas).
 
 **Nao vem:** as outras suites `test-*` e os seus `tests-*.mjs`, os `guards/`, o `check-doc-versions`, o
-`check-test-surface`, o `mutation-sweep`, os `simulate-*`, e os jobs `guard-tests`, `sweep` e `simulators`. As rules, os
+`check-test-surface`, o `mutation-sweep`, os `simulate-*`, e os jobs `guard-tests`, `sweep` e `simulate-*`. As rules, os
 workflows e os pontos de entrada que o projeto ja tem seguem a tabela do §2 do `upgrade.md`, como num upgrade completo.
 
 ## 3. A ordem da fronteira

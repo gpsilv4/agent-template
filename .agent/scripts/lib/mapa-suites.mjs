@@ -142,6 +142,8 @@ export const SUITES = [
   // `FAIL_FAST` dele, de outra arvore: regra propria, para nao ficar de fora (#241).
   { re: /^\.agent\/scripts\/tests\/harness\/relatorio\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs"] },
   { re: /^\.agent\/scripts\/tests\/harness\/(test-harness|recongelar-contexto|projeto-derivado|guard-direto)\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // Os tres jobs dos simuladores e os seus comandos (#460): o `tests-estrutura-workflow` e o `tests-plano-ci` leem-nos.
+  { re: /^\.agent\/scripts\/tests\/harness\/simuladores-ci\.mjs$/, verifica: [S("test-guards.mjs")] },
   // O repo descartavel do portao (#372) tambem e importado pelo harness da superficie (#379) e, com o git que traduz, pelo
   // caso sem git do upgrade (#400): mexer nele corre as tres.
   { re: /^\.agent\/scripts\/tests\/harness\/repo-descartavel\.mjs$/, verifica: [S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-simulate-upgrade.mjs")] },

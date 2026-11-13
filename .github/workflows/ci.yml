@@ -391,13 +391,15 @@ jobs:
   # para dizer "nao aplicavel"), e o `guard-gate` corre sempre — o custo por PR esta no paragrafo dos SHARDS, abaixo (um numero so, `TP8`). Num publico nao se
   # paga. O ganho e o tempo de parede de um PR que toca nos verificadores.
   #
-  # A PERNA COMPLETA EM SHARDS (#308, o desenho do #159): `shard: [1, 2]` reparte os sitios por duas
-  # maquinas (`SWEEP_SHARD=k/n`, `lib/varredura-fatia.mjs`), em TODO o repo — num publico e gratis, e
+  # A PERNA COMPLETA EM SHARDS (#308, o desenho do #159; tres desde o #460): `shard: [1, 2, 3]` reparte os sitios por
+  # tres maquinas (`SWEEP_SHARD=k/n`, `lib/varredura-fatia.mjs`), em TODO o repo — num publico e gratis, e
   # assim o template corre o mesmo caminho que um derivado privado. O `de` diz quantos shards ha; o
   # `guard-gate` confere os relatorios de todos (`lib/varredura-shards.mjs`): um shard que saia da
   # lista, ou um `de` que nao bata com ela, reprova ali, e nao fica verde com sitios por medir.
-  # Num privado: ~+4-6 min faturados por PR (baselines e provas repetidas por maquina), contra
-  # metade do tempo de parede da perna completa.
+  # Num privado: ~+7-9 min faturados por PR de maquinaria (baselines e provas repetidas por maquina, ~3 min por
+  # shard a mais), contra um terco do tempo de parede da perna completa. Com dois shards, a espera de um PR era a da
+  # varredura (mediana 31 min em 7 PRs, #460); um derivado privado que mantenha dois paga menos e espera mais.
+  # A lista `shard:` e exatamente 1..`de` (`tests-estrutura-workflow`, #460).
   sweep:
     name: Mutation sweep (${{ matrix.modo }} ${{ matrix.shard }}/${{ matrix.de }})
     runs-on: ubuntu-24.04
@@ -414,10 +416,10 @@ jobs:
       fail-fast: false
       matrix:
         modo: [completa]
-        shard: [1, 2]
+        shard: [1, 2, 3]
         include:
           - modo: completa
-            de: 2
+            de: 3
           - modo: skips
             shard: 1
             de: 1
@@ -506,10 +508,10 @@ jobs:
   # que nao se aplica — e so ai, recalculado pelo portao). Assim nenhum repo — este, ou um derivado com a
   # protecao ligada — precisa de mudar as definicoes. Num privado de conta free a protecao nao e
   # imposta (`src/docs/github-security.md`): ai e so o semaforo. O required e SO este nome: os das
-  # pernas (`Mutation sweep (completa 1/2)`, ...) nao sao estaveis num `push` (saltadas, sem expandir).
+  # pernas (`Mutation sweep (completa 1/3)`, ...) nao sao estaveis num `push` (saltadas, sem expandir).
   #
-  # NAO espera pelo `simulators`: o bootstrap remove esse job num derivado, e um `needs:` para um job
-  # que nao existe invalida o workflow inteiro.
+  # NAO espera pelos jobs `simulate-*` (#460): o bootstrap remove-os num derivado, e um `needs:` para um job
+  # que nao existe invalida o workflow inteiro (o `tests-estrutura-workflow` tem o controlo).
   guard-gate:
     name: Guard Tests
     runs-on: ubuntu-24.04
@@ -621,27 +623,29 @@ jobs:
           echo "::error::a varredura de mutacao nao passou ($EVENTO): $VARREDURA"
           exit 1
 
-  # Os dois SIMULADORES num job proprio (#158), em paralelo com o `guard-tests`: ~4 min que
-  # corriam em serie ANTES da varredura, e nao dependem dela nem ela deles. Sao so do template —
-  # num projeto derivado dao `SKIP` em segundos —, logo um derivado que os tenha ainda no seu
-  # `guard-tests` paga segundos, nao minutos (o `upgrade.md` manda tira-los de la, e o
-  # `BOOTSTRAP.md` remove ESTE job num derivado novo — la ficava verde sem medir). A varredura
-  # tem o job dela, `sweep` (#308).
-  simulators:
-    name: Simuladores
+  # Os SIMULADORES, cada um no seu job (#158: sairam do `guard-tests`; #460: um job por simulador), em paralelo com
+  # o `guard-tests` e a varredura — nao dependem deles nem eles destes. Sao so do template: num projeto derivado dao
+  # `SKIP` em segundos, e o `BOOTSTRAP.md` (§2.7) remove os TRES num derivado novo (la ficavam verdes sem medir); o
+  # `/upgrade` nao os traz. Ate ao #460 corriam em serie num job `simulators` com um limite partilhado: chegou aos
+  # 29,7 min (o do #541 foi cortado aos 30, #537). Separados, cada um tem o SEU limite, a ~1,5x o maximo medido mais
+  # o setup (7 PRs de maquinaria, #527-#547) — o tempo de cada um esta no comentario do job, e so la (`TP8`).
+  # O portao (`Guard Tests`) nao os espera (ver o `guard-gate`); nenhum e um check exigido pela protecao.
+  # Os tres jobs e os comandos deles: `tests/harness/simuladores-ci.mjs` (o `tests-estrutura-workflow` confere que
+  # cada comando corre uma vez, no seu job, so num PR).
+  #
+  # Cada job tem o `if:` de PR ao nivel do JOB, e nao so nos passos: num `push` o job arrancava, fazia o checkout
+  # completo e o setup, saltava os passos e ficava VERDE sem ter medido nada (`TP2`). Assim aparece como `skipped`.
+  # `fetch-depth: 0`: o `simulate-upgrade` monta um derivado da ULTIMA TAG (um clone raso nao as traz — ele reprova
+  # a dizer que nao mediu); os do derivado leem a base do PR.
+  #
+  # O derivado PRIVADO (#487): o `ci.yml` do pacote de um job no modo completo, a forma que os derivados privados
+  # reais usam. Medido: 3,1-4,4 min (n=7) -> 8.
+  simulate-private:
+    name: Simulador (derivado privado)
     runs-on: ubuntu-24.04
-    # Tambem ao nivel do JOB, e nao so nos passos: num `push` o job arrancava, fazia o checkout
-    # completo e o setup, saltava os dois passos e ficava VERDE sem ter medido nada (`TP2`). Assim
-    # aparece como `skipped`, que e o que aconteceu.
     if: github.event_name == 'pull_request'
-    # 45 da ~1,5x sobre o que os passos medem num PR de maquinaria, que e o mais longo: desde o #487 o
-    # job corre DOIS derivados (o privado e o do bootstrap) mais a `--skips` do derivado maduro (#308,
-    # parte 3), e chegou aos 27-30 min (medido nos PRs #527, #528 e #541; este ultimo cortado aos 30,
-    # #537). O tempo de cada passo esta no comentario dele, e nao repetido aqui — `TP8`.
-    timeout-minutes: 45
+    timeout-minutes: 8
     steps:
-      # `fetch-depth: 0`: o `simulate-upgrade` monta um derivado da ULTIMA TAG, e um clone raso
-      # nao as traz — ele reprova a dizer que nao mediu, em vez de passar em silencio.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
@@ -649,25 +653,37 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
-      # A verificacao que testa a promessa do template: montar um projeto derivado e correr la
-      # tudo. Custa cerca de um minuto (copia o repo e recorre as suites), logo fica so em `pull_request` —
-      # e onde vale a pena e onde alguem le o resultado. Sem isto, a unica forma de saber que
-      # o template funciona num derivado era alguem lembrar-se de o experimentar.
-      # E, num PR que toca na maquinaria, a `--skips` sobre o derivado MADURO (#308, parte 3): o R7B-7
-      # so apareceu no CI de um derivado, porque nenhum CI do template a corria sobre um derivado com
-      # historia. Os MESMOS prefixos do plano da varredura (`lib/plano-ci.mjs`; o `tests-plano-ci.mjs` compara-os pelo
-      # comportamento), sem o pipe (`TP11`); por `SIMULATE_SKIPS` e nao por flag, para o comando ser o do `allow`.
-      # ~+8 min neste job, em paralelo com o `Guard Tests`. O diff e o do plano (`--no-renames`: renomear para fora
-      # da maquinaria conta), mas lido por linha: um nome que o git poe entre aspas (com `"`, `\` ou um caracter de
-      # controlo) escapa ao prefixo AQUI — limite aceite, porque so desliga a `--skips` sobre o derivado; quem
-      # decide a varredura e o plano (#347, C2).
-      # Primeiro o derivado PRIVADO (#487): o `ci.yml` do pacote de um job no modo completo, a forma que os derivados
-      # privados reais usam. Depois o do bootstrap, com o `ci.yml` do template. ~+1 min; o template e publico.
+      - name: Projeto derivado privado — o template funciona depois do bootstrap, com o CI de um job
+        if: github.event_name == 'pull_request'
+        run: SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs
+
+  # O derivado do BOOTSTRAP, com o `ci.yml` do template: montar um projeto derivado e correr la tudo. Sem isto, a
+  # unica forma de saber que o template funciona num derivado era alguem lembrar-se de o experimentar.
+  # E, num PR que toca na maquinaria, a `--skips` sobre o derivado MADURO (#308, parte 3): o R7B-7 so apareceu no
+  # CI de um derivado, porque nenhum CI do template a corria sobre um derivado com historia. Os MESMOS prefixos do
+  # plano da varredura (`lib/plano-ci.mjs`; o `tests-plano-ci.mjs` compara-os pelo comportamento, DENTRO deste job),
+  # sem o pipe (`TP11`); por `SIMULATE_SKIPS` e nao por flag, para o comando ser o do `allow`. O diff e o do plano
+  # (`--no-renames`: renomear para fora da maquinaria conta), mas lido por linha: um nome que o git poe entre aspas
+  # (com `"`, `\` ou um caracter de controlo) escapa ao prefixo AQUI — limite aceite, porque so desliga a `--skips`
+  # sobre o derivado; quem decide a varredura e o plano (#347, C2).
+  # Medido: 10,8-16,4 min com a `--skips` (n=7; ela sozinha 7,6-12,0, e cresce com os sitios), ~4,3 sem -> 26.
+  simulate-derived:
+    name: Simulador (derivado do bootstrap)
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       - name: Projeto derivado — o template funciona depois do bootstrap
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
-          SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs
           tocados="$(git -c core.quotePath=false diff --name-only --no-renames "$(git rev-parse HEAD^1)..HEAD")"
           rc=0
           grep -qE '^(\.agent/scripts/|\.claude/hooks/|\.githooks/)' <<<"$tocados" || rc=$?
@@ -678,18 +694,28 @@ jobs:
             exit 1
           fi
           node .agent/scripts/simulate-derived.mjs
-      # A OUTRA metade da promessa: o template tambem serve para ATUALIZAR projetos que ja
-      # existem, e essa metade nao tinha rede nenhuma ate agora. Monta um derivado da ultima
-      # tag, aplica o upgrade e mede — a FASE 1 dele imprime o que este PR faz reprovar num
-      # consumidor, que e informacao que ninguem mais produz.
-      #
-      # Sem filtro por caminho, e de proposito: o que isto apanha e "o template partiu os
-      # consumidores", e quase qualquer alteracao pode causa-lo — uma rule, um limiar, um
-      # workflow. Restringir o gatilho obrigava a adivinhar quais, que e o mesmo filtro
-      # fragil que ja foi recusado para a varredura.
-      #
-      # Precisa das tags, que o `fetch-depth: 0` deste job traz. Num clone raso ele REPROVA a
-      # dizer que nao mediu, em vez de passar em silencio.
+
+  # A OUTRA metade da promessa: o template tambem serve para ATUALIZAR projetos que ja existem. Monta um derivado da
+  # ultima tag, aplica o upgrade e mede — a FASE 1 dele imprime o que este PR faz reprovar num consumidor, que e
+  # informacao que ninguem mais produz.
+  #
+  # Sem filtro por caminho, e de proposito: o que isto apanha e "o template partiu os consumidores", e quase
+  # qualquer alteracao pode causa-lo — uma rule, um limiar, um workflow. Restringir o gatilho obrigava a adivinhar
+  # quais, que e o mesmo filtro fragil que ja foi recusado para a varredura.
+  # Medido: 6,7-8,9 min (n=7) -> 15.
+  simulate-upgrade:
+    name: Simulador (upgrade)
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
       - name: Projeto ja existente — o /upgrade nao parte um consumidor
         if: github.event_name == 'pull_request'
         run: node .agent/scripts/simulate-upgrade.mjs

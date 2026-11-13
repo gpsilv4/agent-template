@@ -12,7 +12,7 @@
 # atualizar o `if:` (o GitHub redireciona o nome antigo, mas o `github.repository` e o novo).
 #
 # Alem disso, este ficheiro e a config SAEM do derivado (o BOOTSTRAP remove-os; o `/upgrade` nao os
-# traz), como o job `simulators`:
+# traz), como os jobs `simulate-*`:
 #   - repo PUBLICO: ligar o "Default setup" (Settings > Advanced Security > CodeQL analysis) — esse
 #     analisa o codigo da APLICACAO (`src/`...), escolhe as linguagens e nao precisa de ficheiro;
 #   - repo PRIVADO sem licenca GitHub Code Security: nao ligar nada. Os termos do CodeQL proibem

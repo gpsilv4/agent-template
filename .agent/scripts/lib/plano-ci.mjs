@@ -10,7 +10,7 @@
  *
  * NO C2: o passo `plano` do `guard-tests` corre-o (lido da base) e escreve `aplica=true|false`, e o `if:` do
  * `sweep` so arranca os shards com `true`. O portao recalcula-o com as mesmas linhas e e a autoridade (o C1 foi a
- * sombra que o mediu: 13 PRs a concordar). Os prefixos sao os mesmos do `grep` dos `Simuladores` — o
+ * sombra que o mediu: 13 PRs a concordar). Os prefixos sao os mesmos do `grep` do job `simulate-derived` (#460) — o
  * `tests-plano-ci.mjs` compara-os pelo comportamento, e a descoberta da varredura (`alvos-no-disco.mjs`, `PARES`)
  * contra eles. O diff chega com `-z` passado a linhas por um `tr`: o nome tal como e, sem as aspas do git.
  *
