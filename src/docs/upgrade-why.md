@@ -360,7 +360,8 @@ A tabela traz para um projeto **so os jobs em falta** — e e o certo: o CI do p
 proprios. Mas um passo que o template MOVEU de um job para outro aparece, no projeto, nos dois: no
 job novo (que estava em falta e foi trazido) e no velho (que o projeto ja tinha e ninguem tocou).
 
-O #158 tirou os dois simuladores do `guard-tests` para um job `simulators`. Num derivado isso custa
+O #158 tirou os dois simuladores do `guard-tests` para um job `simulators` (o #460 dividiu-o em tres,
+`simulate-private`, `simulate-derived` e `simulate-upgrade`, um por simulador). Num derivado isso custa
 segundos — os simuladores dao `SKIP` fora do template —, e foi por isso que a variante escolhida foi
 essa. A variante recusada mostra o custo do caso geral: mover a **varredura de mutacao** pu-la-ia a
 correr duas vezes em cada PR de um derivado que ja a tem no `guard-tests`, ~30 min a mais num repo
@@ -371,16 +372,16 @@ privado, sem nada que o apanhasse. (Ate ao #308: hoje a varredura tem o job dela
 falta sao categoria de julgamento), logo o `simulate-upgrade` nao mede esta linha. E uma instrucao a
 quem corre o `/upgrade`.
 
-**O job `simulators` nao se traz** (leitor independente do #158): trazido, um derivado ficava com um
-job inteiro — checkout completo, setup, dois `SKIP` — **verde sem ter medido nada**, a forma mais
+**Os jobs `simulate-*` nao se trazem** (leitor independente do #158): trazidos, um derivado ficava com tres
+jobs inteiros — checkout completo, setup, um `SKIP` cada (era um job com dois, ate ao #460) — **verdes sem terem medido nada**, a forma mais
 suave do `TP2`. Num derivado basta tirar os dois passos do seu `guard-tests`; nao fica mais lento
 nem menos coberto, porque eles ja davam `SKIP` la.
 
 **E num repo com branch protection**: se o `Guard Tests` for required check, os simuladores deixam de
-bloquear o merge ate o `Simuladores` passar tambem a required. Este template tem um ruleset no `main`
+bloquear o merge ate os `Simulador (...)` passarem tambem a required. Este template tem um ruleset no `main`
 desde 2026-10-09 (exige `Guard Tests`, `Secret Scan`, `Code Quality` e os dois `Analyze`; ate ao #347
-era `Detect Project` em vez do `Code Quality`) — e o `Simuladores` nao esta nele (medido a 2026-10-13,
-#308; a lista, a 2026-10-20).
+era `Detect Project` em vez do `Code Quality`) — e o `Simuladores` nao estava nele (medido a 2026-10-13,
+#308; a lista, a 2026-10-20). Os tres jobs que o substituiram (#460) tambem nao: a lista exige nomes, e nenhum mudou.
 
 ## Porque o que o git do template IGNORA nao se copia (R7-D)
 
@@ -761,7 +762,7 @@ cabecalho do `mutation-sweep.mjs`).
 A margem era mais ou menos uma ronda do tamanho da 8, e um job morto pelo tecto le-se como defeito.
 O job `sweep` corre as duas varreduras numa matriz, em paralelo, e partilha a mesma condicao ("o PR
 toca nos verificadores") — o tempo de parede passa a ser o da maior. Desde a parte 2 do #308 a
-completa e ela propria repartida em **2 shards** (`SWEEP_SHARD`), e o `guard-gate` confere os
+completa e ela propria repartida em shards (`SWEEP_SHARD`; **3** desde o #460, eram 2), e o `guard-gate` confere os
 relatorios de todos (`lib/varredura-shards.mjs`): cada shard so ve a sua fatia, e um em falta
 ficava verde.
 
@@ -788,7 +789,7 @@ tem quem o diga (medidos, com teste — duas leituras independentes do #308; as 
 | o portao trazido sem os MODOS, ou com modos que nao sao os da matriz (#317: um modo que deixasse de correr passava verde; um a mais punha todos os PRs vermelhos) | `check-test-surface`: "nao recebe o(s) modo(s)" / "exige o(s) modo(s) ... que a matriz nao tem"; em runtime, o portao: "nenhum relatorio" |
 | (runtime) o portao trazido sem o passo do relatorio, ou sem `lib/varredura-shards.mjs` no disco | o proprio portao reprova ("nao consegui ler" / modulo em falta) — fechado, mas a causa e esta linha |
 | (runtime) o `ci.yml` novo com o `mutation-sweep.mjs` antigo (ignora o `SWEEP_SHARD`, nao escreve relatorio) | o upload reprova (`if-no-files-found: error`) — fechado; trazer os scripts com o workflow |
-| uma protecao que exija os checks das pernas pelo nome (`Mutation sweep (completa)`): com os shards passam a `(completa 1/2)`, `(completa 2/2)` e `(skips 1/1)`, e o antigo nunca aparece — os merges bloqueiam | ninguem automaticamente: o exigido e SO `Guard Tests` (o comentario do `guard-gate` di-lo desde a v0.58.0); quem tenha exigido as pernas troca-as por ele |
+| uma protecao que exija os checks das pernas pelo nome (`Mutation sweep (completa)`): com os shards passam a `(completa 1/3)`, `(completa 2/3)`, `(completa 3/3)` e `(skips 1/1)` (eram `1/2` e `2/2` ate ao #460), e o antigo nunca aparece — os merges bloqueiam | ninguem automaticamente: o exigido e SO `Guard Tests` (o comentario do `guard-gate` di-lo desde a v0.58.0); quem tenha exigido as pernas troca-as por ele |
 
 Os defeitos de estrutura (as linhas do `check-test-surface` sem trailer) so se dizem quando o PR
 os INTRODUZ: um defeito que ja existia deixava vermelho cada PR que tocasse no workflow — os do
@@ -811,12 +812,12 @@ mergeado, sem nenhuma definicao mudada. Por isso `Guard Tests` passou a ser um j
 Nenhum repo precisa de mexer na protecao. O `always()` e excecao a marca do `if:` (so alarga onde o
 job corre; sem ele, um `needs` vermelho SALTAVA o gate, e um check saltado conta como passado).
 
-**O custo num privado free** (minutos faturados; cada job arredonda ao minuto): os tres jobs da
-matriz (dois shards e a `--skips`) so arrancam num PR em que o plano da base diz que a varredura se
+**O custo num privado free** (minutos faturados; cada job arredonda ao minuto): os quatro jobs da
+matriz (tres shards e a `--skips`; eram tres jobs, com dois shards, ate ao #460) so arrancam num PR em que o plano da base diz que a varredura se
 aplica (o C2 do #347; antes, faziam checkout e setup em todo o PR para dizer "nao aplicavel"), e o
 gate corre sempre; e cada shard repete as baselines e as provas do prefixo que a sua
-fatia pede — ~+4-6 min por PR que toca nos verificadores, contra metade do tempo de parede da
-completa, e ~+1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
+fatia pede — ~+7-9 min por PR que toca nos verificadores (eram ~+4-6 com dois), contra um terco do tempo de
+parede da completa, e ~+1 por push. O `sweep` espera pelas suites (`needs: guard-tests`): com elas vermelhas nao
 gasta ~40 min a medir um gate ja condenado. Num publico nao se paga. Os tempos medidos (o do derivado
 incluido) vivem so no cabecalho do `mutation-sweep.mjs` (`TP8`).
 

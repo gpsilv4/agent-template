@@ -11,7 +11,8 @@
 import { join } from "path";
 import { pathToFileURL } from "url";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
-import { defeitosDeEstrutura, colisoesEntreWorkflows, colisoesNovas } from "../lib/estrutura-workflow.mjs";
+import { defeitosDeEstrutura, colisoesEntreWorkflows, colisoesNovas, jobsDe, semComentario } from "../lib/estrutura-workflow.mjs";
+import { SIMULADORES, blocoDoJob, semSimuladores, temSimuladores } from "./harness/simuladores-ci.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
 
@@ -25,6 +26,43 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 /** Entry point a que este modulo pertence. */
 export const entryPoint = "test-guards.mjs";
+
+/** O `if:` de PR (#460), na forma isenta do `check-test-surface`. */
+const SO_PR = /^[ \t]*if:[ \t]*github\.event_name == 'pull_request'[ \t]*$/;
+
+/** Os problemas dos SIMULADORES no `ci.yml` (#460): cada job existe com o `if:` de PR nas chaves do PROPRIO job (os
+ *  passos tambem o tem, e uma regex no texto do bloco via-o la, `TP1`), e cada comando aparece UMA vez, no seu job. */
+export function simuladoresDoCi(ci) {
+  const jobs = jobsDe(ci);
+  const problemas = [];
+  for (const id of Object.keys(SIMULADORES)) {
+    const j = jobs.find((x) => x.id === id);
+    if (!j) problemas.push(`o job \`${id}\` nao esta no ci.yml`);
+    else if (!j.cru.map(semComentario).some((l) => SO_PR.test(l))) problemas.push(`o job \`${id}\` sem o \`if:\` de PR nas chaves do job`);
+  }
+  // Uma linha de comando: o `run:` de uma linha, ou uma linha do corpo de um `run: |`, sem espacos.
+  const usos = jobs.flatMap((j) => j.ls.map((l) => ({ id: j.id, c: l.replace(/^[ \t]*(?:-[ \t]+)?run:[ \t]*/, "").trim() })));
+  for (const [id, cmd] of Object.entries(SIMULADORES)) {
+    const onde = usos.filter((u) => u.c === cmd).map((u) => u.id);
+    if (onde.length === 0) problemas.push(`o comando \`${cmd}\` esta em falta no ci.yml`);
+    else if (onde.length > 1 || onde[0] !== id) problemas.push(`o comando \`${cmd}\` aparece ${onde.length} vez(es), em ${onde.join(", ")}, e nao so no job \`${id}\``);
+  }
+  return problemas;
+}
+
+/** A lista `shard:` do `sweep` tem de ser exatamente `1..de` da perna `completa` (#460): hoje so o portao o apanhava,
+ *  em runtime. Sem o `sweep`, ou sem chave `shard:`, nada a comparar; uma chave que nao se le (em bloco, uma
+ *  expressao) reprova, em vez de passar sem comparar (`TP2`, leitor do #460). */
+export function fatiasDoSweep(ci) {
+  const sweep = blocoDoJob(ci, "sweep");
+  if (!sweep || !/^[ \t]*shard[ \t]*:/m.test(sweep)) return [];
+  const lista = /^[ \t]*shard:[ \t]*\[([^\]]*)\][ \t]*(?:#.*)?$/m.exec(sweep);
+  if (!lista) return ["nao li a lista `shard: [...]` do `sweep` (em bloco, ou uma expressao) — sem ela, as fatias nao se comparam com o `de:`"];
+  const de = /-[ \t]*modo:[ \t]*completa[ \t]*\n[ \t]*de:[ \t]*(\d+)/.exec(sweep);
+  const esperado = de ? Array.from({ length: Number(de[1]) }, (_, k) => String(k + 1)).join(",") : "?";
+  const tem = lista[1].split(",").map((s) => s.trim()).join(",");
+  return tem === esperado ? [] : [`a lista \`shard: [${tem}]\` do \`sweep\` nao e 1..de (\`de: ${de ? de[1] : "?"}\`)`];
+}
 
 export function registar() {
   // A VARREDURA (#382): as suites no `guard`, a varredura no `sweep`, e um agregador que le o resultado dele. Cada
@@ -95,19 +133,65 @@ export function registar() {
       ...diz("um modo a mais no portao", "        modo: [completa]\n", " completa skips", "exige o(s) modo(s) skips, que a matriz nao tem"),
     ]);
   }
-  // O que o bootstrap deixa: o `ci.yml` do TEMPLATE sem o job `simulators` (o §2.7 remove-o) nao tem
-  // defeitos. So no template: num derivado, o `ci.yml` e do projeto.
+  // O que o bootstrap deixa: o `ci.yml` do TEMPLATE sem os tres jobs dos simuladores (o §2.7 remove-os, #460) nao
+  // tem defeitos. So no template: num derivado, o `ci.yml` e do projeto.
   {
     const lerRaiz = (rel) => leOuNull(join(ROOT, rel));
     const ci = lerRaiz(".github/workflows/ci.yml");
-    if (ehDerivado(lerRaiz) || ci === null) console.log("  SKIP  gate: o ci.yml do template sem o `simulators` (so no template)");
+    if (ehDerivado(lerRaiz) || ci === null) console.log("  SKIP  gate: o ci.yml do template sem os simuladores, e os simuladores e as fatias dele (so no template)");
     else {
-      const semSimuladores = ci.replace(/^  simulators:[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$)/m, "");
-      registarResultado("gate: o ci.yml do template, sem o job `simulators` (o bootstrap), nao tem defeitos de estrutura (#308)", [
-        ...(semSimuladores !== ci ? [] : ["nao encontrei o job `simulators` para o tirar"]),
-        ...defeitosDeEstrutura(semSimuladores),
+      const sem = semSimuladores(ci);
+      registarResultado("gate: o ci.yml do template, sem os jobs dos simuladores (o bootstrap), nao tem defeitos de estrutura (#308, #460)", [
+        ...Object.keys(SIMULADORES).filter((id) => blocoDoJob(ci, id) === undefined).map((id) => `o job \`${id}\` nao esta no ci.yml`),
+        ...(temSimuladores(sem) ? ["ficou um job dos simuladores depois de os tirar"] : []),
+        ...defeitosDeEstrutura(sem),
         ...defeitosDeEstrutura(ci),
       ]);
+      // O PORTAO nao espera por eles (#460): um `needs:` para um job que o bootstrap remove invalida o workflow inteiro.
+      const comNeeds = ci.replace(/^(    needs: \[guard-tests, sweep)\]/m, "$1, simulate-derived]");
+      registarResultado("gate: o portao com `needs:` para um simulador parte o ci.yml do bootstrap (controlo, #460)", [
+        ...(comNeeds === ci ? ["o controlo nao mudou o `needs:` do portao"] : []),
+        ...(defeitosDeEstrutura(comNeeds).length === 0 ? [] : ["com os jobs todos, o `needs:` novo ja devia ser valido"]),
+        ...(defeitosDeEstrutura(semSimuladores(comNeeds)).some((d) => d.includes("`needs: simulate-derived`")) ? [] : ["sem os simuladores, o `needs:` partido nao foi visto"]),
+      ]);
+      // As FRONTEIRAS (leitor do #460): o comentario de cabecalho do job seguinte e dele, e um id entre aspas ou com um
+      // ponto e um cabecalho. Os controlos sao os mesmos textos sem a fronteira certa (a regex antiga).
+      {
+        const doisJobs = "jobs:\n  simulate-upgrade:\n    runs-on: x\n\n  # o comentario do seguinte\n  seguinte:\n    runs-on: y\n";
+        const comAspas = "jobs:\n  simulate-upgrade:\n    runs-on: x\n  \"a.b\":\n    runs-on: y\n";
+        registarResultado("gate: o bloco de um simulador acaba antes do comentario do job seguinte, e num id entre aspas (#460)", [
+          ...(blocoDoJob(doisJobs, "simulate-upgrade").includes("comentario do seguinte") ? ["o comentario do job seguinte ficou no bloco"] : []),
+          ...(semSimuladores(doisJobs).includes("# o comentario do seguinte") ? [] : ["o comentario do job seguinte saiu com o simulador"]),
+          ...(semSimuladores(comAspas).includes('"a.b":') ? [] : ["o job `\"a.b\"` saiu com o simulador"]),
+          ...(semSimuladores("jobs:\n  # do simulador\n  simulate-upgrade:\n    runs-on: x\n  b:\n    runs-on: y\n").includes("do simulador") ? ["o comentario do simulador ficou orfao"] : []),
+        ]);
+      }
+      registarResultado("gate: um job dos simuladores no FIM do ficheiro tambem sai (#460)",
+        temSimuladores(semSimuladores("jobs:\n  a:\n    runs-on: x\n  simulate-upgrade:\n    runs-on: x\n")) ? ["o ultimo job ficou"] : []);
+      // NENHUMA VERIFICACAO SAIU (#460): cada comando, uma vez, no seu job, e o job so num PR. E as fatias da varredura.
+      registarResultado("gate: os tres simuladores, cada um no seu job e so num PR, e as fatias da varredura 1..de (#460)", [...simuladoresDoCi(ci), ...fatiasDoSweep(ci)]);
+      // O MESMO ci.yml com CRLF (um checkout com `core.autocrlf`) le-se igual: os jobs saem, e nada reprova sem causa.
+      {
+        const crlf = ci.replace(/\r?\n/g, "\r\n");
+        registarResultado("gate: o ci.yml com CRLF le-se como com LF — os simuladores, as fatias e o que o bootstrap deixa (#460)", [
+          ...simuladoresDoCi(crlf), ...fatiasDoSweep(crlf),
+          ...(temSimuladores(semSimuladores(crlf)) ? ["com CRLF, ficou um job dos simuladores depois de os tirar"] : []),
+          ...(Object.keys(SIMULADORES).every((id) => blocoDoJob(crlf, id) !== undefined) ? [] : ["com CRLF, um job dos simuladores nao se leu"]),
+        ]);
+      }
+      const mutado = (de, para) => { const m = ci.replace(de, para); return m === ci ? null : m; };
+      for (const [nome, m, esperado] of [
+        ["sem o comando do derivado privado", mutado(/^.*SIMULATE_PRIVADO=1 node \.agent\/scripts\/simulate-derived\.mjs.*\n/m, ""), "em falta"],
+        ["sem o `if:` de PR do job `simulate-upgrade` (os dos passos ficam)", mutado(/(^  simulate-upgrade:[^\n]*\n(?:(?!  \S)[^\n]*\n)*?)    if: github\.event_name == 'pull_request'[^\n]*\n/m, "$1"), "`simulate-upgrade` sem o `if:`"],
+        ["o `simulate-upgrade.mjs` no job `simulate-derived`", mutado(/^([ \t]*)node \.agent\/scripts\/simulate-derived\.mjs\n/m, "$1node .agent/scripts/simulate-derived.mjs\n$1node .agent/scripts/simulate-upgrade.mjs\n"), "2 vez(es)"],
+        ["a lista `shard:` sem o 3 com `de: 3`", mutado(/^(\s*shard: \[1, 2), 3\]/m, "$1]"), "nao e 1.."],
+        ["a lista `shard:` sem o 3, num ci.yml com CRLF", mutado(/^(\s*shard: \[1, 2), 3\]/m, "$1]")?.replace(/\n/g, "\r\n") ?? null, "nao e 1.."],
+        ["a lista `shard:` em bloco", mutado(/^([ \t]*)shard: \[1, 2, 3\]/m, "$1shard:\n$1  - 1\n$1  - 2\n$1  - 3"), "nao li a lista"],
+      ]) {
+        const ps = m === null ? null : [...simuladoresDoCi(m), ...fatiasDoSweep(m)];
+        registarResultado(`gate: ${nome} reprova (controlo, #460)`,
+          ps === null ? ["o controlo nao mudou o ci.yml"] : ps.some((p) => p.includes(esperado)) ? [] : [`esperava "${esperado}": ${JSON.stringify(ps)}`]);
+      }
     }
   }
   registarResultado("gate: defeitosDeEstrutura le o `needs:` em bloco, e o id como nome quando falta o `name:` (#308)", [

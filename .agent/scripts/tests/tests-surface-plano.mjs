@@ -60,7 +60,7 @@ export function registar() {
     muda(dir, comJob(null), `${base}  sweep:\n    runs-on: y\n    steps:\n      - name: t\n        run: node b-test.mjs\n        if: ${PL}\n`),
   { code: 1, includes: [IF] });
   // Noutro job do `ci.yml` o portao nao recalcula nada por ele: saltar as suites ou a app pelo plano CONTA.
-  for (const id of ["guard-tests", "quality", "simulators"]) {
+  for (const id of ["guard-tests", "quality", "simulate-derived"]) {
     test(`gate: a forma do plano no job \`${id}\` do ci.yml conta (#347 C2)`, (dir) =>
       muda(dir, id === "guard-tests" ? "jobs:\n  guard-tests:\n    runs-on: y\n    steps:\n      - run: node a-test.mjs\n" : comJob(null, id),
         id === "guard-tests" ? `jobs:\n  guard-tests:\n    runs-on: y\n    if: ${PL}\n    steps:\n      - run: node a-test.mjs\n` : comJob(PL, id)),

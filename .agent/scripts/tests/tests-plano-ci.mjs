@@ -8,7 +8,7 @@
  *   - a CLI: `true`/`false`, o ficheiro vazio, e as tres recusas (nunca "false" por nao ter lido);
  *   - o DESVIO face a descoberta da varredura: cada pasta que o `alvosNoDisco` pede, e cada alvo/suite do
  *     `PARES` do template, cai nos prefixos — uma pasta nova na descoberta sem o plano reprova;
- *   - o `ci.yml` contra o plano: a regex dos `Simuladores` (a unica que sobra desde o C2: o `sweep` deixou de ter
+ *   - o `ci.yml` contra o plano: a regex do simulador do bootstrap (job `simulate-derived`, #460; a unica que sobra desde o C2: o `sweep` deixou de ter
  *     `grep`, decide-o o plano) decide igual ao plano, num conjunto de caminhos de prova (comparar o texto falhava:
  *     o JS escapa a `/`). Um derivado com o `sweep` da v0.60.0 ainda tem o `grep` dele, e compara-se tambem. O que
  *     liga o PLANO ao CI no C2 e o `tests-plano-passo.mjs` (o passo e o portao leem a base com as mesmas linhas);
@@ -28,6 +28,7 @@ import { PARES } from "../lib/pares.mjs";
 import { PARES_DO_PROJETO } from "../config/guards-do-projeto.mjs";
 import { ehDerivado } from "../lib/derivado.mjs";
 import { leOuNull } from "../lib/ficheiros.mjs";
+import { JOB_DA_SKIPS, blocoDoJob, semSimuladores, temSimuladores } from "./harness/simuladores-ci.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -49,23 +50,23 @@ export function foraDaDescoberta(descobre) {
   return descobre(() => ficticios).filter((c) => !aplicaVarredura([c]));
 }
 
-/** As regex do `grep -qE '...'` que decidem a varredura no `ci.yml` (o `sweep` e os `Simuladores`). */
+/** As regex do `grep -qE '...'` que decidem a varredura no `ci.yml` (o `sweep` da v0.60.0 e o `simulate-derived`). */
 export const regexDoCi = (ci) => [...ci.matchAll(/grep -qE '([^']+)' <<<"\$tocados"/g)].map((m) => m[1]);
 
 /** Os caminhos de prova: um debaixo de cada prefixo, e os quase-acertos. */
 // E caminhos de FORA plausiveis (leitura 2 do C1): um `grep` alargado (`|\.github/`, `|scripts/`) nao divergia nos outros.
 const PROVA = [".agent/scripts/a.mjs", ".claude/hooks/a.mjs", ".githooks/a", ".agent/scriptsx/a", "x/.agent/scripts/a", ".claude/hook/a", ".githooksx/a", ".agent/a", "README.md", "src/docs/a.md", ".github/workflows/ci.yml", "scripts/check-x.mjs", ".claude/agents/a.md"];
-/** Os problemas de comparar cada regex do `ci.yml` com o plano, pelo comportamento. Um job `simulators` sem a SUA
- *  regex e um problema: a comparacao passava sem comparar a dele (`TP2`). */
+/** Os problemas de comparar cada regex do `ci.yml` com o plano, pelo comportamento. O job `simulate-derived` sem a
+ *  SUA regex e um problema: a comparacao passava sem comparar a dele (`TP2`). */
 export function regexQueDivergem(ci) {
   const rs = regexDoCi(ci);
   // Quantas se esperam vem do ci.yml, e nao de um numero fixo (TP15): desde o C2 o `sweep` nao tem `grep` (decide-o
-  // o plano), e o BOOTSTRAP remove o job `simulators` num derivado. Com o job, a dele e exigida; sem ele, zero e
+  // o plano), e o BOOTSTRAP remove os jobs dos simuladores num derivado. Com o job, a dele e exigida; sem ele, zero e
   // legitimo — e quem chama di-lo num SKIP, em vez de contar um verde que nao comparou nada (`TP2`).
-  // A dos `Simuladores` conta-se DENTRO do job (o `simulate-upgrade` do C2, `TP15`): contada no ficheiro, a regex do
-  // `sweep` de um derivado da v0.60.0 satisfazia a exigencia, e um `simulators` sem a sua passava.
-  const simuladores = /^  simulators:[ \t]*(?:#.*)?\n[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$|(?![\s\S]))/m.exec(ci)?.[0];
-  if (simuladores !== undefined && regexDoCi(simuladores).length === 0) return ["o job `simulators` do ci.yml nao tem a sua regex de `grep -qE ... <<<\"$tocados\"` (a dos `Simuladores`)"];
+  // Conta-se DENTRO do job da `--skips` (`JOB_DA_SKIPS`, #460; o `simulate-upgrade` do C2, `TP15`): contada no
+  // ficheiro, a regex do `sweep` de um derivado da v0.60.0 satisfazia a exigencia, e um job sem a sua passava.
+  const doJob = blocoDoJob(ci, JOB_DA_SKIPS);
+  if (doJob !== undefined && regexDoCi(doJob).length === 0) return [`o job \`${JOB_DA_SKIPS}\` do ci.yml nao tem a sua regex de \`grep -qE ... <<<"$tocados"\` (a da \`--skips\`)`];
   return rs.flatMap((r) => PROVA.filter((c) => new RegExp(r).test(c) !== PREFIXOS_MAQUINARIA.test(c)).map((c) => `a regex '${r}' do ci.yml e o plano decidem diferente em ${c}`));
 }
 
@@ -143,26 +144,27 @@ export function registar() {
   // Sem `grep` nenhum (um derivado no C2): SKIP, registado com o nome do que aconteceu, e nao com o da comparacao
   // (leitura 2 do C2: um PASS "decidem igual" sem ter comparado nada contava como medido).
   if (regexDoCi(ci).length === 0) {
-    console.log("  SKIP  plano: o ci.yml deste projeto nao tem nenhum `grep` de maquinaria a comparar com o plano (sem `simulators`, e o `sweep` decidido pelo plano, #347 C2)");
+    console.log("  SKIP  plano: o ci.yml deste projeto nao tem nenhum `grep` de maquinaria a comparar com o plano (sem os simuladores, e o `sweep` decidido pelo plano, #347 C2)");
     registarResultado("plano: sem `grep` de maquinaria no ci.yml, nada a comparar (#347 C2)", regexQueDivergem(ci));
-  } else registarResultado("plano: as regex do ci.yml (os `Simuladores`; o `sweep` da v0.60.0, se ainda o tiver) decidem igual ao plano (#347)", regexQueDivergem(ci));
-  // Um DERIVADO (o BOOTSTRAP remove o job `simulators`) no C2 nao tem regex nenhuma, e isso e legitimo (TP15). Os
-  // dois casos correm nos DOIS mundos: com o job, tira-se; sem ele, o `ci` ja e o derivado, e o controlo ACRESCENTA
-  // um job `simulators` sem a regex.
+  } else registarResultado("plano: as regex do ci.yml (a do `simulate-derived`; o `sweep` da v0.60.0, se ainda o tiver) decidem igual ao plano (#347, #460)", regexQueDivergem(ci));
+  // Um DERIVADO (o BOOTSTRAP remove os jobs dos simuladores, #460) no C2 nao tem regex nenhuma, e isso e legitimo
+  // (TP15). Os dois casos correm nos DOIS mundos: com os jobs, tiram-se; sem eles, o `ci` ja e o derivado, e o
+  // controlo ACRESCENTA um `simulate-derived` sem a regex.
   {
-    const temSimuladores = /^  simulators:[ \t]*(?:#.*)?$/m.test(ci);
-    const semSimuladores = temSimuladores ? ci.replace(/^  simulators:[\s\S]*?(?=^  [\w-]+:[ \t]*(?:#.*)?$)/m, "") : ci;
-    const simuladoresSemRegex = temSimuladores
-      ? ci.replace(/(^  simulators:[\s\S]*?)grep -qE '[^']+' <<<"\$tocados"/m, "$1true")
-      : ci.replace(/^jobs:[ \t]*\n/m, "jobs:\n  simulators:\n    steps:\n      - run: true\n");
-    registarResultado("plano: num derivado sem o job `simulators`, nao ha regex exigida (TP15, #347 C2)", [
-      ...(/^  simulators:[ \t]*(?:#.*)?$/m.test(semSimuladores) ? ["nao consegui tirar o job `simulators`"] : []),
-      ...regexQueDivergem(semSimuladores),
+    const tem = temSimuladores(ci);
+    const sem = tem ? semSimuladores(ci) : ci;
+    const semRegex = blocoDoJob(ci, JOB_DA_SKIPS) !== undefined
+      ? ci.replace(new RegExp(String.raw`(^  ${JOB_DA_SKIPS}:[\s\S]*?)grep -qE '[^']+' <<<"\$tocados"`, "m"), "$1true")
+      : ci.replace(/^jobs:[ \t]*\n/m, `jobs:\n  ${JOB_DA_SKIPS}:\n    steps:\n      - run: true\n`);
+    registarResultado("plano: num derivado sem os jobs dos simuladores, nao ha regex exigida (TP15, #347 C2, #460)", [
+      ...(temSimuladores(sem) ? ["nao consegui tirar os jobs dos simuladores"] : []),
+      ...regexQueDivergem(sem),
     ]);
-    registarResultado("plano: com o job `simulators` e sem a regex dele, reprova (controlo, TP15)", simuladoresSemRegex !== ci && regexQueDivergem(simuladoresSemRegex).length > 0 ? [] : ["o job `simulators` sem a regex passou"]);
+    registarResultado("plano: com o job `simulate-derived` (o `JOB_DA_SKIPS`) e sem a regex dele, reprova (controlo, TP15, #460)",
+      semRegex !== ci && regexQueDivergem(semRegex).some((p) => p.includes(`\`${JOB_DA_SKIPS}\` do ci.yml nao tem a sua regex`)) ? [] : ["o job `simulate-derived` sem a regex passou"]);
     // No TEMPLATE o job tem de la estar (leitura do PR): renomea-lo baixava a exigencia para 1 regex em silencio.
     if (!ehDerivado((rel) => leOuNull(join(ROOT, rel))))
-      registarResultado("plano: no template, o job `simulators` existe e a sua regex e exigida (TP15)", temSimuladores ? [] : ["o ci.yml do template nao tem o job `simulators`"]);
+      registarResultado("plano: no template, o job `simulate-derived` (o `JOB_DA_SKIPS`) existe e a sua regex e exigida (TP15, #460)", blocoDoJob(ci, JOB_DA_SKIPS) !== undefined ? [] : ["o ci.yml do template nao tem o job `simulate-derived`"]);
   }
   // Cada controlo exige que o `replace` MUDOU o texto (#372 A8, `TP15`): num derivado com o `grep` escrito doutra
   // forma, o `ci` ficava igual e o controlo reprovava pela razao errada (ou passava sem comparar nada).
@@ -180,8 +182,8 @@ export function registar() {
     }
     registarResultado(`plano: ${nome}`, m === null ? ["o controlo nao mudou o ci.yml: o `grep` nao tem a forma esperada"] : regexQueDivergem(m).length > 0 ? [] : [falha]);
   }
-  // (O caso "um ci.yml sem regex reprova" saiu com o C2: sem `simulators`, zero regex e um derivado legitimo. O
-  // vermelho que guardava — zero comparacoes a passar — e o controlo do job `simulators` sem a regex, acima.)
+  // (O caso "um ci.yml sem regex reprova" saiu com o C2: sem os simuladores, zero regex e um derivado legitimo. O
+  // vermelho que guardava — zero comparacoes a passar — e o controlo do `simulate-derived` sem a regex, acima.)
 
   // --- O plano e copiado SOZINHO da base -----------------------------------------------------------------
   registarResultado("plano: o plano-ci.mjs so importa `node:*` (#347)", importsNaoNode(readFileSync(PLANO, "utf8")).map((m) => `importa ${m}: copiado sozinho da base, nao correria`));
