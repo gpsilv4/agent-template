@@ -56,6 +56,11 @@ export const SUITES = [
   // O custo por PR (#517): vem no modo parcial com o `minutos-ci`, e o `test-modo-upgrade` calcula o fecho.
   { re: /^\.agent\/scripts\/lib\/minutos-por-pr\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/casos-minutos-por-pr\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
+  // Os limites de cada job (#542): vem no modo parcial com o `minutos-ci`, e o `test-modo-upgrade` calcula o fecho. O
+  // leitor de jobs saiu do `estrutura-workflow` para la (o gate reexporta-o): mexer nele corre as suites dos dois.
+  { re: /^\.agent\/scripts\/lib\/limites-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/jobs-workflow\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs"), S("test-guards.mjs"), S("test-test-surface.mjs"), S("test-ci-exemplo.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-limites-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
   // O modo parcial do `/upgrade` (#429): a regra (os casos no `test-modo-upgrade`, a ponta no `test-simulate-upgrade`),
   // o fecho (o `harness/fecho-parcial.mjs`, do `test-modo-upgrade`) e o doc, cuja ordem e lista a suite verifica.
   { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs"), S("test-minutos-ci.mjs")], only: "modo-upgrade" },

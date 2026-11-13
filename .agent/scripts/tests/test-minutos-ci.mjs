@@ -15,7 +15,9 @@
  *     SKUs listados fora da soma), a projecao no mes corrente, as linhas `QUOTA:`, e as suas recusas (o scope `user`);
  *   - o `--por-pr` e o `--todos` (#517, no `harness/casos-minutos-por-pr.mjs`): o tipo de cada run (a marca faz o
  *     upgrade, e nao o titulo), o numero do PR pelo branch quando o run o nao traz, o modo de cada privado, um repo 404
- *     fora, os meses do intervalo na faturacao, e as recusas.
+ *     fora, os meses do intervalo na faturacao, e as recusas;
+ *   - os LIMITES de cada job (#542, no `harness/casos-limites-ci.mjs`): o `lib/limites-ci.mjs` com os limiares NA
+ *     fronteira, o leitor de jobs do `lib/jobs-workflow.mjs`, o workflow do commit de cada run, o corte pela anotacao.
  *
  *   node .agent/scripts/tests/test-minutos-ci.mjs
  */
@@ -26,6 +28,7 @@ import { join } from "path";
 import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, projecao, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "../lib/minutos-calculo.mjs";
 import { repoDoOrigin } from "../lib/repo-origin.mjs";
 import { registarPorPr } from "./harness/casos-minutos-por-pr.mjs";
+import { registarLimites } from "./harness/casos-limites-ci.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -92,7 +95,9 @@ appendFileSync(process.env.FAKE_GH_LOG, caminho + "\\n");
 const [base, q = ""] = caminho.split("?");
 const pagina = new URLSearchParams(q).get("page") ?? "1";
 const mapa = JSON.parse(readFileSync(process.env.FAKE_GH, "utf8"));
-const chave = base + "#" + pagina;
+// O ref entra na chave (#542): cada run le o workflow do SEU commit. Sem ref, a chave de sempre.
+const ref = new URLSearchParams(q).get("ref");
+const chave = base + (ref ? "@" + ref : "") + "#" + pagina;
 const v = mapa[chave] ?? mapa[base.replace(/\\/runs\\/\\d+\\//, "/runs/*/") + "#" + pagina] ?? mapa[base.replace(/\\/runs\\/\\d+\\//, "/runs/*/") + "#*"];
 // O pedido de jobs leva filter=all (os jobs das tentativas anteriores tambem se pagam): sem ele, 404.
 if (/\\/jobs$/.test(base) && new URLSearchParams(q).get("filter") !== "all") { process.stderr.write("HTTP 404: sem filter=all\\n"); process.exit(1); }
@@ -390,6 +395,8 @@ for (const [nome, args, frase] of [
 
 // --- O custo por PR e o `--todos` (#517): no harness, pelo tamanho desta suite ---
 registarPorPr({ caso, espera, cli, conta, ITEM, run, job });
+// --- Os limites de cada job (#542): no harness, pelo mesmo motivo ---
+registarLimites({ caso, espera, cli, run });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
