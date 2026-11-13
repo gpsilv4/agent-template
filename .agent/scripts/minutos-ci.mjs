@@ -35,12 +35,22 @@
  * `--desde AAAA-MM-DD --todos` (#517): o run a run de TODOS os repos privados (a lista do `--quota`, dos meses do
  * intervalo), um bloco por repo com o subtotal, e o total geral. Sem `--todos` nem `--repo`, o repo do `origin`.
  *
+ * OS LIMITES (#542), no fim de cada run a run (`--run`/`--desde`, e por repo no `--todos`): cada job contra o SEU
+ * `timeout-minutes`, lido no workflow do commit de cada run (`lib/limites-ci.mjs`), e tres avisos em linhas fixas:
+ * `LIMITE: CORTADO` (o GitHub matou-o pelo limite: so a anotacao do check run o distingue de um cancelamento, e da o
+ * limite efetivo), `LIMITE: AVISO` a >= 90% numa corrida (corte iminente) ou a >= 75% na mediana das ultimas 5
+ * (crescimento), e `LIMITE: OK`. Num PR o limite lido e o do `head` (o GitHub corre o merge): uma aproximacao, dita. Um
+ * workflow que nao se le e "limite nao lido", nunca o default inventado. O `/backlog-review` procura as linhas e PROPOE
+ * um ticket com os numeros — nunca o cria; a melhoria compara as opcoes (separar o job, fatiar, cache, subir o limite)
+ * e prova que mede o mesmo. Custa um pedido por (workflow, commit) e um por job cancelado: `--sem-limites` desliga-o.
+ *
  * Pagina os runs e os jobs (100 por pagina, sem repetidos). Falha ALTO, nunca com "0 min": sem `gh`, sem sessao, um
  * erro da API, uma resposta sem a lista ou sem `total_count`, mais de 1000 runs no intervalo (o limite de uma pesquisa
  * por data: estreitar), ou menos runs/jobs lidos do que a API diz haver. Um zero falso e pior do que nenhum numero.
  */
 import { execFileSync } from "child_process";
-import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, privadosDoMes, projecaoDoMes, quotaDoMes, resumoDosJobs } from "./lib/minutos-calculo.mjs";
+import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, privadosDoMes, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "./lib/minutos-calculo.mjs";
+import { CRESCIMENTO, IMINENTE, JANELA, avisosDoJob, limiteDaAnotacao, limiteDoJob, limitesDoWorkflow } from "./lib/limites-ci.mjs";
 import { repoDoOrigin } from "./lib/repo-origin.mjs";
 import { MARCA, TIPOS, celula, custoPorTipo, prDoRun, precisaDosFicheiros, tipoDoRun } from "./lib/minutos-por-pr.mjs";
 import { modoDoProjeto, temGuardTests } from "./lib/modo-upgrade.mjs";
@@ -65,11 +75,13 @@ for (let i = 0; i < ARGS.length; i++) {
   else if (a === "--quota") opt.quota = true;
   else if (a === "--por-pr") opt.porPr = true;
   else if (a === "--todos") opt.todos = true;
+  else if (a === "--sem-limites") opt.semLimites = true;
   else if (["--run", "--desde", "--ate", "--app", "--repo", "--mes", "--limite"].includes(a) && ARGS[i + 1] !== undefined) opt[a.slice(2)] = ARGS[++i];
   else erros.push(`argumento desconhecido ou sem valor: ${a}`);
 }
 if (opt.quota && (opt.run || opt.desde || opt.repo || opt.ate || opt.app || opt.passos || opt.todos)) erros.push("o `--quota` e da CONTA: nao se junta com `--run`, `--desde`, `--ate`, `--app`, `--passos`, `--repo` nem `--todos`");
 if (opt.porPr && !opt.quota) erros.push("o `--por-pr` so com o `--quota`");
+if (opt.semLimites && opt.quota) erros.push("o `--sem-limites` e do run a run (`--run`/`--desde`): o `--quota` nao le limites");
 if (opt.todos && (opt.repo || opt.run)) erros.push("o `--todos` e o run a run de TODOS os privados: nao se junta com `--repo` nem `--run`");
 if (!opt.quota && (opt.mes || opt.limite)) erros.push("o `--mes` e o `--limite` so com o `--quota`");
 if (opt.mes && !/^\d{4}-(0[1-9]|1[0-2])$/.test(opt.mes)) erros.push(`--mes quer AAAA-MM (deu ${opt.mes})`);
@@ -86,7 +98,7 @@ if (opt.desde && dataReal(opt.desde) && opt.desde > new Date().toISOString().sli
 // Um intervalo ao contrario nao tem runs: "nenhum repo" ou "0 min" seriam um zero que nao mediu nada (`TP2`).
 if (opt.desde && opt.ate && opt.ate < opt.desde) erros.push(`--ate ${opt.ate} vem antes do --desde ${opt.desde}`);
 if (opt.run && !/^\d+$/.test(opt.run)) erros.push(`--run quer o id numerico de um run (deu ${opt.run})`);
-if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos] | --quota [--por-pr] [--mes AAAA-MM] [--limite ${QUOTA_FREE}]`);
+if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos] [--sem-limites] | --quota [--por-pr] [--mes AAAA-MM] [--limite ${QUOTA_FREE}]`);
 
 /** Um pedido a API pelo `gh`: `{ saida }`, ou `{ erro }` com o que o `gh` disse (quem chama decide a recusa). */
 function ghApi(caminho) {
@@ -241,7 +253,77 @@ function relatorio(alvo) {
     const acima = daApp.filter((l) => l.maisLongo > LINHA_DOS_120).length;
     console.log(`mediana ${qual}, do job mais longo de cada run: ${Math.round(med)}s em ${daApp.length} run(s) — ${acima} acima dos ${LINHA_DOS_120}s (um job de ${LINHA_DOS_120 + 1}s ou mais paga ${cobrado(LINHA_DOS_120 + 1)} min)`);
   }
+  if (!opt.semLimites) limitesDosJobs(alvo, pagos);
   return soma("cobrado");
+}
+
+// --- Os LIMITES de cada job (#542) ---
+/** O tempo de cada job contra o SEU `timeout-minutes`, lido no workflow do commit de cada run (o limite muda: 30 -> 45
+ *  no #537), e os avisos de `lib/limites-ci.mjs` nas linhas fixas `LIMITE:` (o `/backlog-review` procura-as). Num
+ *  `pull_request` o GitHub corre o commit de MERGE e o lido e o do `head_sha`: e uma aproximacao, e diz-se; o corte e
+ *  exato (o limite vem da anotacao). Um workflow que nao se le (404, ou um `dynamic` do Dependabot) e "nao lido",
+ *  nunca um limite inventado. */
+function limitesDosJobs(alvo, pagos) {
+  const lidos = new Map();
+  const workflowDe = (path, sha) => {
+    const k = `${path}@${sha}`;
+    if (!lidos.has(k)) {
+      const texto = ficheiroDoRepo(alvo, `${path}?ref=${sha}`);
+      lidos.set(k, texto === null ? null : limitesDoWorkflow(texto));
+    }
+    return lidos.get(k);
+  };
+  const series = new Map();
+  const naoLidos = new Map();
+  const porOmissao = new Set();
+  let cancelados = 0;
+  for (const l of pagos) {
+    const path = l.r.path ?? "";
+    const doRepo = /^\.github\/workflows\//.test(path) && l.r.head_sha;
+    const lido = doRepo ? workflowDe(path, l.r.head_sha) : null;
+    for (const j of l.jobs) {
+      if (j.conclusion === "skipped" || !j.started_at || !j.completed_at) continue;
+      const chave = `${path || l.r.name || "?"} · ${j.name ?? `job ${j.id}`}`;
+      let limiteS = null;
+      if (!lido) naoLidos.set(chave, doRepo ? `o workflow nao se leu em ${String(l.r.head_sha).slice(0, 7)}` : `sem workflow do repo (${path || "sem path"})`);
+      else {
+        const r = limiteDoJob(j.name, lido);
+        if (r.estado === "ok" && r.limiteMin !== null) {
+          limiteS = r.limiteMin * 60;
+          if (r.porOmissao) porOmissao.add(chave);
+        } else naoLidos.set(chave, r.estado === "ok" ? "o timeout-minutes nao e um numero" : r.estado === "ambiguo" ? `ambiguo entre ${r.ids.join(", ")}` : "sem job correspondente no workflow");
+      }
+      let cortadoS = null;
+      if (j.conclusion === "cancelled") {
+        // Uma pagina de 100 (o maximo): um job que emite muitos avisos e depois e cortado podia ter a anotacao do corte
+        // fora da 1.a pagina de 30. Com 100 e possivel haver mais: recusa, em vez de chamar o corte um cancelamento.
+        const anotacoes = api(`repos/${alvo}/check-runs/${j.id}/annotations?per_page=100`);
+        if (!Array.isArray(anotacoes)) fatal(`as anotacoes do job ${j.id} em ${alvo} nao sao uma lista: nao e a resposta que pedi`);
+        if (anotacoes.length >= 100) fatal(`o job ${j.id} em ${alvo} tem 100 anotacoes ou mais: a do corte pode estar fora desta pagina`);
+        cortadoS = limiteDaAnotacao(anotacoes);
+        if (cortadoS === null) cancelados++;
+      }
+      if (!series.has(chave)) series.set(chave, []);
+      series.get(chave).push({ inicio: j.started_at, s: segundos(j.started_at, j.completed_at), conclusao: j.conclusion, limiteS, cortadoS });
+    }
+  }
+  // Por inicio do JOB, e nao pela data do run: a API da os runs do mais recente para o mais antigo, e um run re-tentado
+  // guarda o `created_at` da 1.a tentativa (leitor do #542). As "ultimas 5" sao as mais recentes.
+  for (const corridas of series.values()) corridas.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
+  const mmss = (s) => `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s`;
+  console.log(`\nLIMITES (por job: a mediana das ultimas ${JANELA} corridas e o maximo contra o timeout-minutes; aviso a ${Math.round(IMINENTE * 100)}% numa corrida, a ${Math.round(CRESCIMENTO * 100)}% na mediana; o corte pela anotacao do GitHub; num PR o limite e o do head)`);
+  const avisos = [];
+  for (const [chave, corridas] of series) {
+    const { avisos: a, nota, resumo } = avisosDoJob(chave, corridas);
+    avisos.push(...a);
+    if (resumo.limite === null) continue;
+    const omissao = porOmissao.has(chave) ? " (360 por omissao do GitHub: o job nao tem timeout-minutes)" : "";
+    console.log(`  ${chave}: mediana ${mmss(resumo.mediana)}, max ${mmss(resumo.maximo)}, limite ${mmss(resumo.limite)} (${Math.round((100 * resumo.mediana) / resumo.limite)}%)${omissao}${nota ? ` [${nota}]` : ""}`);
+  }
+  for (const [chave, porque] of naoLidos) console.log(`  limite nao lido: ${chave} — ${porque}`);
+  if (cancelados) console.log(`  ${cancelados} job(s) cancelado(s) sem ser pelo limite (concurrency, a mao): fora dos avisos e da mediana`);
+  for (const a of avisos) console.log(`LIMITE: ${a.tipo} ${a.texto}`);
+  if (!avisos.length) console.log("LIMITE: OK nenhum job perto do seu limite");
 }
 
 // --- O `--todos` (#517): o run a run de todos os privados ---

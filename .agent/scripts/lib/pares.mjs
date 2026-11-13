@@ -413,6 +413,15 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Os LIMITES de cada job (#542): cada `aviso(` (o corte, o iminente, o crescimento) e uma linha `LIMITE:` que um
+    // job a encostar ao limite tem de produzir — desligado, o job seria cortado sem aviso, como o do PR #541. Os
+    // limiares (as constantes) nao sao sitios: provam-se na suite com casos NA fronteira (`casos-limites-ci.mjs`).
+    alvo: ".agent/scripts/lib/limites-ci.mjs",
+    suite: ".agent/scripts/tests/test-minutos-ci.mjs",
+    sinal: /(?<![\w.$]|function )aviso\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O MODO do `/upgrade` (#429): nao recusa, DECIDE — como o `eh-main.mjs` e o `marcas-yaml.mjs`. Cada `resultado(` e
     // uma linha da tabela; o neutro devolve um modo que nao existe, e o caso dessa linha tem de ficar vermelho.
     alvo: ".agent/scripts/lib/modo-upgrade.mjs",
