@@ -205,7 +205,7 @@ git push origin vX.Y.Z
 | "Cada PR merece a sua tag." | A tag e do sprint, nao do PR: num privado cada tag e um job do `release.yml` cobrado ao minuto (#347, secao 7). |
 | "A tag chega, o Release faz-se depois." | O Release cria-se sozinho da tag; sem o `release.yml` ficaram 50 de 55 tags sem ele (#277). Confirmar que apareceu (secao 7). |
 | **No template:** "Subo a versao depois da tag." | O `.agent/TEMPLATE_VERSION` sobe ANTES da tag; o `simulate-upgrade` reprova se ficar atras (secao 7, M6 do #195). |
-| **No template:** "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os tres verificadores correm depois do commit. |
+| **No template:** "A bateria local esta verde, faco push." | O `simulate-derived` entrou porque a sua ausencia deixou passar um PR vermelho (`process-rules.md`): os quatro verificadores correm depois do commit (o `simulate-derived` duas vezes, a segunda com `SIMULATE_PRIVADO=1`). |
 | "O Security Audit esta verde." | No CI do template e informativo (`continue-on-error`), e no de um job o de dev tambem: verde nao e limpo. Ler o relatorio (secao 2). |
 
 ## 8. Verificacao Pos-Deploy

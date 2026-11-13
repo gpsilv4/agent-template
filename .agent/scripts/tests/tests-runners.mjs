@@ -7,7 +7,11 @@
  * vizinho que NAO pode reprovar (o rotulo fixo entre aspas, ou com um comentario a seguir). E os dois SKIP/WARN que o
  * verificador completo nao alcanca (um derivado; nenhum `runs-on:`), chamados diretamente.
  */
+import { join } from "path";
 import { pathToFileURL } from "url";
+import { ehDerivado } from "../lib/derivado.mjs";
+import { BLOCOS_MODO_COMPLETO, comModoCompleto } from "../lib/exemplo-ci.mjs";
+import { leOuNull } from "../lib/ficheiros.mjs";
 import { test, writeF, registarResultado } from "./harness/test-harness.mjs";
 import { guardRunners, RUNNER, runsOnDe } from "../guards/runners.mjs";
 import { correDireto } from "./harness/guard-direto.mjs";
@@ -118,4 +122,33 @@ export function registar() {
   // #534: com `modoCompleto`, o comentado dentro de um bloco le-se; depois do `fim`, volta a nao contar.
   const blocos = runsOnDe(`a:\n  # --- MODO COMPLETO (b) inicio\n  #   runs-on: x-dentro\n  # --- MODO COMPLETO (b) fim ---\n  # runs-on: x-depois\n`, { modoCompleto: true });
   registarResultado("G22: o leitor com modoCompleto le o bloco e para no fim (#534)", blocos.length === 1 && blocos[0].valor === "x-dentro" && blocos[0].linha === 3 ? [] : [`leu: ${JSON.stringify(blocos)}`]);
+  // #545: o EXEMPLO REAL, e nao uma fixture com os marcadores escritos a mao. O Guard 22 tem de ler nele tantos
+  // `runs-on:` como o exemplo descomentado pelo `comModoCompleto` (o que um derivado privado corre), e mais do que sem os
+  // blocos. Um marcador mudado so no exemplo, ou so num dos leitores, deixava o M1 regressar em silencio.
+  // Num derivado o exemplo e dele (pode nao o ter, ou te-lo adaptado) e o Guard 22 salta: SKIP visivel, como no
+  // `test-ci-exemplo`; no template e exigido (`TP15`).
+  const raiz = (p) => leOuNull(join(import.meta.dirname, "..", "..", "..", p));
+  const real = raiz("src/docs/exemplos/ci-sem-maquinaria.yml");
+  const descomentado = real === null ? null : comModoCompleto(real);
+  const nome = "G22: no ci-sem-maquinaria.yml real, le tantos runs-on como o exemplo descomentado, e mais do que sem os blocos (#545)";
+  if (ehDerivado(raiz) && descomentado === null) console.log(`  SKIP  ${nome} — num derivado, sem o exemplo ou com ele adaptado`);
+  else {
+    const comBlocos = runsOnDe(real, { modoCompleto: true }).length;
+    // Um bloco com uma letra fora de `BLOCOS_MODO_COMPLETO` (3.a leitura do #545): nem o Guard 22 nem o `comModoCompleto`
+    // o leem, e as contagens ficavam iguais — so esta pergunta o ve.
+    const letras = [...(real ?? "").matchAll(/# --- MODO COMPLETO \(([^)]*)\)/g)].map((m) => m[1]);
+    const estranhas = [...new Set(letras.filter((l) => !BLOCOS_MODO_COMPLETO.includes(l)))];
+    registarResultado(
+      nome,
+      real === null
+        ? ["o src/docs/exemplos/ci-sem-maquinaria.yml nao existe (no template e exigido, TP15)"]
+        : estranhas.length
+          ? [`blocos MODO COMPLETO fora de BLOCOS_MODO_COMPLETO: ${estranhas.join(", ")} — acrescentar la (e o seu inicio no comModoCompleto)`]
+          : descomentado === null
+            ? ["o comModoCompleto nao reconhece os blocos do exemplo real"]
+            : comBlocos === runsOnDe(descomentado).length && comBlocos > runsOnDe(real).length
+              ? []
+              : [`com os blocos: ${comBlocos}; descomentado: ${runsOnDe(descomentado).length}; sem os blocos: ${runsOnDe(real).length}`],
+    );
+  }
 }

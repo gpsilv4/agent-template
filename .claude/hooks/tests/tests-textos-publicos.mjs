@@ -174,6 +174,11 @@ export function registar({ test }) {
     afirma(corre(`GH_REPO= gh issue create --title x --body "projeto-secreto"`, DESL), NEGA);
     afirma(corre(`gh issue create --title "projeto-secreto" --body "GH_REPO=x funciona?"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
   });
+  // #545: o `+=` do bash tambem define o repo. O controlo e o `export FOO+=1`, que nao muda o alvo.
+  test("textos-publicos: num repo DESLIGADO, um `export GH_REPO+=` e externo; um `export FOO+=1` nao (#545)", () => {
+    afirma(corre(`export GH_REPO+=o/publico && gh issue create --title x --body "projeto-secreto"`, DESL), NEGA);
+    afirma(corre(`export FOO+=1 && gh issue create --title x --body "projeto-secreto"`, DESL), { decisao: "allow", aviso: "DESLIGADA neste repo" });
+  });
   test("textos-publicos: num repo DESLIGADO, um `gh api` fora de `repos/{owner}/{repo}` e externo, e a rota nao se desloca com as flags", () => {
     afirma(corre(`gh api gists -f description="projeto-secreto"`, DESL), NEGA);
     afirma(corre(`gh api -f body="projeto-secreto" repos/{owner}/outro/issues/1/comments`, DESL), NEGA);
@@ -270,9 +275,13 @@ export function registar({ test }) {
       `cp x.mjs .githooks/lib/commit-msg.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`])
       afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
   });
-  // #536 (o `/audit` pre-tag da v0.63.5, M3): as OUTRAS tres formas de tocar no que o script corre, um caso cada.
+  // #536 (o `/audit` pre-tag da v0.63.5, M3): as OUTRAS formas de tocar no que o script corre. A condicao do alvo por
+  // resolver (`e.p === null`) tem DOIS casos (#545): antes da leitura (sem ela o `toca` lancava, e o hook deixava passar);
+  // e depois dela, onde e a unica que nega (o `mesmo` nao ve uma escrita que vem depois) — um aviso a mais, de proposito.
   test("textos-publicos: uma escrita num alvo que nao se resolve tira a isencao (#536)", () =>
     afirma(corre(`echo x > "$F" && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
+  test("textos-publicos: uma escrita por resolver DEPOIS da leitura tambem tira a isencao (falhar fechado, #545)", () =>
+    afirma(corre(`node .githooks/commit-msg pr.md && git commit -F pr.md && echo x > "$F"`, { ficheiros: LIMPOS }), ESCRITO));
   test("textos-publicos: copiar PARA a propria pasta .githooks tira a isencao (#536)", () =>
     afirma(corre(`cp -r d .githooks && node .githooks/commit-msg pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), ESCRITO));
   // A mensagem FORA da pasta copiada (`~/pr.md`): com ela dentro, a copia para `.` ja a tapava e o caso negava sem a
@@ -290,8 +299,25 @@ export function registar({ test }) {
       `function node { ./outro.sh; }; node .githooks/commit-msg pr.md && git commit -F pr.md`])
       afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
   });
+  // #545: o `NODE_OPTIONS+=` (o nome lia-se `NODE_OPTIONS+`; a forma EXPORTADA discrimina, a de prefixo ja negava por
+  // outro caminho) e um `export`/`declare` SEM `=` (exporta o valor posto antes). Controlos: `export FOO+=1`/`FOO`, abaixo.
+  test("textos-publicos: um NODE_OPTIONS+=, ou um export/declare sem `=`, tambem tira a isencao (#545)", () => {
+    for (const c of [`export NODE_OPTIONS+=--import=./w.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `NODE_OPTIONS+=--import=./w.mjs node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `printf -v NODE_OPTIONS -- --import=./w.mjs && export NODE_OPTIONS && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `declare -x PATH && node .githooks/commit-msg pr.md && git commit -F pr.md`])
+      afirma(corre(c, { ficheiros: LIMPOS }), ESCRITO);
+  });
+  // #545: o `X+=y` antes do comando e uma atribuicao (o `cabeca`): o comando que corre e o que vem a seguir. Antes, o
+  // `FOO+=1` lia-se como o comando — um `gh` depois dele nem era lido, e um `cat` contava como escrita.
+  test("textos-publicos: um FOO+=1 antes do gh nao o esconde; antes de um cat, e um leitor como com FOO=1 (#545)", () => {
+    afirma(corre(`FOO+=1 gh issue create --title x --body "projeto-secreto"`), NEGA);
+    afirma(corre(`FOO+=1 cat pr.md && git commit -F pr.md`, { ficheiros: LIMPOS }), DEIXA);
+  });
   test("textos-publicos: CONTROLO — exportar outra variavel, ou escrever fora do que o script corre, deixa a isencao (#536)", () => {
     for (const c of [`export FOO=1 && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `export FOO+=1 && node .githooks/commit-msg pr.md && git commit -F pr.md`,
+      `export FOO && node .githooks/commit-msg pr.md && git commit -F pr.md`,
       `cp x.mjs .agent/scripts/outro.mjs && node .githooks/commit-msg pr.md && git commit -F pr.md`,
       `cp x.mjs .git-hooks-velhos && node .githooks/commit-msg pr.md && git commit -F pr.md`])
       afirma(corre(c, { ficheiros: LIMPOS }), DEIXA);

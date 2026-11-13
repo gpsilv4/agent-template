@@ -87,9 +87,13 @@ const LEITORES = new Set(["cat", "head", "tail", "wc", "grep", "rg", "diff", "cm
 /** Um interpretador a correr um script que so LE os argumentos (#511): o `commit-msg` do template, que se corre sobre
  *  a mensagem antes do `git commit -F` dela. Pelo caminho EXATO e so com a pasta em vigor na RAIZ do repo (pelo
  *  caminho real), com o interpretador pelo nome e sem atribuicoes antes: um `node x.mjs F` qualquer pode escrever o `F`, um
- *  `outro/.githooks/commit-msg` pode ser outro script, e um `NODE_OPTIONS=--import` corre outro codigo. Se o mesmo
- *  comando escrever em `.githooks/`, a isencao cai. Limite dito: um `.githooks/commit-msg` mudado NOUTRA chamada (por um
- *  `Edit`) nao se ve — o hook nao e barreira contra quem o queira contornar. Acrescentar so um que so leia (e com teste). */
+ *  `outro/.githooks/commit-msg` pode ser outro script, e um `NODE_OPTIONS=--import` corre outro codigo. A isencao cai se
+ *  o mesmo comando escrever em `.githooks/` ou nas libs que ele importa (`.agent/scripts/lib/`), ou num alvo que nao se
+ *  resolve, e se QUALQUER comando do texto mudar o `node`: uma atribuicao a `NODE_*`/`PATH` (`X=`, `X+=`, solta ou de
+ *  um `export`), um `export`/`declare` desses nomes mesmo sem `=`, ou uma funcao `node` (#536, #545). Limites ditos: um
+ *  `.githooks/commit-msg` mudado NOUTRA chamada (por um `Edit`) nao se ve; nem uma variavel posta por um verbo que nao a
+ *  escreve como atribuicao (`printf -v`, `read`) e que ja estava exportada (#546). O hook nao e barreira contra quem o
+ *  queira contornar. Acrescentar so um script que so leia (e com teste). */
 const LEITORES_POR_SCRIPT = { node: [".githooks/commit-msg", "./.githooks/commit-msg"] };
 /** Os que copiam PARA uma pasta: ai a pasta do ficheiro lido tambem conta (`cp x /tmp/` escreve `/tmp/x`). */
 const COPIAM = new Set(["cp", "mv", "install", "ln", "rsync"]);
@@ -115,6 +119,9 @@ export function temExpansao(cru, corpo = false) {
   return false;
 }
 
+/** O nome da variavel de uma atribuicao: `X=y` e `X+=y` dao `X`. */
+const nomeDe = (t) => t.split("=")[0].replace(/\+$/, "");
+
 /** O indice da palavra que CORRE (e as atribuicoes antes dela): salta `X=y`, as cabecas (`env`, `timeout 5`) e as
  *  palavras de controlo (`do`, `then`, `!`). */
 function cabeca(ws) {
@@ -122,7 +129,8 @@ function cabeca(ws) {
   let i = 0;
   while (i < ws.length) {
     const t = ws[i].texto;
-    if (/^[A-Za-z_]\w*=/.test(t)) { atribuicoes.push(t.split("=")[0]); i++; continue; }
+    // `X+=y` (o bash acrescenta) e uma atribuicao como `X=y`, e o nome e o mesmo (#545).
+    if (/^[A-Za-z_]\w*\+?=/.test(t)) { atribuicoes.push(nomeDe(t)); i++; continue; }
     if (CONTROLO.has(t)) { i++; continue; }
     if (CABECAS.has(t.replace(/^.*\//, ""))) {
       i++;
@@ -141,10 +149,11 @@ const DEFINEM = new Set(["export", "declare", "typeset", "local", "readonly", "e
 function defineGhRepo(ws) {
   // As atribuicoes que o `cabeca()` recolhe passam as `CABECAS` (`sudo`, `time`, `timeout 60 env ...`), como no `main`.
   if (cabeca(ws).atribuicoes.includes("GH_REPO")) return true;
-  const k = ws.findIndex((w) => /^GH_REPO=/.test(w.texto));
+  // Com o `+=` (#545), como no `mudaONode`: `export GH_REPO+=o/r` tambem define o repo.
+  const k = ws.findIndex((w) => /^GH_REPO\+?=/.test(w.texto));
   // Depois de um `export`/`declare`, tudo e um argumento dele (`export FOO GH_REPO=x`); antes, so prefixos.
   const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
-  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*\+?=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
 }
 
 /** As variaveis que mudam o que um `node` corre (#536): o `NODE_OPTIONS=--import` corre outro codigo antes do script, um
@@ -158,9 +167,14 @@ function mudaONode(ws) {
   // `function node { ... }` (a forma `node() {` ve-se em `textosDoComando`: o lexer tira o `()`, e sobra um `node`
   // sozinho seguido de um `{`).
   if (ws[0]?.texto === "function" && ws[1]?.texto === "node") return true;
-  const k = ws.findIndex((w) => MUDA_O_NODE.test(w.texto.split("=")[0]) && w.texto.includes("="));
+  // Um `export NODE_OPTIONS` SEM `=` (#545): exporta o valor que a variavel ja tinha, posto por outro verbo antes. Um
+  // argumento de `DEFINEM` com um destes nomes conta, com `=` ou sem ele — falhar fechado.
+  const { i: h } = cabeca(ws);
+  if (h >= 0 && DEFINEM.has(ws[h].texto.replace(/^.*\//, "")) && ws.slice(h + 1).some((w) => MUDA_O_NODE.test(nomeDe(w.texto)))) return true;
+  // Com o `+=` (#545): `export NODE_OPTIONS+=--import=...` acrescenta, e muda o `node` na mesma.
+  const k = ws.findIndex((w) => MUDA_O_NODE.test(nomeDe(w.texto)) && w.texto.includes("="));
   const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
-  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*\+?=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
 }
 
 /**
@@ -256,8 +270,9 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     // #511: o script do template que so LE (`LEITORES_POR_SCRIPT`), e so quando e de facto ELE que corre: o interpretador
     // pelo nome (nao um `./node`), sem atribuicoes antes (um `NODE_OPTIONS=--import` corre outro codigo), e com a pasta
     // em vigor a ser a RAIZ do repo, pelo caminho real — o que ja cobre um `cd` antes (para outra pasta, ou por um
-    // symlink) e um `$(...)`, sem regra propria (um controlo do #511 mostrou-o: tirar um `!mudouDir` nao mudava nada). Fica em espera: se o mesmo comando escrever em `.githooks/` (o proprio
-    // script), os argumentos voltam a contar (no fim, `isentos`).
+    // symlink) e um `$(...)`, sem regra propria (um controlo do #511 mostrou-o: tirar um `!mudouDir` nao mudava nada). Fica em espera: se o mesmo comando escrever no que
+    // o script corre (`.githooks/` e `.agent/scripts/lib/`, #536) ou num alvo por resolver, os argumentos voltam a contar
+    // (no fim, `isentos`); com o `node` mudado noutro comando (`nodeMudado`), nem chega a ficar isento.
     // A raiz por ultimo: custa um `git` (preguicosa, no hook), e so se pergunta a um candidato. Sem `base` (um interior
     // depois de um `cd`, ou um `cd` que nao se resolve) nao ha isencao.
     const isento = base !== null && ws[h].texto === nome && cabeca(ws).atribuicoes.length === 0 && !nodeMudado &&
@@ -404,9 +419,12 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
   }
   // #511: um comando que escreve no que o script isento corre (`protegidos`: o `.githooks/` e as libs que ele importa,
   // #536), ou num alvo que nao se resolve, pode ter trocado o que corre: os argumentos dos isentos voltam a contar como
-  // escrita. Quatro formas, cada uma com o seu caso (#536): o alvo por resolver; a propria pasta (`cp -r d .githooks`);
-  // dentro dela; e a pasta de uma copia que a CONTEM (`cp -r outro/.githooks .`) — com o separador, senao `<raiz>/.git`
-  // tambem a continha.
+  // escrita. Quatro formas: o alvo por resolver; a propria pasta (`cp -r d .githooks`); dentro dela; e a pasta de uma
+  // copia que a CONTEM (`cp -r outro/.githooks .`) — com o separador, senao `<raiz>/.git` tambem a continha. As tres
+  // ultimas tem cada uma o seu caso (#536). A primeira faz duas coisas (#545): guarda o `toca` de um `null` (sem ela, o
+  // `startsWith` lancava, e o hook deixava passar — o caso da escrita ANTES da leitura fica vermelho); e e a UNICA que
+  // nega uma escrita por resolver DEPOIS da leitura, que o `mesmo` de baixo nao ve (a ordem). Essa ja nao mudou o que o
+  // `node` correu: e um aviso a mais, de proposito (falhar fechado), e tem o seu caso.
   // A pasta na forma das escritas (a `base` do isento, que e a raiz), e nao a do `git`, que vem resolvida.
   for (const { contaArgs, protegidos } of isentos) {
     const toca = (e, d) => e.p === d || e.p.startsWith(d + sep) || (e.pasta && d.startsWith(e.p + sep));

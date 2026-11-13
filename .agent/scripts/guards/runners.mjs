@@ -9,7 +9,9 @@
  * O QUE VERIFICA: todo o `runs-on:` dos workflows do template (`.github/workflows/`) e dos exemplos dos derivados
  * (`src/docs/exemplos/`) e o rotulo `RUNNER`. Um `-latest`, ou um rotulo diferente dos outros, reprova. Nos exemplos,
  * tambem o `runs-on:` COMENTADO dentro de um bloco `MODO COMPLETO (x) inicio ... fim` (#534): e o que um derivado
- * privado descomenta (o job `guard-tests` do `ci-sem-maquinaria.yml`), e uma subida que o esquecesse passava verde.
+ * privado descomenta (o job `guard-tests` do `ci-sem-maquinaria.yml`), e uma subida que o esquecesse passava verde. So
+ * os blocos de `BLOCOS_MODO_COMPLETO` (`lib/exemplo-ci.mjs`, #545); um bloco com outra letra no exemplo real reprova o
+ * caso do G22 sobre ele (`tests-runners.mjs`), e nao fica de fora calado.
  *
  * SUBIR DE IMAGEM e uma decisao com PR: muda-se o `RUNNER` aqui e os `runs-on:` todos de uma vez, e o CI do PR mostra
  * o que parte. A pergunta "ja ha uma LTS nova estavel, ou o fim da fixada foi anunciado?" vive no `/backlog-review`.
@@ -19,7 +21,7 @@
  * ainda nao, #524) verifica SO os ficheiros que o manifesto diz que vieram do template (`copiados` e `iguais`): os
  * outros sao do projeto. Um manifesto ilegivel avisa, em vez de desligar o guard.
  */
-import { descomenta } from "../lib/exemplo-ci.mjs";
+import { BLOCOS_MODO_COMPLETO, descomenta, marcaFim, marcaInicio } from "../lib/exemplo-ci.mjs";
 
 /** O rotulo fixo. Mudar aqui e nos `runs-on:` de uma vez (o guard reprova o meio-termo). */
 export const RUNNER = "ubuntu-24.04";
@@ -28,14 +30,15 @@ export const RUNNER = "ubuntu-24.04";
 export const ONDE = [".github/workflows", "src/docs/exemplos"];
 
 /** Os `runs-on:` de um texto YAML: `{ linha, valor }`, o valor sem aspas nem comentario. Com `modoCompleto`, as linhas
- *  comentadas DENTRO de um bloco `MODO COMPLETO` leem-se descomentadas (o `descomenta` de `lib/exemplo-ci.mjs`, a
- *  definicao unica): a linha fica a do ficheiro. Fora dos blocos, um comentario continua a nao contar. */
+ *  comentadas DENTRO de um bloco `MODO COMPLETO` leem-se descomentadas (o `descomenta` e os marcadores de
+ *  `lib/exemplo-ci.mjs`, a definicao unica, #545): a linha fica a do ficheiro. Fora dos blocos, um comentario continua
+ *  a nao contar. */
 export function runsOnDe(texto, { modoCompleto = false } = {}) {
   const out = [];
   let dentro = false;
   (texto ?? "").split("\n").forEach((l, i) => {
-    if (modoCompleto && /# --- MODO COMPLETO \([^)]*\) inicio/.test(l)) dentro = true;
-    else if (modoCompleto && /# --- MODO COMPLETO \([^)]*\) fim ---/.test(l)) dentro = false;
+    if (modoCompleto && BLOCOS_MODO_COMPLETO.some((b) => l.includes(marcaInicio(b)))) dentro = true;
+    else if (modoCompleto && BLOCOS_MODO_COMPLETO.some((b) => l.includes(marcaFim(b)))) dentro = false;
     const m = /^\s*runs-on:\s*(.*?)\s*(?:#.*)?$/.exec(dentro ? descomenta(l) : l);
     if (m) out.push({ linha: i + 1, valor: m[1].replace(/^(['"])(.*)\1$/, "$2") });
   });
