@@ -197,11 +197,16 @@ export function registar() {
     try {
       const atual = readF(dir, "CLAUDE.md").split("\n").filter((l) => l.startsWith("@.agent/context/"))
         .reduce((s, l) => s + Buffer.byteLength(readF(dir, l.slice(1)), "utf8"), 0);
-      const falta = Math.max(0, 40000 - atual);
-      // Dois ficheiros abaixo do limite por ficheiro, pela mesma razao do teste de cima (`TP1`).
-      for (const n of ["meio1", "meio2"]) writeF(dir, `.agent/context/${n}.md`, `# ${n}\n\n${"x".repeat(Math.ceil(falta / 2))}`);
-      writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md") + "\n@.agent/context/meio1.md\n@.agent/context/meio2.md\n");
-      writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md") + "\n@./.agent/context/meio1.md\n@./.agent/context/meio2.md\n");
+      // O alvo fica ABAIXO do maximo com folga (#556): um projeto ja perto dele (o contexto importado entre ~47 982 e
+      // 48 000) recebia dois ficheiros de ~9 bytes e passava o maximo. Ja acima do alvo, nao se escreve nada: a NOTE
+      // ja la esta, e o teste prova o mesmo — "perto da NOTE, e nunca passa o maximo".
+      const falta = Math.max(0, 47900 - atual - 2 * Buffer.byteLength("# meio1\n\n"));
+      if (falta > 0) {
+        // Dois ficheiros abaixo do limite por ficheiro, pela mesma razao do teste de cima (`TP1`).
+        for (const n of ["meio1", "meio2"]) writeF(dir, `.agent/context/${n}.md`, `# ${n}\n\n${"x".repeat(Math.floor(falta / 2))}`);
+        writeF(dir, "CLAUDE.md", readF(dir, "CLAUDE.md") + "\n@.agent/context/meio1.md\n@.agent/context/meio2.md\n");
+        writeF(dir, "GEMINI.md", readF(dir, "GEMINI.md") + "\n@./.agent/context/meio1.md\n@./.agent/context/meio2.md\n");
+      }
       const out = runGuard(dir).out ?? "";
       const faltam = ["NOTE  contexto carregado = ", "(perto do limite 48000)", "NOTE    ...dos quais rules + CLAUDE.md = "].filter((s) => !out.includes(s));
       registarResultado("G1c: contexto perto do maximo da NOTE, e diz quanto pesam as rules",
@@ -232,15 +237,24 @@ export function registar() {
   // media se um skip podia ser apagado em silencio. Um guard que deixa de ANUNCIAR que nao
   // correu e o `TP2` em forma pura. Medido com `mutation-sweep --skips`: 17 de 39 cobertos.
 
-  test("G1: rule perto do limite da NOTE (nao WARN)", (dir) => {
-    // 11 500 <= bytes < 12 000: avisa que esta perto, sem reprovar. Sem teste, despromover
-    // este `note` a silencio era invisivel.
+  // 11 500 <= bytes < 12 000: avisa que esta perto, sem reprovar. Sem teste, despromover este `note` a silencio era
+  // invisivel. Completa em BYTES, como o Guard 1 conta (#556): em caracteres, um `core-rules.md` com acentos ficava acima
+  // dos 12 000 bytes, e o `code: 0` caia pelo WARN — um guard que nao e o que este teste mede.
+  const pertoDoLimite = (dir) => {
     const alvo = ".agent/rules/core-rules.md";
-    const atual = readF(dir, alvo).length;
+    const atual = Buffer.byteLength(readF(dir, alvo).replace(/\r\n/g, "\n"), "utf8");
     if (atual < 11500) appendFileSync(file(dir, alvo), "x".repeat(11600 - atual));
-    // A linha INTEIRA do Guard 1: "perto do limite" sozinho tambem casava a NOTE dos workflows
-    // (1e), que o repo imprime sempre — o teste passava sem esta (#192, `--skips`).
-  }, { code: 0, anyOut: ["NOTE  .agent/rules/core-rules.md = ", "bytes (perto do limite 12000)"] });
+  };
+  // A linha INTEIRA do Guard 1: "perto do limite" sozinho tambem casava a NOTE dos workflows (1e), que o repo imprime
+  // sempre — o teste passava sem esta (#192, `--skips`).
+  const NOTE_DO_G1 = { code: 0, anyOut: ["NOTE  .agent/rules/core-rules.md = ", "bytes (perto do limite 12000)"] };
+  test("G1: rule perto do limite da NOTE (nao WARN)", (dir) => pertoDoLimite(dir), NOTE_DO_G1);
+  // O CONTROLO da contagem em bytes: um `core-rules.md` com acentos (2 bytes por "ç") — contado em caracteres, completar
+  // ate 11 600 punha-o a ~16 000 bytes e o Guard 1 avisava.
+  test("G1: rule perto do limite com acentos da NOTE (conta bytes, nao caracteres)", (dir) => {
+    writeF(dir, ".agent/rules/core-rules.md", `# Core\n\n${"ç".repeat(4000)}\n`);
+    pertoDoLimite(dir);
+  }, NOTE_DO_G1);
 
   test("G1c: sem @import de .agent/context/ da SKIP visivel", (dir) => {
     // Os DOIS espelhos: mexer so no CLAUDE.md quebra o Guard 2 e o teste falharia por um

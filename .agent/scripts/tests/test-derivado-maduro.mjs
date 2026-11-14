@@ -218,13 +218,25 @@ await test("comFicheirosGrandes: RECUSA quando os TETOS mudaram de forma", async
 
 // --- 3f: o derivado como os reais ficam (#177) ------------------------------------
 const CFG_VAZIA = "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\nexport const SKIPS_DO_PROJETO = [];\n";
-const comCfg = (txt, { rule = true } = {}) => {
+// As rules do template e o contexto importado que a (f') enche ate ao limite exato (#556). `rules` e o texto de cada uma
+// (null = ausente); `claude` o `CLAUDE.md` (por omissao importa o plano e a sessao).
+const RULES_DO_TEMPLATE = [".agent/rules/core-rules.md", ".agent/rules/process-rules.md", ".agent/rules/anti-patterns.md"];
+const CLAUDE_COM_PLANO = "# Projeto\n\n@.agent/context/session.md\n@.agent/context/implementation_plan.md\n";
+const comCfg = (txt, { rule = true, rules = {}, claude = CLAUDE_COM_PLANO, ficheiros = {} } = {}) => {
   const dir = copia();
   mkdirSync(join(dir, ".agent/scripts/config"), { recursive: true });
   if (txt !== null) writeFileSync(join(dir, ".agent/scripts/config/guards-do-projeto.mjs"), txt);
   mkdirSync(join(dir, ".agent/rules"), { recursive: true });
   if (rule) writeFileSync(join(dir, ".agent/rules/business-logic.md"), "# Logica de negocio\n");
+  for (const r of RULES_DO_TEMPLATE) {
+    const texto = r in rules ? rules[r] : `# ${r}\n\nUma regra.\n`;
+    if (texto !== null) writeFileSync(join(dir, r), texto);
+  }
   mkdirSync(join(dir, ".agent/context"), { recursive: true });
+  writeFileSync(join(dir, ".agent/context/session.md"), "# Sessao\n\nO estado.\n");
+  writeFileSync(join(dir, ".agent/context/implementation_plan.md"), "# Plano\n");
+  writeFileSync(join(dir, "CLAUDE.md"), claude);
+  for (const [rel, txt] of Object.entries(ficheiros)) writeFileSync(join(dir, rel), txt);
   mkdirSync(join(dir, "src/docs"), { recursive: true });
   return dir;
 };
@@ -252,6 +264,18 @@ await test("comoUmDerivadoReal: declara o guard proprio E o seu SKIP na config",
     // (f) entre a NOTE (11 500) e o tecto (12 000) das rules carregadas (#302).
     const bytes = Buffer.byteLength(le(dir, ".agent/rules/business-logic.md"));
     if (bytes <= 11500 || bytes > 12000) p.push(`a rule do projeto devia ficar perto do tecto (11 500-12 000); ficou com ${bytes}`);
+    // (f') as rules do template no limite EXATO (o Guard 1 avisa com `> 12000`: qualquer acrescento passa-o), e o
+    // contexto importado pelo `CLAUDE.md` a 47 990 dos 48 000 (#556). A rede so mede se o tamanho for este.
+    for (const r of RULES_DO_TEMPLATE) {
+      const b = Buffer.byteLength(le(dir, r));
+      if (b !== 12000) p.push(`${r} devia ficar com 12000 bytes exatos; ficou com ${b}`);
+    }
+    const ctx = ["session.md", "implementation_plan.md"].reduce((s, f) => s + Buffer.byteLength(le(dir, `.agent/context/${f}`)), 0);
+    if (ctx !== 47990) p.push(`o contexto importado devia ficar com 47990 bytes; ficou com ${ctx}`);
+    // O enchimento e NEUTRO nos QUATRO: um comentario HTML so com "x" (nenhum guard o le como conteudo).
+    for (const f of [...RULES_DO_TEMPLATE, ".agent/context/implementation_plan.md"]) {
+      if (!/<!-- x+ -->\n$/.test(le(dir, f))) p.push(`o enchimento de ${f} nao e o comentario neutro`);
+    }
     return p;
   } finally {
     limpa(dir);
@@ -281,6 +305,37 @@ await test("comoUmDerivadoReal: sem a rule do projeto, REPROVA", async () => {
     limpa(dir);
   }
 });
+// (f') Os bytes contam-se como o Guard 1 (o CRLF normalizado, #556): um `core-rules.md` com finais de linha do Windows
+// fica a 12 000 bytes PARA O GUARD — contados em bruto, ficava abaixo, e a rede deixava de ser exata sem aviso.
+await test("comoUmDerivadoReal: com CRLF, o core-rules.md fica a 12000 bytes contados como o Guard 1", async () => {
+  const dir = comCfg(CFG_VAZIA, { rules: { ".agent/rules/core-rules.md": "# Core\r\n\r\nUma regra.\r\n".repeat(40) } });
+  try {
+    comoUmDerivadoReal({ dir, ...espia() });
+    const b = Buffer.byteLength(le(dir, ".agent/rules/core-rules.md").replace(/\r\n/g, "\n"));
+    return b === 12000 ? [] : [`normalizado, o core-rules.md ficou com ${b} bytes (esperado 12000)`];
+  } finally {
+    limpa(dir);
+  }
+});
+// (f') As tres recusas da rede no limite (#556): cada uma pela SUA mensagem.
+for (const [nome, opcoes, razao] of [
+  ["sem o core-rules.md, REPROVA", { rules: { ".agent/rules/core-rules.md": null } }, /core-rules\.md nao existe na copia/],
+  ["com uma rule do template JA acima de 12000, REPROVA (a rede tem de ser revista)", { rules: { ".agent/rules/process-rules.md": "x".repeat(12001) } }, /process-rules\.md \(12001 bytes\) ja nao cabe em 12000/],
+  ["com o resto do contexto importado JA no limite, REPROVA a dizer que foi o contexto", { claude: "# Projeto\n\n@.agent/context/session.md\n@.agent/context/implementation_plan.md\n@.agent/context/grande.md\n", ficheiros: { ".agent/context/grande.md": "x".repeat(48000) } }, /o contexto importado sem o plano ja tem \d+ bytes/],
+  ["sem o CLAUDE.md a importar o plano, REPROVA", { claude: "# Projeto\n\n@.agent/context/session.md\n" }, /nao importa o \.agent\/context\/implementation_plan\.md/],
+]) {
+  await test(`comoUmDerivadoReal: ${nome}`, async () => {
+    const dir = comCfg(CFG_VAZIA, opcoes);
+    try {
+      comoUmDerivadoReal({ dir, ...espia() });
+      return ["devia ter reprovado"];
+    } catch (err) {
+      return err instanceof Recusa && razao.test(err.message) ? [] : [`razao errada: ${err.message}`];
+    } finally {
+      limpa(dir);
+    }
+  });
+}
 // Sem a lista dos PARES (#308, parte 3): o guard ficava declarado e a varredura sem rede para ele.
 await test("comoUmDerivadoReal: sem PARES_DO_PROJETO, REPROVA", async () => {
   const dir = comCfg("export const GUARDS = [];\nexport const SKIPS_DO_PROJETO = [];\n");
