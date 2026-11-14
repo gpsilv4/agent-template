@@ -44,6 +44,13 @@
  * um ticket com os numeros — nunca o cria; a melhoria compara as opcoes (separar o job, fatiar, cache, subir o limite)
  * e prova que mede o mesmo. Custa um pedido por (workflow, commit) e um por job cancelado: `--sem-limites` desliga-o.
  *
+ * A ESPERA (#554), `--espera --desde ... [--corte AAAA-MM-DDTHH:MM] [--ultimos N] [--grupo "<prefixo>"] [--workflow
+ * <path>]`: a espera de cada run de PR do workflow (por omissao o `ci.yml`), do `run_started_at` ao fim do ultimo job que
+ * correu nessa tentativa; a mediana dos de MAQUINARIA (um job do `--grupo`, por omissao a perna completa da varredura,
+ * correu) e a dos outros, com os ultimos N; os `cancelled` (a concurrency) fora e contados. Com `--corte` (no
+ * `created_at`, UTC; escolhe-se pelo CI que o run correu, nao pela hora do merge), as duas medianas e a variacao — o
+ * "antes e depois" de uma mudanca no CI (o #460: -19% nos tres primeiros PRs). `lib/espera-ci.mjs`.
+ *
  * Pagina os runs e os jobs (100 por pagina, sem repetidos). Falha ALTO, nunca com "0 min": sem `gh`, sem sessao, um
  * erro da API, uma resposta sem a lista ou sem `total_count`, mais de 1000 runs no intervalo (o limite de uma pesquisa
  * por data: estreitar), ou menos runs/jobs lidos do que a API diz haver. Um zero falso e pior do que nenhum numero.
@@ -51,6 +58,7 @@
 import { execFileSync } from "child_process";
 import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota, passosDosJobs, privadosDoMes, projecaoDoMes, quotaDoMes, resumoDosJobs, segundos } from "./lib/minutos-calculo.mjs";
 import { CRESCIMENTO, IMINENTE, JANELA, avisosDoJob, limiteDaAnotacao, limiteDoJob, limitesDoWorkflow } from "./lib/limites-ci.mjs";
+import { GRUPO_POR_OMISSAO, doWorkflow, linhasDaEspera, medivel } from "./lib/espera-ci.mjs";
 import { repoDoOrigin } from "./lib/repo-origin.mjs";
 import { MARCA, TIPOS, celula, custoPorTipo, prDoRun, precisaDosFicheiros, tipoDoRun } from "./lib/minutos-por-pr.mjs";
 import { modoDoProjeto, temGuardTests } from "./lib/modo-upgrade.mjs";
@@ -76,7 +84,8 @@ for (let i = 0; i < ARGS.length; i++) {
   else if (a === "--por-pr") opt.porPr = true;
   else if (a === "--todos") opt.todos = true;
   else if (a === "--sem-limites") opt.semLimites = true;
-  else if (["--run", "--desde", "--ate", "--app", "--repo", "--mes", "--limite"].includes(a) && ARGS[i + 1] !== undefined) opt[a.slice(2)] = ARGS[++i];
+  else if (a === "--espera") opt.espera = true;
+  else if (["--run", "--desde", "--ate", "--app", "--repo", "--mes", "--limite", "--corte", "--ultimos", "--grupo", "--workflow"].includes(a) && ARGS[i + 1] !== undefined) opt[a.slice(2)] = ARGS[++i];
   else erros.push(`argumento desconhecido ou sem valor: ${a}`);
 }
 if (opt.quota && (opt.run || opt.desde || opt.repo || opt.ate || opt.app || opt.passos || opt.todos)) erros.push("o `--quota` e da CONTA: nao se junta com `--run`, `--desde`, `--ate`, `--app`, `--passos`, `--repo` nem `--todos`");
@@ -98,7 +107,18 @@ if (opt.desde && dataReal(opt.desde) && opt.desde > new Date().toISOString().sli
 // Um intervalo ao contrario nao tem runs: "nenhum repo" ou "0 min" seriam um zero que nao mediu nada (`TP2`).
 if (opt.desde && opt.ate && opt.ate < opt.desde) erros.push(`--ate ${opt.ate} vem antes do --desde ${opt.desde}`);
 if (opt.run && !/^\d+$/.test(opt.run)) erros.push(`--run quer o id numerico de um run (deu ${opt.run})`);
-if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos] [--sem-limites] | --quota [--por-pr] [--mes AAAA-MM] [--limite ${QUOTA_FREE}]`);
+// A ESPERA (#554): so com `--desde` (uma mediana de um run nao mede nada), e sem os modos que imprimem outra coisa.
+if (opt.espera && (opt.run || opt.todos || opt.passos || opt.app || opt.semLimites || opt.quota)) erros.push("o `--espera` e a espera dos PRs de UM repo num intervalo: so com `--desde` (e `--ate`, `--repo`, `--corte`, `--ultimos`, `--grupo`, `--workflow`)");
+for (const k of ["corte", "ultimos", "grupo", "workflow"]) if (opt[k] !== undefined && !opt.espera) erros.push(`o \`--${k}\` so com o \`--espera\``);
+for (const k of ["grupo", "workflow"]) if (opt[k] === "") erros.push(`--${k} vazio: um prefixo vazio apanha todos os jobs, e um workflow vazio nenhum run`);
+if (opt.ultimos !== undefined && !/^[1-9]\d*$/.test(opt.ultimos)) erros.push(`--ultimos quer um inteiro positivo (deu ${opt.ultimos})`);
+// O corte em UTC, com hora: uma data que nao existe, ou no futuro, daria um "depois" vazio que nao mediu nada (`TP2`).
+if (opt.corte !== undefined && (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(opt.corte) || !dataReal(opt.corte.slice(0, 10)) || Number.isNaN(Date.parse(`${opt.corte}:00Z`)))) erros.push(`--corte quer AAAA-MM-DDTHH:MM em UTC, uma data que exista (deu ${opt.corte})`);
+else if (opt.corte !== undefined && Date.parse(`${opt.corte}:00Z`) > Date.now()) erros.push(`--corte ${opt.corte} esta no futuro (em UTC): o "depois" nao teria runs`);
+// Fora do intervalo, um dos lados fica vazio por construcao: a mesma conta que nao mediu nada.
+else if (opt.corte !== undefined && opt.desde && opt.corte.slice(0, 10) < opt.desde) erros.push(`--corte ${opt.corte} vem antes do --desde ${opt.desde}: o "antes" nao teria runs`);
+else if (opt.corte !== undefined && opt.ate && opt.corte.slice(0, 10) > opt.ate) erros.push(`--corte ${opt.corte} vem depois do --ate ${opt.ate}: o "depois" nao teria runs`);
+if (erros.length) fatal(`${erros.join("; ")}\n  uso: --run <id> | --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos] [--sem-limites] | --espera --desde AAAA-MM-DD [--corte AAAA-MM-DDTHH:MM] [--ultimos N] [--grupo "<prefixo>"] [--workflow <path>] | --quota [--por-pr] [--mes AAAA-MM] [--limite ${QUOTA_FREE}]`);
 
 /** Um pedido a API pelo `gh`: `{ saida }`, ou `{ erro }` com o que o `gh` disse (quem chama decide a recusa). */
 function ghApi(caminho) {
@@ -144,14 +164,21 @@ function paginado(base, chave, oQue, limite = null) {
 /** Os runs de um intervalo com os jobs de cada um, e o resumo (`resumoDosJobs`): o percurso que o run a run, o
  *  `--todos` e o `--por-pr` partilham (`TP8`). `intervalo` e `created=` da API; com `run`, so esse. */
 function runsComJobs(repo, { run = null, desde = null, ate = null }) {
-  const runs = run
-    ? [api(`repos/${repo}/actions/runs/${run}`)]
-    : paginado(`repos/${repo}/actions/runs?created=${desde}..${ate ?? "2099-12-31"}`, "workflow_runs", `runs de ${desde} a ${ate ?? "2099-12-31"}`, LIMITE_DA_PESQUISA).itens;
-  return runs.map((r) => {
-    const { itens: jobs } = paginado(`repos/${repo}/actions/runs/${r.id}/jobs?filter=all`, "jobs", `jobs do run ${r.id}`);
+  return runsDoIntervalo(repo, { run, desde, ate }).map((r) => {
+    const jobs = jobsDoRun(repo, r);
     return { r, jobs, ...resumoDosJobs(jobs) };
   });
 }
+
+/** Os runs de um intervalo (ou o run `run`), sem os jobs. */
+function runsDoIntervalo(repo, { run = null, desde = null, ate = null }) {
+  return run
+    ? [api(`repos/${repo}/actions/runs/${run}`)]
+    : paginado(`repos/${repo}/actions/runs?created=${desde}..${ate ?? "2099-12-31"}`, "workflow_runs", `runs de ${desde} a ${ate ?? "2099-12-31"}`, LIMITE_DA_PESQUISA).itens;
+}
+
+/** Os jobs de um run, de TODAS as tentativas (`filter=all`). */
+const jobsDoRun = (repo, r) => paginado(`repos/${repo}/actions/runs/${r.id}/jobs?filter=all`, "jobs", `jobs do run ${r.id}`).itens;
 
 /** O login da conta autenticada. */
 function login() {
@@ -215,6 +242,22 @@ if (!repo) {
   }
 }
 if (!repo) fatal("nao sei o repo: sem `--repo dono/repo` e sem um `origin` do GitHub");
+if (opt.espera) {
+  // O numero do PR: o do run, ou pelo branch nos PRs do repo — so pedidos se algum run nao o traz (`prDoRun`).
+  // Os jobs so dos runs que entram na mediana: um push, o CodeQL ou um cancelado nao gastam pedidos (#554).
+  const workflow = opt.workflow ?? ".github/workflows/ci.yml";
+  const runs = runsDoIntervalo(repo, opt);
+  const doPr = doWorkflow(runs, workflow);
+  if (!doPr.length) {
+    const paths = [...new Set(runs.filter((r) => r.event === "pull_request").map((r) => r.path))].sort();
+    fatal(`nenhum run de pull_request de ${workflow} em ${repo} desde ${opt.desde}${opt.ate ? ` ate ${opt.ate}` : ""}: ${paths.length ? `os workflows com runs de PR sao ${paths.join(", ")} (--workflow)` : "nenhum run de pull_request no intervalo"}`);
+  }
+  const linhas = doPr.map((r) => ({ r, jobs: medivel(r) ? jobsDoRun(repo, r) : [] }));
+  let prs = null;
+  const numeroDoPr = (r) => prDoRun(r, r.pull_requests?.length ? [] : (prs ??= prsDesde(repo, opt.desde)));
+  for (const l of linhasDaEspera({ alvo: repo, workflow, grupo: opt.grupo ?? GRUPO_POR_OMISSAO, ultimos: Number(opt.ultimos ?? 5), corte: opt.corte ?? null, linhas, numeroDoPr })) console.log(l);
+  process.exit(0);
+}
 relatorio(repo);
 
 // --- O relatorio de um repo, run a run ---

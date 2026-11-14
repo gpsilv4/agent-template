@@ -22,8 +22,8 @@ export function segundos(inicio, fim) {
 /** O que um job de `s` segundos custa: arredondado ao minuto ACIMA, e 0 so se nao correu. */
 export const cobrado = (s) => (s > 0 ? Math.ceil(s / 60) : 0);
 
-/** Um job que nao conta: saltado, ou sem inicio/fim. */
-const naoCorreu = (j) => j.conclusion === "skipped" || !j.started_at || !j.completed_at;
+/** Um job que nao conta: saltado, ou sem inicio/fim. Exportado (#554): a espera de um PR usa a MESMA definicao. */
+export const naoCorreu = (j) => j.conclusion === "skipped" || !j.started_at || !j.completed_at;
 
 /** O resumo de um run a partir dos seus jobs: `{ n, real, cobrado, maisLongo }` (`n` jobs; real e maisLongo em
  *  segundos). `maisLongo` e o job mais demorado: e ELE que passa ou nao dos 120 s, e nao a soma (cinco jobs de 30 s
