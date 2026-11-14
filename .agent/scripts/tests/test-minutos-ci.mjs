@@ -17,7 +17,9 @@
  *     upgrade, e nao o titulo), o numero do PR pelo branch quando o run o nao traz, o modo de cada privado, um repo 404
  *     fora, os meses do intervalo na faturacao, e as recusas;
  *   - os LIMITES de cada job (#542, no `harness/casos-limites-ci.mjs`): o `lib/limites-ci.mjs` com os limiares NA
- *     fronteira, o leitor de jobs do `lib/jobs-workflow.mjs`, o workflow do commit de cada run, o corte pela anotacao.
+ *     fronteira, o leitor de jobs do `lib/jobs-workflow.mjs`, o workflow do commit de cada run, o corte pela anotacao;
+ *   - a ESPERA de um PR (#554, no `harness/casos-espera.mjs`): o `lib/espera-ci.mjs`, a tentativa, os cancelados fora,
+ *     o corte na fronteira, o grupo dito quando falta, e as recusas do `--espera`.
  *
  *   node .agent/scripts/tests/test-minutos-ci.mjs
  */
@@ -29,6 +31,7 @@ import { cobrado, correuOPasso, diasDoMes, ehDoDependabot, mediana, nivelDaQuota
 import { repoDoOrigin } from "../lib/repo-origin.mjs";
 import { registarPorPr } from "./harness/casos-minutos-por-pr.mjs";
 import { registarLimites } from "./harness/casos-limites-ci.mjs";
+import { registarEspera } from "./harness/casos-espera.mjs";
 
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const CLI = join(ROOT, ".agent/scripts/minutos-ci.mjs");
@@ -397,6 +400,8 @@ for (const [nome, args, frase] of [
 registarPorPr({ caso, espera, cli, conta, ITEM, run, job });
 // --- Os limites de cada job (#542): no harness, pelo mesmo motivo ---
 registarLimites({ caso, espera, cli, run });
+// --- A espera de um PR (#554): no harness, pelo mesmo motivo ---
+registarEspera({ caso, espera, cli, run });
 
 console.log(`\n  ${passed} passaram, ${falhas.length} falharam.`);
 process.exit(falhas.length ? 1 : 0);
