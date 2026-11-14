@@ -51,6 +51,11 @@ const PLANEAMENTO = [
   "",
 ].join("\n");
 
+/** O plano POLUIDO, um so (#556): o teste positivo e o seu controlo poluem com o MESMO conteudo ("a mesma poluicao"),
+ *  e SUBSTITUEM o plano em vez de se juntarem a ele — num derivado com o contexto perto dos 48 000, juntar fazia o
+ *  Guard 1c avisar, e um teste `code: 0` caia por um guard que nao e o que mede. */
+const POLUIDO = `# Plano de Implementacao\n${PLANEAMENTO}`;
+
 /**
  * Monta, na sandbox, a pre-condicao de que o Guard 21 depende: **este repo e o template**.
  *
@@ -77,7 +82,7 @@ export function registar() {
   // --- O caso que originou o guard -------------------------------------------
   test("G21: planeamento despejado no implementation_plan.md avisa", (dir) => {
     comoTemplate(dir);
-    writeF(dir, ALVO, readF(dir, ALVO) + PLANEAMENTO);
+    writeF(dir, ALVO, POLUIDO);
   }, {
     code: 1,
     includes: [`${ALVO}: DEIXOU DE ESTAR POR ESTREAR`, "Trabalho pendente vive num ISSUE"],
@@ -96,7 +101,8 @@ export function registar() {
   // era mais uma copia a mao a envelhecer — esta dizia 28 quando ja eram 29.
   test("G21: [controlo negativo] sem o Guard 21, a mesma poluicao sai VERDE", (dir) => {
     comoTemplate(dir);
-    writeF(dir, ALVO, readF(dir, ALVO) + PLANEAMENTO);
+    // A MESMA poluicao do teste positivo (`POLUIDO`, #556): sem o Guard 21, nenhum outro guard a ve.
+    writeF(dir, ALVO, POLUIDO);
     const src = readF(dir, GUARD);
     const semChamada = src.replace(/^guardsRun \+= guardContextVirgem\(.*\n/m, "");
     if (semChamada === src) {
@@ -118,9 +124,15 @@ export function registar() {
   test("G21: conteudo do mesmo tamanho que o andaime tambem avisa", (dir) => {
     comoTemplate(dir);
     const original = readF(dir, ALVO);
-    // Mesmo numero de bytes, conteudo completamente diferente.
-    const poluido = ("Plano do sprint 3: fechar a rede dos guards. Ver o issue B12 e o T4. ".repeat(20)).slice(0, Buffer.byteLength(original, "utf8"));
-    if (Buffer.byteLength(poluido, "utf8") !== Buffer.byteLength(original, "utf8")) {
+    // Mesmo numero de bytes, conteudo completamente diferente. A frase repete-se ATE AO TAMANHO do original (#556):
+    // 20 vezes chegavam a ~1 400 bytes, e um plano real (7 574 no derivado B) rebentava o setup. A frase e ASCII, logo o
+    // `slice` da sempre o numero exato de bytes; o `includes` dos bytes abaixo (o guard imprime-os) prova-o.
+    const frase = "Plano do sprint 3: fechar a rede dos guards. Ver o issue B12 e o T4. ";
+    const n = Buffer.byteLength(original, "utf8");
+    const poluido = frase.repeat(Math.ceil(n / frase.length) + 1).slice(0, n);
+    // A guarda FICA: a frase e ASCII hoje, mas trocada por uma com acentos, o `slice` (por caracteres) deixava de dar
+    // `n` bytes, e o teste mediria outra coisa — recusa-se, em vez de passar com um tamanho diferente.
+    if (Buffer.byteLength(poluido, "utf8") !== n) {
       throw new Error("a fixture nao conseguiu igualar o tamanho — o teste mediria outra coisa");
     }
     writeF(dir, ALVO, poluido);
@@ -194,7 +206,9 @@ export function registar() {
   // estes ficheiros DEVEM ter conteudo.
   test("G21: num projeto DERIVADO com contexto preenchido da SKIP visivel", (dir) => {
     derivado(dir);
-    writeF(dir, ALVO, readF(dir, ALVO) + PLANEAMENTO);
+    // Substitui em vez de juntar (#556): num derivado com o contexto perto dos 48 000 e um `session.md` ja curto,
+    // juntar passava o maximo do Guard 1c e este `code: 0` caia por um guard que nao e o que mede.
+    writeF(dir, ALVO, POLUIDO);
     writeF(dir, ".agent/context/session.md", "# Session\n\nSprint 3 em curso, B12 a meio.\n");
   }, {
     code: 0,
