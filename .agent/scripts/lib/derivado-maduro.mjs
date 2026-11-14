@@ -224,7 +224,39 @@ export function comoUmDerivadoReal({ dir, ok, fatal }) {
   if (rule === null) fatal(`${relRule} nao existe na copia — o bootstrap gera-a, e sem ela nao ha rule do projeto a crescer`);
   while (Buffer.byteLength(rule) < 11700) rule += "\n- Regra de dominio do projeto, escrita ao longo de cem dias de trabalho.";
   w(relRule, rule);
-  ok("derivado como os reais: guard proprio com SKIP declarado e par na varredura, CHANGELOG com historia, contexto e README do projeto, uma rule perto do tecto");
+  // (f') AS RULES DO TEMPLATE E O CONTEXTO NO LIMITE EXATO (#556, a ronda 11 do derivado B): um derivado real vai
+  // enchendo o `core-rules.md`, o `process-rules.md` e o `anti-patterns.md` com o seu dominio, e o contexto com os
+  // seus planos. Sete testes do template acrescentavam bytes a esses ficheiros e exigiam `code: 0` — no template
+  // passavam sempre, num derivado perto do tecto caiam pelo Guard 1 (um guard que nao e o que medem). Com os
+  // ficheiros a 12 000 bytes EXATOS (o Guard 1 so avisa com `> 12000`), QUALQUER acrescento de um teste passa o
+  // limite, e o proximo teste desta classe cai aqui, no CI do template. O enchimento e um comentario HTML NEUTRO:
+  // nenhum guard o le como conteudo (sem identificadores, sem caminhos, sem marcas de contagem).
+  // Os bytes como o Guard 1 os conta: com o CRLF normalizado (`guards/budgets.mjs`), senao num checkout com
+  // `core.autocrlf` o ficheiro ficava a 12 000 em bruto e abaixo disso para o guard.
+  const bytes = (t) => Buffer.byteLength(t.replace(/\r\n/g, "\n"), "utf8");
+  const FECHO = " -->\n";
+  const encheAte = (rel, alvo, oque) => {
+    const t = leOuNull(join(dir, rel));
+    if (t === null) fatal(`${rel} nao existe na copia — sem ele nao ha ${oque} a encher ate ao limite`);
+    const base = `${t}\n<!-- `;
+    const falta = alvo - bytes(base) - bytes(FECHO);
+    if (falta < 0) fatal(`${rel} (${bytes(t)} bytes) ja nao cabe em ${alvo} com o enchimento — ${oque} cresceu: a rede tem de ser revista`);
+    // O tamanho fica EXATO por aritmetica (bytes do texto + do comentario); a suite (`test-derivado-maduro`) afirma-o
+    // ficheiro a ficheiro — a rede nao fica vazia em silencio (`TP2`).
+    w(rel, `${base}${"x".repeat(falta)} -->\n`);
+  };
+  for (const rel of [".agent/rules/core-rules.md", ".agent/rules/process-rules.md", ".agent/rules/anti-patterns.md"]) encheAte(rel, 12000, "a rule do template");
+  // O contexto IMPORTADO pelo `CLAUDE.md` (o que o Guard 1c soma) perto dos 48 000: no plano, que e do projeto.
+  const claude = leOuNull(join(dir, "CLAUDE.md")) ?? "";
+  const importados = claude.split("\n").filter((l) => l.startsWith("@.agent/context/")).map((l) => l.slice(1).trim());
+  const plano = ".agent/context/implementation_plan.md";
+  if (!importados.includes(plano)) fatal(`o CLAUDE.md da copia nao importa o ${plano} — o contexto nao se enche onde o Guard 1c o conta`);
+  const outros = importados.filter((r) => r !== plano).reduce((s, r) => s + bytes(leOuNull(join(dir, r)) ?? ""), 0);
+  // Os OUTROS ficheiros importados ja podem ter o contexto perto do limite, e entao o plano nao tem onde crescer: e o
+  // contexto da copia que mudou, e nao o plano — a mensagem diz isso, e nao "o plano cresceu".
+  if (outros >= 47990) fatal(`o contexto importado sem o plano ja tem ${outros} bytes (>= 47990) — o template encheu o contexto: a rede tem de ser revista`);
+  encheAte(plano, 47990 - outros, "o plano de implementacao");
+  ok("derivado como os reais: guard proprio com SKIP declarado e par na varredura, CHANGELOG com historia, contexto e README do projeto, uma rule perto do tecto, e as rules carregadas e o contexto no limite exato");
 }
 
 // --- 3g. o derivado que usa os OPT-OUTS ------------------------------------------

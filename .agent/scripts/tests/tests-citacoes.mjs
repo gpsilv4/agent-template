@@ -151,8 +151,9 @@ export function registar() {
   test("G20: ponteiro com ancora que RESOLVE nao avisa", (dir) => {
     writeF(dir, "src/docs/upgrade-why.md",
       readF(dir, "src/docs/upgrade-why.md") + "\n## Titulo Que Existe\n\nracional.\n");
-    writeF(dir, ".agent/rules/core-rules.md",
-      readF(dir, ".agent/rules/core-rules.md") +
-      '\n\nVer (porque: `upgrade-why.md` § "Titulo Que Existe").\n');
+    // O ponteiro numa rule PEQUENA (o `citaEm`), e nao no `core-rules.md` do projeto: acrescentado la, um derivado
+    // com o `core-rules.md` perto do tecto passava os 12 000 e o teste caia pelo Guard 1, que nao e o que ele mede
+    // (#556, a ronda 11 do derivado B). O G20 le as rules todas da mesma maneira.
+    citaEm(dir, 'Ver (porque: `upgrade-why.md` § "Titulo Que Existe").');
   }, { code: 0, excludes: ["sem ancora", "a evidencia mudou de sitio"] });
 }

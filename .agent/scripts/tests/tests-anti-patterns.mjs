@@ -393,7 +393,16 @@ export function registar() {
     writeF(dir, f, readF(dir, f) + `\n### ${idProprio} — o primeiro deste projeto\n\nTexto.\n`);
     const doc = ".agent/rules/core-rules.md";
     writeF(dir, doc, readF(dir, doc) + `\n> Ver ${idProprio} para o detalhe.\n`);
-  }, { code: 0, excludes: ["nao tem seccao em"] });
+    // O sintetico nao traz a evidencia, e o G18 dava SKIP (medido): sem ela o teste nao media nada. Escreve-se uma
+    // SINTETICA com uma seccao por cada `TPn` do catalogo sintetico (os mesmos cabecalhos — o G18 le os dois com o mesmo
+    // padrao): sem prosa (nenhum outro guard reage a ela) e sem depender do `-why` do projeto, que um derivado pode
+    // ter apagado (a escolha que o proprio guard diz ser legitima).
+    const cabecalhos = readF(dir, ".agent/rules/anti-patterns-template.md").split("\n").filter((l) => /^#{2,3}\s+TP\d+/.test(l));
+    writeF(dir, "src/docs/anti-patterns-why.md", `# Evidencia\n\n${cabecalhos.map((h) => `${h}\n\nO porque.\n`).join("\n")}`);
+    // `synthetic` (#556): as rules sinteticas tem dezenas de bytes, logo o acrescento nunca passa o tecto do Guard 1
+    // (num derivado com o `core-rules.md` perto dos 12 000 o teste caia por ele), e o `code: 0` passa a ABSOLUTO.
+  // O `includes` prova que o G18 CORREU (e nao deu SKIP): sem ele, o `excludes` passava por vacuidade (`TP1`).
+  }, { code: 0, synthetic: true, includes: ["com a sua evidencia em src/docs/anti-patterns-why.md"], excludes: ["nao tem seccao em"] });
 
   // Exit **0**: apagar o `-why` e uma escolha legitima de quem deriva, nao um defeito. O que
   // nao pode e ser silencio — "nao se aplica aqui" tem de aparecer no ecra. (O teste
@@ -408,4 +417,5 @@ export function registar() {
     writeF(dir, DEF_PROJETO, readF(dir, DEF_PROJETO) + `\n### ${idProprio} — o primeiro deste projeto\n\nTexto.\n`);
     const doc = ".agent/rules/core-rules.md";
     writeF(dir, doc, readF(dir, doc) + `\n> Ver ${idProprio} para o detalhe.\n`);
-  }, { code: 0, excludes: ["esta definido em", "nao existe em nenhum dos ficheiros de anti-padroes"] });}
+    // `synthetic` pela mesma razao do G18 acima (#556).
+  }, { code: 0, synthetic: true, excludes: ["esta definido em", "nao existe em nenhum dos ficheiros de anti-padroes"] });}

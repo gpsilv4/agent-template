@@ -110,15 +110,22 @@ export function registar() {
 
   test("G13: `${{ }}` do GitHub Actions nao e falso positivo", (dir) => {
     bootstrapado(dir);
-    writeF(dir, ".agent/rules/core-rules.md",
-      readF(dir, ".agent/rules/core-rules.md") + "\n\nCI: ${{ secrets.TOKEN }} e ${{ github.ref }}\n");
+    // Numa rule PEQUENA, e nao no `core-rules.md` do projeto (#556): perto do tecto, o acrescento fazia o Guard 1
+    // avisar e o `excludes: ["  WARN  "]` caia por um guard que nao e o que este teste mede. O Guard 13 le-a.
+    writeF(dir, ".agent/rules/exemplo-placeholders.md", "# Exemplo\n\nCI: ${{ secrets.TOKEN }} e ${{ github.ref }}\n");
   }, { code: 0, includes: ["sem placeholders esquecidos"], excludes: ["  WARN  "] });
 
   test("G13: o placeholder de argumentos do Gemini nao e falso positivo", (dir) => {
     bootstrapado(dir);
-    writeF(dir, ".agent/rules/core-rules.md",
-      readF(dir, ".agent/rules/core-rules.md") + `\n\nprompt = "corre com ${ph("args")}"\n`);
+    writeF(dir, ".agent/rules/exemplo-placeholders.md", `# Exemplo\n\nprompt = "corre com ${ph("args")}"\n`);
   }, { code: 0, includes: ["sem placeholders esquecidos"], excludes: ["  WARN  "] });
+
+  // O CONTROLO dos dois de cima (#556): o Guard 13 le a rule pequena para onde eles foram. Um placeholder VERDADEIRO
+  // la avisa — sem isto, os dois `excludes: ["  WARN  "]` passavam por vacuidade se a rule deixasse de ser lida.
+  test("G13: a rule de exemplo e lida (um placeholder verdadeiro nela avisa)", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, ".agent/rules/exemplo-placeholders.md", `# Exemplo\n\nNome: ${ph("PROJECT_NAME")}\n`);
+  }, { code: 1, includes: [`exemplo-placeholders.md: placeholder(s) nao substituido(s) apos o bootstrap — ${ph("PROJECT_NAME")}`] });
 
   test("G13: BOOTSTRAP.md e README.md documentam placeholders e nao contam", (dir) => {
     bootstrapado(dir);

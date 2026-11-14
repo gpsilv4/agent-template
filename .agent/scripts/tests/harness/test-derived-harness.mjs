@@ -105,6 +105,10 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
   // A config dos guards do PROJETO, como o template a entrega (#176): o 3f declara la o seu.
   w(".agent/scripts/config/guards-do-projeto.mjs", "export const GUARDS = [];\nexport const PARES_DO_PROJETO = [];\nexport const SKIPS_DO_PROJETO = [];\n");
   w(".agent/rules/process-rules.md", "# Processo\n\nO metodo passa por 6 fases.\n");
+  // O contexto que o `CLAUDE.md` importa: a rede do 3f' (#556) enche-o ate perto dos 48 000 do Guard 1c, e recusa
+  // sem o plano importado — como um template o entrega.
+  w("CLAUDE.md", "# Projeto\n\n@.agent/context/implementation_plan.md\n");
+  w(".agent/context/implementation_plan.md", "# Plano de Implementacao\n");
   if (!semGuardTamanhos) {
     // O `contaLinhas` vem JUNTO com a tabela: o simulador importa-o do guard da copia em vez de
     // reimplementar a contagem, e uma fixture so com `TETOS` fazia o import trazer `undefined`.
