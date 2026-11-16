@@ -313,12 +313,23 @@ caso("--quota: as linhas QUOTA: a 85% AVISO, a 100% ESGOTADA, a projecao acima d
   const um = (q, dia, mesArg = "2020-01") => cli(conta([{ ...ITEM("priv", q), date: `${mesArg}-${String(dia).padStart(2, "0")}T00:00:00Z` }], { priv: true }), ["--quota", "--mes", mesArg]);
   const a85 = linhaQuota(um(1700, 1));
   const a100 = linhaQuota(um(2000, 1));
-  const proj = linhaQuota(cli(conta([DIA("priv", 1000, 1)], { priv: true }), ["--quota", "--mes", HOJE]));
+  // A projecao e `q x dias / hoje` (#561): um fixture fixo (1000 min) so a punha acima do limite ate ao dia ~15, e o
+  // caso reprovava na outra metade do mes. O `q` calcula-se com o mesmo relogio: o menor que passa o limite, abaixo
+  // dos 80% (a linha so pode vir da projecao). Quando nao existe (dias 1-2, sem projecao; os ultimos dias, em que
+  // abaixo dos 80% ja nao se passa o limite), o caso afirma a AUSENCIA da linha.
+  const qProj = Math.floor((2000 * DIA_HOJE) / diasDoMes(AH, MH)) + 1;
+  const comLinha = DIA_HOJE >= 3 && qProj < 1600;
+  const proj = linhaQuota(cli(conta([DIA("priv", comLinha ? qProj : 1000, 1)], { priv: true }), ["--quota", "--mes", HOJE]));
   const baixo = linhaQuota(um(500, 1));
   return [
     ...espera(a85.length === 1 && /^QUOTA: AVISO — 85% de 2000 min$/.test(a85[0]), `85%: ${a85}`),
     ...espera(a100.length === 1 && /^QUOTA: ESGOTADA — 2000 de 2000 min/.test(a100[0]), `100%: ${a100}`),
-    ...espera(DIA_HOJE < 3 ? proj.length === 0 : proj.length === 1 && /^QUOTA: AVISO — 50% de 2000 min, e a projecao \(~\d+\) passa o limite$/.test(proj[0]), `projecao (dia ${DIA_HOJE}): ${proj}`),
+    ...espera(
+      comLinha
+        ? proj.length === 1 && new RegExp(`^QUOTA: AVISO — ${Math.floor((qProj * 100) / 2000)}% de 2000 min, e a projecao \\(~\\d+\\) passa o limite$`).test(proj[0])
+        : proj.length === 0,
+      `projecao (dia ${DIA_HOJE}, ${comLinha ? `${qProj} min` : "sem linha possivel"}): ${proj}`,
+    ),
     ...espera(baixo.length === 0, `a 25% saiu uma linha QUOTA: ${baixo}`),
   ];
 });
