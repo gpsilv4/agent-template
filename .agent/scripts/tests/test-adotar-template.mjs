@@ -18,6 +18,7 @@ import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { executar, MANIFESTO, planear } from "../adotar-template.mjs";
+import { registarAdotarOrigem } from "./harness/casos-adotar-origem.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -92,7 +93,11 @@ try {
   // Numa TAG (#512): a adocao copia de um clone limpo numa tag. DIFERENTE do `TEMPLATE_VERSION` (v9.9.9) de proposito:
   // o caso do manifesto prova que o `versao:` vem da tag, e nao do ficheiro (que entre duas tags diz a anterior).
   git(tpl, "tag", "v9.10.0");
-  git(tpl, "remote", "add", "origin", "https://example.invalid/agent-template");
+  // O `origin` e um repo NU local com a tag (#538: a adocao confirma-a la; nenhum teste toca um host). Criado DEPOIS da
+  // tag: o `clone --bare` so copia as que ja existem.
+  const nu = join(sandbox, "tpl-origin.git");
+  git(sandbox, "clone", "-q", "--bare", tpl, nu);
+  git(tpl, "remote", "add", "origin", nu);
   const commitTpl = git(tpl, "rev-parse", "HEAD").trim();
 
   let n = 0;
@@ -183,7 +188,7 @@ try {
     git(p, "remote", "add", "origin", "https://example.invalid/projeto");
     const { template } = planear(tpl, p);
     return [
-      ...espera(template.origem === "https://example.invalid/agent-template", `origem: ${template.origem}`),
+      ...espera(template.origem === nu, `origem: ${template.origem}`),
       ...espera(template.commit === commitTpl, `commit: ${template.commit}`),
       ...espera(template.versao === "v9.10.0", `versao: ${template.versao} — devia ser a tag, e nao o TEMPLATE_VERSION (#512)`),
       ...espera(template.caminho === realpathSync(tpl), `caminho: ${template.caminho}`),
@@ -196,9 +201,11 @@ try {
     return espera(!/segredo123|eu:/.test(origem) && origem.includes("example.invalid/agent-template"), `origem: ${origem}`);
   });
 
-  test("sem remoto no clone, a origem fica `null` e a adocao segue", () => {
-    const semRemoto = (args) => (args[0] === "remote" ? (() => { throw new Error("sem origin"); })() : git(tpl, ...args));
-    return espera(planear(tpl, projeto(), semRemoto).template.origem === null, "devia ser null");
+  // Era "a origem fica `null` e a adocao segue": sem `origin` a tag nao se confirma (#538), e a adocao recusa.
+  test("sem remoto no clone, a adocao recusa: a tag nao se confirma no origin (#538)", () => {
+    const semRemoto = (args) => (args[0] === "remote" ? (() => { throw new Error("error: No such remote 'origin'"); })() : git(tpl, ...args));
+    const r = recusa(() => planear(tpl, projeto(), semRemoto));
+    return espera(r !== null && /nao tem `origin`/.test(r) && r.includes("--branch v9.10.0"), `deu: ${r}`);
   });
 
   // As recusas. O contra-caso de todas e o primeiro teste: o mesmo `planear` num projeto normal.
@@ -428,7 +435,7 @@ try {
     })();
     escreve(antigo, "README.md", "# mexido\n");
     const sujo = recusa(() => planear(antigo, p));
-    return [...espera(passa, "a retoma de uma adocao antiga num commit sem tag devia passar"), ...espera(sujo !== null && /alteracoes locais/.test(sujo), `sujo: ${sujo}`)];
+    return [...espera(passa, "a retoma de uma adocao antiga num commit sem tag devia passar"), ...espera(sujo !== null && /alteracao\(oes\) por commitar \(README\.md\)/.test(sujo), `sujo: ${sujo}`)];
   });
 
   test("um projeto alcancado por um symlink PARA DENTRO do template e sobreposicao", () => {
@@ -478,6 +485,7 @@ try {
       ...espera(segunda.code === 1 && /ERRO/.test(segunda.out), `a segunda corrida devia recusar: exit ${segunda.code}`),
     ];
   });
+  registarAdotarOrigem({ test, espera, recusa, git, escreve, planear, projeto, tpl, sandbox, MANIFESTO });
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
 }

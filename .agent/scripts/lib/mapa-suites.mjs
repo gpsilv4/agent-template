@@ -200,6 +200,8 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/(lib\/superficie-gate|lib\/superficie-contaveis|tests\/tests-surface-gate)\.mjs$/, verifica: [S("test-test-surface.mjs")] },
   // A adocao num projeto existente (#288): escreve no projeto de outra pessoa.
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
+  // Os casos da origem de uma adocao (#538): chamados no lugar pelo `test-adotar-template`.
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-adotar-origem\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
   // via no Release seguinte, ja publicado.
   { re: /^(\.github\/scripts\/release-da-tag\.sh|\.agent\/scripts\/tests\/test-release-da-tag\.mjs)$/, verifica: [S("test-release-da-tag.mjs")] },

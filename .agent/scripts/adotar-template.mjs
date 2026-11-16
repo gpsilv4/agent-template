@@ -25,7 +25,10 @@
  *
  * O QUE RECUSA, e porque: correr dentro do proprio template (copiava-se para si mesmo), um template
  * que ja e derivado (nao ha versao a declarar), um projeto ja adotado ou ja bootstrapado (e o
- * `/upgrade`), e um caminho que passe por um symlink ou por um ficheiro onde o template tem uma
+ * `/upgrade`), um clone que nao esta limpo numa tag de release (#512), um clone sem `origin` ou cuja tag
+ * o `origin` nao confirma (#538: uma tag so local gravava no manifesto uma versao que nao existe — a adocao
+ * precisa de rede; a confirmacao e contra o `origin` DECLARADO, logo clona-se do URL do template, e um clone
+ * de um clone confirma contra o do meio), e um caminho que passe por um symlink ou por um ficheiro onde o template tem uma
  * pasta — escrever por um symlink pode sair do projeto. Esses caminhos ficam em `colisoes`.
  *
  * NAO APAGA NADA e nao sobrescreve nada: so cria ficheiros que nao existiam (`COPYFILE_EXCL`, que
@@ -44,7 +47,7 @@ import { dirname, join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { ehMain } from "./lib/eh-main.mjs";
-import { confirmaTemplateLimpoNumaTag } from "./lib/origem-upgrade.mjs";
+import { DICA_ULTIMA_TAG, TAG_DE_RELEASE, confirmaLimpo, confirmaTemplateLimpoNumaTag, tagParaComando } from "./lib/origem-upgrade.mjs";
 
 /** O que nunca se copia sem decisao do utilizador: uma licenca nao se herda por omissao. */
 export const PERGUNTAR = ["LICENSE"];
@@ -53,10 +56,45 @@ export const MANIFESTO = ".agent/adocao.json";
  *  fim, logo nao no TMPDIR), e este script nao tem `--fronteira-em` (e da 2b do upgrade). */
 // Numa pasta POR TAG (#524): a recusa tipica e a de um `../agent-template` ja clonado da `main` (o que o README mandava
 // ate a v0.63.4), e clonar por cima dele falhava ("destination path already exists").
-const CLONAR_A_TAG = (tag = "<tag>") =>
-  `git clone --depth 1 --branch ${tag} <url-do-template> ../agent-template-${tag}, e correr, a partir do projeto, ` +
-  `\`node ../agent-template-${tag}/.agent/scripts/adotar-template.mjs\`` +
-  (tag === "<tag>" ? " — a ultima tag: `git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`" : "");
+const CLONAR_A_TAG = (pedida = "<tag>") => {
+  // So uma tag de release entra no comando, que se copia (#538).
+  const tag = tagParaComando(pedida);
+  return `git clone --depth 1 --branch ${tag} <url-do-template> ../agent-template-${tag}, e correr, a partir do projeto, ` +
+    `\`node ../agent-template-${tag}/.agent/scripts/adotar-template.mjs\`` +
+    (tag === "<tag>" ? ` — a ultima tag: ${DICA_ULTIMA_TAG}` : "");
+};
+
+/** Um URL sem credenciais: um `https://<user>:<token>@...` nao vai para o manifesto (que se commita) nem para o ecra. */
+export const semCredenciais = (texto) => String(texto).replace(/(\/\/)[^/@\s]+@/g, "$1");
+
+/** O tempo que o `origin` tem para responder (#538): um https a pedir credenciais ou um ssh a pedir uma passphrase
+ *  falham aqui, em vez de pendurar a adocao. */
+export const ESPERA_DO_ORIGIN_MS = 30_000;
+
+/**
+ * A tag do clone, confirmada no `origin` (#538): uma tag so local (`git tag vX.Y.Z` num commit da `main`) passava a
+ * guarda "limpo numa tag", e o manifesto gravava uma versao que nao existe. O oid comparado com o `HEAD` e o do `^{}`
+ * (tag anotada) ou o da propria ref (leve). Lanca com a razao; um `origin` que nao responde tambem recusa (`TP2`).
+ */
+export function confirmaTagNoOrigin(git, tag, origem) {
+  const ref = `refs/tags/${tag}`;
+  let saida;
+  try {
+    // As duas: com um padrao so, o `^{}` de uma tag anotada nao vem (medido).
+    saida = git(["ls-remote", "--tags", "origin", ref, `${ref}^{}`]);
+  } catch (err) {
+    const e = /** @type {{ stderr?: unknown, code?: string, signal?: string }} */ (err ?? {});
+    // `||`: com o stdio em pipe o `stderr` e sempre uma string, e vazia nao e uma razao.
+    const porque = e.code === "ETIMEDOUT" || e.signal ? `nao respondeu em ${ESPERA_DO_ORIGIN_MS / 1000} s` : `nao respondeu (${semCredenciais(String(String(e.stderr ?? "").trim() || (err instanceof Error ? err.message : err)).trim().split("\n")[0])})`;
+    throw new Error(`o origin ${origem} ${porque} ao \`git ls-remote\` — a adocao confirma a tag ${tag} no origin, e precisa de o alcancar`);
+  }
+  // Os padroes do `ls-remote` casam pelo FIM do nome: so as linhas com o nome exato contam.
+  const oids = new Map(String(saida).split("\n").filter(Boolean).map((l) => l.split("\t")).map(([oid, nome]) => [nome, oid]));
+  const remoto = oids.get(`${ref}^{}`) ?? oids.get(ref);
+  if (!remoto) throw new Error(`o origin ${origem} nao tem a tag ${tag} — e uma tag so local; clona a tag do URL do template: ${CLONAR_A_TAG()}`);
+  const head = git(["rev-parse", "HEAD"]).trim();
+  if (remoto !== head) throw new Error(`a tag ${tag} no origin ${origem} aponta para ${remoto.slice(0, 12)}, e o clone esta em ${head.slice(0, 12)} — clona a tag do URL do template: ${CLONAR_A_TAG()}`);
+}
 
 const lerOuNull = (raiz, rel) => {
   try {
@@ -91,7 +129,12 @@ export function estadoNoProjeto(tpl, proj, rel) {
 }
 
 /** Decide tudo, sem escrever nada. Lanca com a razao quando a adocao nao deve correr. */
-export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tpl, ...args], { encoding: "utf8" })) {
+// O `git` por omissao (#538): o stderr num pipe (o de um `ls-remote` com um token no URL nao sai cru no ecra), sem
+// prompts de credenciais, e com tempo. Sem `GIT_SSH_COMMAND`: passava por cima do `core.sshCommand` de quem o tem.
+const gitDoTemplate = (tpl) => (args) =>
+  execFileSync("git", ["-C", tpl, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: ESPERA_DO_ORIGIN_MS, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+
+export function planear(tpl, proj, git = gitDoTemplate(tpl)) {
   const rTpl = realpathSync(tpl);
   const rProj = realpathSync(proj);
   const derivado = ehDerivado((rel) => lerOuNull(rTpl, rel));
@@ -139,16 +182,21 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
       throw new Error(`a adocao interrompida era do commit ${m.template?.commit} e o clone esta noutro — repoe o clone nesse commit`);
     }
     // Na retoma nao se exige a tag (o commit do manifesto manda), mas o clone tem de estar LIMPO nesse commit: o
-    // resto copia-se do disco.
-    if (git(["status", "--porcelain", "--untracked-files=all"]).trim()) {
-      throw new Error(`o clone do template (${rTpl}) tem alteracoes locais — a retoma copiava um conteudo que nao e o do commit ${m.template.commit}`);
-    }
+    // resto copia-se do disco. A mesma definicao da guarda (#538): tambem o que o `status` esconde.
+    confirmaLimpo(rTpl, (porque) => {
+      throw new Error(`o clone do template (${rTpl}) ${porque} — a retoma copiava um conteudo que nao e o do commit ${m.template.commit}`);
+    });
     // Um ficheiro que a corrida interrompida copiou e que agora DIFERE do template: uma copia
     // cortada a meio, ou uma edicao entre as duas corridas. Passa-lo a `colisoes` em silencio era
     // chamar "do projeto" a um ficheiro do template — o Passo 4 propunha funde-lo.
     const divergentes = m.copiados.filter((rel) => estadoNoProjeto(rTpl, rProj, rel) === "colide");
     if (divergentes.length) {
       throw new Error(`a adocao interrompida deixou ficheiros diferentes do template: ${divergentes.join(", ")} — apaga-os (sao do template) e corre outra vez`);
+    }
+    // A versao do manifesto vai para a marca (`BOOTSTRAP.md`, o `node -e` do §2.0): uma fora do formato (um manifesto de
+    // antes do #538, quando a guarda aceitava o glob `v[0-9]*`) recusa, em vez de seguir para la.
+    if (typeof m.template.versao === "string" && !TAG_DE_RELEASE.test(m.template.versao)) {
+      throw new Error(`${MANIFESTO} tem uma versao fora do formato vX.Y.Z — nao vai para a marca; repoe o manifesto ou recomeca a adocao num clone numa tag`);
     }
     // O caminho e o do clone ATUAL: o anterior pode ja nao existir (o mesmo commit, noutra pasta).
     return { ...m, template: { ...m.template, caminho: rTpl }, tpl: rTpl, proj: rProj, retomar: true };
@@ -171,18 +219,32 @@ export function planear(tpl, proj, git = (args) => execFileSync("git", ["-C", tp
     else plano.copiados.push(rel);
   }
   const origem = (() => {
+    let url;
     try {
-      const url = git(["remote", "get-url", "origin"]).trim();
-      // Um `https://<user>:<token>@...` nao pode ir para um ficheiro que se commita.
-      if (!/^https?:\/\//i.test(url)) return url;
+      url = git(["remote", "get-url", "origin"]).trim();
+    } catch (err) {
+      // So o "nao ha remoto" e `null`: outra falha (um config ilegivel, o tempo) recusa com a SUA razao (`TP2`).
+      // O stderr, ou a mensagem (a do `execFileSync` traz o stderr do git depois do comando).
+      const stderr = String(/** @type {{ stderr?: unknown }} */ (err ?? {}).stderr ?? "").trim();
+      const texto = stderr || (err instanceof Error ? err.message : String(err));
+      if (/no such remote/i.test(texto)) return null;
+      throw new Error(`nao consegui ler o origin do clone do template (${semCredenciais(texto).split("\n")[0]})`);
+    }
+    // Um `https://<user>:<token>@...` nao pode ir para um ficheiro que se commita.
+    // Noutro esquema (`ssh://u:pw@`, `ftps://`), so a password sai: o utilizador (`git@`) e preciso para clonar.
+    if (!/^https?:\/\//i.test(url)) return url.replace(/(\/\/[^/@\s:]+):[^/@\s]+@/, "$1@");
+    try {
       const u = new URL(url);
       u.username = "";
       u.password = "";
       return u.toString();
     } catch {
-      return null;
+      throw new Error(`o origin do clone do template nao e um URL que se leia (${semCredenciais(url)})`);
     }
   })();
+  // DEPOIS do "nao tem ficheiros" (a leitura do #538): a tag confirma-se no `origin`, e sem `origin` nao se confirma.
+  if (origem === null) throw new Error(`o clone do template (${rTpl}) nao tem \`origin\` — a adocao confirma a tag ${tag} no origin (#538); clona do URL do template: ${CLONAR_A_TAG(tag)}`);
+  confirmaTagNoOrigin(git, tag, origem);
   plano.template = {
     caminho: rTpl,
     origem,
