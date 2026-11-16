@@ -10,7 +10,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, readFileSync, rmSyn
 import { tmpdir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
-import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "../lib/origem-upgrade.mjs";
+import { comoClonar, confirmaLimpo, confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "../lib/origem-upgrade.mjs";
 import { aplicaUpgradeMecanico } from "../lib/upgrade-mecanico.mjs";
 import { git, cenario, limpa, contraProjeto, exige, test, SEM_JOB } from "./harness/test-upgrade-harness.mjs";
 
@@ -122,6 +122,31 @@ export function registar() {
       git(d, ["commit", "-qm", "sub"]);
       git(d, ["tag", "-f", "v1.0.0"]);
     }, (d) => recusa(limpo(join(d, "sub")), "nao e a raiz de um repo")));
+  // #538: o git aceita `$ ( ) ;` num nome de ref, e `v[0-9]*` e so um glob — so conta uma tag no formato.
+  test("origem: uma tag fora do formato no HEAD nao conta, e nao entra na recusa (#538)", () =>
+    comRepo((d) => {
+      commit(d, "depois");
+      git(d, ["tag", "v1.0.1$(id);x"]);
+    }, (d) => {
+      const res = limpo(d);
+      return [...recusa(res, "nao esta numa tag de release", "--branch v1.0.0"), ...(res.msg?.includes("$(") ? [`a tag fora do formato entrou: ${res.msg}`] : [])];
+    }));
+  test("origem: so tags fora do formato (v1.2) dizem-no, e nao mandam fazer fetch (#538)", () =>
+    comRepo((d) => {
+      git(d, ["tag", "-d", "v1.0.0"]);
+      git(d, ["tag", "v1.2"]);
+    }, (d) => {
+      const res = limpo(d);
+      return [...recusa(res, "nao tem tags de release no formato"), ...(res.msg?.includes("fetch --tags") ? [`pista errada: ${res.msg}`] : [])];
+    }));
+  test("origem: o comando sugerido so interpola uma tag de release; uma pre-release entra (#538)", () => {
+    const hostil = comoClonar("v1;x");
+    const pre = comoClonar("v1.2.3-rc.1");
+    return [
+      ...(hostil.includes("v1;x") || !hostil.includes("--branch <tag>") ? [`a tag fora do formato entrou: ${hostil}`] : []),
+      ...(pre.includes("--branch v1.2.3-rc.1 ") ? [] : [`a pre-release nao entrou: ${pre}`]),
+    ];
+  });
   test("origem: o commit sem tag sugere clonar a tag mais recente (#490)", () =>
     comRepo((d) => {
       git(d, ["tag", "v1.2.0"]);
@@ -139,6 +164,19 @@ export function registar() {
       return [...recusa(r, "nao responde ao git ("), ...(String(r.msg).includes("Command failed") ? [`so o comando, sem a razao: ${r.msg}`] : [])];
     }));
 
+  // A parte "limpo", sozinha (#538: a retoma da adocao chama-a sem a guarda): um git que falha recusa, nunca "limpo".
+  test("origem: confirmaLimpo num .git partido recusa com a razao do git (#538)", () =>
+    comRepo((d) => {
+      rmSync(join(d, ".git"), { recursive: true, force: true });
+      writeFileSync(join(d, ".git"), "gitdir: /nao/existe\n");
+    }, (d) => recusa(corre((f) => confirmaLimpo(d, f)), "nao responde ao git (")));
+  // Um `fatal` que RETORNA (nao lanca): a guarda nao pode seguir para as tags e devolver `{ tag }` (#538).
+  test("origem: com um fatal que retorna, uma arvore suja nao devolve a tag (#538)", () =>
+    comRepo((d) => writeFileSync(join(d, "a.md"), "mudou\n"), (d) => {
+      const r = confirmaTemplateLimpoNumaTag(d, () => undefined);
+      return r === undefined ? [] : [`seguiu para as tags: ${JSON.stringify(r)}`];
+    }));
+
   // --- (c) sem downgrade ---------------------------------------------------------------------
   const desce = (dir, ref) => corre((f) => confirmaSemDowngrade(dir, ref, f));
   test("origem: a ref antepassada do HEAD passa; a propria tag tambem (#490)", () =>
@@ -152,6 +190,15 @@ export function registar() {
       const fora = commit(d, "lado");
       git(d, ["switch", "-q", "main"]);
       return recusa(desce(d, fora), "tags que o contem: nenhuma", "poe essa tag em `commit:`");
+    }));
+  test("origem: uma tag fora do formato que contem a ref nao entra na recusa do downgrade (#538)", () =>
+    comRepo(null, (d) => {
+      git(d, ["switch", "-q", "-c", "lado"]);
+      const fora = commit(d, "lado");
+      git(d, ["tag", "v1.1.0$(id);x"]);
+      git(d, ["switch", "-q", "main"]);
+      const res = desce(d, fora);
+      return [...recusa(res, "tags que o contem: nenhuma"), ...(res.msg?.includes("$(") ? [`a tag fora do formato entrou: ${res.msg}`] : [])];
     }));
   test("origem: um commit posterior a tag do HEAD recusa, e diz a tag que o contem (#490)", () =>
     comRepo(null, (d) => {

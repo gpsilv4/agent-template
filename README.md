@@ -69,6 +69,10 @@ cd my-project
 > node ../agent-template-<tag>/.agent/scripts/adotar-template.mjs
 > ```
 >
+> The clone needs its `origin` and network: the script confirms the tag there (`git ls-remote`), also
+> with `--simular`. A tag that exists only in your clone is refused. The check is against the `origin`
+> the clone declares, so clone from the template's URL (a clone of a clone checks the one in the middle).
+>
 > It copies only the files you don't have, never overwrites, leaves `LICENSE` for you to decide, and
 > writes `.agent/adocao.json` — what was copied and what **collides** (decided before copying). The
 > bootstrap reads it: Phase 0-R skips the copied files and merges the collisions with the clone's copy.
@@ -343,6 +347,7 @@ not to* line, so every agent sees it.
             ├── simuladores-ci.mjs        <- The three simulator jobs of ci.yml and their commands, one source (#460)
             ├── casos-limites-ci.mjs      <- The minutes script's job-limit cases: thresholds at the boundary (#542)
             ├── casos-espera.mjs          <- The minutes script's PR-wait cases: the attempt, cancelled out, the cut (#554)
+            ├── casos-adotar-origem.mjs   <- The adoption's origin cases: the tag on origin, its format, the resume (#538)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 

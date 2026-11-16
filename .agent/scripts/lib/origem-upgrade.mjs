@@ -11,6 +11,9 @@
  * upgrade e sempre para uma release, e uma correcao urgente e uma tag de correcao.
  *
  * Qualquer falha do git RECUSA, nunca conta como "limpo" (`TP2`).
+ *
+ * So conta como tag de release uma tag no formato `vX.Y.Z[-pre]` (#538): o git aceita `$ ( ) ;` num nome de ref, e
+ * uma tag fora do formato nao chega ao comando de uma recusa, que se copia, nem ao `versao:` de uma marca.
  */
 
 import { execFileSync } from "child_process";
@@ -21,11 +24,22 @@ import { execFileSync } from "child_process";
  *  clone e o URL, que a marca da §4 grava. */
 export const ONDE_CLONAR = "~/.cache/agent-template";
 
+/** Uma tag de release (#538): o pre-release com os caracteres do SemVer, sem build (`+`) — nenhuma release o usa. */
+export const TAG_DE_RELEASE = /^v\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
+/** Uma release estavel, sem pre-release. */
+export const ESTAVEL = /^v\d+\.\d+\.\d+$/;
+/** O que se interpola num comando para copiar: a tag, se for uma tag de release; senao, o marcador. */
+export const tagParaComando = (tag) => (typeof tag === "string" && TAG_DE_RELEASE.test(tag) ? tag : "<tag>");
+/** Como saber a ultima tag: uma so frase, para o upgrade e para a adocao (#538). */
+export const DICA_ULTIMA_TAG = "`git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`";
+
 /** A instrucao de cada recusa: o clone da tag, que nao escreve no repo do template. */
-export const comoClonar = (tag = "<tag>") =>
-  `git clone -q --branch ${tag} <url-do-template> ${ONDE_CLONAR}/${tag}` +
-  (tag === "<tag>" ? " (a mais recente: `git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`)" : "") +
+export const comoClonar = (pedida = "<tag>") => {
+  const tag = tagParaComando(pedida);
+  return `git clone -q --branch ${tag} <url-do-template> ${ONDE_CLONAR}/${tag}` +
+  (tag === "<tag>" ? ` (a mais recente: ${DICA_ULTIMA_TAG})` : "") +
   ` — e correr dali (num sandbox que so escreve no TMPDIR: clonar la e passar --fronteira-em=<pasta vazia fora do projeto e do template>)`;
+};
 
 // `column.ui=never`: com colunas ligadas na config do utilizador, duas tags saiam numa so linha.
 const git = (root, args) =>
@@ -35,7 +49,8 @@ const git = (root, args) =>
 const primeiraLinha = (err) =>
   String(err?.stderr ?? "").trim().split("\n")[0] || (err instanceof Error ? err.message : String(err)).split("\n")[0];
 /** As releases estaveis primeiro: sem `versionsort.suffix`, o git poe `v1.0.0-rc.1` DEPOIS de `v1.0.0`. */
-const estaveisPrimeiro = (ts) => [...ts.filter((t) => /^v\d+\.\d+\.\d+$/.test(t)), ...ts.filter((t) => !/^v\d+\.\d+\.\d+$/.test(t))];
+const estaveisPrimeiro = (ts) => [...ts.filter((t) => ESTAVEL.test(t)), ...ts.filter((t) => !ESTAVEL.test(t))];
+const deRelease = (ts) => ts.filter((t) => TAG_DE_RELEASE.test(t));
 const linhas = (t) => t.split("\n").filter(Boolean);
 
 /**
@@ -47,6 +62,36 @@ const linhas = (t) => t.split("\n").filter(Boolean);
  *
  * @returns {{tag: string}}
  */
+/**
+ * A arvore do `root` esta LIMPA: sem alteracoes seguidas ou nao (os ignorados nao contam: o motor exclui-os), e sem
+ * nada escondido do `status` (sparse, `skip-worktree`, `assume-unchanged`). `recusa(porque)` recebe a razao e NAO
+ * retorna; uma falha do git recusa (`TP2`). Partilhada pela guarda abaixo e pela retoma da adocao (#538).
+ */
+export function confirmaLimpo(root, recusa) {
+  // Devolve `true` SO quando esta limpa: quem chama para se nao for `true` (um `recusa` que retorne, em vez de lancar,
+  // nao deixa a guarda seguir para as tags — a leitura independente do #538).
+  let r;
+  try {
+    r = {
+      // `--untracked-files=all` contra um `status.showUntrackedFiles=no` do utilizador.
+      sujo: linhas(git(root, ["status", "--porcelain", "--untracked-files=all"])),
+      sparse: git(root, ["config", "--bool", "--default", "false", "core.sparseCheckout"]).trim() === "true",
+      // `ls-files -v`: minuscula = `assume-unchanged`, `S` = `skip-worktree` — o `status` nao os ve.
+      escondidos: linhas(git(root, ["ls-files", "-v"])).filter((l) => /^[a-zS] /.test(l)).map((l) => l.slice(2)),
+    };
+  } catch (err) {
+    return recusa(`nao responde ao git (${primeiraLinha(err)})`);
+  }
+  if (r.sujo.length) {
+    const amostra = r.sujo.slice(0, 3).map((l) => l.slice(3)).join(", ");
+    return recusa(`tem ${r.sujo.length} alteracao(oes) por commitar (${amostra}${r.sujo.length > 3 ? ", ..." : ""})`);
+  }
+  if (r.sparse || r.escondidos.length) {
+    return recusa(`esconde ficheiros do \`git status\` (${r.sparse ? "sparse-checkout" : `skip-worktree/assume-unchanged: ${r.escondidos.slice(0, 3).join(", ")}`})`);
+  }
+  return true;
+}
+
 export function confirmaTemplateLimpoNumaTag(root, fatal, { quem = "um upgrade", instrucao = comoClonar } = {}) {
   const recusa = (porque, tag) => fatal(`o template em ${root} ${porque} — ${quem} le um clone limpo numa tag (#490): ${instrucao(tag)}`);
   let r;
@@ -55,28 +100,21 @@ export function confirmaTemplateLimpoNumaTag(root, fatal, { quem = "um upgrade",
     r = {
       // `--show-prefix` vazio = o `root` e a raiz: sem comparar caminhos (maiusculas, symlinks, nomes 8.3).
       prefixo: git(root, ["rev-parse", "--show-prefix"]).trim(),
-      // `--untracked-files=all` contra um `status.showUntrackedFiles=no` do utilizador.
-      sujo: linhas(git(root, ["status", "--porcelain", "--untracked-files=all"])),
-      sparse: git(root, ["config", "--bool", "--default", "false", "core.sparseCheckout"]).trim() === "true",
-      // `ls-files -v`: minuscula = `assume-unchanged`, `S` = `skip-worktree` — o `status` nao os ve.
-      escondidos: linhas(git(root, ["ls-files", "-v"])).filter((l) => /^[a-zS] /.test(l)).map((l) => l.slice(2)),
-      tags: estaveisPrimeiro(linhas(git(root, ["tag", "--points-at", "HEAD", "--list", "--sort=-v:refname", "v[0-9]*"]))),
-      todas: estaveisPrimeiro(linhas(git(root, ["tag", "--list", "--sort=-v:refname", "v[0-9]*"]))),
+      // Pelo formato (#538): `v[0-9]*` e um glob, e deixa passar `v1$(x)`, `v1.2` ou `v1.0.0_x`.
+      tags: estaveisPrimeiro(deRelease(linhas(git(root, ["tag", "--points-at", "HEAD", "--list", "--sort=-v:refname", "v[0-9]*"])))),
+      todasNoGlob: linhas(git(root, ["tag", "--list", "--sort=-v:refname", "v[0-9]*"])),
     };
   } catch (err) {
     return recusa(`nao responde ao git (${primeiraLinha(err)})`);
   }
   if (r.prefixo !== "") return recusa(`nao e a raiz de um repo (e a subpasta ${r.prefixo} de outro)`);
-  if (r.sujo.length) {
-    const amostra = r.sujo.slice(0, 3).map((l) => l.slice(3)).join(", ");
-    return recusa(`tem ${r.sujo.length} alteracao(oes) por commitar (${amostra}${r.sujo.length > 3 ? ", ..." : ""})`);
-  }
-  if (r.sparse || r.escondidos.length) {
-    return recusa(`esconde ficheiros do \`git status\` (${r.sparse ? "sparse-checkout" : `skip-worktree/assume-unchanged: ${r.escondidos.slice(0, 3).join(", ")}`})`);
-  }
+  if (confirmaLimpo(root, recusa) !== true) return undefined;
+  const todas = estaveisPrimeiro(deRelease(r.todasNoGlob));
   if (r.tags.length === 0) {
-    return r.todas.length
-      ? recusa("nao esta numa tag de release (o HEAD e um commit sem tag `v*`)", r.todas[0])
+    if (todas.length) return recusa("nao esta numa tag de release (o HEAD e um commit sem tag `vX.Y.Z`)", todas[0]);
+    // So tags fora do formato: "`git fetch --tags`" seria uma pista errada. O nome dela nunca entra na mensagem.
+    return r.todasNoGlob.length
+      ? recusa("nao tem tags de release no formato `vX.Y.Z[-pre]` (as que tem estao fora dele)")
       : recusa("nao tem tags de release — `git fetch --tags` no template");
   }
   return { tag: r.tags[0] };
@@ -96,7 +134,8 @@ export function confirmaSemDowngrade(root, ref, fatal) {
   }
   let contem = [];
   try {
-    contem = git(root, ["tag", "--contains", ref, "--list", "v[0-9]*"]).split("\n").filter(Boolean);
+    // So as tags de release (#538): uma fora do formato nao entra na mensagem.
+    contem = deRelease(git(root, ["tag", "--contains", ref, "--list", "v[0-9]*"]).split("\n").filter(Boolean));
   } catch {
     // fica "nenhuma": a recusa e a mesma, so a pista se perde
   }
