@@ -163,4 +163,56 @@ export const PARES_DOS_HOOKS = [
     sinal: /(?<![\w.$])console\.log\(/,
     neutro: "(() => {})(",
   },
+  // --- As ATRIBUICOES (#546): as duas definicoes de `fronteira-dados.mjs`, em cada sitio que as CHAMA (a definicao nao e
+  // um sitio). O neutro responde "nao e atribuicao": a palavra deixa de se saltar, e o perigo que vinha a seguir (o `git`,
+  // o `GIT_PAGER`, o interpretador) ou o verbo da allowlist deixa de se ver. Ficam de fora, e e dito: a LARGA no
+  // `RECEBE_CODIGO` (`fronteira.mjs`), dentro de uma template string que a varredura nao le — um controlo manual do
+  // #546 (a regex antiga) ficou vermelho no `env X+=1 $C <<EOF`; as linhas
+  // `.every(...)` do `defineGhRepo`/`mudaONode` (ensombradas pelo `cabeca()`), e o `nomeDaAtribuicao(` nos argumentos
+  // de um `export` (um argumento sem `=` com `[`/`+` nem e valido em bash: o mutante e equivalente).
+  ...[".claude/hooks/guard-protected-branch.mjs", ".claude/hooks/lib/verbos-git.mjs", ".claude/hooks/lib/posicao.mjs"].map((alvo) => ({
+    alvo,
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])ATRIBUICAO_LARGA\.test\(/,
+    neutro: "((x) => false)(",
+  })),
+  // A do BASH onde decide o verbo (a allowlist do `levaMarcador`, a leitura nova do `verboEm`) e, no `textos-publicos`,
+  // so a do `cabeca()` pelo CRU: os outros dois do ficheiro sao os `.every(...)` ensombrados, acima.
+  ...[[".claude/hooks/lib/caminhos.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/], [".claude/hooks/lib/posicao.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/],
+    [".claude/hooks/lib/textos-publicos.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\((?=ws\[i\]\.cru\))/]].map(([alvo, sinal]) => ({
+    alvo,
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal,
+    neutro: "((x) => false)(",
+  })),
+  // A LARGA depois de um `env`/`sudo`: no `depoisDeAtribuidora` (duas seguidas, `env A-B=1 C-D=1 $N`) e no `cabeca()`.
+  ...[".claude/hooks/lib/fronteira-dados.mjs", ".claude/hooks/lib/textos-publicos.mjs"].map((alvo) => ({
+    alvo,
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])ATRIBUICAO_LARGA\.test\(/,
+    neutro: "((x) => false)(",
+  })),
+  {
+    // Cada forma que muda o `node` e tira a isencao do `commit-msg` (#536, #545, #546), uma por linha: desligada uma,
+    // essa forma passava a deixar o `node .githooks/commit-msg` isento depois de mudar o `node`. Casa tambem a 1.a linha
+    // do `defineGhRepo` (o `GH_REPO` que o `cabeca()` recolhe), a mesma forma: desligada, um `sudo GH_REPO=o/r gh` publicava.
+    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /^ {2}if \((?=.+\) return true;$)/,
+    neutro: "  if (false && ",
+  },
+  {
+    // O `+=` literal das variaveis que o git executa e do `NODE_OPTIONS` com `data:`: tirado, o `GIT_PAGER+=cmd` e o
+    // `NODE_OPTIONS+='--import=data:...'` deixavam de se ler.
+    alvo: ".claude/hooks/lib/verbos-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=_\\d\+\)|GIT_CONFIG_PARAMETERS)\\\+\?(?==)/,
+    neutro: "",
+  },
+  {
+    alvo: ".claude/hooks/lib/posicao.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=NODE_OPTIONS)\\\+\?(?==)/,
+    neutro: "",
+  },
 ];

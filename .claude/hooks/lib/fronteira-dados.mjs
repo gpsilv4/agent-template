@@ -174,6 +174,33 @@ const FLAGS_COM_VALOR = {
   // cinco `new Set([])` eram cinco ramos que nenhuma mutacao matava (`TP7`).
 };
 
+/** As ATRIBUICOES, em duas definicoes, uma por DIRECAO de falha (#546). Eram oito leitores com quatro formas, e
+ *  cada um falhava numa (`X+=y`, `X[0]=y`, `env A-B=1`). Uma so definicao nao serve: estreitar o `\w+=` do guard
+ *  do branch para a forma do bash abria `env 1X=y git commit` (1.a leitura do plano).
+ *
+ *  A LARGA: qualquer palavra com `=` antes do primeiro espaco, que nao comece por `-` (uma flag) — o `env` aceita
+ *  qualquer `NOME=valor`. Para quem PROCURA algo perigoso mais a frente (o `git`, o `GIT_PAGER`, o interpretador):
+ *  saltar a mais e falhar fechado. A fonte sem o `^` serve as regex montadas por texto (`RECEBE_CODIGO`). */
+export const ATRIBUICAO_LARGA_SRC = String.raw`[^\s=-][^\s=]*=`;
+export const ATRIBUICAO_LARGA = new RegExp(`^${ATRIBUICAO_LARGA_SRC}`);
+/** A do BASH: `X=y`, `X+=y`, `X[i]=y`, `X[i]+=y` (#545, #546), a forma que a shell aceita como atribuicao. Para quem
+ *  decide pelo verbo que SOBRA numa allowlist: saltar uma palavra que o bash corre como comando abria. */
+export const ATRIBUICAO_BASH = /^[A-Za-z_]\w*(?:\[[^\]\s]*\])?\+?=/;
+/** O nome de uma atribuicao, ou de um argumento de `export`/`declare`: `PATH[0]+=x` da `PATH`, `NODE_OPTIONS+` da
+ *  `NODE_OPTIONS`. Uma palavra sem essa forma fica como esta. */
+export const nomeDaAtribuicao = (t) => /^[A-Za-z_]\w*(?=\[|\+|=|$)/.exec(t)?.[0] ?? t;
+/** A palavra `i` de um argv (`{texto}`) vem depois de um `env`/`sudo`, que aceitam a LARGA (`A-B=1`) como atribuicao,
+ *  so com atribuicoes e flags pelo meio (`env -u FOO A-B=1`)? O `doas` nao aceita; fora disto o bash corre-a (#546). */
+export function depoisDeAtribuidora(argv, i) {
+  for (let k = i - 1; k >= 0; k--) {
+    if (["env", "sudo"].includes(argv[k].texto.replace(/^.*\//, ""))) return true;
+    // Outra cabeca pelo meio (`env -i nice A-B=1`): o `nice` corre o `A-B=1` como comando (6.a leitura do diff).
+    if (CABECAS.has(argv[k].texto.replace(/^.*\//, ""))) return false;
+    if (!ATRIBUICAO_LARGA.test(argv[k].texto) && !/^-/.test(argv[k].texto) && !/^-/.test(argv[k - 1]?.texto ?? "")) return false;
+  }
+  return false;
+}
+
 /** O segmento sem as cabecas inertes — os tokens a partir do VERBO REAL.
  *
  *  @param {string} segmento um segmento que toca a fronteira

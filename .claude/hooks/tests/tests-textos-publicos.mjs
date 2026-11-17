@@ -38,7 +38,7 @@ const SEM_GIT = () => Object.fromEntries(Object.entries(process.env).filter(([k]
  * lista no caminho por omissao (`~/.config/...`), como numa sessao aberta na `$HOME`; `envExtra` junta ao ambiente.
  * Devolve `{ decisao, razao, aviso, status, stderr }`.
  */
-function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligado = false, ficheiros = {}, sessao = "s1", dir: dado, hook = HOOK, semRepo = false, envExtra = {} } = {}) {
+export function corre(comando, { lista = LISTA, pasta = false, dentro = false, desligado = false, ficheiros = {}, sessao = "s1", dir: dado, hook = HOOK, semRepo = false, envExtra = {} } = {}) {
   const dir = dado ?? mkdtempSync(join(tmpdir(), "textos-hook-test-"));
   try {
     if (semRepo) return correSemRepo(comando, realpathSync(dir), envExtra, semRepo === "quebrado");
@@ -88,7 +88,7 @@ function correSemRepo(comando, dir, envExtra, quebrado = false) {
 }
 
 /** Afirma a decisao, o que a razao (ou o aviso) tem, e que o NOME nunca aparece. */
-function afirma(r, { decisao, inclui = [], aviso }) {
+export function afirma(r, { decisao, inclui = [], aviso }) {
   const p = [];
   if (r.decisao !== decisao) p.push(`decisao ${r.decisao}, esperado ${decisao} (${r.razao.slice(0, 120)})`);
   for (const s of inclui) if (!r.razao.includes(s)) p.push(`a razao devia ter "${s}": ${r.razao.slice(0, 160)}`);
@@ -101,9 +101,12 @@ function afirma(r, { decisao, inclui = [], aviso }) {
   if (p.length) throw new Error(p.join("; "));
 }
 
+export const NEGA = { decisao: "deny", inclui: ["o nome da linha 2 da lista"] };
+export const LIMPOS = { "pr.md": "texto limpo\n", "n.md": "notas\n", "t.txt": "tag\n", "b.json": "{}\n", "b.md": "ok\n", "a.md": "ok\n" };
+export const ESCRITO = { decisao: "deny", inclui: ["escrito neste mesmo comando", "numa chamada e publicar noutra"] };
+export const DEIXA = { decisao: "allow", aviso: false };
 export function registar({ test }) {
   // --- Um nome, em cada sitio por onde um texto sai -----------------------------------------------
-  const NEGA = { decisao: "deny", inclui: ["o nome da linha 2 da lista"] };
   test("textos-publicos: um nome no --body de um gh pr create nega, sem o nome na razao", () =>
     afirma(corre(`gh pr create --title "x" --body "visto no Projeto Secreto"`), { ...NEGA, inclui: ["gh pr create --body: o nome da linha 2 da lista"] }));
   test("textos-publicos: uma variante (sublinhado) no --title nega", () => afirma(corre(`gh issue create --title "projeto_secreto" --body ok`), NEGA));
@@ -213,9 +216,6 @@ export function registar({ test }) {
 
   // --- Um ficheiro escrito no MESMO comando (#396) ----------------------------------------------------
   // O ficheiro lido existe e esta LIMPO em todos: a negacao so pode vir da escrita (o hook le antes de correr).
-  const LIMPOS = { "pr.md": "texto limpo\n", "n.md": "notas\n", "t.txt": "tag\n", "b.json": "{}\n", "b.md": "ok\n", "a.md": "ok\n" };
-  const ESCRITO = { decisao: "deny", inclui: ["escrito neste mesmo comando", "numa chamada e publicar noutra"] };
-  const DEIXA = { decisao: "allow", aviso: false };
   test("textos-publicos: um cat > f <<'EOF' antes de --body-file f nega, mesmo com o f velho limpo (#396)", () => {
     afirma(corre(`cat > pr.md <<'EOF'\nvisto no projeto-secreto\nEOF\ngh pr create --title t --body-file pr.md`, { ficheiros: LIMPOS }), ESCRITO);
     afirma(corre(`gh pr create --title t --body-file pr.md`, { ficheiros: LIMPOS }), DEIXA);

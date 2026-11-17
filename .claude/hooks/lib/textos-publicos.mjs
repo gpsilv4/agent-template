@@ -52,7 +52,7 @@
  */
 import { isAbsolute, resolve, sep } from "path";
 import { comandos } from "./posicao.mjs";
-import { CABECAS, GIT_GLOBAIS_COM_VALOR } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, GIT_GLOBAIS_COM_VALOR, nomeDaAtribuicao } from "./fronteira-dados.mjs";
 
 /** As flags de texto e de ficheiro (`-`, ou um caminho) dos subcomandos que publicam, POR GRUPO: a mesma letra muda
  *  de sentido (o `-d` e o `--draft` do `gh pr create`, o `-m` o `--merge` do `gh pr merge`, o `--comment` do `gh pr
@@ -90,10 +90,12 @@ const LEITORES = new Set(["cat", "head", "tail", "wc", "grep", "rg", "diff", "cm
  *  `outro/.githooks/commit-msg` pode ser outro script, e um `NODE_OPTIONS=--import` corre outro codigo. A isencao cai se
  *  o mesmo comando escrever em `.githooks/` ou nas libs que ele importa (`.agent/scripts/lib/`), ou num alvo que nao se
  *  resolve, e se QUALQUER comando do texto mudar o `node`: uma atribuicao a `NODE_*`/`PATH` (`X=`, `X+=`, solta ou de
- *  um `export`), um `export`/`declare` desses nomes mesmo sem `=`, ou uma funcao `node` (#536, #545). Limites ditos: um
- *  `.githooks/commit-msg` mudado NOUTRA chamada (por um `Edit`) nao se ve; nem uma variavel posta por um verbo que nao a
- *  escreve como atribuicao (`printf -v`, `read`) e que ja estava exportada (#546). O hook nao e barreira contra quem o
- *  queira contornar. Acrescentar so um script que so leia (e com teste). */
+ *  um `export`), um `export`/`declare` desses nomes mesmo sem `=`, ou uma funcao `node` (#536, #545), e o que o muda
+ *  sem uma atribuicao a vista (`semAtribuicaoAVista`, #546). Limites ditos: um `.githooks/commit-msg` mudado NOUTRA
+ *  chamada (por um `Edit`) nao se ve; nem uma variavel exportada numa chamada anterior que persista (o `CLAUDE_ENV_FILE`
+ *  de um hook `SessionStart`); nem as formas raras `getopts o PATH`, `let PATH=`, `((PATH=))`, o `for a PATH in` do zsh
+ *  e o `${X=}` com `set -a`; nem um nome posto por uma variavel noutro sitio que nao um argumento (#546). O hook nao e barreira contra quem o queira contornar. Acrescentar so um script que
+ *  so leia (e com teste). */
 const LEITORES_POR_SCRIPT = { node: [".githooks/commit-msg", "./.githooks/commit-msg"] };
 /** Os que copiam PARA uma pasta: ai a pasta do ficheiro lido tambem conta (`cp x /tmp/` escreve `/tmp/x`). */
 const COPIAM = new Set(["cp", "mv", "install", "ln", "rsync"]);
@@ -119,20 +121,24 @@ export function temExpansao(cru, corpo = false) {
   return false;
 }
 
-/** O nome da variavel de uma atribuicao: `X=y` e `X+=y` dao `X`. */
-const nomeDe = (t) => t.split("=")[0].replace(/\+$/, "");
-
 /** O indice da palavra que CORRE (e as atribuicoes antes dela): salta `X=y`, as cabecas (`env`, `timeout 5`) e as
  *  palavras de controlo (`do`, `then`, `!`). */
 function cabeca(ws) {
   const atribuicoes = [];
   let i = 0;
+  let depoisDeCabeca = false;
   while (i < ws.length) {
     const t = ws[i].texto;
-    // `X+=y` (o bash acrescenta) e uma atribuicao como `X=y`, e o nome e o mesmo (#545).
-    if (/^[A-Za-z_]\w*\+?=/.test(t)) { atribuicoes.push(nomeDe(t)); i++; continue; }
+    // O verbo a seguir decide pelos `LEITORES` (uma allowlist): saltar uma palavra que o bash corre como comando abria.
+    // Salta-se a do `main` (pelo texto: nada que ele via deixa de se ver); a do bash SEM aspas (`X[0]=1`; um `"X[0]=1"
+    // cat` corre o `"X[0]=1"`, 4.a leitura do diff) so na posicao da shell ou depois de um `env`/`sudo` (um `nohup X[0]=1`
+    // corre-o, 6.a); e a LARGA depois de um `env`/`sudo` (`env A-B=1 gh`, 5.a leitura).
+    const atribuidora = depoisDeAtribuidora(ws, i);
+    const atribuicao = /^[A-Za-z_]\w*\+?=/.test(t) || (ATRIBUICAO_BASH.test(ws[i].cru) && (!depoisDeCabeca || atribuidora)) || (atribuidora && ATRIBUICAO_LARGA.test(t));
+    if (atribuicao) { atribuicoes.push(nomeDaAtribuicao(t)); i++; continue; }
     if (CONTROLO.has(t)) { i++; continue; }
     if (CABECAS.has(t.replace(/^.*\//, ""))) {
+      depoisDeCabeca = true;
       i++;
       while (i < ws.length && (/^-/.test(ws[i].texto) || /^\d+[smhd]?$/.test(ws[i].texto))) i++;
       continue;
@@ -153,28 +159,74 @@ function defineGhRepo(ws) {
   const k = ws.findIndex((w) => /^GH_REPO\+?=/.test(w.texto));
   // Depois de um `export`/`declare`, tudo e um argumento dele (`export FOO GH_REPO=x`); antes, so prefixos.
   const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
-  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*\+?=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => ATRIBUICAO_BASH.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
 }
 
 /** As variaveis que mudam o que um `node` corre (#536): o `NODE_OPTIONS=--import` corre outro codigo antes do script, um
- *  `PATH` com outra pasta a frente traz outro `node`, e os outros `NODE_*` mudam onde ele procura os modulos. */
-const MUDA_O_NODE = /^(?:NODE_[A-Z0-9_]*|PATH)$/;
+ *  `PATH` com outra pasta a frente traz outro `node`, e os outros `NODE_*` mudam onde ele procura os modulos. E (#546) o
+ *  `path` do zsh (ligado ao `PATH`), as bibliotecas que o carregador poe a frente (`DYLD_*`, `LD_*`), e as tabelas do
+ *  zsh que definem um comando (`functions[node]=`, `aliases`, `commands`) — por falhar fechado, qualquer chave. */
+const MUDA_NOMES = "NODE_[A-Z0-9_]*|PATH|path|fpath|FPATH|DYLD_\\w+|LD_\\w+|functions|aliases|galiases|commands";
+const MUDA_O_NODE = new RegExp(`^(?:${MUDA_NOMES})$`);
+/** `${NOME=x}`, `${NOME:=x}`, o `${NOME::=x}` do zsh e com indice (`${PATH[0]:=x}`) atribuem numa expansao (#546). */
+const ATRIBUI_NA_EXPANSAO = new RegExp(`\\$\\{(?:${MUDA_NOMES})(?:\\[[^\\]]*\\])?:{0,2}=`);
+/** Os verbos que poem uma variavel SEM a escrever como atribuicao, ou correm o que nao se le (#546). */
+const LEEM_PARA = new Set(["read", "mapfile", "readarray"]);
+const CORREM_TEXTO = new Set(["eval", "source", ".", "trap", "emulate"]);
+/** O nome de um argumento (antes do `=`) so se sabe ao expandir (`export "$N=x"`, `read "$N"`): falha fechado (#546). */
+const nomeExpande = (w) => ((n) => temExpansao(n) || /[{}*?]/.test(n))(w.cru.split("=")[0]); // e as chavetas e os globs
+const REFERENCIAS = new Set(["declare", "typeset", "local"]);
 /** O comando muda o `node` de quem vem depois (#536): uma dessas variaveis numa atribuicao (solta, ou como argumento de
  *  `export`/`declare`/`env`), ou uma funcao chamada `node`. Na posicao de atribuicao, e nunca dentro de um texto — a
- *  mesma forma do `defineGhRepo`. */
+ *  mesma forma do `defineGhRepo`. E (#546) as formas que mudam o `node` sem uma atribuicao a vista: falhar fechado. */
 function mudaONode(ws) {
   if (cabeca(ws).atribuicoes.some((a) => MUDA_O_NODE.test(a))) return true;
   // `function node { ... }` (a forma `node() {` ve-se em `textosDoComando`: o lexer tira o `()`, e sobra um `node`
   // sozinho seguido de um `{`).
   if (ws[0]?.texto === "function" && ws[1]?.texto === "node") return true;
+  if (semAtribuicaoAVista(ws)) return true;
   // Um `export NODE_OPTIONS` SEM `=` (#545): exporta o valor que a variavel ja tinha, posto por outro verbo antes. Um
   // argumento de `DEFINEM` com um destes nomes conta, com `=` ou sem ele — falhar fechado.
   const { i: h } = cabeca(ws);
-  if (h >= 0 && DEFINEM.has(ws[h].texto.replace(/^.*\//, "")) && ws.slice(h + 1).some((w) => MUDA_O_NODE.test(nomeDe(w.texto)))) return true;
+  if (h >= 0 && DEFINEM.has(ws[h].texto.replace(/^.*\//, "")) && ws.slice(h + 1).some((w) => MUDA_O_NODE.test(nomeDaAtribuicao(w.texto)) || nomeExpande(w))) return true;
   // Com o `+=` (#545): `export NODE_OPTIONS+=--import=...` acrescenta, e muda o `node` na mesma.
-  const k = ws.findIndex((w) => MUDA_O_NODE.test(nomeDe(w.texto)) && w.texto.includes("="));
+  const k = ws.findIndex((w) => MUDA_O_NODE.test(nomeDaAtribuicao(w.texto)) && w.texto.includes("="));
   const d = ws.findIndex((w, i) => i < k && DEFINEM.has(w.texto.replace(/^.*\//, "")));
-  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => /^[A-Za-z_]\w*\+?=/.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+  return k >= 0 && ws.slice(0, d >= 0 ? d : k).every((w) => ATRIBUICAO_BASH.test(w.texto) || /^-/.test(w.texto) || CONTROLO.has(w.texto));
+}
+
+/** As formas que mudam o `node` SEM uma atribuicao a vista (#546): o `printf -v`/`print -v`, o `read`/`mapfile`/
+ *  `readarray` de um desses nomes (com indice, ou por expandir); uma referencia (`declare -n`, `-gn`), seja qual for o
+ *  alvo, porque `declare -n R; R=NODE_OPTIONS` esconde-o; um `for`/`select`/`foreach` sobre um deles (o `PATH` esta
+ *  sempre exportado); o `${NOME:=}`; o `hash -p`/`hash node=`; um `alias node=`; e o que corre texto que nao se le
+ *  (`eval`, `source`, `.`, `trap`, `emulate`), so na posicao de verbo (um `ls .` nao conta). Limites ditos no
+ *  cabecalho de `LEITORES_POR_SCRIPT`. */
+function semAtribuicaoAVista(ws) {
+  // No inicio do comando (ou depois de uma palavra de controlo): um `echo for path` nao e um ciclo.
+  if (ws.some((w, k) => ["for", "select", "foreach"].includes(w.texto) && (k === 0 || CONTROLO.has(ws[k - 1].texto)) && MUDA_O_NODE.test(ws[k + 1]?.texto ?? ""))) return true;
+  if (ws.some((w) => ATRIBUI_NA_EXPANSAO.test(w.cru))) return true;
+  let { i: h } = cabeca(ws);
+  // Os modificadores do zsh (`noglob eval`, `nocorrect source`) nao sao o verbo.
+  while (h >= 0 && ["noglob", "nocorrect", "-"].includes(ws[h]?.texto)) h = h + 1 < ws.length ? h + 1 : -1;
+  if (h < 0) return false;
+  const verbo = ws[h].texto.replace(/^.*\//, "");
+  const args = ws.slice(h + 1).map((w) => w.texto);
+  // O nome do `-v` (o `print -v`/`-rv` e do zsh), com indice (`PATH[0]`) ou por expandir (`"$N"`).
+  const mudaV = (k, nome) => MUDA_O_NODE.test(nomeDaAtribuicao(nome)) || (ws[h + 1 + k] && temExpansao(ws[h + 1 + k].cru));
+  // Os nomes do `read`/`mapfile`: sem o valor das flags que o levam (`read -p "$x: " v`), que dependem do verbo.
+  const comValor = verbo === "read" ? /^-[A-Za-z]*[uptdnN]$/ : /^-[A-Za-z]*[dnOsuCc]$/;
+  // Um destes nomes conta mesmo como valor de flag (`read -t PATH` do zsh, onde o `-t` nao leva valor): falhar fechado.
+  const nomesLidos = ws.slice(h + 1).filter((w, k, a) => !comValor.test(a[k - 1]?.texto ?? "") || MUDA_O_NODE.test(nomeDaAtribuicao(w.texto)));
+  // Uma verificacao por linha, na forma `if (...) return true;`: e o sinal do par da varredura (`pares-hooks.mjs`).
+  if (CORREM_TEXTO.has(ws[h].texto)) return true;
+  if ((verbo === "printf" || verbo === "print") && args.some((a, k) => (/^-[A-Za-z]*v$/.test(a) && mudaV(k + 1, args[k + 1] ?? "")) || (/^-v./.test(a) && mudaV(k, a.slice(2))))) return true;
+  if (LEEM_PARA.has(verbo) && verbo !== "read" && args.some((a) => /^-[A-Za-z]*C/.test(a))) return true;
+  if (LEEM_PARA.has(verbo) && nomesLidos.some((w) => MUDA_O_NODE.test(nomeDaAtribuicao(w.texto)) || nomeExpande(w))) return true;
+  if (REFERENCIAS.has(verbo) && args.some((a) => /^-[A-Za-z]*n/.test(a))) return true;
+  if (verbo === "hash" && args.some((a) => /^-[A-Za-z]*p/.test(a) || /^node=/.test(a))) return true;
+  if (verbo === "alias" && args.some((a) => /^node=/.test(a))) return true;
+  if (verbo === "enable" && args.some((a) => /^-[A-Za-z]*f/.test(a))) return true;
+  return false;
 }
 
 /**
@@ -275,7 +327,8 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     // (no fim, `isentos`); com o `node` mudado noutro comando (`nodeMudado`), nem chega a ficar isento.
     // A raiz por ultimo: custa um `git` (preguicosa, no hook), e so se pergunta a um candidato. Sem `base` (um interior
     // depois de um `cd`, ou um `cd` que nao se resolve) nao ha isencao.
-    const isento = base !== null && ws[h].texto === nome && cabeca(ws).atribuicoes.length === 0 && !nodeMudado &&
+    // Sem flags de uma cabeca antes (#546): `env -P./evil node` procura o `node` noutra pasta, `env -C./o` muda de pasta.
+    const isento = base !== null && ws[h].texto === nome && cabeca(ws).atribuicoes.length === 0 && !nodeMudado && ws.slice(0, h).every((w) => !/^-/.test(w.texto)) &&
       (LEITORES_POR_SCRIPT[nome]?.includes(ws[h + 1]?.texto ?? "") ?? false) && ((r) => r !== null && real(base) === r)(raiz());
     // O que o script corre: o `.githooks/` e as libs que o `commit-msg` importa de `.agent/scripts/lib/` (#536; a pasta
     // inteira, e nao so as duas de hoje: uma lib nova importada nao reabria o buraco calada).

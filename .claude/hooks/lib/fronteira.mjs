@@ -35,11 +35,12 @@ export { contextoFronteira } from "./caminhos.mjs";
 // Os caminhos da fronteira (`CAMINHOS_FRONTEIRA`, `ehCaminhoFronteira`, `MAES`), o regex `FRONTEIRA`
 // e a `resto()` vivem no modulo-FOLHA (#243): este ficheiro e o `caminhos.mjs` importavam-se um ao
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
-// importe deste ficheiro); `MAES` e `resto` importam-se da folha.
-import { escritaDoBloco, FRONTEIRA, NOMEIA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
+// importe deste ficheiro); `MAES` e `resto` importam-se da folha. A `ATRIBUICAO_LARGA` tambem (#546): o guard do
+// branch importa daqui, e ficava a 499 linhas com um import proprio.
+import { ATRIBUICAO_LARGA_SRC, escritaDoBloco, FRONTEIRA, NOMEIA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
 import { aJusante, comandos, inlineDe, NOMES_SHELL } from "./posicao.mjs";
 import { valoresQueExecutam } from "./verbos-git.mjs";
-export { CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
+export { ATRIBUICAO_LARGA, CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
 
 /** Para onde ESCREVE uma invocacao do `git`, alem do `>` (#237). O `git` esta na LEITURA, e estes
  *  sub-verbos e opcoes truncam ou criam ficheiros: `--output[=]`, o `-o`/`--output-directory` do
@@ -157,7 +158,8 @@ const RECEBE_CODIGO = new RegExp(
     `\\|&?\\s*${RECEBE}(?:\\s+-[\\w-]*)*\\s*(?:$|[;&|)#]|\\d*>)`,
     // O comando-variavel tambem com uma CABECA (`sudo $SHELL <<EOF`, `env -i $X <<EOF`), e o `source`/`.` de um
     // heredoc (`source /dev/stdin <<EOF`): correm o corpo na shell actual (2.a auditoria do #317).
-    `(?:^|[;&|(]\\s*)(?:(?:sudo|env|exec|nohup|command|time|nice)\\s+(?:-\\S+\\s+|\\w+=\\S*\\s+)*)?\\$[^\\s<]*\\)?\\s*<<`,
+    // As atribuicoes pela LARGA (#546): o `env` aceita qualquer `NOME=valor` (`env X+=1 $C <<EOF`, `env A-B=1 ...`).
+    `(?:^|[;&|(]\\s*)(?:(?:sudo|env|exec|nohup|command|time|nice)\\s+(?:-\\S+\\s+|${ATRIBUICAO_LARGA_SRC}\\S*\\s+)*)?\\$[^\\s<]*\\)?\\s*<<`,
     `(?:^|[;&|(]\\s*)(?:source|\\.)\\s[^\\n|;&]*<<`,
     // Quem corre o stdin numa SHELL sem se chamar shell: `sudo -s`/`-i`, `doas -s`, `su`, `runuser` — com um
     // heredoc ou na ponta de um pipe (leitura final do #317: `sudo -s <<\EOF` com um `eval` passava).

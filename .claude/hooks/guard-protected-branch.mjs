@@ -49,7 +49,7 @@ import { comPrazo, negar } from "./lib/resposta.mjs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA, valoresQueExecutam, executaAlgo } from "./lib/verbos-git.mjs";
-import { porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
+import { ATRIBUICAO_LARGA, porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -220,7 +220,7 @@ function invocacoes(texto) {
       // `env GIT_DIR=.git git commit` deixaram de ser detetados — tres regressoes que a
       // tabela de bypasses apanhou no momento em que eu as introduzi.
       if (base === "git") break;
-      if (/^\w+=/.test(t) || t.startsWith("-")) { toks = toks.slice(1); anteriorEraFlag = true; continue; }
+      if (ATRIBUICAO_LARGA.test(t) || t.startsWith("-")) { toks = toks.slice(1); anteriorEraFlag = true; continue; }
       // O VALOR de uma atribuicao com espacos: `GIT_AUTHOR_DATE="2020-01-01 00:00" git commit`
       // parte-se em tokens e o `00:00` nao e atribuicao, nem flag, nem wrapper — o ciclo
       // quebrava ali e a invocacao do git nunca era vista. Medido a passar, e nao e ofuscacao:
