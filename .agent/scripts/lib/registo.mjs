@@ -194,6 +194,13 @@ export async function registaDescobertos({ dir, entryPoint, ctx = {}, contagem, 
   return { registados, deOutros };
 }
 
+/** O valor que um teste DEVOLVE (#539): uma lista e a das falhas (vazia: passou), como nos runners das suites de scripts;
+ *  `undefined` passou; e qualquer outro valor e um erro — mais estrito do que o `fn() ?? []` deles, que deixa passar um
+ *  `null`. Devolve a mensagem da falha, ou `null`. O runner do `test-hooks` so contava o `throw`, e quatro testes que
+ *  devolviam a lista passavam sempre. */
+export const falhaDoRetorno = (r) => (Array.isArray(r) ? (r.length ? r.join("; ") : null) : r === undefined ? null
+  : `devolveu ${typeof r?.then === "function" ? "uma Promise (um teste async?)" : "um valor que nao e uma lista de falhas"}: as falhas lancam, ou devolvem-se numa lista`);
+
 /** Linha de rodape para o entry point dizer o que correu. Sem isto, a descoberta e
  *  invisivel e ninguem nota que um modulo deixou de ser encontrado. */
 export function resumoDescoberta(registados, deOutros = []) {

@@ -313,6 +313,27 @@ testCru(
   { code: 1, includes: ["precisa de `conhecidos`"] }
 );
 
+// O valor que um teste devolve (#539): o `test()` do `test-hooks` so contava o `throw`, e quatro testes que devolviam a
+// lista das falhas passavam sempre. Cada linha tem o veredicto da regra antiga (ignorar o valor) a direita: as duas
+// primeiras e a Promise mudam, que e a prova de que a regra nova decide alguma coisa.
+{
+  const { falhaDoRetorno } = await import(REGISTO);
+  const casos = [
+    ["uma lista com falhas e FAIL, com as mensagens", ["a", "b"], "a; b"], // antes: passava
+    ["uma lista vazia passa", [], null],
+    ["undefined passa (o teste que lanca nas falhas)", undefined, null],
+    ["uma Promise (um teste async) e FAIL", Promise.resolve(), /um teste async/], // antes: passava
+    ["um numero e FAIL", 1, /nao e uma lista de falhas/], // antes: passava
+    ["um null e FAIL (mais estrito do que o `fn() ?? []`), sem sugerir async", null, /^devolveu um valor que nao e uma lista/], // antes: passava
+  ];
+  for (const [nome, r, esperado] of casos) {
+    const f = falhaDoRetorno(r);
+    const certo = esperado instanceof RegExp ? typeof f === "string" && esperado.test(f) : f === esperado;
+    if (certo) { passed++; console.log(`  PASS  falhaDoRetorno: ${nome}`); }
+    else { falhas.push({ nome: `falhaDoRetorno: ${nome}`, problemas: [`deu ${JSON.stringify(f)}`], out: "" }); console.log(`  FAIL  falhaDoRetorno: ${nome}`); }
+  }
+}
+
 console.log("");
 console.log(`  ${passed} passaram, ${falhas.length} falharam.`);
 if (falhas.length) {

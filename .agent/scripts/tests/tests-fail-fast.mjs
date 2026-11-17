@@ -249,6 +249,34 @@ export function registar() {
     caso("fail-fast (#157): test-hooks sai ao primeiro FAIL", p);
   }
 
+  // O `test()` do `test-hooks` CONTA o que um teste devolve (#539): um teste plantado que devolve a lista das falhas
+  // reprova, e pelo caminho do fail-fast. Antes so o `throw` contava, e este saia verde. Plantado na COPIA antes dos
+  // testes inline (como o #157 parte o hook): com o fail-fast, sai logo nele, e nao paga a suite inteira.
+  {
+    const raiz = resolve(AQUI, "..", "..", "..");
+    const dir = mkdtempSync(join(tmpdir(), "fail-fast-test-"));
+    let r;
+    let plantou = false;
+    try {
+      for (const p of [".claude", ".agent/scripts"]) cpSync(join(raiz, p), join(dir, p), { recursive: true });
+      const runner = join(dir, ".claude", "hooks", "tests", "test-hooks.mjs");
+      const src = readFileSync(runner, "utf8");
+      const ancora = 'console.log("\\n=== Testes dos Hooks ===\\n");';
+      const plantado = src.replace(ancora, `${ancora}\ntest("devolve-a-lista", () => ["falha-plantada"]);\ntest("terceiro-so-corre-se-nao-saiu", () => {});`);
+      plantou = plantado !== src;
+      writeFileSync(runner, plantado);
+      r = executa(runner, true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    const p = [];
+    if (!plantou) p.push("a ancora do runner mudou: o teste plantado nao entrou, e o caso mediria outra coisa");
+    if (r.code === 0) p.push("tem de sair != 0: uma lista devolvida e uma falha");
+    if (!/^\s*FAIL\s+devolve-a-lista[\s\S]*falha-plantada/m.test(r.out)) p.push("a linha `FAIL devolve-a-lista` com a mensagem devolvida tem de sair");
+    if (!r.out.includes("MODO FAIL-FAST: saiu ao primeiro FAIL") || r.out.includes("terceiro-so-corre-se-nao-saiu")) p.push("nao saiu ao primeiro FAIL");
+    caso("o test-hooks conta a lista que um teste devolve, pelo caminho do fail-fast (#539)", p);
+  }
+
   // --- O resumo com falhas SEM `out` (#366) ---------------------------------------------------
   // O `registarResultado(name, problems)` sem `out` e o caso comum; o resumo fazia `f.out.split` e
   // rebentava, escondendo o detalhe de TODAS as falhas. Os marcadores `[nome]` so o DETALHE os imprime

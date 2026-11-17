@@ -18,7 +18,7 @@ import { tmpdir } from "os";
 import { fileURLToPath } from "url";
 import { dirname, resolve, join } from "path";
 // Descoberta de suites numa so fonte (TP4); o `tests-ambito-agente.mjs` exercita o `lib/agentes.mjs` (#238).
-import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
+import { falhaDoRetorno, registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
 import { FAIL_FAST } from "../../../.agent/scripts/tests/harness/relatorio.mjs"; // o modo, de uma so fonte (#157)
 import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
@@ -69,7 +69,7 @@ let passed = 0, saltados = 0; // um SKIP conta para o registo: o modulo correu, 
 const falhas = [];
 function test(nome, fn) {
   try {
-    fn();
+    const falha = falhaDoRetorno(fn()); if (falha) throw new Error(falha); // o que devolve CONTA (#539), e segue o `catch`
     passed++;
     console.log(`  PASS  ${nome}`);
   } catch (err) {
