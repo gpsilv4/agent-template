@@ -188,8 +188,9 @@ function linhasPorTipo(active) {
   return out;
 }
 
-/** O `~~X~~`: o `id` NAO muda (um riscado nao casa o `ID_LIKE`, e a rede 2b e o `trackId` ficam iguais); `idLimpo` e so
- *  para a mensagem dizer qual e (#445 PR 2). */
+/** O `~~X~~`: o `riscado` e o `idLimpo` (#445 PR 2). Nos blocos e nas tabelas do ATIVO o `id` fica o cru (um riscado nao
+ *  casa o `ID_LIKE`, e a rede 2b e o `trackId` ficam iguais) e o `idLimpo` so diz qual e na mensagem; no ARQUIVO o leitor
+ *  do Historico troca-o pelo `idLimpo` (#524: a linha riscada movida para la fechou o X). */
 const riscoDe = (celula) => ({ riscado: /~~/.test(celula ?? ""), idLimpo: idDe((celula ?? "").replace(/~~/g, "")) });
 
 /** As tabelas de um texto, cada uma com o seu cabecalho, as linhas e onde comeca: uma tabela acaba numa linha que nao

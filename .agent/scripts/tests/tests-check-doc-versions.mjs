@@ -454,6 +454,10 @@ export function registar() {
     writeF(dir, ".agent/scripts/guards/proprio.mjs", modulo('ok("nunca corre");'));
   }, { code: 1, includes: ["guards/proprio.mjs nao e chamado por ninguem"] });
 
+  // O contra-caso do detetor (os guards ligados pelo import do `check-doc-versions` nao avisam, #539) NAO vive aqui: este
+  // harness desconta os avisos que ja estao na linha de base, e um detetor que lesse o proprio ficheiro poe-nos tambem
+  // na base. Prova-o o "sintetico: repo limpo por construcao" (sem linha de base), que reprova com esse mutante.
+
   // Uma ligacao partida nao pode passar por "nao ha nada a verificar" (`TP2`).
   test("guard PROPRIO declarado e ausente do disco avisa", (dir) => {
     declara(dir, [PROPRIO]);

@@ -261,6 +261,14 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // Os guards proprios do projeto e o detetor de guards desligados, extraidos do check-doc-versions.mjs (#539)
+    // quando ele chegou as 499 linhas: os dois `warn(` que eram dele vivem aqui.
+    alvo: ".agent/scripts/guards/ligacao-proprios.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // Modulo do Guard 15, extraido do check-doc-versions.mjs quando este passou o flag das
     // 500 linhas. A suite e a mesma do ficheiro de origem: o `tests-anti-patterns.mjs` corre
     // por importacao a partir dela, nao por si.

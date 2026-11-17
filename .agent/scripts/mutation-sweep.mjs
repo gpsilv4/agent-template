@@ -50,6 +50,9 @@
  *   EM SHARDS (#328, v0.59.0) — espera do PR, suites + a perna mais lenta:
  *     publico (4/4), 366 sitios: ~17 min (shards 13m25s/11m36s, `--skips` 7m23s; n=1, PR #333)
  *     derivado privado (2/2), 444 sitios: 27m00s (shards 19m09s/23m46s, `--skips` 16m14s; n=1, PR #89)
+ *   EM TRES FATIAS (#460, v0.63.6) — o passo da varredura, por fatia (`minutos-ci --passos`, n=7, PRs #552-#569):
+ *     publico (4/4), ~580 sitios: mediana 19,9 / 15,2 / 16,0 min (a mesma fatia de 13 a 25, conforme o runner),
+ *     `--skips` 10,1; a espera do PR 25,5 min (n=5, `minutos-ci --espera`; antes das tres fatias, 31,9)
  *
  * A maioria dos derivados e privada: quem planear o CI pelo numero do template planeia com
  * metade da margem. Detalhe e origem de cada medicao em `src/docs/scripts-guide-why.md`.

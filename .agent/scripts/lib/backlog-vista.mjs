@@ -263,8 +263,8 @@ export function geraVista(lido, calculo, { agora, vigiar = false, erro = null, b
       return `<tr data-busca="${busca}"><td><a href="#f-${id}">${id}</a></td>${meta.slice(0, 2).join("")}<td>${titulo}</td>${meta.slice(2).join("")}</tr>`;
     })
     .join("");
-  // Um ID do Historico que nao casa o ID_LIKE (riscado, `B-3`, hostil) nao tem detalhe nem link: fica uma linha so de
-  // texto escapado, para o "Fechados (N)" continuar a bater com o calcula (sumir em silencio era o `TP2`).
+  // Um ID do Historico que nao casa o ID_LIKE (`B-3`, hostil; um riscado ja nao: o leitor da-o limpo desde o #524) nao
+  // tem detalhe nem link: fica uma linha so de texto escapado, para o "Fechados (N)" continuar a bater com o calcula (sumir em silencio era o `TP2`).
   const fechadosInvalidos = lido.fechados
     .filter((f) => !ID_LIKE.test(f.id ?? ""))
     .map((f) => {

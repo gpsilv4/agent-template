@@ -602,13 +602,26 @@ O `check-codigo-morto.mjs` so olha para **imports**. Funcoes internas que ningue
 ficam de fora, e o cabecalho dele di-lo, com a razao: a classe que viaja para os derivados e a dos imports, e um
 analisador de ambito escrito a mao com defeitos era pior do que nenhum.
 
-## `minutos-ci` — o que cada modo mede (#429, #442)
+## `minutos-ci` — o que cada modo mede (#429, #442, #517, #542, #554)
 
 Por run, o cobrado (cada job arredondado ao minuto acima) e o real; `--passos` da a duracao de cada passo; a mediana
 dos PRs de app (o job mais longo de cada run) contra os 120 s, porque um job de 121 s paga 3 min. `--quota` le a
 faturacao da conta (`/users/<login>/settings/billing/usage`), soma so os repos PRIVADOS contra a quota gratis, projeta
 o fim do mes a partir do dia 3, e escreve `QUOTA: AVISO`/`ESGOTADA` (sai sempre 0: e o `/deploy` que para). Falha alto,
 nunca `0 min`: um zero que nao mediu era um portao a passar sobre nada.
+
+Os modos que vieram depois (o cabecalho do `minutos-ci.mjs` tem os detalhes):
+
+- **`--quota --por-pr` e `--desde ... --todos` (#517).** O custo por PR de cada repo privado (separado em upgrade, normal
+  e Dependabot, e os runs do proprio Dependabot, `dynamic`), e o run a run de todos os privados, cada um com o seu subtotal. Respondem a "onde vai a quota", e nao
+  so a "quanto falta".
+- **Os limites (#542).** No fim de cada run a run, cada job e medido contra o SEU `timeout-minutes`: `LIMITE: CORTADO`
+  quando a anotacao do check run diz que o job excedeu o tempo (um job cortado fica `cancelled`, e so a anotacao o
+  distingue), e um `AVISO` a 90% numa corrida ou a 75% na mediana de 5. Um job perto do limite e o que vai ser cortado
+  no proximo PR lento.
+- **A espera de um PR (#554), `--espera`.** Mede do inicio do run ao fim do ultimo job que correu, e da a mediana dos
+  PRs de maquinaria e a dos outros, antes e depois de um `--corte`. Os `cancelled` pela concurrency ficam fora e
+  contados. E a medida do #460 (31,9 -> 25,5 min): os minutos cobrados nao dizem quanto tempo um PR espera.
 
 ## `backlog-board` — a vista do backlog (#446)
 

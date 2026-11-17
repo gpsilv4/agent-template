@@ -1,7 +1,7 @@
 # Backlog — {{PROJECT_NAME}}
 
 > Documento vivo com os items de trabalho **ativos**.
-> IDs sao unicos e permanentes — nunca reutilizar um ID (verificar tambem `backlog-archive.md`).
+> IDs sao unicos e nunca se reutilizam (verificar tambem `backlog-archive.md`); renomear um ID fechado so pela regra do `backlog-method.md`.
 > **Estrutura**: ZONA ATIVA (topo, uso diario) -> ZONA DE REFERENCIA (fundo, consulta).
 > Historico de concluidos e sprints fechados vivem em `backlog-archive.md` (NAO carregado no contexto).
 > Atualizado: {{DATE}}
