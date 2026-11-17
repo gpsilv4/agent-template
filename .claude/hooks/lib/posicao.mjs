@@ -21,7 +21,7 @@
  * escrevem, que sao os PRs (c) e (b) do #336. Passados `MAX_POSICOES`/`MAX_VOLTAS`, nega sem julgar.
  */
 import { fimAspasDuplas, fimSubst } from "./caminhos.mjs";
-import { CABECAS, NOMES_INTERPRETADOR, resto } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, NOMES_INTERPRETADOR, resto } from "./fronteira-dados.mjs";
 
 /** O fim do que abre em `s[k]` (`$(`, `<(`, `>(`): o `)` que fecha, lido como a shell. Um nome proprio para
  *  a varredura o poder mutar (`pares-hooks.mjs`), sem tocar no `fimSubst` partilhado. */
@@ -309,18 +309,25 @@ export const MAX_POSICOES = 32;
 const MAX_VOLTAS = 64;
 
 /** O indice da palavra que CORRE, depois das atribuicoes, das palavras-chave, do `exec` e das cabecas inertes.
- *  Ate estabilizar: `env X=1 node` tem uma atribuicao DEPOIS de uma cabeca. `-1` passado o `MAX_VOLTAS`. */
-function verboEm(argv, de = 0) {
+ *  Ate estabilizar: `env X=1 node` tem uma atribuicao DEPOIS de uma cabeca. `-1` passado o `MAX_VOLTAS`. Com `novo`
+ *  falso, as atribuicoes sao as do `main` antes do #546 (`lerArgv` corre as duas leituras). */
+function verboEm(argv, de = 0, novo = true) {
   let i = de;
   for (let volta = 0; ; volta++) {
     if (volta > MAX_VOLTAS) return -1;
     const ini = i;
     // As palavras-chave, as atribuicoes e o `exec` com as flags dele (`-c`, `-l`, `-a <nome>`), num ciclo SO:
-    // um `resto()` por cada `exec` seguido era o que fazia 4000 caracteres custarem segundos.
+    // um `resto()` por cada `exec` seguido era o que fazia 4000 caracteres custarem segundos. As atribuicoes: a do
+    // BASH sempre (`X=$HOME`, `X+=1`, `X[0]=1`: o nome nunca expande, o valor nao conta); a LARGA (`A-B=1`) SO depois
+    // de uma cabeca que a aceita como atribuicao (`env`, `sudo`), e se o NOME nao expande (`$N=`). Fora disso o bash
+    // corre-a como COMANDO (`./x=/npx`, `./n=/node`, `"X+=/perl"`): as quatro leituras do diff do #546.
     for (;;) {
       const t = argv[i]?.texto;
       if (t === undefined) break;
-      if (CHAVES.has(t) || /^[A-Za-z_]\w*=/.test(t)) i++;
+      const atribuicao = novo
+        ? ATRIBUICAO_BASH.test(t) || (ATRIBUICAO_LARGA.test(t) && depoisDeAtribuidora(argv, i) && !expande({ ...argv[i], cru: argv[i].cru.split("=")[0] }))
+        : /^[A-Za-z_]\w*=/.test(t);
+      if (CHAVES.has(t) || atribuicao) i++;
       else if (t === "exec") {
         i++;
         while (/^-[cla]+$/.test(argv[i]?.texto ?? "")) i += argv[i].texto.includes("a") ? 2 : 1;
@@ -346,11 +353,11 @@ const expande = (w) => !/^\[\[?$/.test(w.cru) && /[$`*?]|\[.+\]|\{[^}]*,/.test(w
 /** As posicoes onde um interpretador pode estar: a do verbo, a seguir a um `{` (`function f { node ...`), a
  *  seguir ao `-exec` do `find`, e o primeiro interpretador (ou nome que expande) depois de um executor. Com
  *  `qualquer`, todas as palavras nao citadas com nome de interpretador. `null` passado o `MAX_POSICOES`. */
-function posicoes(argv, v, qualquer) {
+function posicoes(argv, v, qualquer, novo) {
   if (argv.filter((w) => w.texto === "{" || /^-(?:exec|execdir|ok|okdir)$/.test(w.texto)).length > MAX_POSICOES) return null;
   let estourou = false;
   const verbo = (k) => {
-    const r = verboEm(argv, k);
+    const r = verboEm(argv, k, novo);
     if (r < 0) estourou = true;
     return r;
   };
@@ -407,8 +414,15 @@ function lerArgv(argv, qualquer) {
     const de = comandos(colado || argv[s + 1]?.texto || "").map((c) => inlineDe(c, qualquer)).find(Boolean);
     if (de) return de;
   }
-  const v = verboEm(argv);
-  const ps = v < 0 ? null : posicoes(argv, v, qualquer);
+  // As DUAS leituras do verbo (#546): a do `main` e a que salta `X+=1`/`env A-B=1`. Nega se qualquer negar: o que o
+  // `main` negava continua negado por construcao (quatro leituras do diff acharam um bypass em cada remendo).
+  return lerCom(argv, qualquer, true) ?? lerCom(argv, qualquer, false);
+}
+
+/** O `lerArgv` depois do `env -S`, com uma das leituras do verbo. */
+function lerCom(argv, qualquer, novo) {
+  const v = verboEm(argv, 0, novo);
+  const ps = v < 0 ? null : posicoes(argv, v, qualquer, novo);
   if (ps === null) return "variavel";
   for (const p of ps) {
     const w = argv[p];
@@ -427,7 +441,7 @@ function lerArgv(argv, qualquer) {
     // E as que nem chegaram a partir-se (`''{perl,-e,...}`, `${x}{node,-pe,...}`): chavetas com virgula no cru.
     if (variavel && (w.cru === "$" || /\{[^}]*,/.test(w.cru.replace(/'[^']*'/g, "")))) return "variavel";
     // O `data:` numa atribuicao a frente: `NODE_OPTIONS='--import=data:...' node x.js`.
-    if (argv.slice(0, p).some((x) => /^NODE_OPTIONS=.*data:/.test(x.texto))) return sinal("data");
+    if (argv.slice(0, p).some((x) => /^NODE_OPTIONS\+?=.*data:/.test(x.texto))) return sinal("data");
     const args = argv.slice(p + 1);
     // Um pedaco de chavetas (`{node,x.js}`) nao e um script ESCRITO: a isencao e so para o que a shell entrega tal qual.
     if (!variavel && args[0] && !args[0].partida && (shell ? SCRIPT_SHELL : SCRIPT).test(args[0].cru)) continue;

@@ -15,6 +15,7 @@
  */
 
 import { fimSubst } from "./caminhos.mjs";
+import { ATRIBUICAO_LARGA } from "./fronteira-dados.mjs";
 
 /** Verbos que exigem uma FORMA para serem seguros (nao basta faltar-lhes a forma insegura).
  *
@@ -134,8 +135,10 @@ export const CHAVES_PERIGOSAS = new RegExp(
 );
 
 /** Variaveis de ambiente cujo valor o git EXECUTA como comando, postas a frente do `git`. As
- *  `GIT_CONFIG_*` injectam configuracao: o valor julga-se como comando, por precaucao. */
-const ENV_QUE_EXECUTA = /^(?:GIT_PAGER|PAGER|GIT_EDITOR|EDITOR|VISUAL|GIT_SEQUENCE_EDITOR|GIT_SSH_COMMAND|GIT_SSH|GIT_EXTERNAL_DIFF|GIT_ASKPASS|SSH_ASKPASS|GIT_PROXY_COMMAND|GIT_CONFIG_PARAMETERS|GIT_CONFIG_VALUE_\d+)=/;
+ *  `GIT_CONFIG_*` injectam configuracao: o valor julga-se como comando, por precaucao. Com o `+=` (#546): o bash
+ *  acrescenta ao valor que ja havia, que nao se sabe, e julga-se o texto acrescentado. O `X[0]=` nao: nao chega ao
+ *  filho (medido no bash 3.2), e nega-lo fossilizava um falso positivo. */
+const ENV_QUE_EXECUTA = /^(?:GIT_PAGER|PAGER|GIT_EDITOR|EDITOR|VISUAL|GIT_SEQUENCE_EDITOR|GIT_SSH_COMMAND|GIT_SSH|GIT_EXTERNAL_DIFF|GIT_ASKPASS|SSH_ASKPASS|GIT_PROXY_COMMAND|GIT_CONFIG_PARAMETERS|GIT_CONFIG_VALUE_\d+)\+?=/;
 
 /** As chaves cujo VALOR e um comando — nao as de `CHAVES_PERIGOSAS` todas: essas sao as de
  *  ESCRITA perigosa, e incluem caminhos (`core.hooksPath`, `include.path`), URLs (`http.proxy`,
@@ -243,10 +246,11 @@ export function valoresQueExecutam(c) {
     };
     // As atribuicoes a frente do `git`, mesmo atras de uma cabeca e das flags dela
     // (`GIT_PAGER=x env -u FOO git log`): o valor de uma flag (`FOO`) nao para a procura.
-    for (let k = i - 1; k >= 0 && (/^\w+=/.test(ps[k]) || CABECA_DO_GIT.test(ps[k]) || /^-/.test(ps[k - 1] ?? "")); k--) {
+    // Pela LARGA (#546): `GIT_PAGER=x X+=1 git`, `GIT_PAGER=x env A-B=1 git` — uma atribuicao no meio parava a procura.
+    for (let k = i - 1; k >= 0 && (ATRIBUICAO_LARGA.test(ps[k]) || CABECA_DO_GIT.test(ps[k]) || /^-/.test(ps[k - 1] ?? "")); k--) {
       if (!ENV_QUE_EXECUTA.test(ps[k])) continue;
       const valor = ps[k].slice(ps[k].indexOf("=") + 1);
-      if (!/^GIT_CONFIG_PARAMETERS=/.test(ps[k])) { junta(valor, i + 1); continue; }
+      if (!/^GIT_CONFIG_PARAMETERS\+?=/.test(ps[k])) { junta(valor, i + 1); continue; }
       // `'core.pager=cmd'` (antigo) ou `'core.pager'='cmd'` (desde o git 2.31): o comando e o valor.
       for (const m of valor.matchAll(/'([^']*)'(?:='([^']*)')?/g)) junta(m[2] ?? m[1].slice(m[1].indexOf("=") + 1), i + 1);
     }

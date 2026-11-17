@@ -159,7 +159,14 @@ const ANTES_DA_LETRA = [() => "", (op) => `${op} `, () => "--title x.js "];
 export const POSICOES_INLINE = [
   ["", ""], ["sudo ", ""], ["env -i ", ""], ["timeout 5 ", ""], ["for i in 1; do ", "; done"],
   ["if true; then ", "; fi"], ["{ ", "; }"], ["exec ", ""], ["find /tmp -maxdepth 0 -exec ", " \\;"], ["npx ", ""],
+  // As atribuicoes que o bash aceita e o `env` aceita (#546): o interpretador continua a ser o verbo.
+  ["X+=1 ", ""], ["X[0]=1 ", ""], ["env 1X=1 ", ""],
 ];
+/** O VERBO-VARIAVEL depois de uma atribuicao (#546): com a fronteira so citada e o `$N` no lugar do interpretador, e o
+ *  `verboEm` que decide — o `X+=1` lia-se como o verbo, e o `$N` deixava de ser o comando-variavel. */
+export const ATRIBUICOES_ANTES = ["", "FOO=1 ", "X+=1 ", "X[0]=1 ", "X[0]+=1 ", "env 1X=1 ", "env A-B=1 "];
+export const gerarVerboVariavel = () =>
+  ATRIBUICOES_ANTES.flatMap((pre) => ["$N", "${N}", "$(echo node)"].map((v) => `${pre}${v} -e "require('fs').rmSync('.claude/hooks/x.mjs')"`));
 /** A fronteira a VISTA (argumento) ou so DENTRO do codigo citado. */
 const FRONTEIRA_INLINE = [
   (h) => [`"print(1)"`, ` ${h}`],
@@ -336,6 +343,13 @@ export function registar({ test, eq }) {
     eq(citados.length, inline.length / FRONTEIRA_INLINE.length, "a metade citada");
     const outra = citados.filter((c) => porqueAltera(c) !== "citado-mas-executado:inline");
     eq(outra.length, 0, `${outra.length} negados por outra regra. Primeiros: ${outra.slice(0, 3).map((c) => `${c} -> ${porqueAltera(c)}`).join(" | ")}`);
+  });
+
+  test("gerado/inline: o verbo-variavel depois de uma atribuicao continua a ser o comando-variavel (#546)", () => {
+    const casos = gerarVerboVariavel();
+    eq(casos.length, ATRIBUICOES_ANTES.length * 3, "uma dimensao esvaziou-se (TP2)");
+    const passam = casos.filter((c) => porqueAltera(c) === null);
+    eq(passam.length, 0, `${passam.length} de ${casos.length} passam. Primeiros: ${passam.slice(0, 5).join(" | ")}`);
   });
 
   // --- As classes que FECHARAM --------------------------------------------------------------
