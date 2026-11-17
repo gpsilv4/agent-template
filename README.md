@@ -257,7 +257,9 @@ not to* line, so every agent sees it.
     │   ├── sizes.mjs           <- Guard 17: the 500-line flag, as a ratchet (may shrink, never grow)
     │   ├── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
     │   ├── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
-    │   └── runners.mjs         <- Guard 22: the template's CI runners on one pinned label, not ubuntu-latest (#488)
+    │   ├── runners.mjs         <- Guard 22: the template's CI runners on one pinned label, not ubuntu-latest (#488)
+    │   └── ligacao-proprios.mjs <- The project's own guards (config/guards-do-projeto.mjs), and a module
+    │                              in guards/ that nothing calls (#176, #539)
     │
     ├── lib/                    <- Shared modules. No entry point, no discovery: imported
     │   ├── registo.mjs         <- Suite discovery by disk scan: a new suite can't stay unlisted
@@ -344,6 +346,7 @@ not to* line, so every agent sees it.
             ├── casos-salto-cache.mjs     <- The merge-push skip and the cache.yml example's cases (#439)
             ├── casos-dependabot-exemplo.mjs <- The private-repo dependabot.yml example's cases (#440)
             ├── casos-modo-completo.mjs   <- The CI example's full mode, read by the real /upgrade readers (#472, #477)
+            ├── casos-minutos-por-pr.mjs  <- The minutes script's per-PR and all-private cases (#517)
             ├── simuladores-ci.mjs        <- The three simulator jobs of ci.yml and their commands, one source (#460)
             ├── casos-limites-ci.mjs      <- The minutes script's job-limit cases: thresholds at the boundary (#542)
             ├── casos-espera.mjs          <- The minutes script's PR-wait cases: the attempt, cancelled out, the cut (#554)

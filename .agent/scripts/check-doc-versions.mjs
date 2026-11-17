@@ -45,6 +45,7 @@ import { ehDerivado as ehDerivadoDe } from "./lib/derivado.mjs";
 import { guardIsolamento } from "./guards/isolamento.mjs";
 import { guardCitacoes } from "./guards/citacoes.mjs";
 import { guardBudgets } from "./guards/budgets.mjs";
+import { guardsDoProjeto } from "./guards/ligacao-proprios.mjs";
 
 // --- Ancoragem a raiz do repo -------------------------------------------------
 // Este ficheiro vive em <raiz>/.agent/scripts/, logo a raiz esta dois niveis acima.
@@ -461,32 +462,13 @@ guardsRun += guardAntiPatternEvidence({ read, warn, ok, skip });
 // Extraidos para `guards/versions.mjs`. Configurar o `CHECKS` la.
 guardsRun += guardDependencyVersions({ read, warn, ok, skip });
 
-// --- Os guards PROPRIOS do projeto, declarados em `config/guards-do-projeto.mjs` ---
-// Ligados aqui a mao, o `/upgrade` desligava-os ao substituir este ficheiro (#176). A config e do
-// projeto e o upgrade nunca a substitui.
-{
-  // Um modulo em `guards/` que ninguem chama e um guard DESLIGADO. Foi assim que o R7-A ficou
-  // invisivel: depois do upgrade os modulos do derivado continuavam no disco e a config vinha
-  // vazia — sem isto, o resultado era um SKIP verde. Ligado = importado aqui, ou declarado.
-  const ligados = new Set([
-    ...[...readFileSync(fileURLToPath(import.meta.url), "utf8").matchAll(/from "\.\/guards\/([\w-]+\.mjs)"/g)].map((m) => m[1]),
-    ...GUARDS.map((g) => g.modulo.split("/").pop()),
-  ]);
-  for (const nome of listDir(".agent/scripts/guards", ".mjs") ?? []) {
-    if (!ligados.has(`${nome}.mjs`)) warn(`.agent/scripts/guards/${nome}.mjs nao e chamado por ninguem — declarar em config/guards-do-projeto.mjs (GUARDS), ou apagar`);
-  }
-  if (GUARDS.length === 0) skip("guards do projeto — nenhum declarado em config/guards-do-projeto.mjs");
-  const ctx = { read, readMeaningful, warn, ok, note, skip, listDir, listTree, ehDerivado, ROOT, join, existsSync, readdirSync };
-  for (const { modulo, funcao } of GUARDS) {
-    const caminho = join(ROOT, ".agent/scripts", modulo);
-    const m = existsSync(caminho) ? await import(pathToFileURL(caminho).href) : null;
-    if (typeof m?.[funcao] !== "function") {
-      warn(`config/guards-do-projeto.mjs declara ${funcao} em ${modulo}, e ${m ? "o modulo nao a exporta" : "o modulo nao existe"} — o guard nao corre`);
-      continue;
-    }
-    guardsRun += m[funcao](ctx);
-  }
-}
+// --- Os guards PROPRIOS do projeto, declarados em `config/guards-do-projeto.mjs` (#176) ---
+// Em `guards/ligacao-proprios.mjs` (#539; nao `do-projeto.mjs`, que e o nome que um derivado da ao SEU guard). O detetor de guards desligados le os imports DESTE ficheiro: passa-se o texto.
+guardsRun += await guardsDoProjeto({
+  fonte: readFileSync(fileURLToPath(import.meta.url), "utf8"),
+  GUARDS,
+  ctx: { read, readMeaningful, warn, ok, note, skip, listDir, listTree, ehDerivado, ROOT, join, existsSync, readdirSync },
+});
 
 console.log("");
 console.log(`  ${guardsRun} guard(s) executado(s), ${guardsSkipped} saltado(s).`);

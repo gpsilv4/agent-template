@@ -27,7 +27,7 @@ O agente atualiza as tabelas **pelo nome da seccao** — nunca assumindo posicao
 - **O "Depende de"** so tem IDs, em maiusculas (um `b2` nao conta). Cada ID tem de existir, e se esta aberto tem de vir ANTES: num bloco anterior, ou no mesmo com `Ordem` menor. Uma dependencia fechada nao conta.
 - **Bloqueado** (a espera de algo de fora, como a versao de um pacote) escreve-se no "Depende de", `T58; Bloqueado: <motivo>`, e os IDs do motivo nao contam. **Condicional** (fazer se ou quando algo acontecer) escreve-se na `Nota`, e nao e um bloqueio.
 - **Dois tickets "num so PR":** so a linha de DEPOIS cita a de antes, por exemplo `UX122 (num so PR)`. A de antes nao cita a de depois, senao uma das duas depende de algo que vem depois.
-- **Debaixo do `> Objetivo:`** (o resultado do bloco), uma linha `> Fecho: /audit → /deploy → /backlog-review` (o processo de o fechar) e opcional, e o guarda nao a le.
+- **Debaixo do `> Objetivo:`** (o resultado do bloco), uma linha `> Fecho: /review → /audit → /security-tests → relatorio → /deploy → /backlog-review` (o processo de o fechar, resumido; a sequencia inteira esta nas `process-rules`) e opcional, e o guarda nao a le.
 - **Os Pendentes sem Sprint** tem a coluna `Nota`, com esse nome.
 - **Uma linha riscada** (`~~X~~`) num bloco, nos Pendentes ou numa tabela por tipo e um fecho a meio: fechar move a linha para o arquivo.
 
