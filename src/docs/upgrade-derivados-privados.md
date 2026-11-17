@@ -49,8 +49,13 @@ O audit do CI do template (`npm audit --audit-level=high`) cobre dev e producao,
   PR de SEGURANCA faz-se no proprio dia (`@dependabot rebase`, CI, merge). O template e publico, nao paga, e o dele
   fica semanal.
 - **Um alerta sem versao compativel continua a tentar, e paga:** num derivado, o update de seguranca de um pacote so de
-  dev falhou 6 vezes em 5 dias (17 min). **Nao confirmado** que dispensar o alerta no GitHub pare as tentativas (a
-  documentacao do GitHub nao o diz): medir num derivado, dispensando-o e vendo se os runs `dynamic` param numa semana.
+  dev falhou 6 vezes em 5 dias (17 min).
+  - **O gatilho:** um run `dynamic` do proprio Dependabot a cada push no `main`, e nao so na agenda. O `rebase-strategy:
+    disabled` nao o trava: o de seguranca nao espera pelo `schedule`.
+  - **O custo:** ~3 min por run, sempre `failure`. Noutro derivado, 6 dos 14 min do Dependabot num dia foram so isto.
+  - **Nao confirmado** que dispensar o alerta no GitHub pare as tentativas (a documentacao do GitHub nao o diz). Mede-se
+    num derivado: dispensa-se o alerta e ve-se se os runs `dynamic` param **depois de uma ronda mensal**. Com o
+    Dependabot mensal, uma semana sem ronda nao prova nada (a medicao de 12 nov deu zero tentativas e zero rondas).
 
 ## 5. Publicar um texto escrito num ficheiro
 
