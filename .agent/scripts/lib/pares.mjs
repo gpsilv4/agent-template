@@ -199,6 +199,13 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O que um teste devolve (#539): o neutro julga tudo como "passou", que e a regra antiga do `test-hooks`.
+    alvo: ".agent/scripts/lib/registo.mjs",
+    suite: ".agent/scripts/tests/test-registo.mjs",
+    sinal: /(?<=export const falhaDoRetorno = \(r\) => )\(/,
+    neutro: "null && (",
+  },
+  {
     alvo: ".agent/scripts/check-doc-versions.mjs",
     suite: ".agent/scripts/tests/test-guards.mjs",
     sinal: /(?<![\w.$])warn\(/,
