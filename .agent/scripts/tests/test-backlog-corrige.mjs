@@ -206,7 +206,7 @@ caso("o ficheiro corrigido mantem o modo do original, e chega por rename (outro 
 });
 
 caso("com duas linhas Total (um merge que a duplicou), so a primeira se corrige: e a que o calculo verifica", (dir) => {
-  writeF(dir, A, errado(ACTIVE_OK).replace("| **Total** | **60** |", "| **Total** | **60** |").replace("| **Total** |", "| **Total** | **1** | **1** | **1** | **1** | **1** |\n| **Total** |"));
+  writeF(dir, A, errado(ACTIVE_OK).replace("| **Total** |", "| **Total** | **1** | **1** | **1** | **1** | **1** |\n| **Total** |"));
   const antes = readF(dir, A);
   const r = run(dir, undefined, ["--corrigir"]);
   const t = readF(dir, A);

@@ -92,6 +92,23 @@ export function registarEspera({ caso, espera, cli, run }) {
     ];
   });
 
+  caso("espera: um re-tentado e contado, e e maquinaria se a perna completa correu so na 1.a tentativa", () => {
+    const out = corre([linha(1, T(0), 700, { run_attempt: 2 }, [job(MAQ, 2000, { run_attempt: 1 }), job("A", 700, { run_attempt: 2 })])]).join("\n");
+    // Se o grupo lesse so a tentativa do run, o PR ia para "outros"; a espera e a da 2.a tentativa (700 s = 11,7 min).
+    return [
+      ...espera(/re-tentados: 1 \(conta a ultima tentativa\)/.test(out), `sem a contagem dos re-tentados: ${out}`),
+      ...espera(/correu\): mediana 11\.7 min \(n=1;/.test(out) && /outros: sem amostra/.test(out), `o grupo ou a espera: ${out}`),
+    ];
+  });
+  caso("espera: o --ultimos corta a lista aos N mais recentes (a mediana conta todos)", () => {
+    const out = corre([linha(1, "2026-11-13T10:00:00Z", 600), linha(2, "2026-11-13T11:00:00Z", 1200), linha(3, "2026-11-13T12:00:00Z", 1800)], { ultimos: 2 }).join("\n");
+    return [
+      ...espera(/^ +3 +2026-11-13T12:00/m.test(out) && /^ +2 +2026-11-13T11:00/m.test(out), `faltam os dois mais recentes: ${out}`),
+      ...espera(!/^ +1 +2026-11-13T10:00/m.test(out), `o mais antigo nao foi cortado: ${out}`),
+      ...espera(/mediana 20\.0 min \(n=3;/.test(out), `a mediana nao contou os tres: ${out}`),
+    ];
+  });
+
   // --- A CLI: as recusas, cada uma pela sua mensagem (o P6) ---
   for (const [nome, args, msg] of [
     ["o --espera com o --run", ["--espera", "--run", "7", "--repo", "o/r"], /o `--espera` e a espera dos PRs de UM repo/],
@@ -99,6 +116,9 @@ export function registarEspera({ caso, espera, cli, run }) {
     ["o --corte sem o --espera", ["--desde", "2026-11-01", "--corte", "2026-11-02T10:00", "--repo", "o/r"], /o `--corte` so com o `--espera`/],
     ["o --ultimos que nao e um inteiro positivo", ["--espera", "--desde", "2026-11-01", "--ultimos", "0", "--repo", "o/r"], /--ultimos quer um inteiro positivo/],
     ["um --corte sem hora", ["--espera", "--desde", "2026-11-01", "--corte", "2026-11-02", "--repo", "o/r"], /--corte quer AAAA-MM-DDTHH:MM em UTC/],
+    // A data que nao existe passa a forma e cai no `dataReal` (o `/audit` da v0.63.6: o caso de cima nao chegava la).
+    ["um --corte numa data que nao existe", ["--espera", "--desde", "2026-02-01", "--corte", "2026-02-30T10:00", "--repo", "o/r"], /uma data que exista \(deu 2026-02-30T10:00\)/],
+    ["o --sem-limites com o --quota", ["--quota", "--sem-limites"], /o `--sem-limites` e do run a run/],
     ["um --corte no futuro", ["--espera", "--desde", "2026-11-01", "--corte", "2099-01-01T00:00", "--repo", "o/r"], /--corte 2099-01-01T00:00 esta no futuro/],
     ["um --corte antes do --desde", ["--espera", "--desde", "2026-11-10", "--corte", "2026-11-01T00:00", "--repo", "o/r"], /--corte 2026-11-01T00:00 vem antes do --desde 2026-11-10/],
     ["um --corte depois do --ate", ["--espera", "--desde", "2026-11-01", "--ate", "2026-11-05", "--corte", "2026-11-06T00:00", "--repo", "o/r"], /--corte 2026-11-06T00:00 vem depois do --ate 2026-11-05/],

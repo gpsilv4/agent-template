@@ -242,10 +242,16 @@ caso("recusa: sem --repo e sem um origin do GitHub", () => {
   const r = cli({}, ["--run", "7"]);
   return [...NAO_ZERO(r), ...espera(/nao sei o repo/.test(r.err), `stderr: ${r.err}`)];
 });
-for (const [nome, args] of [["nenhum de --run/--desde", []], ["os dois", ["--run", "1", "--desde", "2026-11-01"]], ["um argumento desconhecido", ["--run", "1", "--ultimos", "5"]], ["uma data mal escrita", ["--desde", "1/11/2026"]], ["um --run que nao e um numero", ["--run", "abc"]]]) {
+// O 3.o elemento e a mensagem do RAMO que o caso prova (M4 do `/audit` da v0.63.6): o `uso:` sai em todas as recusas, e o
+// caso do argumento desconhecido usava o `--ultimos`, que o #554 tornou conhecido — passava por outra recusa. O `--repo`
+// vai a frente, para uma flag sem valor poder ser a ultima.
+for (const [nome, args, msg] of [["nenhum de --run/--desde", []], ["os dois", ["--run", "1", "--desde", "2026-11-01"]],
+  ["um argumento desconhecido", ["--run", "1", "--naoexiste"], /argumento desconhecido ou sem valor: --naoexiste/],
+  ["uma flag sem valor (a ultima)", ["--run", "1", "--ultimos"], /argumento desconhecido ou sem valor: --ultimos/],
+  ["uma data mal escrita", ["--desde", "1/11/2026"]], ["um --run que nao e um numero", ["--run", "abc"]]]) {
   caso(`recusa: argumentos — ${nome}`, () => {
-    const r = cli({}, [...args, "--repo", "o/r"]);
-    return [...NAO_ZERO(r), ...espera(/uso:/.test(r.err), `stderr: ${r.err}`), ...espera(r.log === "", "chamou o gh antes de validar os argumentos")];
+    const r = cli({}, ["--repo", "o/r", ...args]);
+    return [...NAO_ZERO(r), ...espera(/uso:/.test(r.err) && (!msg || msg.test(r.err)), `stderr: ${r.err}`), ...espera(r.log === "", "chamou o gh antes de validar os argumentos")];
   });
 }
 

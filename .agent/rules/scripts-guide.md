@@ -33,7 +33,7 @@
 - **O que SAIU do template** (`lib/upgrade-mecanico.mjs`): o upgrade copia e **nunca apaga**, logo um ficheiro renomeado ficava no consumidor ao lado do novo. O motor lista os que **estavam na tag**, **ja nao estao no template** e **ainda existem no consumidor** — as tres juntas impedem propor apagar trabalho do projeto. **Lista, nao apaga.**
 - **Detector de codigo morto** (`check-codigo-morto.mjs`): imports que ninguem usa. Conta ocorrencias sobre **codigo**, nao texto — um nome so num comentario ou numa string nao e uso, e `${nome}` numa template string **e**. Sem dependencias. Limites: `scripts-guide-why.md` § "O que o detector de codigo morto nao ve".
 - **Textos publicos** (`check-textos-publicos.mjs`, #375): os textos do GitHub contra a lista de nomes FORA do repo. A mao; `2` = nao mediu.
-- **Minutos de CI** (`minutos-ci.mjs`): por run (`--todos`), a quota (`--quota`, `--por-pr`), limites e espera (*why*). Falha alto.
+- **Minutos de CI** (`minutos-ci.mjs`): run a run, a quota, os limites e a espera; as flags no "Uso" dele (*why*). Falha alto.
 - **Vista do backlog** (`backlog-board.mjs`, #446): HTML local, so de leitura (*why*).
 - **Guard 20 — citacoes de ficheiro** (`guards/citacoes.mjs`): um ficheiro citado numa rule ou workflow **existe** e e **um so**. Estreito de proposito: citar sem a pasta **nao** e defeito — o porque esta no cabecalho.
 - **Guard 19 — isolamento das suites** (`guards/isolamento.mjs`): o que torna a varredura e as suites (#337) paralelas seguras — tmpdir proprio (`mkdtempSync`), zero portas, zero escrita em `process.env`. Verificacao ESTATICA; o limite e o porque estao no cabecalho do modulo.

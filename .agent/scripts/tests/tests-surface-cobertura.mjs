@@ -80,6 +80,10 @@ export function registar() {
     muda(dir, "tests/a.test.js", 't.test("a", () => {});\nt.test("b", () => {});\n', 't.test("a", () => {});\n'),
   { code: 1, includes: ["casos de teste: 2 -> 1"] });
 
+  test("cobertura: apagar um `tap.test(` desce a contagem (#551)", (dir) =>
+    muda(dir, "tests/a.test.js", 'tap.test("a", () => {});\ntap.test("b", () => {});\n', 'tap.test("a", () => {});\n'),
+  { code: 1, includes: ["casos de teste: 2 -> 1"] });
+
   test("cobertura: apagar um `Deno.test(` desce a contagem (#551)", (dir) =>
     muda(dir, "tests/a.test.ts", 'Deno.test("a", () => {});\nDeno.test("b", () => {});\n', 'Deno.test("a", () => {});\n'),
   { code: 1, includes: ["casos de teste: 2 -> 1"] });

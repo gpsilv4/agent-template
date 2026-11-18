@@ -176,9 +176,19 @@ export function registarLimites({ caso, espera, cli, run }) {
     const s = cli(mapa, ["--run", "7", "--repo", "o/r", "--sem-limites"]);
     return [
       ...espera(r.status === 0 && /limite nao lido: .*Simuladores — o workflow nao se leu em sx/.test(r.out), `sem o 'nao lido': ${r.status} ${r.out}`),
+      // M1 do `/audit` da v0.63.6: sem nenhum limite lido, nao e um OK — era um zero que nao mediu (`TP2`).
+      ...espera(/LIMITE: NAO MEDIDO nenhum dos 1 job\(s\) tem o limite lido/.test(r.out) && !/LIMITE: OK/.test(r.out), `disse OK sem medir: ${r.out}`),
       ...espera(!/360|6h00|360m/.test(r.out.split("LIMITES")[1] ?? ""), "inventou o 360"),
       ...espera(s.status === 0 && !/LIMITES|LIMITE:/.test(s.out) && !/contents|check-runs/.test(s.log), `--sem-limites: ${s.out} ${s.log}`),
     ];
+  });
+  caso("limites (CLI): um OK com jobs por ler diz quantos ficaram por ler (M1 do /audit da v0.63.6)", () => {
+    const r = cli({
+      [`${R}/7#1`]: run(7, "pull_request", { ...doRepo, head_sha: "s30" }),
+      [`${R}/7/jobs#1`]: { total_count: 2, jobs: [jobSim(71, 100), { ...jobSim(72, 50), name: "Outro" }] },
+      [`${CT}@s30#1`]: b64(WORKFLOW(30)),
+    }, ["--run", "7", "--repo", "o/r"]);
+    return espera(r.status === 0 && /LIMITE: OK nenhum job perto do seu limite \(1 de 2 sem limite lido\)/.test(r.out), `sem a contagem dos por ler: ${r.out}`);
   });
   caso("limites (CLI): as 'ultimas 5' sao as MAIS RECENTES, com os runs entregues do mais recente para o mais antigo (como a API)", () => {
     // Tres antigos a 1000 s (83% de 20 min) e cinco recentes a 600 s (50%). Sem ordenar pela hora do job, as "ultimas 5"

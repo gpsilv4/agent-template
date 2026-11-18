@@ -18,7 +18,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { porqueAltera } from "../lib/fronteira.mjs";
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, nomeDaAtribuicao } from "../lib/fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_BASH_LITERAL, ATRIBUICAO_LARGA, nomeDaAtribuicao } from "../lib/fronteira-dados.mjs";
 import { afirma, corre as correTextos, DEIXA, ESCRITO, LIMPOS, NEGA } from "./tests-textos-publicos.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -91,6 +91,11 @@ const FRONTEIRA_NEGA = [
   ["X=*.js antes do data: a jusante de um pipe", `ls ${H} | X=*.js NODE_OPTIONS='--import=data:text/javascript,0' node /tmp/x.js`],
   ["X[0]=1 antes do data: a jusante de um pipe", `ls ${H} | X[0]=1 NODE_OPTIONS='--import=data:text/javascript,0' node /tmp/x.js`],
   ["X=$HOME antes de um cross-env com data:", `ls ${H} | X=$HOME cross-env NODE_OPTIONS='--import=data:text/javascript,0' node /tmp/x.js`],
+  // O M3 do `/audit` pre-tag da v0.63.6: um indice com NOMES e aritmetica, e o bash avalia-a — `X[Y]=1` SOLTO corre uma
+  // substituicao escondida no valor de `Y` (medido no bash 3.2; o zsh recusa). Saltado como atribuicao, o segmento depois
+  // de um `cd` para a fronteira ficava sem marcador. So um indice LITERAL numerico se salta.
+  ["X[Y]=1 solto depois de um cd para a fronteira (o indice com nomes e avaliado)", "cd .claude/hooks && X[Y]=1"],
+  ["X[i+1]=1 solto depois de um cd para a fronteira", "cd .claude/hooks && X[i+1]=1"],
   // Sitio 7 no sentido contrario: o bash corre o `1X=1` como COMANDO, e a allowlist nao o pode saltar (a LARGA abria).
   ["regressao (a forma do bash no levaMarcador): 1X=1 true depois de um cd para a fronteira", "cd .claude/hooks && 1X=1 true"],
 ];
@@ -208,7 +213,18 @@ const FORMAS = [
   ["NODE_OPTIONS+", false, false, "NODE_OPTIONS"], ["PATHX", false, false, "PATHX"], ["PATH/x", false, false, "PATH/x"],
 ];
 
+/** A do BASH so com indice LITERAL (M3 do `/audit` da v0.63.6): [palavra, e dela]. Um indice com nomes, `$`, sinal ou
+ *  operador fica de fora (o preco aceite: um `n[$i]=v` na fronteira e julgado como verbo). */
+const LITERAIS = [
+  ["X=y", true], ["X+=y", true], ["X[0]=y", true], ["X[]=y", true], ["X[12]+=y", true],
+  ["X[Y]=1", false], ["X[i+1]=1", false], ["X[$i]=1", false], ["X[-1]=1", false], ["X[@]=1", false],
+];
+
 export function registar({ test, corre, repo, eq }) {
+  test("atribuicoes/estrutura: a do BASH LITERAL so salta um indice numerico", () => {
+    const p = LITERAIS.filter(([t, e]) => ATRIBUICAO_BASH_LITERAL.test(t) !== e).map(([t, e]) => `LITERAL(${t}) devia ser ${e}`);
+    eq(p.length, 0, p.join("; "));
+  });
   test("atribuicoes/estrutura: a LARGA, a do BASH e o nome, na fronteira de cada uma", () => {
     const p = [];
     for (const [t, larga, bash, nome] of FORMAS) {
@@ -216,7 +232,7 @@ export function registar({ test, corre, repo, eq }) {
       if (ATRIBUICAO_BASH.test(t) !== bash) p.push(`BASH(${t}) devia ser ${bash}`);
       if (nomeDaAtribuicao(t) !== nome) p.push(`nome(${t}) deu ${nomeDaAtribuicao(t)}, esperado ${nome}`);
     }
-    // O `test` do `test-hooks.mjs` ignora o que se devolve: as falhas tem de LANCAR.
+    // Lanca-se com a lista inteira (desde o #539 o `test` do `test-hooks.mjs` tambem conta a que se devolve).
     eq(p.length, 0, p.join("; "));
   });
   for (const [nome, comando] of NO_PROTEGIDO) {

@@ -186,6 +186,13 @@ export const ATRIBUICAO_LARGA = new RegExp(`^${ATRIBUICAO_LARGA_SRC}`);
 /** A do BASH: `X=y`, `X+=y`, `X[i]=y`, `X[i]+=y` (#545, #546), a forma que a shell aceita como atribuicao. Para quem
  *  decide pelo verbo que SOBRA numa allowlist: saltar uma palavra que o bash corre como comando abria. */
 export const ATRIBUICAO_BASH = /^[A-Za-z_]\w*(?:\[[^\]\s]*\])?\+?=/;
+/** A do BASH so com um indice LITERAL numerico (`X[0]=1`): um indice com nomes e aritmetica, e o bash avalia-a — num
+ *  `X[Y]=1` solto corre uma substituicao escondida no valor de `Y` (M3 do `/audit` da v0.63.6, medido no bash 3.2).
+ *  Para quem salta palavras antes de uma allowlist: o `X[Y]=1` fica como verbo, e e julgado. O preco, aceite: um
+ *  `n[$i]=v`, `X[-1]=v` ou `m[chave]=v` depois de um `cd` para a fronteira tambem fica como verbo, e e negado.
+ *  Fecha so ESTA forma: o mesmo payload numa variavel lida por `${A[Y]}`, `$((Y))` ou `[[ Y -eq 0 ]]` continua fora
+ *  do alcance de um hook que le texto (medido no bash 3.2): uma barreira contra o descuido, nao contra quem a contorna. */
+export const ATRIBUICAO_BASH_LITERAL = /^[A-Za-z_]\w*(?:\[\d*\])?\+?=/;
 /** O nome de uma atribuicao, ou de um argumento de `export`/`declare`: `PATH[0]+=x` da `PATH`, `NODE_OPTIONS+` da
  *  `NODE_OPTIONS`. Uma palavra sem essa forma fica como esta. */
 export const nomeDaAtribuicao = (t) => /^[A-Za-z_]\w*(?=\[|\+|=|$)/.exec(t)?.[0] ?? t;
