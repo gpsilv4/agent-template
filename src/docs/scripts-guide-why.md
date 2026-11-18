@@ -617,11 +617,13 @@ Os modos que vieram depois (o cabecalho do `minutos-ci.mjs` tem os detalhes):
   so a "quanto falta".
 - **Os limites (#542).** No fim de cada run a run, cada job e medido contra o SEU `timeout-minutes`: `LIMITE: CORTADO`
   quando a anotacao do check run diz que o job excedeu o tempo (um job cortado fica `cancelled`, e so a anotacao o
-  distingue), e um `AVISO` a 90% numa corrida ou a 75% na mediana de 5. Um job perto do limite e o que vai ser cortado
+  distingue), e um `AVISO` a 90% numa corrida ou a 75% na mediana de 5; sem nenhum limite lido, `LIMITE: NAO MEDIDO` (e nunca um
+  `OK` que nao mediu nada, `TP2`). Um job perto do limite e o que vai ser cortado
   no proximo PR lento.
 - **A espera de um PR (#554), `--espera`.** Mede do inicio do run ao fim do ultimo job que correu, e da a mediana dos
   PRs de maquinaria e a dos outros, antes e depois de um `--corte`. Os `cancelled` pela concurrency ficam fora e
-  contados. E a medida do #460 (31,9 -> 25,5 min): os minutos cobrados nao dizem quanto tempo um PR espera.
+  contados. E a medida do #460 (os tempos estao no cabecalho do `mutation-sweep.mjs`): os minutos cobrados nao dizem
+  quanto tempo um PR espera.
 
 ## `backlog-board` — a vista do backlog (#446)
 

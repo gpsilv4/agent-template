@@ -230,8 +230,8 @@ not to* line, so every agent sees it.
     │                              quota, with a month-end projection (#442); --por-pr: what a PR costs, by type
     │                              and mode; --todos: every private repo run by run (#517); each job against its own
     │                              timeout-minutes, read at the run's commit: LIMITE: CORTADO / AVISO (90% one run, 75%
-    │                              the median of 5) / OK (#542); --espera: the PR wait and its median before/after
-    │                              a cut (#554); fails loud, never a false 0 (#429)
+    │                              the median of 5) / OK / NAO MEDIDO (#542); --espera: the PR wait and its median
+    │                              before/after a cut (#554); fails loud, never a false 0 (#429)
     ├── simulate-derived.mjs    <- Builds a derived project and runs everything there
     ├── simulate-upgrade.mjs    <- Builds a project derived from the LAST TAG and upgrades it
     │
@@ -288,6 +288,9 @@ not to* line, so every agent sees it.
     │   ├── backlog-vista-assets.mjs <- The board's inline CSS and JS (#446)
     │   ├── minutos-calculo.mjs <- The minutes maths, pure: rounding per job, the median, the account quota (#429, #442)
     │   ├── minutos-por-pr.mjs  <- What a PR costs, by type (upgrade, normal, Dependabot, dynamic), pure (#517)
+    │   ├── limites-ci.mjs      <- Each job against its own timeout-minutes: CUT, the 90%/75% warnings, pure (#542)
+    │   ├── espera-ci.mjs       <- A PR's wait and its median before and after a cut, pure (#554)
+    │   ├── jobs-workflow.mjs   <- The CI job reader (`jobsDe`), split out of estrutura-workflow for the partial mode (#542)
     │   ├── marcas-yaml.mjs     <- What the surface MARKS read in a workflow; template-only files
     │   ├── repo-origin.mjs     <- The owner/repo of a GitHub `origin` URL (#455)
     │   ├── concurrency-ci.mjs  <- A workflow's top-level `concurrency:` block, and what it lacks (#427, #455)
@@ -300,7 +303,7 @@ not to* line, so every agent sees it.
     │   ├── suites-em-paralelo.mjs <- Runs the Guard Suites in parallel (all of them), with a core cap
     │   ├── passo-paralelo.mjs  <- ...and how the surface gate reads that step: one unit per suite in the runner's chain (#341)
     │   ├── superficie-gate.mjs <- The CI gate in the test surface: `on:`/`env:`/`defaults:`, machinery steps, the `Test-Surface:` trailer (#285)
-    │   ├── estrutura-workflow.mjs <- The CI gate's structure: a job/step reader (used by the two below), `needs:`, aggregators, shape defects, cross-workflow check names (#374b, #355, #362)
+    │   ├── estrutura-workflow.mjs <- The CI gate's structure: re-exports the job reader from jobs-workflow (used by the two below), `needs:`, aggregators, shape defects, cross-workflow check names (#374b, #355, #362)
     │   ├── exemplo-ci.mjs      <- The one-job CI example with its MODO COMPLETO blocks uncommented: a private derived project's ci.yml (#487)
     │   ├── saltos-variavel.mjs <- A step that skips on a `case` variable whose value stopped deciding (#353)
     │   ├── passos-novos.mjs    <- A new step before the suites that is not read-only (#362)
@@ -412,6 +415,7 @@ not to* line, so every agent sees it.
 │       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
 │       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
 │       ├── tests-textos-publicos.mjs <- A forbidden name in what gh/git publishes, and what it cannot read
+│       ├── tests-atribuicoes.mjs   <- bash and env assignments read the same way in every hook (#546)
 │       ├── tests-posicao.mjs       <- The position lexer (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
@@ -490,7 +494,7 @@ The app steps (TypeScript to Security Audit) are steps of ONE job, `Code Quality
 | Bundle Tests | `node .agent/scripts/tests/test-bundle-sizes.mjs` — fake `.next/` trees asserting the bundle checker fails rather than reporting an unmeasured number (runs in the `guard-tests` job) |
 | Backlog Tests | `node .agent/scripts/tests/test-backlog.mjs` — synthetic backlog fixture; breaks one counter/state/ID at a time and asserts the checker warns; `node .agent/scripts/tests/test-backlog-corrige.mjs` — `--corrigir` rewrites only the derived counters, and nothing when another warning is present (#431); `node .agent/scripts/tests/test-backlog-itens.mjs` — the shared reader, and the checker's output frozen before it moved onto it (#445); `node .agent/scripts/tests/test-backlog-regras.mjs` — each rule (Ordem, "Depende de", the archive, struck-out rows, Pendentes) warns, with its control (#445); `node .agent/scripts/tests/test-backlog-board.mjs` and `test-backlog-board-cli.mjs` — the board: cards, escape per context, CSP, the CLI and `--vigiar` (#446) (all six in the `guard-tests` job) |
 | Mutation Sweep | `node .agent/scripts/mutation-sweep.mjs` — disables each checker's warning sites one by one and demands the suite goes red; also fails if a checker has no suite. Includes **itself** as a target. Minutes, not seconds — **runs in CI on every PR that touches checkers or hooks**, decided by the plan read from the base commit (#347): on a PR without them the shards are `skipped`, never started, and the gate recomputes the plan. Its own `sweep` job, in parallel: the full sweep split into 3 shards (the `Guard Tests` gate checks every shard reported) and `--skips`; run locally after touching a `check-*.mjs` |
-| Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch (twice: first a PRIVATE one with the one-job CI in full mode, `SIMULATE_PRIVADO=1`, then one with the template's `ci.yml`, #487), and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **one job per simulator** (#460: `simulate-private`, `simulate-derived`, `simulate-upgrade`, each with its own timeout), **in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
+| Simulators | `simulate-derived.mjs` and `simulate-upgrade.mjs` — build a derived project from scratch (two of them, in separate jobs: a PRIVATE one with the one-job CI in full mode, `SIMULATE_PRIVADO=1`, and one with the template's `ci.yml`, #487), and upgrade one from the last tag, then run everything there; in a PR that touches the machinery, also the `--skips` mutation sweep over the mature derived (`SIMULATE_SKIPS`, #308) — **one job per simulator** (#460: `simulate-private`, `simulate-derived`, `simulate-upgrade`, each with its own timeout), **in parallel with Guard Suites** (the suites job; `Guard Tests` is now the gate that also waits for the mutation sweep) |
 | Release Tests | `node .agent/scripts/tests/test-release-da-tag.mjs` — the arguments `release-da-tag.sh` passes to `gh release create` for each kind of tag (pre-release, highest final, late patch, lightweight tag, existing Release), with a fake `gh` (runs in the `guard-tests` job) |
 | Tmpdir Tests | `node .agent/scripts/tests/test-tmp-limpo.mjs` — asserts a dead run's copy is swept and a LIVE run's copy is never touched (runs in the `guard-tests` job) |
 | CI Minutes & CI Example Tests | `node .agent/scripts/tests/test-minutos-ci.mjs` — the minutes script against a fake `gh` (rounding, paging, `dynamic`, each refusal by its message, never a false 0; the cost per PR by type and mode, `--por-pr`, and every private repo run by run, `--todos`, #517; each job's limit — the thresholds at the boundary, the workflow of each run's commit, the cut read from the check-run annotation, #542; the PR wait — the last job that ran, cancelled runs out, the cut at the boundary, #554); `node .agent/scripts/tests/test-ci-exemplo.mjs` — the CI example's properties, each with its own mutated control, and its `scope` step run in a git fixture (#429); the merge-push skip, the `(deps`/`,deps` step and the PR-description check run in fixtures, the `cache-sem-maquinaria.yml` example (#439) and the private `dependabot-privado.yml` (#440) (both in the `guard-tests` job) |

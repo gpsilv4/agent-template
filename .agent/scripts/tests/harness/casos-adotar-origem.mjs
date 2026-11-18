@@ -76,6 +76,11 @@ export function registarAdotarOrigem({ test, espera, recusa, git, escreve, plane
     const r = recusa(() => planear(tpl, projeto(), ilegivel));
     return espera(r !== null && /nao consegui ler o origin do clone do template \(fatal: bad config line 3/.test(r) && !/nao tem `origin`/.test(r), `deu: ${r}`);
   });
+  test("recusa: um token no stderr do get-url NAO aparece na mensagem (a razao fica)", () => {
+    const comToken = (args) => (args[0] === "remote" ? (() => { throw Object.assign(new Error("x"), { stderr: "fatal: unable to access 'https://eu:segredo321@example.invalid/tpl': timeout\n" }); })() : git(tpl, ...args));
+    const r = recusa(() => planear(tpl, projeto(), comToken));
+    return espera(r !== null && /nao consegui ler o origin .*https:\/\/example\.invalid\/tpl/.test(r) && !/segredo321|eu:/.test(r), `deu: ${r}`);
+  });
   test("recusa: um origin https que nao e um URL que se leia diz-o, sem o token (#538)", () => {
     const torto = (args) => (args[0] === "remote" ? "https://eu:segredo789@exa mple.invalid/tpl\n" : git(tpl, ...args));
     const r = recusa(() => planear(tpl, projeto(), torto));

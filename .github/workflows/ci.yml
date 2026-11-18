@@ -398,7 +398,8 @@ jobs:
   # lista, ou um `de` que nao bata com ela, reprova ali, e nao fica verde com sitios por medir.
   # Num privado: ~+7-9 min faturados por PR de maquinaria (baselines e provas repetidas por maquina, ~3 min por
   # shard a mais), contra um terco do tempo de parede da perna completa. Com dois shards, a espera de um PR era a da
-  # varredura (mediana 31 min em 7 PRs, #460); um derivado privado que mantenha dois paga menos e espera mais.
+  # varredura (#460; os tempos medidos estao num so sitio, o cabecalho do `mutation-sweep.mjs`); um derivado privado que
+  # mantenha dois paga menos e espera mais.
   # A lista `shard:` e exatamente 1..`de` (`tests-estrutura-workflow`, #460).
   sweep:
     name: Mutation sweep (${{ matrix.modo }} ${{ matrix.shard }}/${{ matrix.de }})

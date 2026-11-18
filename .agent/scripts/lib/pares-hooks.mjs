@@ -176,9 +176,10 @@ export const PARES_DOS_HOOKS = [
     sinal: /(?<![\w.$])ATRIBUICAO_LARGA\.test\(/,
     neutro: "((x) => false)(",
   })),
-  // A do BASH onde decide o verbo (a allowlist do `levaMarcador`, a leitura nova do `verboEm`) e, no `textos-publicos`,
-  // so a do `cabeca()` pelo CRU: os outros dois do ficheiro sao os `.every(...)` ensombrados, acima.
-  ...[[".claude/hooks/lib/caminhos.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/], [".claude/hooks/lib/posicao.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/],
+  // A do BASH onde decide o verbo (a allowlist do `levaMarcador`, so com o indice literal desde o M3 do `/audit` da
+  // v0.63.6; a leitura nova do `verboEm`) e, no `textos-publicos`, so a do `cabeca()` pelo CRU: os outros dois do ficheiro
+  // sao os `.every(...)` ensombrados, acima.
+  ...[[".claude/hooks/lib/caminhos.mjs", /(?<![\w.$])ATRIBUICAO_BASH_LITERAL\.test\(/], [".claude/hooks/lib/posicao.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/],
     [".claude/hooks/lib/textos-publicos.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\((?=ws\[i\]\.cru\))/]].map(([alvo, sinal]) => ({
     alvo,
     suite: ".claude/hooks/tests/test-hooks.mjs",

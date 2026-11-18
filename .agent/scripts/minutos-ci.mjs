@@ -10,8 +10,9 @@
  *
  * Uso:
  *   node .agent/scripts/minutos-ci.mjs --run <id>
- *   node .agent/scripts/minutos-ci.mjs --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos]
+ *   node .agent/scripts/minutos-ci.mjs --desde AAAA-MM-DD [--ate AAAA-MM-DD] [--passos] [--app "<passo>"] [--repo dono/repo | --todos] [--sem-limites]
  *   node .agent/scripts/minutos-ci.mjs --quota [--por-pr] [--mes AAAA-MM] [--limite 2000]
+ *   node .agent/scripts/minutos-ci.mjs --espera --desde AAAA-MM-DD [--corte AAAA-MM-DDTHH:MM] [--ultimos N] [--grupo "<prefixo>"] [--workflow <path>]
  *
  * `--app "<passo>"`: a mediana conta so os PRs em que esse passo CORREU (ex.: `--app TypeScript`), que sao os de app;
  * sem ele conta todos os PRs, os de docs incluidos, e diz-o. Os runs do proprio Dependabot (`dynamic`) PAGAM-SE num
@@ -39,7 +40,7 @@
  * `timeout-minutes`, lido no workflow do commit de cada run (`lib/limites-ci.mjs`), e tres avisos em linhas fixas:
  * `LIMITE: CORTADO` (o GitHub matou-o pelo limite: so a anotacao do check run o distingue de um cancelamento, e da o
  * limite efetivo), `LIMITE: AVISO` a >= 90% numa corrida (corte iminente) ou a >= 75% na mediana das ultimas 5
- * (crescimento), e `LIMITE: OK`. Num PR o limite lido e o do `head` (o GitHub corre o merge): uma aproximacao, dita. Um
+ * (crescimento), e `LIMITE: OK` (com quantos ficaram por ler), ou `LIMITE: NAO MEDIDO` se nenhum se leu. Num PR o limite lido e o do `head` (o GitHub corre o merge): uma aproximacao, dita. Um
  * workflow que nao se le e "limite nao lido", nunca o default inventado. O `/backlog-review` procura as linhas e PROPOE
  * um ticket com os numeros — nunca o cria; a melhoria compara as opcoes (separar o job, fatiar, cache, subir o limite)
  * e prova que mede o mesmo. Custa um pedido por (workflow, commit) e um por job cancelado: `--sem-limites` desliga-o.
@@ -49,7 +50,7 @@
  * correu nessa tentativa; a mediana dos de MAQUINARIA (um job do `--grupo`, por omissao a perna completa da varredura,
  * correu) e a dos outros, com os ultimos N; os `cancelled` (a concurrency) fora e contados. Com `--corte` (no
  * `created_at`, UTC; escolhe-se pelo CI que o run correu, nao pela hora do merge), as duas medianas e a variacao — o
- * "antes e depois" de uma mudanca no CI (o #460: -19% nos tres primeiros PRs). `lib/espera-ci.mjs`.
+ * "antes e depois" de uma mudanca no CI (o #460; os tempos no cabecalho do `mutation-sweep.mjs`). `lib/espera-ci.mjs`.
  *
  * Pagina os runs e os jobs (100 por pagina, sem repetidos). Falha ALTO, nunca com "0 min": sem `gh`, sem sessao, um
  * erro da API, uma resposta sem a lista ou sem `total_count`, mais de 1000 runs no intervalo (o limite de uma pesquisa
@@ -355,18 +356,18 @@ function limitesDosJobs(alvo, pagos) {
   for (const corridas of series.values()) corridas.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)));
   const mmss = (s) => `${Math.floor(s / 60)}m${String(Math.round(s % 60)).padStart(2, "0")}s`;
   console.log(`\nLIMITES (por job: a mediana das ultimas ${JANELA} corridas e o maximo contra o timeout-minutes; aviso a ${Math.round(IMINENTE * 100)}% numa corrida, a ${Math.round(CRESCIMENTO * 100)}% na mediana; o corte pela anotacao do GitHub; num PR o limite e o do head)`);
-  const avisos = [];
+  const avisos = []; let medidos = 0; // os jobs com o limite LIDO: um OK sem nenhum e um zero que nao mediu (`TP2`)
   for (const [chave, corridas] of series) {
     const { avisos: a, nota, resumo } = avisosDoJob(chave, corridas);
     avisos.push(...a);
-    if (resumo.limite === null) continue;
+    if (resumo.limite === null) continue; medidos++;
     const omissao = porOmissao.has(chave) ? " (360 por omissao do GitHub: o job nao tem timeout-minutes)" : "";
     console.log(`  ${chave}: mediana ${mmss(resumo.mediana)}, max ${mmss(resumo.maximo)}, limite ${mmss(resumo.limite)} (${Math.round((100 * resumo.mediana) / resumo.limite)}%)${omissao}${nota ? ` [${nota}]` : ""}`);
   }
   for (const [chave, porque] of naoLidos) console.log(`  limite nao lido: ${chave} — ${porque}`);
   if (cancelados) console.log(`  ${cancelados} job(s) cancelado(s) sem ser pelo limite (concurrency, a mao): fora dos avisos e da mediana`);
   for (const a of avisos) console.log(`LIMITE: ${a.tipo} ${a.texto}`);
-  if (!avisos.length) console.log("LIMITE: OK nenhum job perto do seu limite");
+  if (!avisos.length) console.log(medidos ? `LIMITE: OK nenhum job perto do seu limite${series.size > medidos ? ` (${series.size - medidos} de ${series.size} sem limite lido)` : ""}` : `LIMITE: NAO MEDIDO nenhum dos ${series.size} job(s) tem o limite lido`);
 }
 
 // --- O `--todos` (#517): o run a run de todos os privados ---

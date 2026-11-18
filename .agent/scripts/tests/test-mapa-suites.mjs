@@ -117,6 +117,13 @@ test("o `lib/exemplo-ci.mjs` leva as quatro suites que o leem (#534, #545)", () 
   return ["test-ci-exemplo.mjs", "test-simulate-upgrade.mjs", "test-simulate-derived.mjs", "test-guards.mjs"].filter((s) => !verifica.some((v) => v.endsWith(s))).map((s) => `falta ${s}`);
 });
 
+// O `regex-literal` e importado pelo `limites-ci` (#542) e esta no fecho do modo parcial: mexer-lhe corre as suites do
+// `minutos-ci` e do modo parcial (M2 do `/audit` da v0.63.6).
+test("o `lib/regex-literal.mjs` leva o `test-minutos-ci` e o `test-modo-upgrade` (M2 do /audit da v0.63.6)", () => {
+  const verifica = regraDe(".agent/scripts/lib/regex-literal.mjs")?.verifica ?? [];
+  return ["test-minutos-ci.mjs", "test-modo-upgrade.mjs"].filter((s) => !verifica.some((v) => v.endsWith(s))).map((s) => `falta ${s}`);
+});
+
 // O `ci.yml` do template e lido pelo Guard 17 e pelas listas das suites (`test-guards`), e pela 2b de ponta a ponta
 // com o pacote de um job (`test-simulate-upgrade`, #477): mexer-lhe obriga a correr os dois (achado do `/audit`).
 test("o `ci.yml` do template leva ao `test-guards` e ao `test-simulate-upgrade` (#477)", () => {

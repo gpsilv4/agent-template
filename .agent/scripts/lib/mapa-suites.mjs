@@ -260,7 +260,9 @@ export const SUITES = [
   // `ci.yml` (no `test-guards`) e o do exemplo sem a maquinaria.
   { re: /^\.agent\/scripts\/lib\/concurrency-ci\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs")] },
   // O escape de um literal (#400): a fonte; as duas copias e a guarda vivem no `tests-regex-literal` (no `test-guards`).
-  { re: /^\.agent\/scripts\/lib\/regex-literal\.mjs$/, verifica: [S("test-guards.mjs"), S("test-codigo-morto.mjs"), S("test-bundle-sizes.mjs")] },
+  // O `limites-ci.mjs` importa-o desde o #542 (o `moldeDoNome`), e esta no fecho do modo parcial: as duas suites dele
+  // tambem (M2 do `/audit` da v0.63.6).
+  { re: /^\.agent\/scripts\/lib\/regex-literal\.mjs$/, verifica: [S("test-guards.mjs"), S("test-codigo-morto.mjs"), S("test-bundle-sizes.mjs"), S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")] },
   // Os modulos `tests-*` do simulador de /upgrade: declaram outro entry point, e a regra generica
   // abaixo mandava-os para o `test-guards`. Apanhado pelo teste do mapa que compara a regra com o
   // `entryPoint` que o proprio modulo declara — uma regra que manda para a suite errada nao da

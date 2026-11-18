@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { ATRIBUICAO_BASH, CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, NOMEIA, resto } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH_LITERAL, CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, NOMEIA, resto } from "./fronteira-dados.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
@@ -191,9 +191,10 @@ export function levaMarcador(seg, toks) {
   // descartado como interior inofensivo. As inofensivas (`2>/dev/null`, `>&2`) nao contam.
   if (/>/.test(seg.replace(REDIRECCAO_INOFENSIVA, " "))) return true;
   let i = 0;
-  // A forma do BASH (#546): o verbo que sobra decide pela allowlist `SEM_MARCADOR`, e saltar uma palavra que o bash
-  // corre como comando (`1X=1 true`) abria. `X+=1 true` e `X[0]=1 true` correm o `true`.
-  while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || ATRIBUICAO_BASH.test(toks[i]))) i++;
+  // A forma do BASH (#546), com o indice so LITERAL (o M3 do `/audit` da v0.63.6): o verbo que sobra decide pela
+  // allowlist `SEM_MARCADOR`, e saltar uma palavra que o bash corre como comando (`1X=1 true`), ou cujo indice ele avalia
+  // (`X[Y]=1`), abria. `X+=1 true` e `X[0]=1 true` correm o `true`.
+  while (i < toks.length && (["while", "until", "{"].includes(toks[i]) || ATRIBUICAO_BASH_LITERAL.test(toks[i]))) i++;
   const v = toks[i];
   if (v === undefined || v.startsWith("#")) return false;
   return !SEM_MARCADOR.has(v);
