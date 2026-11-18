@@ -14,6 +14,7 @@ import { execFileSync } from "child_process";
 import { test, commit, git, registarResultado, ROOT, seOGlobExistir, seAContagemExistir } from "./harness/test-surface-harness.mjs";
 import { CONTAGENS, MARCAS } from "../lib/surface-patterns.mjs";
 import { PARES } from "../lib/pares.mjs";
+import { ehDerivado } from "../lib/derivado.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -56,6 +57,36 @@ export function registar() {
   test("cobertura: apagar um `def test_` (python) baixa a contagem", (dir) =>
     muda(dir, "tests/test_a.py", "def test_um():\n    pass\n\ndef test_dois():\n    pass\n", "def test_um():\n    pass\n"),
   { code: 1, includes: ["casos de teste (python): 2 -> 1"] });
+
+  // O metodo das regex (`re.test(`, `/a/.test(`) NAO e um caso de teste (#551). Os dois primeiros sao a prova: com o
+  // `\btest\s*\(` antigo, trocar um caso por um `re.test(` nao descia (2 -> 2), e tirar dois `re.test(` descia (3 -> 1).
+  // Num DERIVADO cuja `CONTAGENS` (do projeto: o `/upgrade` preserva-a) ainda conta o `re.test(`, os dois dao SKIP
+  // visivel em vez de reprovar o CI dele; no template correm sempre (o neutro da varredura nao conta nada, e corre).
+  const casosDeTeste = CONTAGENS.find((c) => c.msg === "casos de teste")?.re;
+  const ler = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return null; } };
+  const semMetodo = (nome, ...resto) => (casosDeTeste?.test("/a/.test(s)") && ehDerivado(ler)
+    ? console.log(`  SKIP  ${nome} — a entrada "casos de teste" das CONTAGENS do projeto ainda conta o \`re.test(\`: adotar a regex do #551`)
+    : test(nome, ...resto));
+  semMetodo("cobertura: apagar um `test(` e acrescentar um `re.test(` desce a contagem (#551)", (dir) =>
+    muda(dir, "tests/a.test.js", 'test("a", () => {});\ntest("b", () => {});\n', 'test("a", () => {});\nif (/x/.test(s)) {}\n'),
+  { code: 1, includes: ["casos de teste: 2 -> 1"] });
+
+  semMetodo("cobertura: tirar chamadas `re.test(` nao e apagar casos de teste (#551)", (dir) =>
+    muda(dir, "tests/a.test.js", 'test("a", () => { if (re.test(s)) {} if (/a/.test(t)) {} });\n', 'test("a", () => {});\n'),
+  { code: 0, excludes: ["casos de teste:"] });
+
+  // Os receptores que DECLARAM testes continuam a contar (#551): sem a alternativa deles, apagar metade daria 0 -> 0.
+  test("cobertura: apagar um `t.test(` (subteste do tap/node:test) desce a contagem (#551)", (dir) =>
+    muda(dir, "tests/a.test.js", 't.test("a", () => {});\nt.test("b", () => {});\n', 't.test("a", () => {});\n'),
+  { code: 1, includes: ["casos de teste: 2 -> 1"] });
+
+  test("cobertura: apagar um `Deno.test(` desce a contagem (#551)", (dir) =>
+    muda(dir, "tests/a.test.ts", 'Deno.test("a", () => {});\nDeno.test("b", () => {});\n', 'Deno.test("a", () => {});\n'),
+  { code: 1, includes: ["casos de teste: 2 -> 1"] });
+
+  test("cobertura: um `await test(` continua a contar (#551)", (dir) =>
+    muda(dir, "tests/a.test.js", 'await test("a", () => {});\nawait test("b", () => {});\n', 'await test("a", () => {});\n'),
+  { code: 1, includes: ["casos de teste: 2 -> 1"] });
 
   test("cobertura: apagar assercoes `eq(` baixa a contagem", (dir) =>
     muda(dir, "tests/a.test.js", 'test("a", () => { eq(x, "um"); eq(y, "dois"); });\n', 'test("a", () => {});\n'),
