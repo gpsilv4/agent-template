@@ -5,8 +5,8 @@
  * **So-Claude Code.** Ligado em `.claude/settings.json` (`PreToolUse` / `Bash`), a seguir ao
  * `guard-protected-branch`. A logica vive em `lib/ambito-agente.mjs`; o porque tambem (S-01 do #195).
  *
- * Vive a parte do `guard-protected-branch.mjs` porque aquele esta no tecto do Guard 17, e porque
- * pergunta outra coisa: aquele julga o COMANDO, este julga QUEM o corre.
+ * Vive a parte do `guard-protected-branch.mjs` porque pergunta outra coisa: aquele julga o COMANDO, este julga
+ * QUEM o corre. (Nasceu tambem porque aquele estava no tecto do Guard 17; o #580 deu-lhe folga.)
  *
  * CONTRATO DE SAIDA: sai `0` em tudo excepto na negacao explicita. Sem `agent_type` (o agente
  * principal), sem o ficheiro do agente (um agente de fora do projeto) ou com um erro: permite.

@@ -37,7 +37,7 @@ const RM = `'rm -rf .claude/hooks'`;
 /** Um comando com o `commit-msg` isento a seguir a `pre` (a isencao do #511): `ESCRITO` se ela cair. */
 const isento = (pre) => `${pre} && node .githooks/commit-msg pr.md && git commit -F pr.md`;
 
-/** Sitio 1 (`guard-protected-branch.mjs`, `invocacoes`): uma atribuicao a frente nao esconde o `git`. Em `main`. */
+/** Sitio 1 (o `invocacoes` do guard dos branches, `lib/invocacoes-git.mjs`): uma atribuicao a frente nao esconde o `git`. Em `main`. */
 const NO_PROTEGIDO = [
   ["X+=1 antes do git", "X+=1 git commit -m x"],
   ["X[0]=1 antes do git", "X[0]=1 git commit -m x"],
@@ -120,7 +120,7 @@ const FRONTEIRA_DEIXA = [
   ["um rg com um padrao com = e []", "rg \"[a-z]+=.*\" .claude/hooks -c"],
 ];
 
-/** Sitio 8 e o D2 (`textos-publicos.mjs`): o que muda o `node` tira a isencao do `commit-msg`. */
+/** Sitio 8 e o D2 (o `mudaONode`, `cabeca-comando.mjs`): o que muda o `node` tira a isencao do `commit-msg`. */
 const TIRAM_A_ISENCAO = [
   ["PATH[0]= solto (medido: a shell procura o node so la)", "PATH[0]=./bin"],
   ["path= do zsh (ligado ao PATH)", "path=(./bin $path)"],

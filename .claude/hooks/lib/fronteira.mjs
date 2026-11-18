@@ -35,10 +35,11 @@ export { contextoFronteira } from "./caminhos.mjs";
 // Os caminhos da fronteira (`CAMINHOS_FRONTEIRA`, `ehCaminhoFronteira`, `MAES`), o regex `FRONTEIRA`
 // e a `resto()` vivem no modulo-FOLHA (#243): este ficheiro e o `caminhos.mjs` importavam-se um ao
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
-// importe deste ficheiro); `MAES` e `resto` importam-se da folha. A `ATRIBUICAO_LARGA` tambem (#546): o guard do
-// branch importa daqui, e ficava a 499 linhas com um import proprio.
+// importe deste ficheiro); `MAES` e `resto` importam-se da folha. A `ATRIBUICAO_LARGA` (#546) ja ninguem a importa daqui
+// (#580), e FICA: num `/upgrade` parcial a `lib/` chega antes dos hooks, e o guard dos branches ANTIGO rebentava no import.
 import { ATRIBUICAO_LARGA_SRC, escritaDoBloco, FRONTEIRA, NOMEIA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
-import { aJusante, comandos, inlineDe, NOMES_SHELL } from "./posicao.mjs";
+import { comandos } from "./comandos.mjs";
+import { aJusante, inlineDe, NOMES_SHELL } from "./posicao.mjs";
 import { valoresQueExecutam } from "./verbos-git.mjs";
 export { ATRIBUICAO_LARGA, CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
 

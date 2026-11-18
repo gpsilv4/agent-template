@@ -394,12 +394,15 @@ not to* line, so every agent sees it.
 │   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
 │   │                                  block AFTER compaction dropped the imported rules
 │   ├── lib/                        <- What the hooks share: the frontier rule (`fronteira`,
-│   │                                  `caminhos`, the command-position lexer `posicao`, and
-│   │                                  their import-free leaf `fronteira-dados`),
-│   │                                  git verbs, the guard's deadline (`resposta`),
-│   │                                  porcelain parsing, a subagent's scope (`ambito-agente`),
-│   │                                  the protected-branch list (`protegidos`), what a command
-│   │                                  publishes (`textos-publicos`)
+│   │                                  `caminhos`, the shell lexer `comandos`, the command
+│   │                                  position `posicao`, and their import-free leaf
+│   │                                  `fronteira-dados`), git verbs, the branch guard's git
+│   │                                  invocations (`invocacoes-git`), the guard's deadline
+│   │                                  (`resposta`), porcelain parsing, a subagent's scope
+│   │                                  (`ambito-agente`), the protected-branch list
+│   │                                  (`protegidos`), what a command publishes
+│   │                                  (`textos-publicos`, with a command's head and what
+│   │                                  changes `node` in `cabeca-comando`)
 │   └── tests/                      <- Negative tests for the hooks
 │       ├── test-hooks.mjs          <- Real git repos, real payloads
 │       │                              (count: node .claude/hooks/tests/test-hooks.mjs)
@@ -415,8 +418,9 @@ not to* line, so every agent sees it.
 │       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
 │       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
 │       ├── tests-textos-publicos.mjs <- A forbidden name in what gh/git publishes, and what it cannot read
+│       ├── tests-textos-publicos-isencao.mjs <- The commit-msg exemption: one case per condition (#511, #580)
 │       ├── tests-atribuicoes.mjs   <- bash and env assignments read the same way in every hook (#546)
-│       ├── tests-posicao.mjs       <- The position lexer (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
+│       ├── tests-posicao.mjs       <- The lexer (`lib/comandos.mjs`) and the position (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the
 │                                      repo being measured, not the hook's own
