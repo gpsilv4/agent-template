@@ -29,7 +29,10 @@
 // passava com exit 0. Adaptar ao vocabulario do projeto no bootstrap: o que interessa e que
 // os nomes contados sejam os que o projeto **usa** para declarar um teste e uma assercao.
 const CONTAGENS = [
-  { re: /\b(?:it|test|describe|context)\s*\(/, msg: "casos de teste" },
+  // `(?<![.\w$])` e nao `\b` (#551): o metodo das regex (`re.test(`, `/a/.test(`) nao e um caso de teste. Contado, inflava
+  // quase todas as suites, e trocar um `test(...)` por um `re.test(...)` mantinha o numero (uma descida escondida). Os
+  // receptores que DECLARAM testes contam pelo nome: o `t.test(` (subtestes do tap e do `node:test`) e o `Deno.test(`.
+  { re: /(?<![.\w$])(?:it|test|describe|context)\s*\(|\b(?:Deno|t|tap)\.test\s*\(/, msg: "casos de teste" },
   { re: /\bdef\s+test_\w+/, msg: "casos de teste (python)" },
   { re: /\b(?:expect|assert\w*)\s*\(/, msg: "assercoes (expect/assert)" },
   // O vocabulario DESTE repo. Sem estas linhas a contagem de assercoes era **zero em todas
