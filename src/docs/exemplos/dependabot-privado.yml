@@ -13,6 +13,8 @@
 #   - `rebase-strategy: disabled`: sem ele, cada merge no `main` rebaseia os PRs abertos do Dependabot, e cada rebase
 #     corre o CI do PR outra vez. A troca: os PRs dele ficam desatualizados em silencio, e um PR de seguranca faz-se no
 #     proprio dia (`@dependabot rebase`, CI, merge). Esta opcao vale tambem para os de seguranca.
+# Fora do alcance destas duas: um alerta de seguranca SEM versao compativel tenta a cada push no `main` (~3 min por run,
+# sempre `failure`), e nem o `monthly` nem o `rebase-strategy` o travam. Ver o §4 de `src/docs/upgrade-derivados-privados.md`.
 version: 2
 # NOTA: o bloco `npm` abaixo so funciona num repo COM `package.json`. Sem manifesto, comentar este bloco;
 # `github-actions` e sempre valido e fica ligado.
