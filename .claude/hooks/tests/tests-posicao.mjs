@@ -1,5 +1,5 @@
 /**
- * O LEXER de posicao (`lib/posicao.mjs`), por estrutura — {{PROJECT_NAME}}
+ * O LEXER (`lib/comandos.mjs`) e a posicao (`lib/posicao.mjs`), por estrutura — {{PROJECT_NAME}}
  *
  * NAO e um entry point: o `test-hooks.mjs` descobre este modulo e chama `registar()`.
  *
@@ -9,7 +9,8 @@
  * fica vermelho quando a varredura muta o fim de uma substituicao, de umas aspas ou de um heredoc.
  */
 import { pathToFileURL } from "url";
-import { comandos, familiaDe, inlineDe } from "../lib/posicao.mjs";
+import { comandos } from "../lib/comandos.mjs";
+import { familiaDe, inlineDe } from "../lib/posicao.mjs";
 import { NOMES_INTERPRETADOR } from "../lib/fronteira-dados.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

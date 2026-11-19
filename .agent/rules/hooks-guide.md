@@ -42,7 +42,7 @@
     (o texto citado que corre, #229). E a linha do `CLAUDE.md` — barreira contra o **descuido** —
     escrita em casos.
   - **A posicao de comando** (#336). `node -pe`, `perl -le`, `python3 -Ic` e `php -r` passavam
-    pela regex. O `lib/posicao.mjs` le o comando como a shell e diz que palavra CORRE (palavras-
+    pela regex. O `lib/posicao.mjs` le o comando (`comandos.mjs`) e diz que palavra CORRE (palavras-
     chave, cabecas, executores, o que fica a jusante por pipe; com a fronteira so citada, qualquer
     inline). **So acrescenta**: as regex ficam como piso. Uma mensagem que cite `node -e` e a
     fronteira fica negada de proposito (#344). O detalhe e o que fica de fora: o cabecalho do modulo.

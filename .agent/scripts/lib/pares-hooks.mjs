@@ -55,14 +55,14 @@ export const PARES_DOS_HOOKS = [
     neutro: "((x) => null)(",
   },
   {
-    // O LEXER de posicao (#336). Nao nega: diz onde acaba uma substituicao, umas aspas ou um heredoc. O neutro
+    // O LEXER (#336; em `comandos.mjs` desde o #580). Nao nega: diz onde acaba uma substituicao, umas aspas ou um heredoc. O neutro
     // devolve o FIM do texto — a mutacao engole o resto do comando numa palavra (ou num corpo de heredoc), e
     // os casos de estrutura do `tests-posicao.mjs` tem de ficar vermelhos. Auto-contido de proposito: um nome
     // que nao existisse no ambito lancava, caia no `erro-ao-analisar`, e contava como morto pela razao errada.
     // As DEFINICOES (`const fechaSubst =`, `function fechaHeredoc(`) nao casam. Ficam de fora os ciclos que
     // seguem as aspas SIMPLES (o `indexOf`), as CRASES (dentro e fora de aspas duplas) e o `$'...'` — e dito,
     // para nao se ler "o lexer coberto" a mais. O `aritmetica()` usa o `fechaSubst(`, e entra.
-    alvo: ".claude/hooks/lib/posicao.mjs",
+    alvo: ".claude/hooks/lib/comandos.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /(?<![\w.$])(?<!function\s)(?:fechaSubst|fechaAspas|fechaHeredoc)\(/,
     neutro: "((t) => t.length)(",
@@ -169,25 +169,26 @@ export const PARES_DOS_HOOKS = [
   // `RECEBE_CODIGO` (`fronteira.mjs`), dentro de uma template string que a varredura nao le — um controlo manual do
   // #546 (a regex antiga) ficou vermelho no `env X+=1 $C <<EOF`; as linhas
   // `.every(...)` do `defineGhRepo`/`mudaONode` (ensombradas pelo `cabeca()`), e o `nomeDaAtribuicao(` nos argumentos
-  // de um `export` (um argumento sem `=` com `[`/`+` nem e valido em bash: o mutante e equivalente).
-  ...[".claude/hooks/guard-protected-branch.mjs", ".claude/hooks/lib/verbos-git.mjs", ".claude/hooks/lib/posicao.mjs"].map((alvo) => ({
+  // de um `export` (um argumento sem `=` com `[`/`+` nem e valido em bash: o mutante e equivalente). O do guard dos
+  // branches esta no `invocacoes-git.mjs` desde o #580.
+  ...[".claude/hooks/lib/invocacoes-git.mjs", ".claude/hooks/lib/verbos-git.mjs", ".claude/hooks/lib/posicao.mjs"].map((alvo) => ({
     alvo,
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /(?<![\w.$])ATRIBUICAO_LARGA\.test\(/,
     neutro: "((x) => false)(",
   })),
   // A do BASH onde decide o verbo (a allowlist do `levaMarcador`, so com o indice literal desde o M3 do `/audit` da
-  // v0.63.6; a leitura nova do `verboEm`) e, no `textos-publicos`, so a do `cabeca()` pelo CRU: os outros dois do ficheiro
-  // sao os `.every(...)` ensombrados, acima.
+  // v0.63.6; a leitura nova do `verboEm`) e, no `cabeca-comando` (era o `textos-publicos` ate ao #580), so a do `cabeca()`
+  // pelo CRU: os outros dois do ficheiro sao os `.every(...)` ensombrados, acima.
   ...[[".claude/hooks/lib/caminhos.mjs", /(?<![\w.$])ATRIBUICAO_BASH_LITERAL\.test\(/], [".claude/hooks/lib/posicao.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\(/],
-    [".claude/hooks/lib/textos-publicos.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\((?=ws\[i\]\.cru\))/]].map(([alvo, sinal]) => ({
+    [".claude/hooks/lib/cabeca-comando.mjs", /(?<![\w.$])ATRIBUICAO_BASH\.test\((?=ws\[i\]\.cru\))/]].map(([alvo, sinal]) => ({
     alvo,
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal,
     neutro: "((x) => false)(",
   })),
   // A LARGA depois de um `env`/`sudo`: no `depoisDeAtribuidora` (duas seguidas, `env A-B=1 C-D=1 $N`) e no `cabeca()`.
-  ...[".claude/hooks/lib/fronteira-dados.mjs", ".claude/hooks/lib/textos-publicos.mjs"].map((alvo) => ({
+  ...[".claude/hooks/lib/fronteira-dados.mjs", ".claude/hooks/lib/cabeca-comando.mjs"].map((alvo) => ({
     alvo,
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /(?<![\w.$])ATRIBUICAO_LARGA\.test\(/,
@@ -197,7 +198,8 @@ export const PARES_DOS_HOOKS = [
     // Cada forma que muda o `node` e tira a isencao do `commit-msg` (#536, #545, #546), uma por linha: desligada uma,
     // essa forma passava a deixar o `node .githooks/commit-msg` isento depois de mudar o `node`. Casa tambem a 1.a linha
     // do `defineGhRepo` (o `GH_REPO` que o `cabeca()` recolhe), a mesma forma: desligada, um `sudo GH_REPO=o/r gh` publicava.
-    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    // Em `cabeca-comando.mjs` desde o #580.
+    alvo: ".claude/hooks/lib/cabeca-comando.mjs",
     suite: ".claude/hooks/tests/test-hooks.mjs",
     sinal: /^ {2}if \((?=.+\) return true;$)/,
     neutro: "  if (false && ",

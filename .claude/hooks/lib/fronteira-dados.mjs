@@ -62,7 +62,7 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** As opcoes GLOBAIS do `git` (antes do verbo) que consomem a palavra seguinte, numa so lista (#397, `TP8`): eram
  *  quatro copias e divergiam. Hoje so o `textos-publicos.mjs` a le; o `fronteira.mjs`, o `verbos-git.mjs` e o
- *  `guard-protected-branch.mjs` convergem no #336, com o corpus diferencial (la, mudar a lista troca negacoes por
+ *  `invocacoes-git.mjs` (o do guard dos branches, #580) convergem no #336, com o corpus diferencial (la, mudar a lista troca negacoes por
  *  permissoes). O `--exec-path` so leva valor com `=` (sem ele o git imprime e sai: consumir o seguinte e inofensivo);
  *  o `--super-prefix` ja nao existe nos git recentes, e fica pelos antigos. */
 export const GIT_GLOBAIS_COM_VALOR = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix", "--config-env", "--attr-source"];
@@ -92,7 +92,7 @@ export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|p
 
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *
- *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do `guard-protected-branch.mjs`, e digo-o em
+ *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do guard dos branches (`invocacoes-git.mjs` desde o #580), e digo-o em
  *  vez de escrever "reutiliza": ali as formas nao sao exportadas, logo nao ha nada a reutilizar,
  *  e isto e um `TP8` assumido — uma cabeca acrescentada num ficheiro nao aparece no outro e nada
  *  o denuncia. Extrair para um modulo comum e trabalho proprio, e fica dito aqui em vez de
