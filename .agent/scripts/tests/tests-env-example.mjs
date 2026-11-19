@@ -40,7 +40,10 @@ const DEMO = "super-secret-jwt-token-" + "with-at-least-32-characters-long";
 const jwt = (carga, segredo = "outro-segredo-qualquer-com-32-caracteres") => {
   const h = "eyJ" + "hbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9";
   const p = Buffer.from(JSON.stringify(carga)).toString("base64url");
-  return `${h}.${p}.${createHmac("sha256", segredo).update(`${h}.${p}`).digest("base64url")}`;
+  // A assinatura numa variavel, e nao dentro do `${...}`: o `check-codigo-morto` nao ve um uso dentro de uma template
+  // string que tem outra template string la dentro, e dava o `createHmac` por importado e nunca usado.
+  const assinatura = createHmac("sha256", segredo).update(`${h}.${p}`).digest("base64url");
+  return `${h}.${p}.${assinatura}`;
 };
 const URL_ = (cred, host = "db.exemplo.pt") => `postgres://${cred}@${host}:5432/app`;
 const LIMPO = [
