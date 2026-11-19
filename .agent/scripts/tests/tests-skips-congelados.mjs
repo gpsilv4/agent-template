@@ -34,6 +34,7 @@ import { join } from "path";
 import { sandbox, runGuard, registarResultado, readF, writeF } from "./harness/test-harness.mjs";
 import { bootstrapado, comoTemplate } from "./harness/projeto-derivado.mjs";
 import { ficheirosComProsa } from "../guards/derived-counts.mjs";
+import { exemplosEm } from "../guards/env-example.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -85,6 +86,10 @@ const semCitacaoDeWorkflows = (dir) => {
 const semCursor = (dir) =>
   existsSync(join(dir, ".cursor/rules/project.mdc")) ? [] : [{ chave: ".cursor/rules/project.mdc — ponteiro ausente", vezes: 1 }];
 
+/** Sem nenhum exemplo do `.env` na arvore, o Guard 23 salta (#595). Do disco: um derivado com um `.env.example` corre-o. */
+const semExemplosEnv = (dir) =>
+  exemplosEm(dir).exemplos.length ? [] : [{ chave: "Guard 23 (exemplos do `.env` sem segredos)", vezes: 1 }];
+
 /** As rules que a Fase 2.2 do bootstrap GERA. Se existem na sandbox, os guards leem-nas e nao
  *  saltam; se nao existem, saltam duas vezes cada — uma pelo ficheiro, outra pelo `@import` que
  *  o CLAUDE.md lhe faz.
@@ -135,7 +140,7 @@ export function registar() {
     montar(dir);
     const out = runGuard(dir).out ?? "";
     const linhas = out.split("\n").filter((l) => /\bSKIP\b/.test(l));
-    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir), ...semCitacaoDeWorkflows(dir), ...semCursor(dir)];
+    const esp = [...esperados, ...porGerar(dir), ...doProjeto(dir), ...semCitacaoDeWorkflows(dir), ...semCursor(dir), ...semExemplosEnv(dir)];
     const afirma = (nome, problemas) => registarResultado(`skips (${rotulo}): ${nome}`, problemas, out);
 
     // 1. Nenhum SKIP a mais. E este que apanha a fixture incompleta: um ficheiro que falte faz o

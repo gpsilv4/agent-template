@@ -19,6 +19,7 @@ import { dirname, join, resolve } from "path";
 import { fileURLToPath } from "url";
 import { executar, MANIFESTO, planear } from "../adotar-template.mjs";
 import { registarAdotarOrigem } from "./harness/casos-adotar-origem.mjs";
+import { registarAdotarEnv } from "./harness/casos-adotar-env.mjs";
 
 const SCRIPTS = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -84,6 +85,9 @@ try {
   // O que o `adotar-template.mjs` importa tem de vir com ele (#373: a guarda de entry point partilhada).
   cpSync(join(SCRIPTS, "lib/eh-main.mjs"), join(tpl, ".agent/scripts/lib/eh-main.mjs"));
   cpSync(join(SCRIPTS, "lib/origem-upgrade.mjs"), join(tpl, ".agent/scripts/lib/origem-upgrade.mjs"));
+  // O Guard 23 (#595), que a adocao corre antes de copiar, e as formas de segredo que ele le.
+  cpSync(join(SCRIPTS, "guards/env-example.mjs"), join(tpl, ".agent/scripts/guards/env-example.mjs"));
+  cpSync(join(SCRIPTS, "lib/segredos.mjs"), join(tpl, ".agent/scripts/lib/segredos.mjs"));
   git(tpl, "init", "-q", "-b", "main");
   // O `.gitignore` GLOBAL de quem corre nao entra (`TP3`): o caso do ficheiro nao seguido (#512) conta com que o git o
   // veja, e um `.gitignore` global que o apanhasse punha a suite verde sem medir nessa maquina.
@@ -486,6 +490,7 @@ try {
     ];
   });
   registarAdotarOrigem({ test, espera, recusa, git, escreve, planear, projeto, tpl, sandbox, MANIFESTO });
+  registarAdotarEnv({ test, espera, recusa, cli, planear, projeto, tpl, commitTpl, MANIFESTO });
 } finally {
   rmSync(sandbox, { recursive: true, force: true });
 }

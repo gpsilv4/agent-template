@@ -235,12 +235,20 @@ if (settingsRaw === null) {
     // estrito (`Read(./**/.env*)`) cobre; uma sonda de `ask` aceita o `deny` (e mais estrito), uma de
     // `deny` nao aceita o `ask`. As da fronteira so contam com a pasta no disco.
     const ask = asList(perms.ask, "ask");
+    const fechadas = [];
     for (const { tipo, sonda } of emFalta({ deny, ask }, (pasta) => listDir(pasta, "") !== null)) {
-      if (tipo === "leitura") flag(`nenhuma regra \`deny\` cobre a leitura de \`${sonda.alvo}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
+      if (tipo === "aberta") fechadas.push(descreve(sonda));
+      else if (tipo === "leitura") flag(`nenhuma regra \`deny\` cobre a leitura de \`${sonda.alvo}\` (nota: o tradutor de glob nao expande braces \`{a,b}\`)`);
       else if (tipo === "deny" && sonda.nota) note(`${SETTINGS_PATH}: ${descreve(sonda)} nao esta em \`deny\` — o template nega-o; se o fluxo do projeto o usa, fica a decisao escrita`);
       else if (tipo === "deny") flag(`${descreve(sonda)} nao esta em \`deny\` — o template nega-o, e nada neste settings.json o trava`);
       else if (sonda.nota) note(`${SETTINGS_PATH}: ${descreve(sonda)} nao esta em \`ask\` nem em \`deny\` — o template pergunta antes; se a stack o usa, acrescentar`);
       else flag(`${descreve(sonda)} nao esta em \`ask\` nem em \`deny\` — o template pergunta antes`);
+    }
+    // Os exemplos do `.env` que o `deny` ainda apanha (#595): NOTA, uma so — um derivado abre-os editando o
+    // `settings.json` a mao, e ate la nao fica vermelho. Onde inserir cada `!` esta no BOOTSTRAP §2.9.
+    if (fechadas.length) {
+      note(`${SETTINGS_PATH}: o \`deny\` apanha os ficheiros de EXEMPLO do \`.env\` (${fechadas.join(", ")}) — o agente nao os mantem; ` +
+        "o template abre-os com um `!` logo a seguir as regras do `.env` (BOOTSTRAP §2.9), depois de o Guard 23 os dar limpos");
     }
 
     // Um `allow` que caia dentro de um prefixo negado ou perguntado e contradicao
@@ -382,7 +390,7 @@ if (settingsRaw === null) {
     // verificadas; quando a camada so-Claude nao existe, nao promete nada sobre hooks.
     if (issues === 0) {
       ok(
-        `${SETTINGS_PATH} (deny de secrets cobre .env*, allow sem concessoes largas` +
+        `${SETTINGS_PATH} (deny de secrets cobre os .env de segredo, allow sem concessoes largas` +
           `${hooksVistos === null ? "" : `, ${hooksVistos} hook(s) em disco e todos ligados`})`
       );
     }

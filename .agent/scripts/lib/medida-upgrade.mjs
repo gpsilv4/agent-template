@@ -52,6 +52,8 @@ function notasDasPermissoes({ raiz, template, note, listas }) {
       note(`o \`${lista}\` do settings.json do template tem ${falta[lista].length} regra(s)${qual} que o deste projeto nao tem, ${como}: ${falta[lista].join(", ")} — trazer, ou decidir que nao`);
     }
   }
+  // Um `!` (#595) corta as regras de caminho ANTERIORES: a lista acima e plana, e no fim do `deny` abria o `secrets/**`.
+  if (listas.includes("deny") && falta?.deny.some((r) => /^\w+\(\s*!/.test(r))) note("as regras com `!` (os exemplos do `.env`, #595) inserem-se LOGO A SEGUIR as regras do `.env` e antes de qualquer outra regra de caminho — no fim do `deny` abriam tambem o `secrets/.env.example`; e as `Edit`/`Write(./**/.env*)` que estejam mais abaixo SOBEM para cima delas (um `!` antes da regra larga nao abre nada); correr antes o Guard 23, que reprova um exemplo com um segredo real (BOOTSTRAP §2.9)");
 }
 
 /** Os comandos que o consumidor corre, DERIVADOS dos jobs `guard-tests` e `sweep` do `ci.yml` de `raiz` —

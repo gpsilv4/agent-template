@@ -38,6 +38,16 @@ export function registar({ H, P, cpDe }) {
       { codigo: 0, inclui: [".agent/scripts/velho.mjs"], exclui: [".agent/scripts/velho.mjs   (FRONTEIRA"] }));
   // 2. Onde ligar cada hook: o evento e o matcher do settings do template, e a ligacao que muda num hook intacto.
   const SET = ".claude/settings.json";
+  // O `!` dos exemplos do `.env` (#595): a posicao decide o que abre, e a lista da 2b e plana. O controlo: uma regra
+  // em falta SEM `!` nao traz a nota.
+  const ONDE = "inserem-se LOGO A SEGUIR as regras do `.env`";
+  const permsDeny = (deny) => `${JSON.stringify({ permissions: { deny, ask: [], allow: [] } })}\n`;
+  test("um `!` em falta no deny diz ONDE inserir, e manda correr o Guard 23 antes (#595)", () =>
+    exige(contraProjeto({ hoje: { [SET]: permsDeny(["Read(./**/.env.*)", "Read(!.env.example)"]) }, projeto: { [SET]: permsDeny(["Read(./**/.env.*)"]) } }),
+      { codigo: 0, inclui: ["Read(!.env.example)", ONDE, "as `Edit`/`Write(./**/.env*)` que estejam mais abaixo SOBEM", "correr antes o Guard 23"] }));
+  test("CONTROLO — uma regra em falta sem `!` nao traz a nota da posicao (#595)", () =>
+    exige(contraProjeto({ hoje: { [SET]: permsDeny(["Read(./**/.env.*)", "Read(~/.ssh/**)"]) }, projeto: { [SET]: permsDeny(["Read(./**/.env.*)"]) } }),
+      { codigo: 0, inclui: ["Read(~/.ssh/**)"], exclui: [ONDE] }));
   const liga = (pares) =>
     JSON.stringify({ hooks: Object.fromEntries(pares.map(([ev, m, rel]) => [ev, [{ ...(m ? { matcher: m } : {}), hooks: [{ type: "command", command: `node "$CLAUDE_PROJECT_DIR/${rel}"` }] }]])) });
   test("um hook novo diz o evento e o matcher onde o ligar (#317)", () =>

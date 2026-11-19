@@ -47,40 +47,56 @@ function globParaRegex(glob) {
  *  - um caminho sem `/` e um nome solto e casa a qualquer profundidade (gitignore: `Read(.env)` e
  *    `Read(**\/.env)` sao a mesma regra); `./x` e `/x` ancoram na raiz do projeto; `//x` e absoluto
  *    e `~/x` e a casa, e nenhum dos dois cobre um caminho do repo;
- *  - o nome nu (`Edit`) e a ferramenta INTEIRA.
+ *  - o nome nu (`Edit`) e a ferramenta INTEIRA;
+ *  - um `!` e a negacao do gitignore (#595): "carves the paths it matches out of the `path` or `./path` rules listed
+ *    BEFORE it" — a ORDEM conta, e um `!` antes da regra larga nao tira nada. A doc nao diz se um `Edit(!x)` corta
+ *    tambem um `Read(...)` anterior: com `cruza` (o defeito) supoe-se que SIM, que e o lado seguro para uma regra que
+ *    tem de cobrir um segredo; `cruza: false` mede o lado oposto, para o que tem de ficar ABERTO.
  * Na duvida, NAO cobre: um aviso a mais custa uma leitura, um silencio indevido custa a fronteira.
  * @param {unknown[]} regras
  * @param {string} ferramenta
  * @param {string} alvo
+ * @param {{ cruza?: boolean }} [opcoes]
  */
-export function cobre(regras, ferramenta, alvo) {
-  return regras.some((r) => {
-    if (typeof r !== "string") return false;
-    if (r.trim() === ferramenta) return true;
-    const m = /^([A-Za-z]+)\((.*)\)$/.exec(r.trim());
-    if (!m || m[1] !== ferramenta) return false;
-    if (ferramenta !== "Bash") {
-      const cru = m[2].trim();
-      const glob = cru.includes("/") ? cru.replace(/^\/(?!\/)/, "") : `**/${cru}`;
-      // Um `~/` so e coberto por um padrao com `~/`: senao `Read(./**/id_*)` dava por coberto o
-      // `~/.ssh/id_ed25519` (o `~` lido como uma pasta do repo), e apagar o deny de `~/.ssh` calava-se.
-      return alvo.startsWith("~/") === glob.startsWith("~/") && globParaRegex(glob).test(alvo);
-    }
-    const corpo = m[2];
-    // Um `*` NO MEIO ("A `*` can go anywhere in the rule", a doc de permissoes do Claude Code): o resto e literal,
-    // e o `:*` final e o mesmo que ` *`. So o prefixo nao chegava: `Bash(git config*chave*)` nunca cobria nada (#375).
-    if (corpo.replace(/(?::\*| \*|\*)\s*$/, "").includes("*")) {
-      const partes = corpo.trim().replace(/:\*$/, " *").split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
-      return new RegExp(`^${partes.join(".*")}$`).test(alvo);
-    }
-    const palavra = /^(.*?)(?::\*| \*)\s*$/.exec(corpo);
-    if (palavra) {
-      const p = palavra[1].trim();
-      return alvo === p || alvo.startsWith(`${p} `);
-    }
-    const colado = /^(.*)\*\s*$/.exec(corpo);
-    return colado ? alvo.startsWith(colado[1].trim()) : alvo === corpo.trim();
-  });
+export function cobre(regras, ferramenta, alvo, { cruza = true } = {}) {
+  let coberto = false;
+  for (const r of regras) {
+    // So uma regra de CAMINHO nega: um `Bash(!x)` e um comando literal, como era antes do #595.
+    const neg = typeof r === "string" ? /^((?!Bash\()[A-Za-z]+)\(\s*!(.*)\)$/.exec(r.trim()) : null;
+    if (neg) {
+      if (coberto && ferramenta !== "Bash" && (cruza || neg[1] === ferramenta) && casa(`${neg[1]}(${neg[2]})`, neg[1], alvo)) coberto = false;
+    } else if (casa(r, ferramenta, alvo)) coberto = true;
+  }
+  return coberto;
+}
+
+/** A regra `r` (sem `!`) casa `alvo` para `ferramenta`? A semantica do `cobre`, regra a regra. */
+function casa(r, ferramenta, alvo) {
+  if (typeof r !== "string") return false;
+  if (r.trim() === ferramenta) return true;
+  const m = /^([A-Za-z]+)\((.*)\)$/.exec(r.trim());
+  if (!m || m[1] !== ferramenta) return false;
+  if (ferramenta !== "Bash") {
+    const cru = m[2].trim();
+    const glob = cru.includes("/") ? cru.replace(/^\/(?!\/)/, "") : `**/${cru}`;
+    // Um `~/` so e coberto por um padrao com `~/`: senao `Read(./**/id_*)` dava por coberto o
+    // `~/.ssh/id_ed25519` (o `~` lido como uma pasta do repo), e apagar o deny de `~/.ssh` calava-se.
+    return alvo.startsWith("~/") === glob.startsWith("~/") && globParaRegex(glob).test(alvo);
+  }
+  const corpo = m[2];
+  // Um `*` NO MEIO ("A `*` can go anywhere in the rule", a doc de permissoes do Claude Code): o resto e literal,
+  // e o `:*` final e o mesmo que ` *`. So o prefixo nao chegava: `Bash(git config*chave*)` nunca cobria nada (#375).
+  if (corpo.replace(/(?::\*| \*|\*)\s*$/, "").includes("*")) {
+    const partes = corpo.trim().replace(/:\*$/, " *").split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&"));
+    return new RegExp(`^${partes.join(".*")}$`).test(alvo);
+  }
+  const palavra = /^(.*?)(?::\*| \*)\s*$/.exec(corpo);
+  if (palavra) {
+    const p = palavra[1].trim();
+    return alvo === p || alvo.startsWith(`${p} `);
+  }
+  const colado = /^(.*)\*\s*$/.exec(corpo);
+  return colado ? alvo.startsWith(colado[1].trim()) : alvo === corpo.trim();
 }
 
 /**
@@ -89,11 +105,24 @@ export function cobre(regras, ferramenta, alvo) {
  */
 export const LEITURAS_NEGADAS = [
   ".env", ".env.local", ".env.production", "a/b/.env", "a/.env.local",
+  // Os de segredo que o `!` dos exemplos (#595) nao pode abrir: um nome de exemplo com sufixo, um sufixo depois dele,
+  // um nome de ambiente que nenhuma lista escreveria, e um exemplo DENTRO de `secrets/` (um `!` mal posto abre-o).
+  ".env.production.local", "apps/web/.env.local", ".env.example.local", "a/.env.local.example", ".env.staging",
+  "secrets/.env.example", "a/secrets/.env.sample",
   "chave.pem", "a/chave.pem", "tls.key", "a/b/tls.key", "id_rsa", "a/id_rsa.pub", "a/id_ed25519", ".npmrc", "a/.npmrc",
   "credentials.json", "a/credentials.json", "secrets/db.json", "a/secrets/db.json",
   ".envrc", "a/.netrc", "a/.pgpass", "a/.git-credentials", "a/cert.p12", "a/cert.pfx", "a/keystore.jks",
   "~/.ssh/id_ed25519", "~/.aws/credentials", "~/.npmrc", "~/.config/gh/hosts.yml",
 ];
+
+/**
+ * Os ficheiros de EXEMPLO do `.env` (#595): so placeholders, e o agente mantem-nos quando uma variavel muda. Um
+ * `deny` que os apanhe e o defeito do derivado F — o utilizador editava-os a mao. NOTA e nao reprovacao: um derivado
+ * so os abre editando o `settings.json` a mao, e ate la nao fica vermelho no CI. Uma por ferramenta: e o que da a
+ * cada `!` do template um efeito medido no teste de remocao um a um.
+ */
+export const ABERTAS = ["Read", "Edit", "Write"].flatMap((ferramenta) =>
+  [".env.example", "a/b/.env.sample", ".env.template"].map((alvo) => ({ ferramenta, alvo })));
 
 /**
  * O resto da fronteira. `lista`: onde a regra TEM de estar — `deny`, ou `ask` (e ai o `deny` tambem
@@ -104,7 +133,7 @@ export const LEITURAS_NEGADAS = [
 const BASH = (lista, cmds, extra = {}) => cmds.map((c) => ({ lista, ferramenta: "Bash", alvo: `${c} x`, ...extra }));
 export const SONDAS = [
   // A configuracao de permissoes e os segredos nao se escrevem.
-  ...["Edit", "Write"].flatMap((f) => [".claude/settings.json", ".claude/settings.local.json", ".env.local", "a/.env"].map((alvo) => ({ lista: "deny", ferramenta: f, alvo }))),
+  ...["Edit", "Write"].flatMap((f) => [".claude/settings.json", ".claude/settings.local.json", ".env.local", "a/.env", ".env.example.local", "apps/web/.env.production.local"].map((alvo) => ({ lista: "deny", ferramenta: f, alvo }))),
   ...BASH("deny", ["git push --force", "git push -f", "git reset --hard", "rm -rf", "rm -fr", "rm -Rf", "rm -fR", "rm -r -f", "rm -f -r", "rm --recursive --force"]),
   ...BASH("deny", ["git push --force-with-lease"], { nota: true }),
   // O interruptor dos nomes proibidos (#375): so o UTILIZADOR o desliga, e um agente recusado que o desligasse
@@ -127,7 +156,7 @@ export const descreve = ({ ferramenta, alvo }) => (ferramenta === "Bash" ? `\`${
 
 /**
  * O que falta a `perms` (o `permissions` de um settings.json), sonda a sonda: `{ tipo, sonda }`, com
- * `tipo` `leitura` (alvo de `LEITURAS_NEGADAS`), `deny` ou `ask`. O guard decide o nivel; o teste de
+ * `tipo` `leitura` (alvo de `LEITURAS_NEGADAS`), `deny`, `ask`, ou `aberta` (um exemplo de `ABERTAS` que o `deny` apanha). O guard decide o nivel; o teste de
  * remocao um a um usa a mesma funcao, para medir com a semantica que o guard aplica.
  * @param {{ deny?: unknown, ask?: unknown }} perms
  * @param {(pasta: string) => boolean} [existe]
@@ -139,8 +168,11 @@ export function emFalta(perms, existe = () => true) {
   return [
     ...LEITURAS_NEGADAS.filter((a) => !cobre(deny, "Read", a)).map((alvo) => ({ tipo: "leitura", sonda: { ferramenta: "Read", alvo } })),
     ...SONDAS.filter((s) => !s.pasta || existe(s.pasta))
-      .filter((s) => !cobre(s.lista === "deny" ? deny : [...ask, ...deny], s.ferramenta, s.alvo))
+      // Cada lista por si: um `!` do `deny` so corta regras do `deny` (a doc: "the same source"), e juntar as duas
+      // listas deixava-o cortar o `ask` que viesse antes dele na concatenacao.
+      .filter((s) => !cobre(deny, s.ferramenta, s.alvo) && (s.lista === "deny" || !cobre(ask, s.ferramenta, s.alvo)))
       .map((sonda) => ({ tipo: sonda.lista, sonda })),
+    ...ABERTAS.filter((s) => cobre(deny, s.ferramenta, s.alvo, { cruza: false })).map((sonda) => ({ tipo: "aberta", sonda })),
   ];
 }
 

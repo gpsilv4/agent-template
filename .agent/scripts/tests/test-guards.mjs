@@ -23,7 +23,8 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // nesse modulo corre ESTE comando. O `tests-pares.mjs` exercita o `lib/pares.mjs` e o
 // `lib/pares-hooks.mjs`, o `lib/pares-publicos.mjs` e o `lib/pares-simuladores.mjs` que ele junta (#243, #375, #400). O `tests-nomes-proibidos.mjs`
 // exercita o `lib/nomes-proibidos.mjs` (a lista guardada fora do repo, #375). O `tests-settings-sondas.mjs` exercita o `lib/permissoes.mjs`
-// (as sondas do Guard 11, #301). O `tests-varredura-shards.mjs` exercita o `lib/varredura-fatia.mjs` e o
+// (as sondas do Guard 11, #301; o `!` dos exemplos do `.env` no `tests-settings-exemplos.mjs`, #595). O `tests-env-example.mjs` e o
+// `tests-mcp.mjs` exercitam o `lib/segredos.mjs` (as formas de um segredo literal, #595). O `tests-varredura-shards.mjs` exercita o `lib/varredura-fatia.mjs` e o
 // `lib/varredura-shards.mjs` (os shards da varredura, #308), e o `--diff` do `lib/varredura-diff.mjs` (#317). O `tests-suites-em-paralelo.mjs` exercita o
 // `lib/suites-em-paralelo.mjs` (as suites do `Guard Suites` em paralelo, #337). O `tests-medida-upgrade-ci.mjs` exercita o
 // `lib/medida-upgrade-ci.mjs` (as notas da 2b sobre a forma do `ci.yml`, #347), e o `tests-plano-ci.mjs` o `lib/plano-ci.mjs` (o

@@ -25,7 +25,8 @@
  *
  * O QUE RECUSA, e porque: correr dentro do proprio template (copiava-se para si mesmo), um template
  * que ja e derivado (nao ha versao a declarar), um projeto ja adotado ou ja bootstrapado (e o
- * `/upgrade`), um clone que nao esta limpo numa tag de release (#512), um clone sem `origin` ou cuja tag
+ * `/upgrade`), um projeto com um `.env.example` (ou `.sample`/`.template`) com cara de segredo real (#595: o
+ * `settings.json` do template deixa o agente le-lo, e a primeira sessao lia-o antes de qualquer guard), um clone que nao esta limpo numa tag de release (#512), um clone sem `origin` ou cuja tag
  * o `origin` nao confirma (#538: uma tag so local gravava no manifesto uma versao que nao existe — a adocao
  * precisa de rede; a confirmacao e contra o `origin` DECLARADO, logo clona-se do URL do template, e um clone
  * de um clone confirma contra o do meio), e um caminho que passe por um symlink ou por um ficheiro onde o template tem uma
@@ -47,6 +48,7 @@ import { dirname, join, relative, resolve, sep } from "path";
 import { fileURLToPath } from "url";
 import { ehDerivado } from "./lib/derivado.mjs";
 import { ehMain } from "./lib/eh-main.mjs";
+import { problemasDosExemplos } from "./guards/env-example.mjs";
 import { DICA_ULTIMA_TAG, TAG_DE_RELEASE, confirmaLimpo, confirmaTemplateLimpoNumaTag, tagParaComando } from "./lib/origem-upgrade.mjs";
 
 /** O que nunca se copia sem decisao do utilizador: uma licenca nao se herda por omissao. */
@@ -150,6 +152,13 @@ export function planear(tpl, proj, git = gitDoTemplate(tpl)) {
   }
   if (existsSync(join(rProj, ".agent/.template-version"))) {
     throw new Error("o projeto ja foi bootstrapado a partir do template — para o atualizar, e o /upgrade");
+  }
+  // O `settings.json` do template deixa o agente LER os exemplos do `.env` (#595). Num projeto que ja existia, um
+  // `.env.example` pode ter valores reais: a primeira sessao do agente lia-os antes de qualquer guard correr. O Guard 23
+  // corre aqui, antes de copiar, e o valor nunca se mostra.
+  const { problemas: exemplos } = problemasDosExemplos(rProj);
+  if (exemplos.length) {
+    throw new Error(`os ficheiros de exemplo do .env deste projeto nao passam no Guard 23 — o template deixa o agente le-los, logo a adocao para aqui:\n${exemplos.map((p) => `    ${p}`).join("\n")}\n  Passar os valores reais para um .env de segredo (.env.local), deixar placeholders no exemplo (ou um ficheiro normal no lugar do symlink), e voltar a correr`);
   }
   // O manifesto escreve-se em `.agent/`: por um symlink, ia parar fora do projeto.
   const agent = (() => {

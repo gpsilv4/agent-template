@@ -15,7 +15,11 @@ coverage/
 # Env / secrets
 .env
 .env.*
+# Os tres nomes de EXEMPLO versionam-se (#595): o `settings.json` deixa o agente le-los e escreve-los, e o Guard 23 e o
+# `gitleaks` do CI so verificam o que entra no repo. Um ignorado podia guardar valores reais — e o agente le-lo-ia.
 !.env.example
+!.env.sample
+!.env.template
 
 # Tooling / local overrides
 .vercel

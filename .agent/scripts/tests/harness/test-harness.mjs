@@ -403,10 +403,14 @@ function syntheticSandbox() {
     permissions: {
       // Deny e ask completos: a fixture tem de satisfazer a cobertura que o Guard 11
       // exige, senao deixa de estar "limpa por construcao".
-      deny: ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)", "Read(./**/*.pem)", "Read(./**/*.key)", "Read(./**/id_rsa*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)",
+      deny: ["Read(./.env)", "Read(./.env.*)", "Read(./**/.env)", "Read(./**/.env.*)", "Edit(./**/.env*)", "Write(./**/.env*)",
+        // Os exemplos do `.env` abertos (#595), logo a seguir as regras do `.env` — e ANTES de outra regra de caminho
+        // que um `!` pudesse cortar (o `secrets/**`). Ver `ABERTAS` em `lib/permissoes.mjs`.
+        ...["Read", "Edit", "Write"].flatMap((f) => [".env.example", ".env.sample", ".env.template"].map((n) => `${f}(!${n})`)),
+        "Read(./**/*.pem)", "Read(./**/*.key)", "Read(./**/id_rsa*)", "Read(./**/.npmrc)", "Read(./**/credentials*)", "Read(./**/secrets/**)",
         "Read(./**/id_*)", "Read(./**/.envrc)", "Read(./**/.netrc)", "Read(./**/.pgpass)", "Read(./**/.git-credentials)", "Read(./**/*.p12)", "Read(./**/*.pfx)", "Read(./**/*.jks)",
         "Read(~/.ssh/**)", "Read(~/.aws/**)", "Read(~/.npmrc)", "Read(~/.config/gh/**)",
-        "Edit(./.claude/settings*.json)", "Write(./.claude/settings*.json)", "Edit(./**/.env*)", "Write(./**/.env*)",
+        "Edit(./.claude/settings*.json)", "Write(./.claude/settings*.json)",
         "Bash(git push --force:*)", "Bash(git push -f:*)", "Bash(git push --force-with-lease:*)", "Bash(git reset --hard:*)", "Bash(rm -rf:*)", "Bash(rm -fr:*)", "Bash(rm -Rf:*)", "Bash(rm -fR:*)", "Bash(rm -r -f:*)", "Bash(rm -f -r:*)", "Bash(rm --recursive --force:*)"],
       ask: ["Bash(git commit:*)", "Bash(git push:*)", "Bash(git merge:*)", "Bash(gh pr merge:*)", "Bash(npm:*)", "Bash(pnpm:*)", "Bash(yarn:*)", "Bash(bun:*)", "Bash(pip install:*)", "Bash(git checkout -b:*)", "Bash(git switch -c:*)", "Bash(git branch:*)",
         "Edit(./.claude/hooks/**)", "Write(./.claude/hooks/**)", "Edit(./.githooks/**)", "Write(./.githooks/**)", "Edit(./.claude/agents/**)", "Write(./.claude/agents/**)"],

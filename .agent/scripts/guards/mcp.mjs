@@ -21,6 +21,8 @@
  * servir conteudo hostil em runtime; contra isso a defesa e a regra de tratar o output como
  * dados, e essa e prosa. Ver `.agent/rules/mcp-policy.md`.
  */
+// Os segredos literais: as formas vivem em `lib/segredos.mjs`, partilhadas com o Guard 23 (#595).
+import { SEGREDOS } from "../lib/segredos.mjs";
 
 /** Onde os agentes guardam a configuracao de servidores **no repo**. A config de utilizador
  *  (`~/.claude.json`, `~/.cursor/mcp.json`, ...) fica fora de proposito: e do utilizador, nao
@@ -42,26 +44,6 @@ export const MCP_FILES = [
 
 /** A rule que guarda as decisoes. Sem tabela, nao ha aprovacao a comparar. */
 const POLICY = ".agent/rules/mcp-policy.md";
-
-/** Segredos literais. Deliberadamente estreito: um falso positivo aqui bloqueia trabalho
- *  legitimo, e o `gitleaks` do CI e a rede larga. O que se apanha e o descuido obvio —
- *  um token colado no ficheiro em vez de vir do ambiente. */
-const SEGREDOS = [
-  { re: /\bsk-[A-Za-z0-9_-]{16,}/, o: "chave de API (sk-...)" },
-  { re: /\bgh[pousr]_[A-Za-z0-9]{20,}/, o: "token do GitHub" },
-  { re: /\bgithub_pat_[A-Za-z0-9_]{20,}/, o: "token do GitHub (fine-grained)" },
-  { re: /\bAKIA[0-9A-Z]{16}\b/, o: "chave da AWS" },
-  { re: /\bAIza[0-9A-Za-z_-]{30,}/, o: "chave da Google" },
-  { re: /\bxox[baprs]-[A-Za-z0-9-]{10,}/, o: "token do Slack" },
-  { re: /\bsbp_[a-f0-9]{40}\b/, o: "token do Supabase (sbp_)" },
-  { re: /\bglpat-[A-Za-z0-9_-]{20,}/, o: "token do GitLab" },
-  { re: /\bnpm_[A-Za-z0-9]{36}\b/, o: "token do npm" },
-  // Um JWT (`eyJ` e o `{"` em base64) e a forma canonica de uma service key do Supabase e de
-  // meia duzia de servicos. Tres segmentos base64url e uma forma que texto normal nao tem.
-  { re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/, o: "JWT (eyJ...)" },
-  { re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, o: "chave privada" },
-  { re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:@/]+:[^\s:@/]+@/i, o: "URL com credencial embutida" },
-];
 
 /** `${VAR}`, `$VAR` e `env:NOME` sao referencias ao ambiente — a forma CERTA, nao um segredo. */
 const REFERENCIA_AO_AMBIENTE = /^\s*(?:\$\{[^}]+\}|\$[A-Za-z_][A-Za-z0-9_]*|env:[A-Za-z_][A-Za-z0-9_]*)\s*$/;
