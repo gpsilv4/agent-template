@@ -27,6 +27,8 @@
 const S = (n) => (/^tests?-/.test(n) ? `.agent/scripts/tests/${/harness\.mjs$/.test(n) ? "harness/" : ""}${n}` : `.agent/scripts/${n}`);
 
 export const SUITES = [
+  // O Guard 23 (#595) e tambem a recusa da adocao: mexer nele corre as duas. ANTES da regra generica dos guards.
+  { re: /^\.agent\/scripts\/guards\/env-example\.mjs$/, verifica: [S("test-guards.mjs"), S("test-adotar-template.mjs")], only: "guards" },
   { re: /^\.agent\/scripts\/guards\//, verifica: [S("test-guards.mjs")], only: "guards" },
   { re: /^\.agent\/scripts\/check-doc-versions\.mjs$/, verifica: [S("test-guards.mjs")], only: "check-doc" },
   // O `check-backlog`, o `minutos-ci`, os hooks e o `.githooks/` vem no modo parcial (#429): mexer num pode acrescentar
@@ -104,6 +106,8 @@ export const SUITES = [
   // As sondas do Guard 11 e a comparacao do `deny`/`ask` com o template (#301): o guard as usa (e o
   // anti-`TP8` vive no `tests-settings.mjs`), e a 2b imprime a lista.
   { re: /^\.agent\/scripts\/lib\/permissoes\.mjs$/, verifica: [S("test-guards.mjs"), S("test-simulate-upgrade.mjs")] },
+  // As formas de um segredo literal (#595): os Guards 16 e 23 usam-nas, e os casos vivem no `test-guards`.
+  { re: /^\.agent\/scripts\/lib\/segredos\.mjs$/, verifica: [S("test-guards.mjs"), S("test-adotar-template.mjs")] },
   // O plano do CI (#347, C1): o dono no `test-guards` (a CLI, o desvio face a descoberta, as regex do `ci.yml`).
   { re: /^\.agent\/scripts\/lib\/plano-ci\.mjs$/, verifica: [S("test-guards.mjs")] },
   // As notas da forma do `ci.yml` na 2b (#347, C0): o dono no `test-guards` (unitarios, rapidos), e a 2b de ponta a ponta.
@@ -202,6 +206,7 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/(adotar-template|tests\/test-adotar-template)\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // Os casos da origem de uma adocao (#538): chamados no lugar pelo `test-adotar-template`.
   { re: /^\.agent\/scripts\/tests\/harness\/casos-adotar-origem\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-adotar-env\.mjs$/, verifica: [S("test-adotar-template.mjs")] },
   // O criador de Releases (#277) vive em `.github/scripts/`, fora de `.agent/`: um erro nele so se
   // via no Release seguinte, ja publicado.
   { re: /^(\.github\/scripts\/release-da-tag\.sh|\.agent\/scripts\/tests\/test-release-da-tag\.mjs)$/, verifica: [S("test-release-da-tag.mjs")] },

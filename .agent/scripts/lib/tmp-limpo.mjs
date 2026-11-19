@@ -163,6 +163,8 @@ export const PREFIXOS_DE_TESTE = [
   "fuga-2b-",
   // A suite da adocao num projeto existente (#288).
   "adotar-test-",
+  // O caso da pasta ilegivel do Guard 23 (#595): corre fora da sandbox, para repor a permissao antes de a apagar.
+  "g23-",
 ];
 
 /**

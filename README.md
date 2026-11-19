@@ -258,6 +258,7 @@ not to* line, so every agent sees it.
     │   ├── isolamento.mjs      <- Guard 19: suites stay isolated — what makes the parallel sweep safe
     │   ├── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
     │   ├── runners.mjs         <- Guard 22: the template's CI runners on one pinned label, not ubuntu-latest (#488)
+    │   ├── env-example.mjs     <- Guard 23: a .env.example/.sample/.template carries no real secret (#595)
     │   └── ligacao-proprios.mjs <- The project's own guards (config/guards-do-projeto.mjs), and a module
     │                              in guards/ that nothing calls (#176, #539)
     │
@@ -267,7 +268,8 @@ not to* line, so every agent sees it.
     │   ├── alvos-no-disco.mjs  <- Which verifier files exist on disk (what the sweep must cover)
     │   ├── alcance.mjs         <- Which files a guard reaches (instructions vs fixtures)
     │   ├── agentes.mjs         <- Reads the `tools:` of `.claude/agents/*` (Guard 11 + the subagent hook)
-    │   ├── permissoes.mjs      <- Guard 11's probes for deny/ask, and the deny/ask a project lacks (2b)
+    │   ├── permissoes.mjs      <- Guard 11's probes for deny/ask (and the `!` that opens the .env examples), and the deny/ask a project lacks (2b)
+    │   ├── segredos.mjs        <- The shapes of a literal secret, shared by Guards 16 and 23
     │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
     │   ├── superficie-contaveis.mjs <- What the test surface measures by COUNT (workflows, PARES, verifiers, hooks) (#400)
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
@@ -354,6 +356,7 @@ not to* line, so every agent sees it.
             ├── casos-limites-ci.mjs      <- The minutes script's job-limit cases: thresholds at the boundary (#542)
             ├── casos-espera.mjs          <- The minutes script's PR-wait cases: the attempt, cancelled out, the cut (#554)
             ├── casos-adotar-origem.mjs   <- The adoption's origin cases: the tag on origin, its format, the resume (#538)
+            ├── casos-adotar-env.mjs      <- The adoption refuses a project whose .env.example carries a real secret (#595)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 

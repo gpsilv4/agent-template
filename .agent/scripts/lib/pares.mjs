@@ -159,6 +159,13 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O Guard 23 (#595): os exemplos do `.env` que o agente passou a escrever nao trazem um segredo real.
+    alvo: ".agent/scripts/guards/env-example.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])warn\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // Falha aberta por desenho (esta no caminho de CADA prompt), logo nao tem `warn(`.
     // O sitio que DECIDE e o `console.log` do lembrete.
     alvo: ".claude/hooks/prompt-fase0.mjs",

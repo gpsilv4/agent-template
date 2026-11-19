@@ -53,9 +53,10 @@ a copia foi interrompida e as listas sao as PLANEADAS: parar e pedir que o volte
 Ler, sem correr nada: os manifestos e o lockfile (dependencias, `scripts`, `engines`), a config de
 TypeScript e do runner de testes, o CI que ja exista (`.github/workflows/`, outro), o router (`app/`,
 `pages/`, ficheiro de rotas), os ficheiros de deploy (`vercel.json`, `netlify.toml`, `Dockerfile`,
-`fly.toml`), o `LICENSE`, e a arvore de pastas ate dois niveis. **Os `.env*` nao se leem** — nem o
-`.env.example`, que costuma ter valores realistas (o template nega-o de proposito, ver o §2.9): os
-NOMES das variaveis vem dos usos no codigo.
+`fly.toml`), o `LICENSE`, e a arvore de pastas ate dois niveis. **Os `.env*` nao se leem**, salvo
+os de exemplo (`.env.example`/`.sample`/`.template`): num projeto que ja existia podiam ter valores
+reais, e o `adotar-template.mjs` ja recusou um com a forma de um segredo (o Guard 23, que nunca mostra
+o valor — ver o §2.9). "Sem forma conhecida" nao e "sem segredo": a duvida, perguntar antes de ler.
 
 ### Passo 2 — As respostas propostas
 
@@ -468,7 +469,7 @@ formato de cada um (#176).
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 30 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 31 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, os ficheiros de exemplo do `.env` sem segredo real, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/tests/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -652,7 +653,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   machine-enforceable, e JSON nao aceita comentarios, por isso o racional vive aqui:
   - `deny` e avaliado **antes** de `ask` e `allow` (primeira match ganha). Cobre leitura de secrets
     (`.env*`, `*.pem`, `*.key`, `id_rsa*`, `.npmrc`, `credentials*`, `secrets/**`), escrita sobre
-    `.env*`, e **edicao do proprio `settings.json`** — sem esta ultima, o agente alarga as proprias
+    `.env*` (salvo os de exemplo, abaixo), e **edicao do proprio `settings.json`** — sem esta ultima, o agente alarga as proprias
     permissoes. Mais os destrutivos irrecuperaveis (`git push --force`, `git reset --hard`, `rm -rf`).
   - `ask` cobre o que o `CLAUDE.md` declara como "Perguntar primeiro": `git commit`/`push`/`merge`,
     `gh pr merge`, `npm install`/`uninstall`. Sem isto, essas fronteiras existem so em prosa.
@@ -660,10 +661,28 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
     pre-aprova qualquer ficheiro nesse caminho (incluindo um que o agente acabe de escrever) e um
     `Bash(npm run lint*)` pre-aprova `npm run lint-and-deploy`. Ao adicionar um script, acrescentar
     a linha exata — nao alargar o padrao.
-  - **Assimetria deliberada**: o `.gitignore` versiona `.env.example` (`!.env.example`) mas o
-    `deny` de `Read(./.env.*)` impede o agente de o ler. E intencional — um ficheiro de exemplo
-    costuma conter valores realistas, e o agente nao precisa dele. Se o teu projeto quiser que o
-    agente o leia, renomear para um nome que o `deny` nao apanhe (ex: `env.example`).
+  - **Os ficheiros de EXEMPLO do `.env` leem-se e escrevem-se (#595)**: `.env.example`, `.env.sample`
+    e `.env.template`, em qualquer pasta, sao so placeholders, e o agente mantem-nos quando uma
+    variavel muda (antes, o `deny` negava-os e o utilizador editava-os a mao). **Segredo e o resto**:
+    `.env`, `.env.local`, `.env.*.local`, `.env.<ambiente>`, `.envrc` — e um nome que ninguem previu.
+    - **Como**: o `deny` largo (`Read(./**/.env.*)`, `Edit(./**/.env*)`, ...) fica, e LOGO A SEGUIR
+      vem um `!` por nome e ferramenta (`Read(!.env.example)`, `Edit(!.env.example)`,
+      `Write(!.env.example)`, e o mesmo para os outros dois). E a negacao do gitignore, documentada
+      nas permissoes do Claude Code: tira o caminho as regras de caminho ANTERIORES. Falha fechada:
+      um `.env.staging` ou um `.env.example.local` continuam negados. Uma lista explicita dos de
+      segredo falhava aberta, e um `allow` nunca abre um `deny`.
+    - **A posicao conta**: os `!` vem antes de qualquer outra regra de caminho, e nenhuma regra de
+      caminho nova entra acima deles. Um `!` no fim do `deny` cortava tambem o `secrets/**`, e abria
+      o `secrets/.env.example`. O Guard 11 reprova um `!` que abra um segredo, e da NOTA se os
+      exemplos estiverem fechados.
+    - **O Guard 23** (no `check-doc-versions.mjs`) reprova um exemplo com cara de segredo real, sem
+      mostrar o valor; o que reprova e os placeholders que deixa passar estao no cabecalho de
+      `.agent/scripts/guards/env-example.mjs`. A ADOCAO de um projeto que ja existia corre-o antes
+      de copiar e recusa; num derivado, corre-lo antes de aplicar os `!`. "Limpo" e "sem forma
+      conhecida", nao "sem segredo": o `gitleaks` do CI e a rede larga.
+    - **Os tres nomes versionam-se** (`.gitignore`: `!.env.example`, `!.env.sample`,
+      `!.env.template`): um exemplo ignorado podia guardar valores reais e o agente lia-o; e o
+      Guard 23 e o `gitleaks` do CI so verificam o que entra no repo.
   - **Limite conhecido**: as regras `Read(...)` nao alcancam ficheiros abertos por um subprocesso
     (`node`, `python`). Para bloqueio a nivel de OS, usar sandbox ou um hook `PreToolUse`.
   - Ajustar `allow` a stack do projeto. `settings.local.json` e pessoal (gitignored) — nao versionar.

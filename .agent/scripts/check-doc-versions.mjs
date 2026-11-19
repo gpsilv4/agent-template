@@ -39,6 +39,7 @@ import { guardRunners } from "./guards/runners.mjs";
 import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardContextVirgem } from "./guards/context-virgem.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
+import { guardEnvExemplo } from "./guards/env-example.mjs";
 import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
 import { ehDerivado as ehDerivadoDe } from "./lib/derivado.mjs";
@@ -448,6 +449,9 @@ guardsRun += guardFileSizes({ read, warn, ok, skip, note, listTree });
 
 // --- Guard 16: a configuracao MCP respeita a politica ---
 guardsRun += guardMcp({ read, warn, ok, skip });
+
+// --- Guard 23: os exemplos do `.env` que o agente escreve nao trazem um segredo real (#595) ---
+guardsRun += guardEnvExemplo({ warn, ok, skip, note, ROOT });
 
 // --- Guard 15: as referencias a anti-padroes RESOLVEM ---
 // Uma citacao de anti-padrao errada manda o leitor a uma entrada REAL com outro significado,
