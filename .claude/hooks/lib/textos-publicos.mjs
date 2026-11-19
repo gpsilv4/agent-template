@@ -11,7 +11,8 @@
  *
  * O QUE NAO LE O TEXTO, e por isso fica em `porLer` (o hook NEGA, `TP2`/`TP6`): um valor com uma expansao que nao
  * se resolve sem correr a shell (`"$BODY"`, `"$(gerador)"`); o stdin que nao e um heredoc (um pipe, um `<<<`); um
- * ficheiro que nao se le (ou que nao e um ficheiro regular), ou relativo depois de um `cd` que nao se resolve. A
+ * ficheiro que nao se le (ou que nao e um ficheiro regular), ou relativo depois de um `cd` que nao se resolve ou de
+ * uma cabeca que muda a pasta (`env -C`, `sudo -D`, #565). A
  * UNICA expansao resolvida e a forma literal `"$(cat <<'X' ... X)"`, lida do PROPRIO valor pela etiqueta: o lexer
  * fecha um `$(` no primeiro `)`, e um `1)` no corpo escondia o resto dele (leitura independente do #375b).
  * As mensagens do `porLer` dizem a origem e o tipo, nunca o valor: o valor pode ter o nome.
@@ -44,8 +45,18 @@
  * label (`gh label create|edit`, `--name`), de uma tag (`git tag`, `gh release create <tag>`) e de um branch
  * (`gh pr create --head`, `git push`). So os textos.
  *
- * O QUE FICA DE FORA, dito: uma invocacao que nao e esta forma (`/usr/bin/env -S gh`, um alias, `sh -c '...'`,
- * `curl` a API) — o hook e uma barreira contra o descuido, nao contra quem a queira contornar (`CLAUDE.md`).
+ * AS CABECAS (#565): toda a palavra com o nome base `gh`/`git` le-se, e nao so o verbo — o valor de uma flag de cabeca
+ * (`env -u FOO gh`, `sudo -D ~/src/gh gh`) ja nao a esconde. Falsos positivos aceites: um `gh`/`git` que nao corre
+ * (`echo gh issue comment --body N`, `man git commit -F f`) le-se como se corresse (so nega com um nome ou um ficheiro
+ * que nao se le). Uma cabeca que muda a pasta (`env -C`/`--chdir`, `sudo -D`/`-i`) manda um ficheiro relativo para o
+ * "nao li" e arma o externo; um `GH_REPO=` antes do `gh` tambem arma.
+ *
+ * Um falso positivo que fica, dito: com uma flag de cabeca com valor antes (`sudo -u eu gh ... --body-file f`), o
+ * verbo das escritas e o valor (`eu`), que nao e um `LEITOR`, logo o `f` conta como escrito no mesmo comando e nega com
+ * essa razao, mesmo limpo (no `main` passava SEM ser lido). E o `sudo -R`/`--chroot` (muda a raiz) nao se le.
+ *
+ * O QUE FICA DE FORA, dito: uma invocacao que nao e esta forma (`env -S "gh ..."` numa so palavra, um alias,
+ * `sh -c '...'`, `curl` a API) — o hook e uma barreira contra o descuido, nao contra quem a queira contornar (`CLAUDE.md`).
  * E o texto que o `gh` le de um editor (`gh pr create` sem `--body`): esse nao esta no comando. Do interruptor (#397),
  * so o `git config` que NOMEIA a chave: `git config --list`/`-l`/`--get-regexp` (que a mostram), o `--rename-section`,
  * e uma escrita do `.git/config` pela shell ou pelo `Edit` ficam de fora.
@@ -54,7 +65,7 @@ import { isAbsolute, resolve, sep } from "path";
 import { comandos } from "./comandos.mjs";
 import { GIT_GLOBAIS_COM_VALOR } from "./fronteira-dados.mjs";
 // A CABECA de cada comando e o que muda o `node` vivem a parte desde o #580; aqui fica a extracao dos textos.
-import { cabeca, defineGhRepo, mudaONode, temExpansao } from "./cabeca-comando.mjs";
+import { cabeca, defineGhRepo, mudaAPasta, mudaONode, temExpansao } from "./cabeca-comando.mjs";
 
 /** As flags de texto e de ficheiro (`-`, ou um caminho) dos subcomandos que publicam, POR GRUPO: a mesma letra muda
  *  de sentido (o `-d` e o `--draft` do `gh pr create`, o `-m` o `--merge` do `gh pr merge`, o `--comment` do `gh pr
@@ -103,6 +114,9 @@ const COPIAM = new Set(["cp", "mv", "install", "ln", "rsync"]);
 const ESCREVE = new Set([">", ">>", ">|", ">!", "&>", "&>>", "<>", ">&"]);
 const NAO_E_FICHEIRO = /^(?:\d+-?|-|\/dev\/null)$/;
 const CICLO = new Set(["for", "while", "until", "select"]);
+/** O nome base de uma palavra (`/usr/bin/gh` e `gh`), e os dois que publicam (#565). */
+const nomeBase = (t) => t.replace(/^.*\//, "");
+const GH_OU_GIT = /^(?:gh|git)$/;
 
 /**
  * Os pares `[flag, palavra-do-valor]` de `ws` (desde `ini`) para as flags de `nomes`, e os indices que eles e os
@@ -225,7 +239,7 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     }
     if (temExpansao(w.cru)) return out.porLer.push(`${origem}: o caminho do ficheiro tem uma expansao`);
     const p = caminho(w.texto, base);
-    if (p === null) return out.porLer.push(`${origem}: um caminho relativo depois de um \`cd\` que nao se resolve`);
+    if (p === null) return out.porLer.push(`${origem}: um caminho relativo numa pasta que o hook nao sabe (um \`cd\` que nao se resolve, ou uma cabeca que muda a pasta)`);
     try {
       const texto = ler(p);
       lidos.push({ p, origem, cmd });
@@ -250,8 +264,19 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     const ws = cmd.argv;
     const { i: h } = cabeca(ws);
     escreve(cmd, ws, h);
+    // #565: a pasta onde um `gh`/`git` na palavra `k` le os relativos. Uma cabeca que muda a pasta antes dela tira-lha
+    // (um relativo vai para o `porLer`) e arma o externo; um `GH_REPO=` antes dela tambem (`sudo -u eu GH_REPO=o/r gh`).
+    const baseDe = (k) => {
+      const muda = mudaAPasta(ws, k);
+      if (muda || ws.slice(0, k).some((w) => /^GH_REPO\+?=/.test(w.texto))) out.alvoExterno = true;
+      return muda ? null : dir;
+    };
+    // #565: TODA a palavra com o nome base `gh`/`git` despacha-se, e nao so o verbo do `cabeca()` — o valor de uma flag de
+    // cabeca (`env -u FOO gh`, `sudo -D ~/src/gh gh`, `env -u cd gh`) escondia-o. ANTES do `cd` e do `h < 0`, de
+    // proposito. Uma que nao corre (`echo gh issue comment --body N`) le-se como se corresse: so mais estrito.
+    for (let k = 0; k < ws.length; k++) if (k !== h && GH_OU_GIT.test(nomeBase(ws[k].texto))) despacha(cmd, ws, k, baseDe(k));
     if (h < 0) continue;
-    const nome = ws[h].texto.replace(/^.*\//, "");
+    const nome = nomeBase(ws[h].texto);
     // O `cd` muda a pasta dos caminhos relativos que vem a seguir, e o repo: com uma expansao (ou `-`), nao se sabe qual.
     if (nome === "cd" || nome === "pushd") {
       if (cmd.dentro) continue;
@@ -261,6 +286,12 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
       dir = !alvo ? home ?? null : temExpansao(alvo.cru) || alvo.texto === "-" ? null : caminho(alvo.texto, dir);
       continue;
     }
+    if (GH_OU_GIT.test(nome)) despacha(cmd, ws, h, baseDe(h));
+  }
+  /** O ramo do `gh`/`git` para a palavra `h` do comando (#565: chamado para cada palavra com esse nome, e nao so para o
+   *  verbo). `dir` e a pasta onde os relativos se leem — `null` quando uma cabeca a muda. */
+  function despacha(cmd, ws, h, dir) {
+    const nome = nomeBase(ws[h].texto);
     if (nome === "gh") {
       let i = h + 1;
       while (i < ws.length && /^-/.test(ws[i].texto)) i += ws[i].texto === "-R" || ws[i].texto === "--repo" ? 2 : 1;
@@ -270,7 +301,7 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
       if (ws.slice(h + 1).some((w) => /^(?:-R|--repo(?:=.*)?|-R[^\s/]+\/\S+)$/.test(w.texto))) out.alvoExterno = true;
       if (grupo === "api") {
         const { pares: metodo } = valores(ws, i + 1, ["-X", "--method"]);
-        if (metodo.some(([, w]) => /^get$/i.test(w.texto))) continue;
+        if (metodo.some(([, w]) => /^get$/i.test(w.texto))) return;
         // A rota e o primeiro posicional que nenhuma flag consumiu (#399): `-f body=x repos/...` nao a desloca.
         const consumidos = new Set([...valores(ws, i + 1, API.campo, [...API.comValor, ...API.ficheiro]).usados, ...valores(ws, i + 1, API.ficheiro, [...API.campo, ...API.comValor]).usados]);
         const rota = ws.slice(i + 1).find((w, k) => !consumidos.has(i + 1 + k) && !/^-/.test(w.texto))?.texto.replace(/^\//, "");
@@ -293,15 +324,17 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
           const consultas = out.textos.slice(antes).filter((t) => / query$/.test(t.origem));
           if (!consultas.length || consultas.some((t) => /\bmutation\b/.test(t.texto))) out.alvoExterno = true;
         }
-        continue;
+        return;
       }
-      const def = GH[grupo];
-      if (!def) continue;
+      // So as chaves PROPRIAS: um `gh constructor` dava a funcao do prototipo, o `def.subs.includes` lancava, e o `catch`
+      // do hook deixava passar o comando inteiro (leitura do diff do #565; ja era assim antes).
+      const def = Object.hasOwn(GH, grupo ?? "") ? GH[grupo] : undefined;
+      if (!def) return;
       // O subcomando: a primeira palavra que nao e flag depois do grupo (o cobra aceita `gh issue -R o/r close`).
       let j = i + 1;
       while (j < ws.length && /^-/.test(ws[j].texto)) j += ws[j].texto === "-R" || ws[j].texto === "--repo" ? 2 : 1;
       const sub = ws[j]?.texto;
-      if (!def.subs.includes(sub)) continue;
+      if (!def.subs.includes(sub)) return;
       const flags = def.flags ?? (/^(?:close|reopen)$/.test(sub) ? FECHO : { texto: TEXTO, ficheiro: FICHEIRO });
       const origem = (f) => `gh ${grupo} ${sub} ${f}`;
       const t = valores(ws, j + 1, flags.texto, [...flags.ficheiro, ...(flags.comValor ?? []), "-R", "--repo"]);
@@ -325,7 +358,7 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
           doFicheiro(cmd, ws[k], dir, `gh ${grupo} ${sub} (ficheiro)`);
         }
       }
-      continue;
+      return;
     }
     if (nome === "git") {
       let i = h + 1;
@@ -339,7 +372,7 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
       const sub = ws[i]?.texto;
       // O interruptor (#397, M4): ler ou escrever a chave, por qualquer forma de `git config`, nega antes de o resto.
       if (sub === "config" && ws.slice(i + 1).some((w) => INTERRUPTOR.test(w.texto))) out.interruptor = true;
-      if (sub !== "tag" && sub !== "commit") continue;
+      if (sub !== "tag" && sub !== "commit") return;
       const comValor = sub === "tag" ? ["-u", "--local-user"] : ["-C", "-c", "--author", "--date", "--fixup", "--squash"];
       for (const [f, w] of valores(ws, i + 1, GIT.texto, [...GIT.ficheiro, ...comValor]).pares) { out.publica = true; doTexto(w, `git ${sub} ${f}`); }
       for (const [f, w] of valores(ws, i + 1, GIT.ficheiro, [...GIT.texto, ...comValor]).pares) { out.publica = true; doFicheiro(cmd, w, base, `git ${sub} ${f}`); }
