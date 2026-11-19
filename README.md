@@ -419,6 +419,7 @@ not to* line, so every agent sees it.
 │       ├── tests-porcelain.mjs     <- `git status --porcelain -z` parsing
 │       ├── tests-textos-publicos.mjs <- A forbidden name in what gh/git publishes, and what it cannot read
 │       ├── tests-textos-publicos-isencao.mjs <- The commit-msg exemption: one case per condition (#511, #580)
+│       ├── tests-textos-publicos-cabeca.mjs <- A gh/git behind a head with flags (`env -u FOO gh`, `sudo -D dir`) (#565)
 │       ├── tests-atribuicoes.mjs   <- bash and env assignments read the same way in every hook (#546)
 │       ├── tests-posicao.mjs       <- The lexer (`lib/comandos.mjs`) and the position (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and

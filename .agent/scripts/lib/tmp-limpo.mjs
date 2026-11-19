@@ -112,7 +112,7 @@ export const PREFIXOS_DE_TESTE = [
   "board-test-",
   // Do `test-textos-publicos.mjs` (#375): a lista, e o repo onde ela nao pode estar.
   "textos-publicos-test-",
-  // Do `tests-textos-publicos.mjs` dos hooks (#375b) e do `tests-textos-publicos-isencao.mjs` (#580): o cwd do payload,
+  // Do `tests-textos-publicos.mjs` dos hooks (#375b) e dos `tests-textos-publicos-*.mjs` (#580, #565): o cwd do payload,
   // a lista, e a copia do hook sem a lib.
   "textos-hook-test-",
   // Do `tests-suites-em-paralelo.mjs` (#337): as suites falsas e o registo partilhado. A simulacao de

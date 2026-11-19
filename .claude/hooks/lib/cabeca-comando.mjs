@@ -3,12 +3,11 @@
  *
  * O `textos-publicos.mjs` extrai o texto que um comando publica; isto le, de cada comando simples do lexer, a palavra
  * que CORRE (`cabeca`), se uma palavra tem uma expansao que so a shell resolve (`temExpansao`), se o comando define o
- * repo do `gh` (`defineGhRepo`) e se muda o `node` de quem vem depois (`mudaONode`, que tira a isencao do
- * `commit-msg`, #511/#536/#545/#546).
+ * repo do `gh` (`defineGhRepo`), se muda o `node` de quem vem depois (`mudaONode`, que tira a isencao do
+ * `commit-msg`, #511/#536/#545/#546), e se uma cabeca muda a pasta antes de uma palavra (`mudaAPasta`, #565).
  *
- * Vivia no `textos-publicos.mjs` ate ao #580, que o separou da extracao para os dois ficarem com folga do Guard 17.
- * Os blocos vieram sem mudanca, menos o `export` do `cabeca`, do `defineGhRepo` e do `mudaONode` (o
- * `textos-publicos.mjs` usa-os).
+ * Vivia no `textos-publicos.mjs` ate ao #580, que o separou da extracao para os dois ficarem com folga do Guard 17
+ * (os blocos vieram sem mudanca); o `mudaAPasta` e o comentario do `cabeca()` sao do #565.
  */
 import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao } from "./fronteira-dados.mjs";
 
@@ -33,7 +32,11 @@ export function temExpansao(cru, corpo = false) {
 }
 
 /** O indice da palavra que CORRE (e as atribuicoes antes dela): salta `X=y`, as cabecas (`env`, `timeout 5`) e as
- *  palavras de controlo (`do`, `then`, `!`). */
+ *  palavras de controlo (`do`, `then`, `!`).
+ *
+ *  NAO salta o VALOR de uma flag de cabeca (`env -u FOO gh`: o verbo lido e o `FOO`) — e de proposito: este indice decide
+ *  as allowlists (os `LEITORES`, a isencao do `commit-msg`, o `nodeMudado`), e saltar a mais la abria (#565, 1.a leitura).
+ *  O `gh`/`git` escondido atras de um valor ve-se a parte: o `textosDoComando` despacha TODA a palavra com esse nome. */
 export function cabeca(ws) {
   const atribuicoes = [];
   let i = 0;
@@ -57,6 +60,23 @@ export function cabeca(ws) {
     return { i, atribuicoes };
   }
   return { i: -1, atribuicoes };
+}
+
+/** Uma cabeca ANTES do indice `k` muda a pasta de quem corre (#565): o `env -C`/`--chdir` (tambem colado, `-Cx`, num
+ *  grupo, `-iC`, e abreviado, `--chd`: o `getopt_long` aceita-o) e o `sudo -D`/`--chdir`/`-i`/`--login` (a HOME do
+ *  alvo). Um `-F f` relativo desse `gh`/`git` le-se noutra pasta do que a do hook. Falha fechado: depois de um `env` ou de
+ *  um `sudo` (qualquer um, mesmo que outra cabeca venha pelo meio, `env -u sudo -C /o`), as duas regras valem. Fica de
+ *  fora, dito: o `sudo -R`/`--chroot` (muda a raiz, e tambem os absolutos; pede o `sudoers`). */
+export function mudaAPasta(ws, k) {
+  const vistas = new Set();
+  for (let j = 0; j < k; j++) {
+    const t = ws[j].texto;
+    const base = t.replace(/^.*\//, "");
+    if (CABECAS.has(base)) { vistas.add(base); continue; }
+    if (vistas.has("env") && (/^-[^-]*C/.test(t) || /^--c(?:h(?:d(?:i(?:r)?)?)?)?(?:=|$)/.test(t))) return true;
+    if (vistas.has("sudo") && (/^-[^-]*[Di]/.test(t) || /^--(?:chd(?:i(?:r)?)?|lo(?:g(?:i(?:n)?)?)?)(?:=|$)/.test(t))) return true;
+  }
+  return false;
 }
 
 /** As palavras que DEFINEM uma variavel com os argumentos (`export GH_REPO=x`). */

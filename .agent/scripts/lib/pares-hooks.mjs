@@ -205,6 +205,24 @@ export const PARES_DOS_HOOKS = [
     neutro: "  if (false && ",
   },
   {
+    // #565: as duas cabecas que mudam a pasta (`env -C`/`--chdir`, `sudo -D`/`-i`/`--login`), uma por linha: desligada
+    // uma, um `-F f` relativo desse `gh` lia-se no cwd do hook e publicava-se o de outra pasta (o caso da pasta mudada).
+    alvo: ".claude/hooks/lib/cabeca-comando.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    // O sinal sem o literal (a varredura le as linhas com o conteudo das strings em branco, `"env"` vira `"   "`).
+    sinal: /^ {4}if \((?=vistas\.has\()/,
+    neutro: "    if (false && ",
+  },
+  {
+    // #565: o despacho das palavras `gh`/`git` que NAO sao o verbo do `cabeca()` (a do verbo despacha-se noutra linha).
+    // Desligado, volta-se exatamente ao `main`: o valor de uma flag de cabeca esconde o `gh` (`env -u FOO gh`,
+    // `sudo -u eu git commit`), e so os casos do #565 ficam vermelhos.
+    alvo: ".claude/hooks/lib/textos-publicos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])despacha\(cmd, ws, k,/,
+    neutro: "(() => {})(cmd, ws, k,",
+  },
+  {
     // O `+=` literal das variaveis que o git executa e do `NODE_OPTIONS` com `data:`: tirado, o `GIT_PAGER+=cmd` e o
     // `NODE_OPTIONS+='--import=data:...'` deixavam de se ler.
     alvo: ".claude/hooks/lib/verbos-git.mjs",
