@@ -90,6 +90,12 @@ export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
  *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
 export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
 
+/** Quem corre o stdin numa SHELL sem se chamar shell (#566), uma so vez: o `SHELL_ELEVADA` do piso (`fronteira.mjs`)
+ *  e o `recebeDe` (`posicao.mjs`) montam-se daqui. Os que ELEVAM com uma flag (`sudo -s`, `doas -i`) e os que sao uma
+ *  shell de login por si (`su`, `runuser`). */
+export const ELEVAM = ["sudo", "doas"];
+export const SU = ["su", "runuser"];
+
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *
  *  Esta lista e uma SEGUNDA COPIA da `WRAPPERS` do guard dos branches (`invocacoes-git.mjs` desde o #580), e digo-o em
