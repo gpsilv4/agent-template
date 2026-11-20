@@ -37,9 +37,9 @@ export { contextoFronteira } from "./caminhos.mjs";
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
 // importe deste ficheiro); `MAES` e `resto` importam-se da folha. A `ATRIBUICAO_LARGA` (#546) ja ninguem a importa daqui
 // (#580), e FICA: num `/upgrade` parcial a `lib/` chega antes dos hooks, e o guard dos branches ANTIGO rebentava no import.
-import { ATRIBUICAO_LARGA_SRC, escritaDoBloco, FRONTEIRA, NOMEIA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA_SRC, ELEVAM, escritaDoBloco, FRONTEIRA, NOMEIA, NOMES_INTERPRETADOR, PALAVRAS_DE_BLOCO, resto, SU } from "./fronteira-dados.mjs";
 import { comandos } from "./comandos.mjs";
-import { aJusante, inlineDe, NOMES_SHELL } from "./posicao.mjs";
+import { aJusante, inlineDe, NOMES_SHELL, recebeDe } from "./posicao.mjs";
 import { valoresQueExecutam } from "./verbos-git.mjs";
 export { ATRIBUICAO_LARGA, CAMINHOS_FRONTEIRA, ehCaminhoFronteira } from "./fronteira-dados.mjs";
 
@@ -147,7 +147,11 @@ const INLINE_SEM_ISENCAO = new RegExp(`${INTERPRETADOR}${FLAG_INLINE}`);
 // script") negava `node --test | grep "<fronteira>"`. As letras agrupadas, o `php -r` e o `data:` decidem-se
 // por posicao (`posicao.mjs`, #336); o heredoc lido como texto e o PR (c) do #336.
 const RECEBE = `(?:${NOME(NOMES_INTERPRETADOR)}|${SHELL})`;
-const SHELL_ELEVADA = String.raw`(?:(?:sudo|doas)(?:\s+-\S+)*\s+-[A-Za-z]*[si]\b|(?<![\w.-])(?:su|runuser)(?![\w.-]))`;
+// Os nomes em constantes, e nao `${ELEVAM.join("|")}` dentro da template string: o `check-codigo-morto` nao ve esse
+// uso, e dava o import por morto (#599).
+const ELEVAM_SRC = ELEVAM.join("|");
+const SU_SRC = SU.join("|");
+const SHELL_ELEVADA = String.raw`(?:(?:${ELEVAM_SRC})(?:\s+-\S+)*\s+-[A-Za-z]*[si]\b|(?<![\w.-])(?:${SU_SRC})(?![\w.-]))`;
 // As quatro formas: (1) quem recebe um heredoc/here-string, salvo com um SCRIPT logo a seguir (`node x.mjs <<EOF`
 // passa dados a um ficheiro, e correr um ficheiro e leitura); (2) um heredoc que segue por um pipe para quem o
 // corre; (3) a ponta de um pipe (`|`, `|&`) sem mais do que flags e redireccoes (`| bash -s`, `| node --`); (4) um
@@ -299,9 +303,13 @@ function julga(texto, ctx, dentroDoGit = false) {
     // Com `qualquer`: aqui conta qualquer palavra nao citada com nome de interpretador, e nao so as posicoes
     // conhecidas — um wrapper fora da lista (`rlwrap node -pe`) escondia-o. E a politica do piso para `-e`/`-p`/
     // `-c`, estendida as letras agrupadas: um inline num comando, e a fronteira so citada noutro, nega.
-    const pos = negaInline(comandos(texto), "citado-mas-executado:inline", true, "citado-mas-executado");
+    const cmds = comandos(texto);
+    const pos = negaInline(cmds, "citado-mas-executado:inline", true, "citado-mas-executado");
     if (pos) return pos;
-    return opaco || crases || recebe ? nega("citado-mas-executado") : null;
+    if (opaco || crases || recebe) return nega("citado-mas-executado");
+    // Quem RECEBE codigo pelo stdin com uma cabeca, um executor ou um grupo antes (#566: `| env bash`, `nohup su <<EOF`),
+    // por posicao. No FIM do ramo: so acrescenta, e nenhum rotulo muda.
+    return cmds.some(recebeDe) ? nega("citado-mas-executado") : null;
   }
 
   // Por SEGMENTO, e com as citacoes ja removidas — senao um `|` dentro de aspas parte o
@@ -459,13 +467,17 @@ function julga(texto, ctx, dentroDoGit = false) {
   // Tambem um bloco inteiro a jusante (`| while read l; do python3 -c ... "$l"; done`): `aJusante`.
   const cita = (c) =>
     c.argv.some((w) => NOMEIA.test(w.cru) || NOMEIA.test(w.texto)) || c.redir.some((r) => NOMEIA.test(r.alvo));
-  const citam = aJusante(comandos(texto), cita);
+  const todos = comandos(texto);
+  const citam = aJusante(todos, cita);
   const pos = negaInline([...tocam.flatMap((s) => comandos(s)), ...citam], "codigo-inline", false, "wrapper-opaco");
   if (pos) return pos;
   if (opaco) return nega("wrapper-opaco");
   if (redireciona) return nega("redireciona");
   if (gitQueEscreve) return nega("git-que-escreve");
   if (findQueEscreve) return nega("find-que-escreve");
+  // O `recebeDe` (#566), no FIM e sobre TODOS os comandos — o alcance do piso (`RECEBE_CODIGO` sobre o comando inteiro):
+  // `cat <f>; true | env bash` tem a fronteira so no `cat`.
+  if (todos.some(recebeDe)) return nega("recebe-codigo");
   return null;
 }
 

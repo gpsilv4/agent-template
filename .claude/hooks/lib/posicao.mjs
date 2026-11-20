@@ -14,7 +14,7 @@
  * escrevem, que sao os PRs (c) e (b) do #336. Passados `MAX_POSICOES`/`MAX_VOLTAS`, nega sem julgar.
  */
 import { comandos } from "./comandos.mjs";
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, NOMES_INTERPRETADOR, resto } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, ELEVAM, NOMES_INTERPRETADOR, resto, SU } from "./fronteira-dados.mjs";
 
 // --- Quem corre codigo INLINE, por posicao ------------------------------------------------------
 
@@ -81,6 +81,9 @@ const JANELA = 32;
  *  isto nao e trabalho de ninguem, e julga-lo custava segundos (`{ x env A=1` encadeado: 277 s a 64k
  *  caracteres, auditoria do PR a). Passado o tecto nao se sabe quem corre, e conta como um comando-variavel. */
 export const MAX_POSICOES = 32;
+/** As palavras de um comando que RECEBE o stdin acima das quais o `recebeDe` nega sem julgar (#566): o custo dele e
+ *  quadratico no pior caso, e um comando real a ponta de um pipe tem poucas. */
+export const MAX_PALAVRAS = 8 * 32;
 const MAX_VOLTAS = 64;
 
 /** O indice da palavra que CORRE, depois das atribuicoes, das palavras-chave, do `exec` e das cabecas inertes.
@@ -237,6 +240,117 @@ function lerCom(argv, qualquer, novo) {
     }
   }
   return null;
+}
+
+// --- Quem RECEBE codigo pelo stdin, por posicao (#566) --------------------------------------------------------
+
+/** Os nomes EXATOS de quem corre o stdin como codigo — os do piso (`RECEBE` no `fronteira.mjs`), sem o sufixo largo
+ *  do `EH_INTERPRETADOR`: `node-gyp` e `php-cs-fixer` nao sao o `node` nem o `php`. */
+const RECEBE_NOME = new RegExp(`^(?:${NOMES_INTERPRETADOR}|${NOMES_SHELL})$`);
+const SO_SHELL = new RegExp(`^(?:${NOMES_SHELL})$`);
+/** O argumento que diz "o script e o stdin", depois de colapsar `//` e `/./` (`/dev//stdin`): `-`, `/dev/stdin`, um
+ *  `/dev/fd/N` ou `/proc/self/fd/N` (`bash 3<&0 /dev/fd/3`) — ou uma palavra que expande (`/dev/std?n`): nao se sabe. */
+const STDIN = /^(?:-|\/dev\/stdin|\/dev\/fd\/\d+|\/proc\/self\/fd\/\d+)$/;
+//  E uma substituicao de processo (`bash <(cat)`): o `cat` le o stdin do pipe, e a shell corre-o.
+const ehStdin = (w) => expande(w) || w.cru.startsWith("<(") || STDIN.test(w.texto.replace(/\/(?:\.?\/)+/g, "/"));
+/** O `-c` do `su` corre um comando: aqui nao conta (o `su -c` como comando opaco e o #600); sem ele, o `su` e uma
+ *  shell que le o stdin. */
+const SU_COMANDO = /^(?:-c|--command|--session-command)(?:=|$)/;
+/** Uma flag (o `-` sozinho e o stdin, nao uma flag); numa SHELL tambem com `+` (`bash +x`: desliga uma opcao). */
+const ehFlag = (w, shell) => (w.texto.startsWith("-") ? w.texto !== "-" : shell && /^\+[A-Za-z]+$/.test(w.texto));
+/** Os argumentos de quem corre o stdin (`argv` desde `de`) dizem que o script E o stdin? So flags, ou o 1.o posicional
+ *  e o stdin, ou (shell) um `-s` antes dele (`bash -s -- arg`). Um script a seguir e leitura. Por INDICE, e nao por uma
+ *  fatia: copiar o argv por cada posicao fazia o custo quadratico (a 2.a leitura adversarial do #566). */
+function leStdin(argv, de, shell) {
+  for (let k = de; k < argv.length; k++) {
+    if (!ehFlag(argv[k], shell)) return ehStdin(argv[k]);
+    if (shell && /^-[A-Za-z]*s[A-Za-z]*$/.test(argv[k].texto)) return true;
+  }
+  return true;
+}
+/** Uma flag do `sudo`/`doas` que abre uma shell: `s`/`i` MINUSCULOS num grupo (`-s`, `-i`, `-Es`), ou a forma longa. */
+const eleva = (w) => /^-[A-Za-z]*[si][A-Za-z]*$/.test(w.texto) || /^--(?:shell|login)$/.test(w.texto);
+/** As palavras de `argv` desde `de` ate a cabeca seguinte, exclusive: as flags que pertencem a cabeca anterior. */
+const ateCabeca = (argv, de) => {
+  const fim = argv.findIndex((w, k) => k >= de && CABECAS.has(nomeBase(w)));
+  return argv.slice(de, fim < 0 ? argv.length : fim);
+};
+
+/**
+ * Este comando RECEBE o stdin (um pipe, um heredoc, uma here-string) e corre-o como codigo? Com uma cabeca, um
+ * executor ou um grupo antes: `| env bash`, `| caffeinate -i bash`, `| (bash)`, `nohup su <<EOF`, `timeout 5 $X <<<x`.
+ * Le-se por POSICAO (o `verboEm`, as `posicoes`), com os tectos de la: passado um, nega. O piso (`RECEBE_CODIGO`)
+ * continua no `fronteira.mjs`; isto so acrescenta.
+ *
+ * Fica de fora, dito: o `su -c`/`runuser -c` como comando opaco (#600); um grupo depois de uma palavra (`| time (bash)`)
+ * e um heredoc dado a `{ }`/`( )` — o lexer (#601); os interpretadores fora da lista (`tclsh`, #602); uma substituicao
+ * a jusante (`| echo "$(bash)"`), o `find -exec bash \;`, o `source /dev/stdin` com uma cabeca, `/dev/../dev/stdin` e o
+ * `=(cat)` do zsh (#603); e o PR (c) do #336: o stdin por redireccao (`bash < f`), os comandos depois do 1.o num bloco,
+ * as flags de interpretador que levam valor (`| bash -o pipefail`), `| deno run -`, `| caffeinate $SHELL`,
+ * `| timeout 1.5 bash` e os nomes com sufixo (`| node.exe`).
+ * Nega a mais, dito (so num comando que ja toca a fronteira): depois de um executor, uma palavra com nome de shell ou
+ * de interpretador em qualquer posicao (`| flock /tmp/l grep bash`, `| npm ls node`), e um `su`/`runuser` sem `-c` ou
+ * um `sudo`/`doas` que eleva em qualquer posicao (`| caffeinate sudo -s grep x`); uma cabeca com uma flag antes de um
+ * comando cujo argumento tem um desses nomes, ou expande (`| env -i grep bash`, `| env -i grep "$P"`: a flag pode
+ * levar valor); o `su` com argumentos a seguir ao utilizador, e o `-c` agrupado (`su -lc`); `| command -v bash`; o
+ * verbo que expande com `-s` (`| "$GREP" -s x`); e um script que expande ou e um `<(...)` (`| node "$F"`).
+ * @param {ReturnType<typeof comandos>[number]} cmd
+ */
+export function recebeDe(cmd) {
+  if (!(cmd.pipeDe || cmd.heredoc || cmd.redir.some((r) => r.op === "<<<"))) return false;
+  const argv = semChavetas(cmd.argv);
+  // O TECTO de palavras: o `verboEm` e quadratico nas atribuicoes LARGAS (`depoisDeAtribuidora`), e o recomeco (b)
+  // repete-o — 44 s a 36k caracteres (`env A-B=1 ...`, medido na 3.a leitura adversarial), e um hook que passa o prazo
+  // PERMITE. No ramo a vista isto corre em TODOS os comandos: passado o tecto, nao se sabe quem corre, e nega.
+  if (argv.length > MAX_PALAVRAS) return true;
+  return recebeEm(argv, true, JANELA) || recebeEm(argv, false, JANELA);
+}
+
+/** A flag de um `sudo`/`doas` que eleva e NAO leva valor: o grupo eleva e a ULTIMA letra nao leva valor (`-s`, `-Es`,
+ *  `-sE`), ou a forma longa. O `-su eu` acaba num `u`, que leva o `eu` (a 3.a leitura adversarial: o `eleva` sozinho
+ *  fechava o recomeco (b) nele); e so "acabar em `s`/`i`" negava `| sudo -sE python3 -m json.tool` (a leitura focada).
+ *  As letras que levam valor sao as do `sudo` (`-u -g -p -C -U -h -r -t -D -T -R`). */
+const elevaSemValor = (w) => (eleva(w) && !/[ugpCUhrtDTR]$/.test(w.texto)) || /^--(?:shell|login)$/.test(w.texto);
+
+/** O `recebeDe` sobre um argv, com uma das leituras do verbo (#546). `valores`: quantas palavras ainda se podem tirar
+ *  como o VALOR de uma flag desconhecida (o recomeco (b)); passado o `JANELA`, nao se sabe quem corre: nega. */
+function recebeEm(argv, novo, valores, usadas = new Set()) {
+  const v = verboEm(argv, 0, novo);
+  if (v < 0) return true;
+  // Sem verbo: so cabecas. Uma shell elevada se um `sudo`/`doas` leva, ANTES da cabeca seguinte, uma flag com `s`/`i`
+  // MINUSCULOS (`-s`, `-i`, `-Es`; o `-S` le a password) ou `--shell`/`--login`: `env -i sudo` nao conta pelo `-i`.
+  if (v >= argv.length) return argv.some((w, k) => ELEVAM.includes(nomeBase(w)) && ateCabeca(argv, k + 1).some(eleva));
+  const base = nomeBase(argv[v]);
+  if (SU.includes(base)) return !argv.slice(v + 1).some((w) => SU_COMANDO.test(w.texto));
+  // Uma palavra que EXPANDE no verbo (`| $SHELL /dev/stdin`, `| $PAGER`): nao se sabe quem e — le-se como uma shell.
+  if (expande(argv[v])) return leStdin(argv, v + 1, true);
+  const ps = posicoes(argv, v, false, novo);
+  if (ps === null) return true;
+  // Os nomes EXATOS: as posicoes de um executor trazem tambem os nomes largos e a 1.a palavra que expande — os largos
+  // nao sao quem se pensa (`| node-gyp`), e a que expande depois de um executor fica de fora (`| caffeinate $SHELL`).
+  if (ps.some((p) => RECEBE_NOME.test(nomeBase(argv[p])) && leStdin(argv, p + 1, SO_SHELL.test(nomeBase(argv[p]))))) return true;
+  // (a) O `su`/`sudo -s` que um executor corre (`| caffeinate su`, `| caffeinate sudo -s`): em QUALQUER posicao a seguir,
+  // como os nomes de shell — uma varredura linear, sem recursao (so o 1.o deixava `| caffeinate sudo caffeinate su` e
+  // `| flock /tmp/sudo su`; um por cada era cubico). Um `-c` depois tira o `su` (e do #600).
+  if (EXECUTORES.has(base)) {
+    let ultimoC = -1;
+    argv.forEach((w, i) => SU_COMANDO.test(w.texto) && (ultimoC = i));
+    const corre = argv.some((w, k) => k > v &&
+      ((SU.includes(nomeBase(w)) && k > ultimoC) || (ELEVAM.includes(nomeBase(w)) && ateCabeca(argv, k + 1).some(eleva))));
+    if (corre) return true;
+  }
+  // (b) Uma flag de cabeca que o `resto()` nao sabe que leva valor fez do VALOR o verbo (`| sudo --user eu bash`): tira-se
+  // so o valor e recomeca-se COM a cabeca e as flags (`| sudo -i --user root`, `| sudo --user eu -- bash`). Uma flag leva
+  // UM valor: a mesma nao volta a dar outro (`| sudo -s grep x` nao vira `sudo -s`). A posicao dela nao muda: tira-se
+  // so o que esta DEPOIS.
+  // E a flag que ELEVA de um `sudo`/`doas` (`-s`, `-i`, `--login`) nunca leva valor: `| sudo -s rm -rf /tmp/x` nao vira
+  // `sudo -s -rf`. So a do `sudo`/`doas` (a cabeca mais proxima antes dela): o `-i` do `env` e outra coisa.
+  const dono = argv.slice(0, v - 1).reverse().find((w) => CABECAS.has(nomeBase(w)));
+  const daElevacao = v > 0 && dono !== undefined && ELEVAM.includes(nomeBase(dono)) && elevaSemValor(argv[v - 1]);
+  if (v > 0 && argv[v - 1].texto.startsWith("-") && !daElevacao && !usadas.has(v - 1) && dono !== undefined) {
+    return valores <= 0 || recebeEm(argv.filter((_, k) => k !== v), novo, valores - 1, new Set([...usadas, v - 1]));
+  }
+  return false;
 }
 
 /** Os comandos que CITAM a fronteira, e os que lhes ficam a jusante por pipe — incluindo o bloco inteiro de um

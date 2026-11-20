@@ -43,7 +43,8 @@ function fechaHeredoc(s, ini, tag) {
  *   dono?: object}[]} — o `dono` e o comando que contem a substituicao de onde o interior saiu (o `aJusante` le-o);
  *   as palavras partidas de chavetas levam `partida: true` (o `inlineDe` nao lhes da a isencao do script)
  *   pela ordem em que aparecem; os de dentro de uma substituicao vem DEPOIS do comando que a contem.
- *   O `redir` le-o o `cita` do `fronteira.mjs`. O `pipePara` e o `heredoc.corpo` ainda so os leem os testes: sao
+ *   O `redir` le-o o `cita` do `fronteira.mjs`, e o `recebeDe` do `posicao.mjs` (a here-string, #566), que tambem le se
+ *   ha `heredoc` (nao o corpo). O `pipePara` e o `heredoc.corpo` ainda so os leem os testes: sao
  *   para o PR (c) do #336 (o heredoc como texto), e ficam aqui para o lexer ser um so.
  */
 export function comandos(texto, dentro = false) {
