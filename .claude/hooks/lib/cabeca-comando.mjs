@@ -9,7 +9,7 @@
  * Vivia no `textos-publicos.mjs` ate ao #580, que o separou da extracao para os dois ficarem com folga do Guard 17
  * (os blocos vieram sem mudanca); o `mudaAPasta` e o comentario do `cabeca()` sao do #565.
  */
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao, nomeDoComando } from "./fronteira-dados.mjs";
 
 /** As palavras de controlo que o lexer deixa no inicio do comando seguinte (`for ...; do gh ...`). */
 const CONTROLO = new Set(["do", "then", "else", "elif", "{", "if", "while", "until", "!", "exec", "coproc"]);
@@ -37,7 +37,7 @@ export function temExpansao(cru, corpo = false) {
  *  NAO salta o VALOR de uma flag de cabeca (`env -u FOO gh`: o verbo lido e o `FOO`) — e de proposito: este indice decide
  *  as allowlists (os `LEITORES`, a isencao do `commit-msg`, o `nodeMudado`), e saltar a mais la abria (#565, 1.a leitura).
  *  O `gh`/`git` escondido atras de um valor ve-se a parte: o `textosDoComando` despacha TODA a palavra com esse nome. */
-export function cabeca(ws) {
+export function cabeca(ws, equals = false) {
   const atribuicoes = [];
   let i = 0;
   let depoisDeCabeca = false;
@@ -51,7 +51,9 @@ export function cabeca(ws) {
     const atribuicao = /^[A-Za-z_]\w*\+?=/.test(t) || (ATRIBUICAO_BASH.test(ws[i].cru) && (!depoisDeCabeca || atribuidora)) || (atribuidora && ATRIBUICAO_LARGA.test(t));
     if (atribuicao) { atribuicoes.push(nomeDaAtribuicao(t)); i++; continue; }
     if (CONTROLO.has(t)) { i++; continue; }
-    if (CABECAS.has(t.replace(/^.*\//, ""))) {
+    // Com `equals` (#567), tambem a cabeca `=sudo`/`=env`: so a 2.a leitura das escritas o pede, e ela so ACRESCENTA.
+    const nomeDaCabeca = equals ? nomeDoComando(t) : t.replace(/^.*\//, "");
+    if (CABECAS.has(nomeDaCabeca)) {
       depoisDeCabeca = true;
       i++;
       while (i < ws.length && (/^-/.test(ws[i].texto) || /^\d+[smhd]?$/.test(ws[i].texto))) i++;
@@ -73,6 +75,8 @@ export function mudaAPasta(ws, k) {
     const t = ws[j].texto;
     const base = t.replace(/^.*\//, "");
     if (CABECAS.has(base)) { vistas.add(base); continue; }
+    // #567: com o EQUALS do zsh, `=env -C`/`=sudo -D` tambem mudam a pasta (so arma mais: o relativo vai para o "nao li").
+    if (CABECAS.has(nomeDoComando(t))) { vistas.add(nomeDoComando(t)); continue; }
     if (vistas.has("env") && (/^-[^-]*C/.test(t) || /^--c(?:h(?:d(?:i(?:r)?)?)?)?(?:=|$)/.test(t))) return true;
     if (vistas.has("sudo") && (/^-[^-]*[Di]/.test(t) || /^--(?:chd(?:i(?:r)?)?|lo(?:g(?:i(?:n)?)?)?)(?:=|$)/.test(t))) return true;
   }

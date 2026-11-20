@@ -63,7 +63,7 @@
  */
 import { isAbsolute, resolve, sep } from "path";
 import { comandos } from "./comandos.mjs";
-import { GIT_GLOBAIS_COM_VALOR } from "./fronteira-dados.mjs";
+import { GIT_GLOBAIS_COM_VALOR, nomeDoComando } from "./fronteira-dados.mjs";
 // A CABECA de cada comando e o que muda o `node` vivem a parte desde o #580; aqui fica a extracao dos textos.
 import { cabeca, defineGhRepo, mudaAPasta, mudaONode, temExpansao } from "./cabeca-comando.mjs";
 
@@ -197,16 +197,19 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     }
     const nome = h < 0 ? "" : ws[h].texto.replace(/^.*\//, "");
     if (h < 0 || LEITORES.has(nome)) return;
+    // #567: `=cp`/`=dd` (o EQUALS do zsh) sao o `cp`/`dd`. So para ACRESCENTAR a pasta e o `of=`: o `LEITORES` fica com o
+    // nome do `main`, que nunca da um `=cat` como leitor — ler a mais so nega mais.
+    const nomeEq = nomeDoComando(ws[h].texto);
     const args = ws.slice(h + 1);
     const contaArgs = () => args.forEach((w, k) => {
       // `dd of=f` e `--x=f` (o valor colado a flag); a PASTA de um verbo de `COPIAM` e o ultimo argumento ou o `-t`.
       const igual = /^--[\w-]+=/.exec(w.texto);
-      const t = nome === "dd" && w.texto.startsWith("of=") ? w.texto.slice(3) : igual ? w.texto.slice(igual[0].length) : w.texto;
+      const t = (nome === "dd" || nomeEq === "dd") && w.texto.startsWith("of=") ? w.texto.slice(3) : igual ? w.texto.slice(igual[0].length) : w.texto;
       if ((/^-/.test(t) && !igual) || !t || temExpansao(w.cru)) return;
       const p = caminho(t, base);
       const destino = k === args.length - 1 || /^(?:-t|--target-directory)$/.test(args[k - 1]?.texto ?? "") || igual?.[0] === "--target-directory=";
       // Um interior depois de um `cd` nao sabe a pasta: conta como escrita de tudo, como uma redireccao que nao se resolve.
-      if (p !== null || cmd.dentro) escritas.push({ p, pasta: COPIAM.has(nome) && destino, cmd });
+      if (p !== null || cmd.dentro) escritas.push({ p, pasta: (COPIAM.has(nome) || COPIAM.has(nomeEq)) && destino, cmd });
     });
     // #511: o script do template que so LE (`LEITORES_POR_SCRIPT`), e so quando e de facto ELE que corre: o interpretador
     // pelo nome (nao um `./node`), sem atribuicoes antes (um `NODE_OPTIONS=--import` corre outro codigo), e com a pasta
@@ -264,6 +267,11 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     const ws = cmd.argv;
     const { i: h } = cabeca(ws);
     escreve(cmd, ws, h);
+    // #567: com uma cabeca `=sudo`/`=env` (o EQUALS do zsh), o verbo que escreve e o de depois dela (`=sudo cp a sub`:
+    // a pasta `sub`). Uma 2.a passagem a partir desse verbo, por UNIAO: so acrescenta escritas, e uma escrita a mais so
+    // nega mais (o `LEITORES` e a isencao desta passagem so podem deixar de acrescentar, nunca tirar as da 1.a).
+    const { i: hEq } = cabeca(ws, true);
+    if (hEq !== h && hEq >= 0) escreve(cmd, ws, hEq);
     // #565: a pasta onde um `gh`/`git` na palavra `k` le os relativos. Uma cabeca que muda a pasta antes dela tira-lha
     // (um relativo vai para o `porLer`) e arma o externo; um `GH_REPO=` antes dela tambem (`sudo -u eu GH_REPO=o/r gh`).
     const baseDe = (k) => {
@@ -274,7 +282,9 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
     // #565: TODA a palavra com o nome base `gh`/`git` despacha-se, e nao so o verbo do `cabeca()` — o valor de uma flag de
     // cabeca (`env -u FOO gh`, `sudo -D ~/src/gh gh`, `env -u cd gh`) escondia-o. ANTES do `cd` e do `h < 0`, de
     // proposito. Uma que nao corre (`echo gh issue comment --body N`) le-se como se corresse: so mais estrito.
-    for (let k = 0; k < ws.length; k++) if (k !== h && GH_OU_GIT.test(nomeBase(ws[k].texto))) despacha(cmd, ws, k, baseDe(k));
+    // #567: o nome com o EQUALS do zsh (`=gh`, `=git`) tambem despacha — so ACRESCENTA textos (o `cd` abaixo fica no
+    // `nomeBase`: o `=cd` e o `/usr/bin/cd`, que nao muda a pasta, e le-lo como `cd` lia o ficheiro noutra pasta).
+    for (let k = 0; k < ws.length; k++) if (k !== h && GH_OU_GIT.test(nomeDoComando(ws[k].texto))) despacha(cmd, ws, k, baseDe(k));
     if (h < 0) continue;
     const nome = nomeBase(ws[h].texto);
     // O `cd` muda a pasta dos caminhos relativos que vem a seguir, e o repo: com uma expansao (ou `-`), nao se sabe qual.
@@ -286,12 +296,12 @@ export function textosDoComando(texto, { cwd, home, ler, raiz = () => null, real
       dir = !alvo ? home ?? null : temExpansao(alvo.cru) || alvo.texto === "-" ? null : caminho(alvo.texto, dir);
       continue;
     }
-    if (GH_OU_GIT.test(nome)) despacha(cmd, ws, h, baseDe(h));
+    if (GH_OU_GIT.test(nomeDoComando(ws[h].texto))) despacha(cmd, ws, h, baseDe(h));
   }
   /** O ramo do `gh`/`git` para a palavra `h` do comando (#565: chamado para cada palavra com esse nome, e nao so para o
    *  verbo). `dir` e a pasta onde os relativos se leem — `null` quando uma cabeca a muda. */
   function despacha(cmd, ws, h, dir) {
-    const nome = nomeBase(ws[h].texto);
+    const nome = nomeDoComando(ws[h].texto);
     if (nome === "gh") {
       let i = h + 1;
       while (i < ws.length && /^-/.test(ws[i].texto)) i += ws[i].texto === "-R" || ws[i].texto === "--repo" ? 2 : 1;

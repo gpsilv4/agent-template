@@ -74,6 +74,21 @@ const EXECUTORES = new Set([
   ...CABECAS,
 ]);
 const nomeBase = (w) => (w?.texto ?? "").replace(/^.*\//, "");
+/** O argv como o zsh o le com o EQUALS (#567: `=bash` corre o `/usr/bin/bash`): cada palavra cujo `=` inicial esta FORA
+ *  de aspas perde-o — pelo CRU, e nao pelo `citada` (verdadeiro com qualquer parte citada): `="bash"`, `=ba''sh` e `=b\ash`
+ *  correm o bash (medido no zsh), e so o `"=bash"` e literal. Devolve o MESMO array se nenhuma mudou. */
+function argvSemEquals(argv) {
+  const novo = argv.map((w) => (/^=[^=\s]/.test(w.cru) && w.texto.startsWith("=") ? { ...w, texto: w.texto.slice(1) } : w));
+  return novo.some((w, k) => w !== argv[k]) ? novo : argv;
+}
+/** `fn` com o argv do `main` e, se alguma palavra perde o `=`, tambem com o do EQUALS — o 1.o resultado nao nulo. As duas
+ *  leituras juntam-se por OU, e nunca se troca uma pela outra: a do `main` fica intacta, logo nao se herda nenhum buraco
+ *  dela. Tirar o `=` a PALAVRA, e nao so ao nome, deixa o `resto()` consumir as cabecas (`| =sudo -s`, `=env -i bash`). */
+function comAsDuas(argv, fn) {
+  const r = fn(argv);
+  const sem = argvSemEquals(argv);
+  return r || sem === argv ? r : fn(sem);
+}
 /** Quantas palavras o `resto()` ve de cada vez: as cabecas de um comando real sao poucas, e sem tecto o
  *  `verboEm` por cada `{`/`-exec` era cubico — 11 s a 4000 caracteres, no processo do hook (auditoria do PR a). */
 const JANELA = 32;
@@ -173,6 +188,11 @@ const semChavetas = (argv) =>
  * @returns {"letra"|"data"|"deno"|"variavel"|"shell"|null} o sinal que o denuncia, ou `null`
  */
 export function inlineDe(cmd, qualquer = false) {
+  return comAsDuas(cmd.argv, (argv) => inlineDeUma(argv === cmd.argv ? cmd : { ...cmd, argv }, qualquer));
+}
+
+/** O `inlineDe` com uma das leituras do nome (a do `main`, ou a do EQUALS: `comAsDuas`). */
+function inlineDeUma(cmd, qualquer) {
   // As DUAS leituras, com as chavetas partidas e por partir, e nega se qualquer delas negar. Partir e uma
   // aproximacao (a shell tira os pedacos vazios, o zsh nem sempre expande): a palavra inteira continua a dar o
   // "variavel" que dava antes, e `{,node} -pe ...` nao fica com o pedaco vazio como verbo (leitura da 6.a passagem).
@@ -303,7 +323,7 @@ export function recebeDe(cmd) {
   // repete-o — 44 s a 36k caracteres (`env A-B=1 ...`, medido na 3.a leitura adversarial), e um hook que passa o prazo
   // PERMITE. No ramo a vista isto corre em TODOS os comandos: passado o tecto, nao se sabe quem corre, e nega.
   if (argv.length > MAX_PALAVRAS) return true;
-  return recebeEm(argv, true, JANELA) || recebeEm(argv, false, JANELA);
+  return comAsDuas(argv, (a) => recebeEm(a, true, JANELA) || recebeEm(a, false, JANELA));
 }
 
 /** A flag de um `sudo`/`doas` que eleva e NAO leva valor: o grupo eleva e a ULTIMA letra nao leva valor (`-s`, `-Es`,
