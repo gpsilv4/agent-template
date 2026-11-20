@@ -336,7 +336,12 @@ try {
 
   // Uma opcao que faz o git EXECUTAR um comando (#253) nao e segura em branch protegido, seja qual
   // for o verbo — so os paginadores passam. Antes negava por acidente (o valor partia o token).
-  const executa = (inv) => valoresQueExecutam(inv.seg).some(({ valor }) => executaAlgo(valor));
+  // Dentro de um wrapper opaco (`sh -c 'git ... log'`, `eval "git ..."`), o comando do git e UMA palavra citada, e o
+  // `valoresQueExecutam` nao encontra o `git`: le-se tambem sem as aspas (o `limpo`), por uniao (#579 — com o verbo lido
+  // certo, uma chave que executa dada pela variavel de ambiente, dentro de um `sh -c '...'`, passava a deixar; o leitor
+  // adversarial. Os casos estao no modulo de testes do #579).
+  const executa = (inv) => [inv.seg, ...(inv.viaWrapperOpaco ? [limpo(inv.seg)] : [])]
+    .some((s) => valoresQueExecutam(s).some(({ valor }) => executaAlgo(valor)));
   const perigosas = invs.filter((inv) => !seguro(inv) || executa(inv));
   if (!perigosas.length) process.exit(0);
 
