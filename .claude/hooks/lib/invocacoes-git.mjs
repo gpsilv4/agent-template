@@ -17,7 +17,13 @@ const WRAPPERS = new Set([
   "sudo", "env", "eval", "command", "builtin", "exec", "time", "nohup", "setsid", "stdbuf",
   "nice", "ionice", "xargs", "timeout", "doas", "script", "unbuffer", "watch", "sh", "bash",
   "zsh", "dash", "ksh",
+  // #600: o `su`/`runuser` (com `-c`, um comando numa shell). Fora daqui, o ciclo parava neles e o git do `-c` nao se via.
+  "su", "runuser",
 ]);
+/** Depois de um `su`/`runuser` (#600): o `-c` colado ao valor (`-c'git push'` da `-cgit`; `-lcgit`) e o `--command=V`
+ *  (e os prefixos, `--co=V`, `--se=V`) partem-se em flag + valor. PREGUICOSO, no 1.o `c` do grupo. */
+const SU_C_COLADO = /^(-[A-Za-z]*?c)(.+)$/;
+const SU_C_LONGO = /^(--(?:c|se)[\w-]*)=(.+)$/;
 
 /** Palavras-chave de shell: nunca sao o comando, logo saltam-se. Sem elas, `if ...; then
  *  git commit`, `for ...; do git push` e `! git commit` escapavam — tres dos bypasses. */
@@ -122,7 +128,14 @@ export function invocacoes(texto, { equals = false } = {}) {
     let viuWrapper = false;
     let viuWrapperOpaco = false;
     let anteriorEraFlag = false;
+    // #600: depois de um `su`/`runuser`, e se o UTILIZADOR (uma palavra so, que nao e flag nem valor dela) ja saiu.
+    let depoisDeSu = false;
+    let utilizador = false;
     for (;;) {
+      if (depoisDeSu && toks[0]) {
+        const m = SU_C_COLADO.exec(toks[0]) ?? SU_C_LONGO.exec(toks[0]);
+        if (m) toks = [m[1], m[2], ...toks.slice(1)];
+      }
       const t = toks[0];
       if (!t) break;
       const base = nome(t);
@@ -149,8 +162,15 @@ export function invocacoes(texto, { equals = false } = {}) {
       if (WRAPPERS.has(base)) {
         toks = toks.slice(1);
         viuWrapper = true;
-        if (WRAPPERS_OPACOS.has(base)) viuWrapperOpaco = true;
+        if (WRAPPERS_OPACOS.has(base) || OPACOS_SO_NA_INVOCACAO.has(base)) viuWrapperOpaco = true;
+        if (base === "su" || base === "runuser") [depoisDeSu, utilizador] = [true, false];
         anteriorEraFlag = false;
+        continue;
+      }
+      // O utilizador do `su root -c '...'`: uma palavra, depois do valor das flags (`su -g wheel root -c`).
+      if (depoisDeSu && !utilizador && !anteriorEraFlag) {
+        toks = toks.slice(1);
+        utilizador = true;
         continue;
       }
       // O valor de uma opcao de wrapper nem sempre e um numero: `sudo -u me git commit`,
@@ -183,3 +203,8 @@ export function invocacoes(texto, { equals = false } = {}) {
  *  corre, logo falha fechado. Os outros (`env`, `timeout`, `sudo`, `command`, `nice`) passam
  *  o comando como ARGUMENTOS — o texto e fiavel e `env git --version` nao esconde nada. */
 const WRAPPERS_OPACOS = new Set(["xargs", "eval", "sh", "bash", "zsh", "dash", "ksh", "ssh", "su", "doas"]);
+/** O `runuser` corre o `-c` numa shell (#600), e a invocacao conta como vinda de um wrapper opaco — mas NAO entra no
+ *  `WRAPPERS_OPACOS`: o `comandoOpaco` decide pela 1.a palavra do texto INTEIRO, e com o `runuser` la o `;` citado de um git
+ *  SEGUINTE partia (`runuser -u me true; git push -o "a;b" origin x --force` passava a deixar: o leitor adversarial do
+ *  #600; o buraco do `su`, que ja la estava, e o #605). */
+const OPACOS_SO_NA_INVOCACAO = new Set(["runuser"]);

@@ -9,7 +9,10 @@
  * Vivia no `textos-publicos.mjs` ate ao #580, que o separou da extracao para os dois ficarem com folga do Guard 17
  * (os blocos vieram sem mudanca); o `mudaAPasta` e o comentario do `cabeca()` sao do #565.
  */
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao, nomeDoComando } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao, nomeDoComando, SUDO_LOGIN_SRC } from "./fronteira-dados.mjs";
+
+/** O `--chdir` e o `--login` do `sudo` (e os prefixos unicos): mudam a pasta de quem corre (a HOME do alvo). */
+const SUDO_MUDA_PASTA = new RegExp(`^--(?:chd(?:i(?:r)?)?|${SUDO_LOGIN_SRC})(?:=|$)`);
 
 /** As palavras de controlo que o lexer deixa no inicio do comando seguinte (`for ...; do gh ...`). */
 const CONTROLO = new Set(["do", "then", "else", "elif", "{", "if", "while", "until", "!", "exec", "coproc"]);
@@ -78,7 +81,7 @@ export function mudaAPasta(ws, k) {
     // #567: com o EQUALS do zsh, `=env -C`/`=sudo -D` tambem mudam a pasta (so arma mais: o relativo vai para o "nao li").
     if (CABECAS.has(nomeDoComando(t))) { vistas.add(nomeDoComando(t)); continue; }
     if (vistas.has("env") && (/^-[^-]*C/.test(t) || /^--c(?:h(?:d(?:i(?:r)?)?)?)?(?:=|$)/.test(t))) return true;
-    if (vistas.has("sudo") && (/^-[^-]*[Di]/.test(t) || /^--(?:chd(?:i(?:r)?)?|lo(?:g(?:i(?:n)?)?)?)(?:=|$)/.test(t))) return true;
+    if (vistas.has("sudo") && (/^-[^-]*[Di]/.test(t) || SUDO_MUDA_PASTA.test(t))) return true;
   }
   return false;
 }
