@@ -9,7 +9,7 @@
  * Vivia no `guard-protected-branch.mjs` ate ao #580, que o separou da decisao para os dois ficarem com folga do
  * Guard 17. Os blocos vieram sem mudanca, menos o `export` do `limpo` e do `invocacoes` (o guard usa-os).
  */
-import { ATRIBUICAO_LARGA } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA, nomeDoComando } from "./fronteira-dados.mjs";
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
  *  regex de posicao de comando: cada entrada em falta era um bypass. */
@@ -45,9 +45,9 @@ const OPACO = "\u0000opaco\u0000";
 
 /** A primeira palavra do texto e um wrapper que volta a interpretar o que recebe? Se sim, o
  *  que esta dentro de aspas E codigo e tem de partir; se nao, e um argumento literal. */
-function comandoOpaco(txt) {
-  const primeira = (txt.trim().split(/\s+/)[0] ?? "").replace(/["'\\]/g, "").replace(/^.*\//, "");
-  return WRAPPERS_OPACOS.has(primeira);
+function comandoOpaco(txt, equals = false) {
+  const primeira = (txt.trim().split(/\s+/)[0] ?? "").replace(/["'\\]/g, "");
+  return WRAPPERS_OPACOS.has(equals ? nomeDoComando(primeira) : primeira.replace(/^.*\//, ""));
 }
 
 /** Para cada indice: cai dentro de um par de aspas aberto? UMA passagem (#224): perguntar indice a
@@ -66,7 +66,7 @@ function zonasCitadas(txt) {
 
 /** Parte o comando em comandos simples. Todo o separador de shell conta — incluindo
  *  `$(`, backticks, `{`/`}` e `!`, que eram bypasses na versao anterior. */
-function segmentos(texto) {
+function segmentos(texto, equals = false) {
   // Uma substituicao de comando e DUAS coisas ao mesmo tempo, e a versao anterior tratou-a
   // como uma so:
   //   - o **interior** e um comando que corre (`echo $(git commit)` faz um commit), logo tem
@@ -94,7 +94,7 @@ function segmentos(texto) {
       // de uma redireção nunca contem um separador de shell — enumera-los aqui e o que
       // impede o consumo de atravessar a fronteira do comando.
       .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ");
-    const [z1, opaco] = [zonasCitadas(x), comandoOpaco(x)]; // uma vez por texto, nao por separador
+    const [z1, opaco] = [zonasCitadas(x), comandoOpaco(x, equals)]; // uma vez por texto, nao por separador
     const y = x
       // Separadores. `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o
       // comando nao e um wrapper opaco: `eval "a; git commit"` parte (o shell reinterpreta a
@@ -110,10 +110,13 @@ function segmentos(texto) {
 }
 
 /** As invocacoes de `git` de um comando, cada uma com o seu verbo (ou `null` se nao se
- *  conseguir determinar — e um `null` conta como NAO seguro). */
-export function invocacoes(texto) {
+ *  conseguir determinar — e um `null` conta como NAO seguro).
+ *  `equals` (#567): le o nome com o EQUALS do zsh (`=git`, `=sudo`, `=sh`). E a SEGUNDA leitura — quem a pede junta-a a
+ *  do `main` (o guard faz a uniao): trocar uma pela outra herdava os buracos do `git` que o `main` negava por acaso. */
+export function invocacoes(texto, { equals = false } = {}) {
+  const nome = (t) => (equals ? nomeDoComando(t) : t.replace(/^.*\//, ""));
   const out = [];
-  for (const seg of segmentos(texto)) {
+  for (const seg of segmentos(texto, equals)) {
     let toks = seg.split(/\s+/).map(limpo).filter(Boolean);
     // Consumir wrappers, palavras-chave de shell, flags e atribuicoes ate ao comando real.
     let viuWrapper = false;
@@ -122,7 +125,7 @@ export function invocacoes(texto) {
     for (;;) {
       const t = toks[0];
       if (!t) break;
-      const base = t.replace(/^.*\//, "");
+      const base = nome(t);
       // Chegar ao `git` para SEMPRE o consumo. Sem esta linha primeiro, o salto do valor de
       // flag comia o proprio `git`: `sh -c "git commit"`, `bash -c "git push"` e
       // `env GIT_DIR=.git git commit` deixaram de ser detetados — tres regressoes que a
@@ -163,7 +166,7 @@ export function invocacoes(texto) {
       break;
     }
     if (!toks.length) continue;
-    if (toks[0].replace(/^.*\//, "") !== "git") continue; // nao e uma invocacao do git
+    if (nome(toks[0]) !== "git") continue; // nao e uma invocacao do git
     // Saltar as flags globais do git ate ao verbo.
     let i = 1;
     while (i < toks.length && toks[i].startsWith("-")) {

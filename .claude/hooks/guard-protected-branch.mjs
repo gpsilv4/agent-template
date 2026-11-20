@@ -53,6 +53,7 @@ import { porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
 // O RECONHECIMENTO de uma invocacao do `git` (os segmentos, os wrappers, as flags globais ate ao verbo) vive a
 // parte desde o #580; aqui fica a DECISAO.
 import { invocacoes, limpo } from "./lib/invocacoes-git.mjs";
+import { temEquals } from "./lib/fronteira-dados.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -266,6 +267,8 @@ try {
   // a analise inteira. Dois bypasses medidos. O corpo desses e guardado e varrido como
   // segmento proprio, em vez de descartado.
   const corposExecutaveis = [];
+  // O EQUALS do zsh (#567): a 2.a leitura so corre com uma palavra que comeca por `=` — sem ela, tudo como no `main`.
+  const comEquals = temEquals(cmd);
   const texto = cmd.replace(
     // `[\t ]`, nao `\s` (#224): o `\s` casa o `\n`, e um `<<TAG` sem terminador era quadratico.
     /^([^\n]*?)<<-?[\t ]*(['"]?)(\w+)\2([\s\S]*?)^[\t ]*\3[\t ]*$/gm,
@@ -274,11 +277,15 @@ try {
       // Quem recebe o corpo pode estar ANTES do `<<` (`bash -s <<EOF`) ou **depois do
       // terminador** (`cat <<EOF | bash`). A versao anterior so olhava para o preambulo, e a
       // segunda forma passava — e a vizinha da que tinha sido corrigida.
-      const ehShell = (t) => /(?:^|[\s|])(?:sh|bash|zsh|dash|ksh)(?:\s|$)/.test(limpo(t));
+      // Com o EQUALS do zsh (#567), `=bash` e a shell: a 2.a leitura aceita o `=` antes do nome.
+      const ehShell = (t, equals) => new RegExp(`(?:^|[\\s|])${equals ? "=?" : ""}(?:sh|bash|zsh|dash|ksh)(?:\\s|$)`).test(limpo(t));
       // Em `cat <<EOF | bash`, o `| bash` fica no RESTO DA LINHA do `<<` — que o regex captura
       // como inicio do corpo, nao depois do terminador. E ai que se procura.
       const restoDaLinha = corpo.split("\n")[0] ?? "";
-      if (invocacoes(preambulo).length === 0 && (ehShell(preambulo) || ehShell(restoDaLinha))) {
+      // As DUAS leituras (#567): varre-se se QUALQUER delas o pedir. So a nova (o `=git` visto no preambulo) deixava de
+      // varrer `=git stripspace <<EOF | bash` com um force-push no corpo — o `main` varria-o (o N1 do plano).
+      const pede = (equals) => invocacoes(preambulo, { equals }).length === 0 && (ehShell(preambulo, equals) || ehShell(restoDaLinha, equals));
+      if (pede(false) || (comEquals && pede(true))) {
         corposExecutaveis.push(corpo);
       }
       return preambulo;
@@ -292,7 +299,15 @@ try {
   // `cat <<'EOF' > .claude/hooks/x.mjs` chegava aqui como `cat` — o `porqueAltera` trata os heredocs ele proprio.
   { const porque = porqueAltera(cmd, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque)}\n\n(condicao: ${porque})`); }
 
-  const invs = [...invocacoes(texto), ...corposExecutaveis.flatMap((c) => invocacoes(c))];
+  // As invocacoes das DUAS leituras, por UNIAO e sem repetidas (#567): todas as decisoes abaixo sao "existe uma invocacao
+  // perigosa", logo juntar so nega mais. Sem `=` no comando nao se deduplica: a lista e a do `main`, byte a byte (com as
+  // repetidas que ele tinha). Com `=`, a da leitura do `main` vem primeiro, e a do EQUALS so acrescenta as que faltam.
+  const leitura = (equals) => [...invocacoes(texto, { equals }), ...corposExecutaveis.flatMap((c) => invocacoes(c, { equals }))];
+  const chave = (inv) => JSON.stringify([inv.seg, inv.verbo, inv.args]);
+  // Fica a 1.a de cada chave (a do `main`): um `Map` guardava a posicao da 1.a e o valor da ULTIMA. Um falso positivo dito:
+  // um `=x` noutro sitio liga a 2.a leitura, e o `"=git" commit` citado passa a ler-se como `git commit` — so nega a mais.
+  const vistas = new Set();
+  const invs = !comEquals ? leitura(false) : [...leitura(false), ...leitura(true)].filter((inv) => !vistas.has(chave(inv)) && vistas.add(chave(inv)));
   if (!invs.length) process.exit(0); // nada de git em posicao de comando
 
   for (const inv of invs) {

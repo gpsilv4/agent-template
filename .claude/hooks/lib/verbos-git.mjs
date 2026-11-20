@@ -15,7 +15,7 @@
  */
 
 import { fimSubst } from "./caminhos.mjs";
-import { ATRIBUICAO_LARGA } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA, nomeDoComando } from "./fronteira-dados.mjs";
 
 /** Verbos que exigem uma FORMA para serem seguros (nao basta faltar-lhes a forma insegura).
  *
@@ -233,9 +233,13 @@ export function palavrasPorSegmento(c) {
  */
 export function valoresQueExecutam(c) {
   const out = [];
-  for (const ps of palavrasPorSegmento(c)) {
-    const i = ps.findIndex((p) => p.replace(/^.*\//, "") === "git");
-    if (i < 0) continue;
+  // As DUAS leituras do nome (#567): `=git` (o EQUALS do zsh) tambem e o git. Por UNIAO, e nao trocando: trocar mudava o
+  // indice. E TODAS as palavras git, e nao a 1.a de cada leitura: um engodo antes do git real (`sudo -u git =git -c
+  // core.pager=... log`, o valor `git` do `-u`) escondia o `-c` dele (leitor adversarial do #567). Ler a mais so nega mais.
+  // O teste do EQUALS numa linha so: com a regex `/^.*\//` na mesma, o `check-codigo-morto` nao via o uso (#599).
+  const ehGitComEquals = (p) => nomeDoComando(p) === "git";
+  const indices = (ps) => ps.flatMap((p, i) => (p.replace(/^.*\//, "") === "git" || ehGitComEquals(p) ? [i] : []));
+  for (const [ps, i] of palavrasPorSegmento(c).flatMap((ps) => indices(ps).map((i) => [ps, i]))) {
     // O resto vai RE-CITADO: sem as aspas, a mensagem de `git commit -m "... <f> ..."` virava
     // argumentos e o caminho dela, um alvo (3.a leitura). Um booleano ou o vazio nao sao comandos
     // (`pager.log=false`, `GIT_EDITOR=true`, `GIT_PAGER=`).
@@ -247,7 +251,9 @@ export function valoresQueExecutam(c) {
     // As atribuicoes a frente do `git`, mesmo atras de uma cabeca e das flags dela
     // (`GIT_PAGER=x env -u FOO git log`): o valor de uma flag (`FOO`) nao para a procura.
     // Pela LARGA (#546): `GIT_PAGER=x X+=1 git`, `GIT_PAGER=x env A-B=1 git` — uma atribuicao no meio parava a procura.
-    for (let k = i - 1; k >= 0 && (ATRIBUICAO_LARGA.test(ps[k]) || CABECA_DO_GIT.test(ps[k]) || /^-/.test(ps[k - 1] ?? "")); k--) {
+    // #567: a cabeca tambem pelo `nomeDoComando` (`=env`, `=sudo`; e `/usr/bin/env`), por UNIAO — so prolonga a procura.
+    const ehCabeca = (p) => CABECA_DO_GIT.test(p) || CABECA_DO_GIT.test(nomeDoComando(p));
+    for (let k = i - 1; k >= 0 && (ATRIBUICAO_LARGA.test(ps[k]) || ehCabeca(ps[k]) || /^-/.test(ps[k - 1] ?? "")); k--) {
       if (!ENV_QUE_EXECUTA.test(ps[k])) continue;
       const valor = ps[k].slice(ps[k].indexOf("=") + 1);
       if (!/^GIT_CONFIG_PARAMETERS\+?=/.test(ps[k])) { junta(valor, i + 1); continue; }

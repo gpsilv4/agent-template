@@ -90,6 +90,14 @@ export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
  *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
 export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
 
+/** O nome do comando de uma palavra com o EQUALS do zsh (#567): `=git` corre o `/usr/bin/git`. Tira um `=` inicial seguido
+ *  de algo que nao e `=` nem espaco, e depois o caminho. E a SEGUNDA leitura: quem a usa junta-a a do `main` (nega se
+ *  qualquer negar) — trocar uma pela outra herdava os buracos do `git` que o `main` negava por acaso (o N1 do plano). */
+export const nomeDoComando = (t) => t.replace(/^=(?=[^=\s])/, "").replace(/^.*\//, "");
+/** O texto tem uma palavra que comeca por `=` (e so entao a leitura do EQUALS corre: sem ela, o veredicto E a razao sao
+ *  os do `main`, sem nada a dobrar). */
+export const temEquals = (texto) => /(?:^|[\s;&|(){}`$])=[^=\s]/.test(texto);
+
 /** Quem corre o stdin numa SHELL sem se chamar shell (#566), uma so vez: o `SHELL_ELEVADA` do piso (`fronteira.mjs`)
  *  e o `recebeDe` (`posicao.mjs`) montam-se daqui. Os que ELEVAM com uma flag (`sudo -s`, `doas -i`) e os que sao uma
  *  shell de login por si (`su`, `runuser`). */

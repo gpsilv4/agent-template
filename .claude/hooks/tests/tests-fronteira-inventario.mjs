@@ -79,6 +79,9 @@ const FECHADO = [
   // mutacao como MORTA — a guarda existia e nada a exercitava.
   ["fronteira como VALOR de uma flag de cabeca", `sudo -u ${H} cat /tmp/y`, "verbo-nao-e-leitura:stop-verify.mjs"],
   ["o mesmo com `env -u`", `env -u ${F} cat /tmp/y`, "verbo-nao-e-leitura:fronteira.mjs"],
+  // Nasceu em ABERTO (4.a leitura do #253). Fechou no #567: o `valoresQueExecutam` passou a ler TODAS as palavras git do
+  // segmento, e nao so a 1.a — o isco do `-a` deixou de esconder o `-c` do git real.
+  ["`exec -a git` a por um isco antes do git", `exec -a git git -c alias.x='!rm -rf ${H}' x`, "git-que-executa"],
 ];
 
 /**
@@ -183,7 +186,6 @@ const ABERTO = [
   // Da 4.a leitura do #253: a classe "o que o git executa" voltou com mais quatro formas em cada
   // leitura. Pelo criterio do `hooks-guide.md`, um contorno regista-se e nao se persegue.
   ["CONTORNO", "`GIT_CONFIG_PARAMETERS` com o escape `'\\''`", `GIT_CONFIG_PARAMETERS="'alias.x=!rm -rf '\\''${H}'\\'''" git x`],
-  ["CONTORNO", "`exec -a git` a por um isco antes do git", `exec -a git git -c alias.x='!rm -rf ${H}' x`],
   ["CONTORNO", "`git clone -c` depois do verbo", `git clone -c core.sshCommand='rm -rf ${H}' ssh://h/r z`],
   ["CONTORNO", "opcao abreviada a duas letras (`--ex`)", `git rebase --ex 'rm -rf ${H}' HEAD~1`],
   // Da 5.a leitura: o nome partido por aspas, num git aninhado — a classe de `D=.cla; ${D}ude`.
