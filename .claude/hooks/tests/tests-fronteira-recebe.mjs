@@ -113,17 +113,18 @@ const DEIXAM = [
   "sudo -u eu", // nenhuma flag que eleva
   // As condicoes do `-s`: so numa SHELL, e so ANTES do 1.o posicional.
   "python3 -s x.py", "bash x.sh -s",
-  // As formas longas do `-c` do `su`.
-  "su --command=ls", "su --session-command=ls",
   // O recomeco (b) nao tira o comando a seguir a uma flag que ELEVA (o corpus da P3 apanhou-o a negar estes).
   "sudo -s python3 -m json.tool", "sudo -s rm -rf /tmp/x",
   // Da passagem 3: uma flag da UM valor (o `usadas`: `--user` ja deu o `eu`, e o `grep` fica verbo); e o `dono` e a
   // cabeca mais proxima (o `-s` e do `sudo`, nao do `env`).
   "sudo --user eu grep bash", "env sudo -s python3 -m json.tool",
-  // Da leitura focada: o grupo que eleva e ACABA numa letra sem valor (`-sE`); e o `-c` do `su` depois de um executor
-  // (o `ultimoC`).
-  "sudo -sE python3 -m json.tool", "caffeinate su -c ls",
+  // Da leitura focada: o grupo que eleva e ACABA numa letra sem valor (`-sE`).
+  "sudo -sE python3 -m json.tool",
 ];
+/** O `su -c <comando que nao le o stdin>` (#600): com a fronteira no MESMO comando, o `inlineDe` nega-o (o `su -c` e
+ *  opaco, como o `sh -c`). O que o `recebeDe` decide so se ve com a fronteira NOUTRO comando, e o `su` fora de quem a
+ *  cita: e ai que estes controlos vivem. Eram `DEIXAM` antes do #600. */
+const SU_C_DEIXAM = ["su --command=ls", "su --session-command=ls", "caffeinate su -c ls", "su -c ls"];
 
 const falha = (cmd, esperado, obtido) => new Error(`"${cmd.replace(/\n[\s\S]*/, " <<heredoc>>")}": esperado ${esperado}, obtido ${obtido}`);
 const nega = (cmd, rotulo) => {
@@ -156,8 +157,10 @@ export function registar({ test }) {
       deixa(`${VISTA} ${p}`);
     });
   }
-  test("recebe: CONTROLO — `su -c` e um heredoc para quem nao corre codigo DEIXAM (#566)", () => {
-    deixa(`cat ${F} | su -c 'ls'`);
+  for (const p of SU_C_DEIXAM) {
+    test(`recebe: CONTROLO — \`cat <f>; true | ${p}\` DEIXA: o valor do \`-c\` nao le o stdin (#566, #600)`, () => deixa(`cat ${F}; true | ${p}`));
+  }
+  test("recebe: CONTROLO — um heredoc para quem nao corre codigo DEIXA (#566)", () => {
     deixa(`cat ${F}; ${DOC("env grep x").replace(`rm -rf ${F}`, "linha")}`);
   });
   // A guarda "so com stdin": sem pipe, heredoc nem here-string, a shell nao le codigo do stdin do hook.

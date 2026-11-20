@@ -103,6 +103,15 @@ export const temEquals = (texto) => /(?:^|[\s;&|(){}`$])=[^=\s]/.test(texto);
  *  shell de login por si (`su`, `runuser`). */
 export const ELEVAM = ["sudo", "doas"];
 export const SU = ["su", "runuser"];
+/** A flag CURTA do `sudo`/`doas` que abre uma shell: `s`/`i` MINUSCULOS num grupo (`-s`, `-i`, `-Es`; o `-S` le a
+ *  password). Uma so fonte (#600): o `eleva`/`elevaSemValor` (`posicao.mjs`) e o heredoc do guard do branch. */
+export const ELEVA_CURTA_SRC = "-[A-Za-z]*[si][A-Za-z]*";
+/** O `--login` do `sudo` e os prefixos unicos dele (o `getopt_long` aceita-os: `--lo`, `--log`, `--logi`; o `--l` e
+ *  ambiguo com o `--list`). Uma so fonte (#600): o `mudaAPasta` (`cabeca-comando.mjs`), o `eleva` (`posicao.mjs`) e o
+ *  heredoc do guard do branch. */
+export const SUDO_LOGIN_SRC = "lo(?:g(?:i(?:n)?)?)?";
+/** O `--shell` do `sudo` e os prefixos unicos (`--sh`, `--she`, `--shel`; o `--s` e ambiguo com o `--set-home`). */
+export const SUDO_SHELL_SRC = "sh(?:e(?:l(?:l)?)?)?";
 
 /** Cabecas INERTES: correm o comando seguinte sem lhe mudar o sentido.
  *
@@ -118,7 +127,10 @@ export const SU = ["su", "runuser"];
  *  1. As cabecas OPACAS (`eval`, `xargs`, `sh -c` e irmas) NAO entram. Sao tratadas pelo
  *     `OPACO`, e consumi-las faria julgar o verbo errado: em `ls <fronteira> | xargs rm`, quem
  *     apaga e o `xargs`, que nao tem o caminho escrito.
- *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`. */
+ *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`.
+ *  3. O `su`/`runuser` NAO entram (#600). Nos `WRAPPERS` do `invocacoes-git.mjs` entraram, para o ciclo chegar ao git
+ *     do `-c`. Aqui sao lidos a parte (o
+ *     `inlineDe` e o `recebeDe`, em `posicao.mjs`): consumi-los fazia do utilizador ou do valor do `-c` o verbo. */
 export const CABECAS = new Set([
   "sudo", "doas", "env", "command", "builtin", "time", "timeout", "nohup", "setsid", "stdbuf",
   "nice", "ionice", "unbuffer",

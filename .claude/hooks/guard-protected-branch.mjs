@@ -22,7 +22,7 @@
  *
  * O QUE CONTINUA A FALHAR ABERTO, e nao vale a pena esconder: para chegar ao verbo e preciso
  * primeiro reconhecer que o segmento e uma invocacao do `git`, e isso depende da lista
- * `WRAPPERS` (`lib/invocacoes-git.mjs`), que **e** uma blocklist. Passam `flock l git commit`, `su - u -c "git commit"` e
+ * `WRAPPERS` (`lib/invocacoes-git.mjs`), que **e** uma blocklist. Passam `flock l git commit`, `sg grupo -c "git commit"` (#607) e
  * `ssh host git commit` (o `GIT_PAGER=...` e o `-c core.pager=...` que executam fecharam no #253:
  * negam em branch protegido, salvo um paginador simples). Fechar isto exigiria negar qualquer `git` em qualquer posicao e recuperar depois os
  * `echo`/`grep` legitimos — mais falsos positivos do que valor, para um modelo de ameaca que
@@ -53,7 +53,7 @@ import { porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
 // O RECONHECIMENTO de uma invocacao do `git` (os segmentos, os wrappers, as flags globais ate ao verbo) vive a
 // parte desde o #580; aqui fica a DECISAO.
 import { invocacoes, limpo } from "./lib/invocacoes-git.mjs";
-import { temEquals } from "./lib/fronteira-dados.mjs";
+import { ELEVA_CURTA_SRC, ELEVAM, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC, temEquals } from "./lib/fronteira-dados.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -278,13 +278,28 @@ try {
       // terminador** (`cat <<EOF | bash`). A versao anterior so olhava para o preambulo, e a
       // segunda forma passava — e a vizinha da que tinha sido corrigida.
       // Com o EQUALS do zsh (#567), `=bash` e a shell: a 2.a leitura aceita o `=` antes do nome.
-      const ehShell = (t, equals) => new RegExp(`(?:^|[\\s|])${equals ? "=?" : ""}(?:sh|bash|zsh|dash|ksh)(?:\\s|$)`).test(limpo(t));
+      // E quem le o stdin numa shell sem se chamar shell (#600): o `su`/`runuser`, e o `sudo`/`doas` com uma flag que eleva
+      // (`-s`, `-i`, `-Es`, `--shell`, `--login` e os prefixos). `su - root <<EOF` e `sudo -s <<EOF` passavam.
+      // As novas tambem depois de um caminho ou de um separador (`/bin/su - <<EOF`, `true;su <<EOF`): so acrescenta varreduras.
+      // As shells ficam com o `(?:^|[\s|])` do `main` (o `/bin/bash <<EOF` e do #605).
+      // As novas leem-se SEM o texto entre aspas, e as flags do `sudo`/`doas` SEGUIDAS a ele (cada uma com um valor no
+      // maximo): `gh pr create --title "... su -c ..." --body "$(cat <<'EOF'` e `doas git commit -s -F - <<EOF` (o `-s` e do
+      // git) varriam o corpo — a mensagem de um PR que fala de `su` e de force-push era negada (a leitura focada do #600).
+      const semAspas = (t) => limpo(t.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " "));
+      const ehShell = (t, equals) => new RegExp(`(?:^|[\\s|])${equals ? "=?" : ""}(?:sh|bash|zsh|dash|ksh)(?:\\s|$)`).test(limpo(t)) ||
+        new RegExp(`(?:^|[\\s|;&(/])${equals ? "=?" : ""}(?:${SU.join("|")})(?:\\s|$)`).test(semAspas(t)) ||
+        new RegExp(`(?:^|[\\s|;&(/])${equals ? "=?" : ""}(?:${ELEVAM.join("|")})(?:\\s+-\\S*(?:\\s+[^-\\s]\\S*)?)*?\\s+(?:${ELEVA_CURTA_SRC}|--(?:${SUDO_SHELL_SRC}|${SUDO_LOGIN_SRC}))(?:\\s|$)`).test(semAspas(t));
       // Em `cat <<EOF | bash`, o `| bash` fica no RESTO DA LINHA do `<<` — que o regex captura
       // como inicio do corpo, nao depois do terminador. E ai que se procura.
       const restoDaLinha = corpo.split("\n")[0] ?? "";
       // As DUAS leituras (#567): varre-se se QUALQUER delas o pedir. So a nova (o `=git` visto no preambulo) deixava de
       // varrer `=git stripspace <<EOF | bash` com um force-push no corpo — o `main` varria-o (o N1 do plano).
-      const pede = (equals) => invocacoes(preambulo, { equals }).length === 0 && (ehShell(preambulo, equals) || ehShell(restoDaLinha, equals));
+      // Um git que corre DENTRO de um wrapper opaco do preambulo (`su root -c 'git status; bash' <<EOF`, o mesmo com `sh -c`)
+      // nao faz do corpo texto (#600): so conta o que o preambulo corre a vista. Sem isto, por o `su` nos `WRAPPERS` fazia do
+      // `git status` uma invocacao, e o corpo — com um force-push — deixava de se varrer. Nega a mais, dito: o corpo de
+      // `sh -c 'git commit -F -' <<EOF` passa a varrer-se, e uma mensagem com uma linha `git push --force` e negada.
+      const aVista = (equals) => invocacoes(preambulo, { equals }).filter((inv) => !inv.viaWrapperOpaco);
+      const pede = (equals) => aVista(equals).length === 0 && (ehShell(preambulo, equals) || ehShell(restoDaLinha, equals));
       if (pede(false) || (comEquals && pede(true))) {
         corposExecutaveis.push(corpo);
       }
