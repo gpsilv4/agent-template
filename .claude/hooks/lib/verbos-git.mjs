@@ -140,6 +140,14 @@ export const CHAVES_PERIGOSAS = new RegExp(
  *  filho (medido no bash 3.2), e nega-lo fossilizava um falso positivo. */
 const ENV_QUE_EXECUTA = /^(?:GIT_PAGER|PAGER|GIT_EDITOR|EDITOR|VISUAL|GIT_SEQUENCE_EDITOR|GIT_SSH_COMMAND|GIT_SSH|GIT_EXTERNAL_DIFF|GIT_ASKPASS|SSH_ASKPASS|GIT_PROXY_COMMAND|GIT_CONFIG_PARAMETERS|GIT_CONFIG_VALUE_\d+)\+?=/;
 
+/** As chaves que executam e que nem a `CHAVES_PERIGOSAS` nem a `CHAVES_QUE_EXECUTAM` tem: o programa de um remoto local
+ *  e o `!cmd` de um submodulo. So para o `--config-env` (#579), onde o valor nao se ve. */
+const EXECUTAM_PELO_AMBIENTE = /^(?:remote\..+\.(?:uploadpack|receivepack)|submodule\..+\.update)$/i;
+/** As da `CHAVES_PERIGOSAS` cujo valor e so um DADO, e nao corre nada: uma URL de proxy e o nome de uma variante de ssh.
+ *  Pelo `--config-env` passam segredos (um proxy com credenciais), e julga-las negava-o — e, na fronteira, um `git log`
+ *  que cita a fronteira com elas a frente (a leitura focada do #579). O `protocol.*.allow` fica: liga o `ext::`. */
+const SO_DADOS = /^(?:http\.proxy|ssh\.variant)$/i;
+
 /** As chaves cujo VALOR e um comando — nao as de `CHAVES_PERIGOSAS` todas: essas sao as de
  *  ESCRITA perigosa, e incluem caminhos (`core.hooksPath`, `include.path`), URLs (`http.proxy`,
  *  `url.*.insteadOf`) e booleanos. Julgar `core.hooksPath=.githooks` como comando negava a forma
@@ -225,8 +233,10 @@ export function palavrasPorSegmento(c) {
  *
  * Fica de fora, de proposito: o que corre da CONFIGURACAO do repo (`--textconv`,
  * `--show-signature`, `--ext-diff` sem `-c`), que nao e texto do comando — escreve-la nao e
- * escrever na fronteira; e o que vem de OUTRA variavel (`--config-env`, `export X=...; git`): um
- * CONTORNO, em `ABERTO` no `tests-fronteira-inventario.mjs`.
+ * escrever na fronteira; e o que vem de OUTRA variavel (`export X=...; git`): um CONTORNO, em `ABERTO` no
+ * `tests-fronteira-inventario.mjs`. O `--config-env K=VAR` com uma chave que executa da `$VAR` (#579): no guard dos
+ * branches conta como "executa"; na fronteira, nega so se os ARGUMENTOS do git citarem a fronteira (`$VAR log -- <f>`).
+ * O contorno do inventario (o comando no conteudo de uma OUTRA variavel, sem a fronteira nos argumentos) continua `ABERTO`.
  *
  * @param {string} c o comando completo
  * @returns {{valor: string, comando: string}[]} o que o git executaria; `[]` se nada
@@ -264,8 +274,24 @@ export function valoresQueExecutam(c) {
     // (`git grep -c`, `git branch -c`). O git nao aceita `-c` colado (`-ckey=v`: medido).
     let j = i + 1;
     for (; j < ps.length && ps[j].startsWith("-"); j++) {
+      // O `--config-env K=VAR` (#579) e o `-c K=<o conteudo de VAR>`: uma variavel que o hook nao ve. Com uma chave que
+      // executa, o valor junta-se como `$VAR` — o `executaAlgo` conta-o, e falha fechado. Partido no ULTIMO `=`, como o
+      // git (`credential.https://h/?a=b.helper=X`: o primeiro dava uma chave que nao executa). Separado ou com `=`.
+      // E com as chaves PERIGOSAS tambem (`core.hooksPath`, `include.path`, `remote.*.uploadpack`): no `-c` ficam de fora
+      // porque o valor se ve (`-c core.hooksPath=.githooks` e como este repo liga o hook); aqui nao se ve, e esse falso
+      // positivo nao existe (a opcao A estreitada, decidida a 20 nov, do leitor adversarial).
+      const comEnv = /^--config-env(?:=([\s\S]*))?$/.exec(ps[j]);
+      if (comEnv) {
+        const cfg = comEnv[1] ?? ps[++j] ?? "";
+        const igual = cfg.lastIndexOf("=");
+        const k = cfg.slice(0, igual);
+        const perigosa = CHAVES_PERIGOSAS.test(k) && !SO_DADOS.test(k);
+        if (igual > 0 && (CHAVES_QUE_EXECUTAM.test(k) || perigosa || EXECUTAM_PELO_AMBIENTE.test(k))) junta(`$${cfg.slice(igual + 1)}`, j + 1);
+        continue;
+      }
       if (ps[j] !== "-c") {
-        if (/^-C$|^--(?:git-dir|work-tree|namespace|exec-path|super-prefix|config-env|attr-source)$/.test(ps[j])) j++;
+        // Sem o `config-env`: o bloco de cima apanha-o antes (#579). A copia da lista converge no #336.
+        if (/^-C$|^--(?:git-dir|work-tree|namespace|exec-path|super-prefix|attr-source)$/.test(ps[j])) j++;
         continue;
       }
       const cfg = ps[++j] ?? "";

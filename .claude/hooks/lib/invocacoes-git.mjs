@@ -9,7 +9,7 @@
  * Vivia no `guard-protected-branch.mjs` ate ao #580, que o separou da decisao para os dois ficarem com folga do
  * Guard 17. Os blocos vieram sem mudanca, menos o `export` do `limpo` e do `invocacoes` (o guard usa-os).
  */
-import { ATRIBUICAO_LARGA, nomeDoComando } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA, GIT_GLOBAIS_COM_VALOR, nomeDoComando } from "./fronteira-dados.mjs";
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
  *  regex de posicao de comando: cada entrada em falta era um bypass. */
@@ -36,8 +36,9 @@ const PALAVRAS_SHELL = new Set([
  *  `timeout 5 git push` parava o consumo e a invocacao passava por nao-git. */
 const VALOR_DE_WRAPPER = /^\d+[smhd]?$/;
 
-/** Flags globais do `git` que consomem o argumento seguinte. */
-const GIT_FLAGS_COM_VALOR = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix"]);
+/** As flags globais do `git` que consomem o argumento seguinte: a lista UNICA (`fronteira-dados.mjs`), e nao uma copia
+ *  (#579). A copia que aqui vivia nao tinha duas delas, e o valor passava a verbo: um force-push passava. */
+const GIT_FLAGS_COM_VALOR = new Set(GIT_GLOBAIS_COM_VALOR);
 
 /** Um token sem aspas nem escapes: `'git'`, `"git"` e `g\i\t` sao todos `git`. E o que
  *  desmonta a ofuscacao por aspas (`git comm""it`) sem precisar de a prever. */

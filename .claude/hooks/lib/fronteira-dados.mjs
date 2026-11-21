@@ -61,9 +61,9 @@ export const MAES = [...new Set(CAMINHOS_FRONTEIRA.flatMap((f) => {
  *  que PERMITE). O `tests-regex-literal.mjs` prende a copia ao texto da fonte. */
 export const literalEmRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** As opcoes GLOBAIS do `git` (antes do verbo) que consomem a palavra seguinte, numa so lista (#397, `TP8`): eram
- *  quatro copias e divergiam. Hoje so o `textos-publicos.mjs` a le; o `fronteira.mjs`, o `verbos-git.mjs` e o
- *  `invocacoes-git.mjs` (o do guard dos branches, #580) convergem no #336, com o corpus diferencial (la, mudar a lista troca negacoes por
- *  permissoes). O `--exec-path` so leva valor com `=` (sem ele o git imprime e sai: consumir o seguinte e inofensivo);
+ *  quatro copias e divergiam. Hoje leem-na o `textos-publicos.mjs` e o `invocacoes-git.mjs` (o guard dos branches, desde o
+ *  #579: a copia dele nao tinha duas flags, e um force-push passava); o `fronteira.mjs` e o `verbos-git.mjs` convergem no
+ *  #336, com o corpus diferencial (la, mudar a lista troca negacoes por permissoes). O `--exec-path` so leva valor com `=` (sem ele o git imprime e sai: consumir o seguinte e inofensivo);
  *  o `--super-prefix` ja nao existe nos git recentes, e fica pelos antigos. */
 export const GIT_GLOBAIS_COM_VALOR = ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--super-prefix", "--config-env", "--attr-source"];
 /** O texto NOMEIA a fronteira: so o nome das pastas de topo (`.claude`, `.githooks`), em qualquer sitio. Mais
