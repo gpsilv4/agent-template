@@ -49,7 +49,7 @@ import { comPrazo, negar } from "./lib/resposta.mjs";
 // As tabelas de verbos vivem a parte: sao DADOS, e mante-las aqui punha o hook acima do teto
 // do Guard 17 (que so deixa encolher). Acrescentar um verbo faz-se la.
 import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA, valoresQueExecutam, executaAlgo } from "./lib/verbos-git.mjs";
-import { porqueAltera, contextoFronteira, razaoDe } from "./lib/fronteira.mjs";
+import { porqueAltera, contextoFronteira, executaCrase, razaoDe } from "./lib/fronteira.mjs";
 // O RECONHECIMENTO de uma invocacao do `git` (os segmentos, os wrappers, as flags globais ate ao verbo) vive a
 // parte desde o #580; aqui fica a DECISAO.
 import { invocacoes, limpo } from "./lib/invocacoes-git.mjs";
@@ -312,7 +312,7 @@ try {
   // segue a condicao: escrita vista, ou leitura que nao se conseguiu provar (#307).
   // Com o comando CRU, e nao o `texto` de cima (auditoria do #317): esse corte e do git, e com ele
   // `cat <<'EOF' > .claude/hooks/x.mjs` chegava aqui como `cat` — o `porqueAltera` trata os heredocs ele proprio.
-  { const porque = porqueAltera(cmd, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque)}\n\n(condicao: ${porque})`); }
+  { const porque = porqueAltera(cmd, contextoFronteira(payload?.cwd)); if (porque) negar(`${razaoDe(porque, executaCrase(cmd))}\n\n(condicao: ${porque})`); }
 
   // As invocacoes das DUAS leituras, por UNIAO e sem repetidas (#567): todas as decisoes abaixo sao "existe uma invocacao
   // perigosa", logo juntar so nega mais. Sem `=` no comando nao se deduplica: a lista e a do `main`, byte a byte (com as

@@ -31,7 +31,7 @@
 
 import { levaMarcador, normalizaCaminhos, pedacosDe, REDIRECCAO_INOFENSIVA, semCitacoes, semCorposDeHeredoc, substituicoes } from "./caminhos.mjs";
 // O hook pede o contexto aqui, como antes; a normalizacao de caminhos vive em `caminhos.mjs`.
-export { contextoFronteira } from "./caminhos.mjs";
+export { contextoFronteira, executaCrase } from "./caminhos.mjs";
 // Os caminhos da fronteira (`CAMINHOS_FRONTEIRA`, `ehCaminhoFronteira`, `MAES`), o regex `FRONTEIRA`
 // e a `resto()` vivem no modulo-FOLHA (#243): este ficheiro e o `caminhos.mjs` importavam-se um ao
 // outro. So `CAMINHOS_FRONTEIRA` e `ehCaminhoFronteira` se reexportam daqui (sao os que tem quem os
@@ -287,8 +287,8 @@ function julga(texto, ctx, dentroDoGit = false) {
   // que foi como o `node -e "...writeFileSync('.claude/settings.json')..."` se escondia.
   if (!FRONTEIRA.test(visivel)) {
     if (!FRONTEIRA.test(texto)) return null;
-    // A crase EXECUTA fora de aspas simples e de heredoc: `` cd `rm -rf <fronteira>` `` passava. So um
-    // CAMINHO SOZINHO (o markdown de uma mensagem de commit) fica isento — `` `<f>; rm -rf <f>` `` nao.
+    // So chegam aqui as crases que o `semCitacoes` NAO executou (#568): um comentario, um `<<\EOF`, um `<<'END-X'`.
+    // A rede antiga (`` cd `rm -rf <fronteira>` ``) fica; um CAMINHO SOZINHO nao corre nada, e fica isento.
     const crases = (texto.replace(/<<-?\s*(['"]?)(\w+)\1[\s\S]*?^[\t ]*\2[\t ]*$/gm, " ")
       .replace(/'(?:[^'\\]|\\.)*'/g, " ").match(/`[^`]*`/g) ?? []).some((c) => {
       const dentro = c.slice(1, -1).trim();

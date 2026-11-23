@@ -322,14 +322,23 @@ const OPACAS = new Set([
 /**
  * A razao para a condicao que negou. So a MENSAGEM muda — o veredicto e o mesmo.
  * @param {string} condicao o rotulo de `porqueAltera()`
+ * @param {boolean} [crase] o comando tem uma crase que o shell executa (`executaCrase`): leva a `NOTA_CRASE` (#568)
  * @returns {string} `RAZAO_OPACA` ou `RAZAO_FRONTEIRA`
  */
-export function razaoDe(condicao) {
+export function razaoDe(condicao, crase = false) {
   const [rotulo, verbo] = condicao.split(/:(.*)/s);
   const opaca = OPACAS.has(rotulo) || (rotulo === "verbo-nao-e-leitura" && PALAVRAS_DE_BLOCO.has(verbo));
   const inline = rotulo === "codigo-inline" || (rotulo === "citado-mas-executado" && verbo === "inline");
-  return (opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA) + (inline ? NOTA_INLINE : "");
+  return (opaca ? RAZAO_OPACA : RAZAO_FRONTEIRA) + (inline ? NOTA_INLINE : "") + (crase ? NOTA_CRASE : "");
 }
+
+/** So quando o comando tem uma crase que o shell executa (#568): a crase com "so um caminho" deixou de ser isenta, e a
+ *  mensagem com `` `.claude/hooks` `` entre aspas duplas nega. Dizer o que funciona poupa a tentativa seguinte. Aparece
+ *  tambem quando a negacao veio de outra parte do comando (`rm <f> && echo `date``): e uma nota, e julgar o comando duas
+ *  vezes para a afinar nao compensa (decidido no #568). */
+const NOTA_CRASE =
+  " Nota: a crase EXECUTA, tambem entre aspas duplas e num heredoc sem aspas — `` `.claude/hooks` `` corre o " +
+  "caminho. Para um caminho num texto, usar plicas, `-F <ficheiro>` ou `<<'EOF'`.";
 
 /** So nas negacoes de CODIGO INLINE (#336): o que so le tambem e negado, e de proposito — distinguir ler de
  *  escrever dentro do codigo era analisar JS com regex (decisao 3 do `/grill`). Dizer o caminho que funciona
