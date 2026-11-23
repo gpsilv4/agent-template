@@ -23,7 +23,7 @@ import { join, dirname, sep, relative } from "path";
 export { leOuNull } from "./ficheiros.mjs";
 import { leOuNull, blocoDaConstante, listaDeBranches } from "./ficheiros.mjs";
 import { foraDoTemplate } from "./fora-do-template.mjs";
-import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "./origem-upgrade.mjs";
+import { comoClonar, confirmaTemplateLimpoNumaTag, confirmaSemDowngrade, projetoDe } from "./origem-upgrade.mjs";
 import { intactoAMenosDePlaceholders, capturaPlaceholders, valoresDoProjeto } from "./intacto.mjs";
 
 // As categorias (o que se copia, o que e do projeto, o que mudou de casa) vivem em
@@ -47,12 +47,14 @@ export { substituivel, PLACEHOLDER, andaFicheiros, MIGRACOES, CONSTANTES_DO_PROJ
  *          seja, o ficheiro mudou de sitio e a remocao **faz parte da migracao**, nao e uma
  *          limpeza opcional. Continua a ser uma LISTA, nunca uma accao ja feita.
  */
-export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, constantes = CONSTANTES_DO_PROJETO, origem = "ref" }) {
+export function aplicaUpgradeMecanico({ dir, root, tag, fatal, substituto, constantes = CONSTANTES_DO_PROJETO, origem = "ref", projeto }) {
   // O lado novo le-se do DISCO do `root` (#490): so e a release se o `root` for um clone limpo numa
   // tag. Recusa o resto; so o simulador do proprio template pede `"disco"`, explicito.
   if (origem !== "ref" && origem !== "disco") fatal(`origem ${JSON.stringify(origem)} desconhecida — "ref" ou "disco"`);
   if (origem === "ref") {
-    confirmaTemplateLimpoNumaTag(root, fatal);
+    // A instrucao leva o nome do PROJETO, e nao o do template (#589): o clone e por projeto. Quem corre o motor sobre
+    // uma COPIA (a 2b, num tmp) passa o `projeto`; sem ele, a pasta do `dir` (que e o projeto, chamado de fora).
+    confirmaTemplateLimpoNumaTag(root, fatal, { instrucao: (t) => comoClonar(t, projeto ?? projetoDe(dir)) });
     confirmaSemDowngrade(root, tag, fatal);
   }
 

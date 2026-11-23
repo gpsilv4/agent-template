@@ -19,7 +19,7 @@ Mostrar: o que se traz, o que se ignora, e o diff do que ja existe. Repo **priva
 cat .agent/.template-version 2>/dev/null || echo "SEM MARCA"
 ```
 
-> **`$TPL` e um clone limpo numa TAG** (#490; o resto recusa) fora do `TMPDIR`: `git clone -q --branch <tag> <url> ~/.cache/agent-template/<tag>` (a ultima: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'`). Num sandbox: no `TMPDIR`, a 2b com `--fronteira-em`.
+> **`$TPL` e um clone limpo numa TAG, por projeto** (#490, #589; o resto recusa) fora do `TMPDIR`: `git clone -q --branch <tag> <url> ~/.cache/agent-template/<tag>-<projeto>` (tag e `<projeto>`: `upgrade-why`). Num sandbox: no `TMPDIR`, a 2b com `--fronteira-em`.
 
 Isto decide o modo. **Sem a maquinaria** (`modo: parcial` na marca; sem `modo:` nem o job `guard-tests`, propoe-se): o
 **modo parcial**, variante do Modo A — `src/docs/upgrade-parcial.md`. No Modo B, esta pergunta vem primeiro.
@@ -89,7 +89,7 @@ existe nos dois decide-se por categoria na tabela da secao 2, nunca por overwrit
 | `.github/workflows/*` | **So os jobs em falta**, contra o ficheiro do **TEMPLATE** (passo **comentado** = AUSENTE; **movido** ou **substituido**: o antigo sai). Workflow AUSENTE: inteiro. Nos passos que ja tem, as flags novas e o trailer `Test-Surface:`. A varredura, o `guard-gate` e o pacote de 1 job: `upgrade-why.md` § "A linha `.github/workflows/*`" | O CI tem passos do projeto |
 | `.claude/settings.json` | **Do UTILIZADOR** (o `deny` proibe-o ao agente): o `deny`/`ask` em falta e o `allow` da maquinaria (2b lista; Guard 11 avisa), os hooks novos | O agente propoe o texto |
 | `.claude/agents/*` | Como a fronteira (linha abaixo). Os customizados: o `tools:` novo por `Edit` (a 2b lista-os; o hook impoe-no). Exigidos: `code-reviewer` (Fase 4), `plan-auditor` (`L`) | So-Claude |
-| `.claude/hooks/*`, `.githooks/*` | **Aprovados um a um pelo utilizador**: os comandos da 2b (o staging ja traz os placeholders e as constantes), ou `Edit`/`Write` com aprovacao, nunca `cp` do `$TPL`. Por `Edit` (e no Modo B): substituir os placeholders, manter `CONSTANTES_DO_PROJETO` e o `protegidos.json` | Fronteira (`upgrade-why.md`) |
+| `.claude/hooks/*`, `.githooks/*` | **Aprovados um a um pelo utilizador**: os comandos da 2b (o staging ja traz os placeholders e as constantes), ou `Edit`/`Write` com aprovacao, nunca `cp` nem `>` do `$TPL`. Por `Edit` (e no Modo B): substituir os placeholders, manter `CONSTANTES_DO_PROJETO` e o `protegidos.json` | Fronteira (`upgrade-why.md`) |
 | `src/docs/agent-guide.md` | Diff. Um workflow novo **tem** de aparecer aqui — o Guard 9b reprova se faltar | Duplica a lista de workflows, e o guard verifica-a |
 | `.github/` restante (`CODEOWNERS`, `ISSUE_TEMPLATE/`, `dependabot.yml`, `pull_request_template.md`) | Diff. O PR template espelha o `/review` | Metade e do projeto |
 | **Qualquer outro ficheiro versionado** (`README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `.editorconfig`, `.nvmrc`, `.gitignore`, ...) | **Diff e decidir caso a caso**, nunca overwrite cego | As categorias acima tambem envelhecem; esta linha e a rede |
@@ -155,4 +155,4 @@ Sem isto, o proximo `/upgrade` cai no Modo B. So com a fronteira aplicada: senao
 
 O relatorio diz o que foi trazido **por categoria**, o que foi deliberadamente ignorado e
 porque, os conflitos que exigiram integracao a mao, e o resultado dos verificadores da secao
-3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou. Aplicada, **apagar o staging** (o caminho vem na 2b) e o clone da tag.
+3 — incluindo qualquer `SEM SUITE` que tenha aparecido, que e um ticket e nao um detalhe —, e a fronteira por aplicar, se ficou. Aplicada, **apagar o staging** (o caminho vem na 2b) e o `$TPL`.

@@ -32,7 +32,7 @@ import { regrasEmFalta } from "./permissoes.mjs";
 import { fronteiraDa2b, validaFronteiraEm, notasDaLigacaoParcial } from "./fronteira-upgrade.mjs";
 import { notasDaFormaDoCi } from "./medida-upgrade-ci.mjs";
 import { modoDoProjeto, mensagemDoModo, textoDoJob } from "./modo-upgrade.mjs";
-import { confirmaTemplateLimpoNumaTag, confirmaSemDowngrade } from "./origem-upgrade.mjs";
+import { comoClonar, confirmaTemplateLimpoNumaTag, confirmaSemDowngrade, projetoDe } from "./origem-upgrade.mjs";
 
 /** A fronteira de permissoes (#301, R7B-1): o que o `settings.json` do template tem e o do projeto nao. O motor nao
  *  toca no `settings.json` (e do projeto), e a tabela do `/upgrade` mandava "trazer regras novas" em prosa: um derivado
@@ -322,7 +322,8 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   validaFronteiraEm(fronteiraEm, [raiz, template], fatal);
   // O $TPL limpo numa tag ANTES de ler o disco dele, e antes da recusa do Modo B (#490): quem le essa
   // recusa copia a mao do $TPL, e tem de saber ja que ele nao serve.
-  ok(`template: ${confirmaTemplateLimpoNumaTag(template, fatal).tag}, limpo`);
+  // A instrucao leva o nome do PROJETO (#589): o clone e por projeto, e o `cwd` aqui e o template.
+  ok(`template: ${confirmaTemplateLimpoNumaTag(template, fatal, { instrucao: (t) => comoClonar(t, projetoDe(raiz)) }).tag}, limpo`);
   const refs = versaoDeOrigem(raiz);
   if (refs.length === 0) {
     fatal(
@@ -437,7 +438,8 @@ export async function medeImpactoAqui({ raiz, template, dir, git, ok, note, fata
   // trazidos onde eram 7, e um FAIL do G18 que era da medicao. Agora a comparacao e a menos dos
   // placeholders, e os valores reais saem dos ficheiros intactos; a fachada so preenche um `X`
   // que nunca apareca intacto.
-  const medido = aplicaUpgradeMecanico({ dir, root: template, tag: ref, fatal, substituto: "EsteProjeto" });
+  // O `dir` e a COPIA num tmp: o nome do clone vem do projeto real (#589, o leitor 2).
+  const medido = aplicaUpgradeMecanico({ dir, root: template, tag: ref, fatal, substituto: "EsteProjeto", projeto: projetoDe(raiz) });
   ok(
     `upgrade mecanico aplicado a copia: ${medido.repostas} constante(s) preservada(s), ` +
       `${medido.trazidos} doc(s) actualizado(s)`
