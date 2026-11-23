@@ -143,6 +143,8 @@ export const PREFIXOS_DE_TESTE = [
   "hook-ambito-",
   // As configs da leitura dos branches protegidos (#257).
   "hook-protegidos-",
+  // Os repos com o `session-context` copiado e um hook vazio (a rede de arranque, #589).
+  "hook-vazio-",
   // Da suite do MODO FAIL-FAST, que monta uma suite falsa em tmpdir para medir a saida
   // antecipada. Entrou aqui pela mesma razao que o `derivado-maduro-teste-` acima, e pela mesma
   // ordem de acontecimentos: eu criei a fixture, nao corri esta suite, e foi a **simulacao de
