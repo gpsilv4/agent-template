@@ -96,6 +96,9 @@ const FRONTEIRA_NEGA = [
   // de um `cd` para a fronteira ficava sem marcador. So um indice LITERAL numerico se salta.
   ["X[Y]=1 solto depois de um cd para a fronteira (o indice com nomes e avaliado)", "cd .claude/hooks && X[Y]=1"],
   ["X[i+1]=1 solto depois de um cd para a fronteira", "cd .claude/hooks && X[i+1]=1"],
+  // #576: as leituras aritmeticas que o hook nega HOJE so pelo verbo (o payload entre plicas no `Y` nao se ve). Sem estes, por
+  // o `:` ou o `let` numa allowlist abria-as em silencio — o contorno das outras formas esta no `ABERTO` do inventario.
+  ...[": $((Y))", "let Y", "(( Y ))", "declare -i X=Y"].map((f) => [`#576: \`${f}\` com o payload entre plicas, depois de um cd`, `Y='a[$(rm -rf x)]'; cd .claude/hooks && ${f}`]),
   // Sitio 7 no sentido contrario: o bash corre o `1X=1` como COMANDO, e a allowlist nao o pode saltar (a LARGA abria).
   ["regressao (a forma do bash no levaMarcador): 1X=1 true depois de um cd para a fronteira", "cd .claude/hooks && 1X=1 true"],
 ];
