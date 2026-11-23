@@ -223,6 +223,7 @@ export function listaDoDoc(doc) {
 /** O que o fecho nomeia e NAO e dependencia: dados, estado de runtime, ficheiros do projeto. Cada um com o porque. */
 export const ISENCOES = [
   { ficheiro: ".claude/hooks/lib/fronteira-dados.mjs", literal: ".claude/settings.local.json", porque: "a lista dos caminhos da fronteira: o hook protege-o, nao o le" },
+  { ficheiro: ".claude/hooks/session-context.mjs", literal: ".claude/settings.local.json", porque: "e do projeto (local, nao versionado): a rede de arranque le-o para ver os hooks ligados (#589), o upgrade nao o traz" },
   { ficheiro: ".claude/hooks/stop-verify.mjs", literal: ".claude/state/stop-verify.last", porque: "estado de runtime, criado pelo proprio hook" },
   { ficheiro: ".claude/hooks/guard-textos-publicos.mjs", literal: ".claude/state/textos-publicos.sessao", porque: "estado de runtime, criado pelo proprio hook" },
   { ficheiro: ".agent/scripts/check-backlog.mjs", literal: ".agent/context/backlog.md", porque: "o backlog e do projeto (e o que se verifica)" },

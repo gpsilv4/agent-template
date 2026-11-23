@@ -296,6 +296,26 @@ test("G11b: registo a apontar para um hook que nao existe avisa", (dir) => {
   });
 }, { code: 1, includes: ["fantasma.mjs", "hook morto"] });
 
+// #589: ligado e VAZIO — um hook vazio sai 0, e no Claude Code so o 2 bloqueia. So com espacos tambem conta como vazio.
+test("G11b: registo a apontar para um hook VAZIO avisa (#589)", (dir) => {
+  writeF(dir, ".claude/hooks/oco.mjs", " \n\t\n");
+  patchSettings(dir, (cfg) => {
+    cfg.hooks = cfg.hooks ?? {};
+    cfg.hooks.Stop = [...(cfg.hooks.Stop ?? []), { hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/oco.mjs"' }] }];
+    return cfg;
+  });
+}, { code: 1, includes: ["oco.mjs", "esta VAZIO"] });
+// O controlo: o mesmo registo com o hook CHEIO nao diz nada.
+test("G11b: controlo — o mesmo registo com o hook cheio nao avisa (#589)", (dir) => {
+  writeF(dir, ".claude/hooks/oco.mjs", "process.exit(0);\n");
+  patchSettings(dir, (cfg) => {
+    cfg.hooks = cfg.hooks ?? {};
+    // ACRESCENTA ao `Stop`, e nao o substitui: tirar o `stop-verify` dava um aviso que nao e deste caso.
+    cfg.hooks.Stop = [...(cfg.hooks.Stop ?? []), { hooks: [{ type: "command", command: 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/oco.mjs"' }] }];
+    return cfg;
+  });
+}, { code: 0, excludes: ["esta VAZIO", "hook morto"] });
+
 // `lib/` e `tests/` NAO sao hooks — sao o que eles usam e o que os testa. Acusa-los era acusar
 // o desenho, e um guard que acusa quem lhe obedece e desligado na primeira semana.
 test("G11b: um modulo em `lib/` nao e tratado como hook por registar", (dir) => {

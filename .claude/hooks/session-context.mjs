@@ -19,13 +19,50 @@
  */
 
 import { execFileSync } from "child_process";
-
-// O parser do `git status --porcelain -z` vive numa so copia (A3 do #195), partilhada com o
-// `stop-verify.mjs`. Aqui so interessa o caminho.
-import { caminhosPorcelain } from "./lib/porcelain.mjs";
-import { ehProtegido, PROTEGIDOS_ESTADO } from "./lib/protegidos.mjs";
+import { existsSync, readFileSync } from "fs";
+import { dirname, join, relative, resolve } from "path";
 
 const MAX_FICHEIROS = 12; // acima disto, so a contagem — a lista deixa de informar
+
+/**
+ * A REDE DE ARRANQUE (#589): um hook ligado no `settings.json` VAZIO ou EM FALTA, ou um ficheiro que ele importa (o
+ * fecho dos imports relativos, tambem as libs de `.agent/scripts/lib/`) vazio ou em falta. Um hook vazio sai `0`, e um
+ * que importe uma lib vazia sai `1`: no Claude Code so o `2` bloqueia, logo os dois desligam a fronteira CALADOS (uma
+ * copia por redireccionamento do `$TPL` deixou seis no derivado A). O `SessionStart` nao bloqueia — mas diz.
+ * Corre PRIMEIRO e so com `fs`/`path`: as libs do projeto podem ser elas as vazias. Fica de fora, dito: um ficheiro
+ * TRUNCADO (nao vazio), e este proprio hook vazio. Devolve as linhas do aviso, ou nada.
+ */
+function fronteiraDesligada() {
+  const raiz = process.env.CLAUDE_PROJECT_DIR || tenta(() => git(["rev-parse", "--show-toplevel"]));
+  if (!raiz) return [];
+  const ligados = new Set();
+  // So a chave `hooks`, como o Guard 11b: o `allow` tambem nomeia hooks (`Bash(node .claude/hooks/x.mjs)`), e um hook
+  // tirado com a entrada do `allow` deixada dava "em falta" a cada sessao (o leitor do #589). Um JSON partido: calado.
+  // Ancorado em `.claude/hooks/`: um `.githooks/x.mjs` tambem contem "hooks/".
+  for (const s of [".claude/settings.json", ".claude/settings.local.json"]) {
+    const hooks = JSON.stringify(tenta(() => JSON.parse(readFileSync(join(raiz, s), "utf8")).hooks, null) ?? {});
+    for (const m of hooks.matchAll(/\.claude\/hooks\/([\w-]+\.mjs)/g)) ligados.add(join(raiz, ".claude/hooks", m[1]));
+  }
+  const vistos = new Set(), vazios = [], faltam = [];
+  const visita = (f) => {
+    if (vistos.has(f) || vistos.size > 300) return;
+    vistos.add(f);
+    if (!existsSync(f)) return void faltam.push(f);
+    const t = tenta(() => readFileSync(f, "utf8"));
+    if (t === null) return;
+    if (!t.trim()) return void vazios.push(f);
+    for (const m of t.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s+)["'](\.\.?\/[^"']+)["']/gm)) visita(resolve(dirname(f), m[1]));
+  };
+  for (const f of ligados) visita(f);
+  if (!vazios.length && !faltam.length) return [];
+  const nomes = (fs) => fs.map((f) => `\`${relative(raiz, f)}\``).join(", ");
+  return [
+    `**FRONTEIRA DESLIGADA** (#589): ${[vazios.length ? `vazio(s): ${nomes(vazios)}` : "", faltam.length ? `em falta: ${nomes(faltam)}` : ""].filter(Boolean).join("; ")}. ` +
+      "Um hook vazio sai 0, e um que importe um ficheiro vazio ou em falta sai 1 — no Claude Code so o 2 bloqueia, logo nenhum nega nada. " +
+      "Repor pelo git (`git status`, `git restore <f>`) antes de continuar.",
+  ];
+}
+
 
 function git(args) {
   // `.replace(/\n+$/)` e NAO `.trim()`: no `git status --porcelain` a coluna de estado do
@@ -46,14 +83,23 @@ function tenta(fn, fallback = null) {
   }
 }
 
-const linhas = [];
+const linhas = tenta(fronteiraDesligada, []);
+
+// O parser do `git status --porcelain -z` vive numa so copia (A3 do #195), partilhada com o
+// `stop-verify.mjs`. Aqui so interessa o caminho. Por `import()`, e depois da rede (#589): um import ESTATICO de uma
+// lib vazia rebentava este hook, e a sessao ficava sem o contexto e sem o aviso. O `import("...")` literal e o que a
+// rede segue — um helper com o caminho num argumento escondia-lhe estas duas libs (medido).
+const { caminhosPorcelain } = (await import("./lib/porcelain.mjs").catch(() => null)) ?? {};
+const { ehProtegido, PROTEGIDOS_ESTADO } = (await import("./lib/protegidos.mjs").catch(() => null)) ?? {};
 
 const branch = tenta(() => git(["symbolic-ref", "--short", "HEAD"])) ?? tenta(() => `(detached em ${git(["rev-parse", "--short", "HEAD"])})`);
-if (!branch) process.exit(0); // nao e um repo git: nada a dizer
+// Nao e um repo git: nada a dizer — salvo a fronteira desligada, que se diz na mesma.
+if (!branch && !linhas.length) process.exit(0);
 
 // A mesma lista que o guard usa (#257): aqui estava uma segunda copia, que o upgrade substituia.
-linhas.push(
-  ehProtegido(branch)
+// Sem a lib (vazia, #589), o branch diz-se na mesma; o aviso de cima ja diz porque falta o resto.
+if (branch) linhas.push(
+  typeof ehProtegido === "function" && ehProtegido(branch)
     ? `Branch: **${branch}** — e um branch PROTEGIDO. Antes de implementar, perguntar se se cria branch (ver "Regra de Branch"). O hook nega commit/push aqui.`
     : `Branch: **${branch}**`
 );
@@ -63,9 +109,11 @@ if (PROTEGIDOS_ESTADO === "invalido") linhas.push("- `.claude/hooks/protegidos.j
 
 // `--untracked-files=all`: sem ele o git colapsa diretorios nao rastreados e a contagem de
 // "por commitar" fica errada — um ficheiro novo em pasta nova conta como 1 (a pasta).
-const porcelain = tenta(() => git(["status", "--porcelain", "--untracked-files=all", "-z"]), "");
+const porcelain = typeof caminhosPorcelain === "function" && branch ? tenta(() => git(["status", "--porcelain", "--untracked-files=all", "-z"]), "") : null;
 const sujos = porcelain ? caminhosPorcelain(porcelain).map((e) => e.caminho) : [];
-if (sujos.length === 0) {
+if (porcelain === null) {
+  // Sem a lib (#589) ou sem repo: calado sobre a arvore — "limpa" seria uma afirmacao que nao se mediu.
+} else if (sujos.length === 0) {
   linhas.push("Arvore de trabalho limpa.");
 } else if (sujos.length <= MAX_FICHEIROS) {
   // `sujos` ja sao caminhos: o `caminhosPorcelain` tirou a coluna de estado. Um segundo

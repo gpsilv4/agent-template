@@ -147,6 +147,22 @@ export function registar() {
       ...(pre.includes("--branch v1.2.3-rc.1 ") ? [] : [`a pre-release nao entrou: ${pre}`]),
     ];
   });
+  // #589: dois upgrades para a mesma tag partilhavam `~/.cache/agent-template/<tag>`, e o que acabou primeiro apagou-o ao
+  // outro (derivado A). Um clone POR PROJETO: `<tag>-<pasta do projeto>`, com o nome filtrado como a tag.
+  test("origem: o clone e por projeto, `<tag>-<projeto>`, tambem na via do sandbox (#589)", () => {
+    const c = comoClonar("v1.2.3", "proj-x");
+    return [
+      ...(c.includes("~/.cache/agent-template/v1.2.3-proj-x ") ? [] : [`o clone nao e por projeto: ${c}`]),
+      ...(/TMPDIR[^—]*v1\.2\.3-proj-x/.test(c) ? [] : [`a via do sandbox nao e por projeto: ${c}`]),
+    ];
+  });
+  test("origem: um nome de pasta hostil passa a `_`, e um vazio da o marcador `<projeto>` (#589)", () =>
+    [["a b", "a_b"], ["x;y", "x_y"], ["$z", "_z"], ["`w`", "_w_"], ["proj-x.2_b", "proj-x.2_b"], ["", "<projeto>"]].flatMap(([nome, fica]) => {
+      const c = comoClonar("v1.2.3", nome);
+      return c.includes(`agent-template/v1.2.3-${fica} `) ? [] : [`"${nome}" devia dar "${fica}": ${c}`];
+    }));
+  test("origem: sem projeto, o comando leva o marcador `<projeto>` (#589)", () =>
+    comoClonar("v1.2.3").includes("agent-template/v1.2.3-<projeto> ") ? [] : [`sem o marcador: ${comoClonar("v1.2.3")}`]);
   test("origem: o commit sem tag sugere clonar a tag mais recente (#490)", () =>
     comRepo((d) => {
       git(d, ["tag", "v1.2.0"]);
@@ -285,7 +301,36 @@ export function registar() {
     }
   });
 
+  // #589 (B2): o NOME chega pelo chamador real. O motor recusa um template sujo, e a instrucao diz o clone DESTE projeto.
+  test("motor: a recusa manda clonar para `<tag>-<pasta do projeto>` (#589)", () => {
+    const base = mkdtempSync(join(tmpdir(), "sim-up-origem-"));
+    try {
+      const root = mkdtempSync(join(base, "root-"));
+      const dir = join(base, "proj-x");
+      mkdirSync(dir);
+      writeFileSync(join(root, "a.md"), "a\n");
+      git(root, ["init", "-q", "-b", "main"]);
+      git(root, ["config", "user.email", "t@t"]);
+      git(root, ["config", "user.name", "t"]);
+      git(root, ["config", "core.excludesFile", "/dev/null"]);
+      git(root, ["add", "-A"]);
+      git(root, ["commit", "-qm", "um"]);
+      git(root, ["tag", "v1.0.0"]);
+      writeFileSync(join(root, "sujo.md"), "x\n");
+      // Sujo, a recusa nao diz a tag (`<tag>`): o que importa e o PROJETO no caminho.
+      return [
+        ...recusa(corre((f) => aplicaUpgradeMecanico({ dir, root, tag: "v1.0.0", substituto: "C", fatal: f })), "agent-template/<tag>-proj-x "),
+        // A 2b corre o motor sobre uma COPIA num tmp, e passa o `projeto` (o leitor 2): ele ganha a pasta do `dir`.
+        ...recusa(corre((f) => aplicaUpgradeMecanico({ dir, root, tag: "v1.0.0", substituto: "C", fatal: f, projeto: "proj-real" })), "agent-template/<tag>-proj-real "),
+      ];
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
   // --- A 2b ----------------------------------------------------------------------------------
+  // #589 (B2): a 2b passa a pasta do PROJETO (a `--projeto`), e nao a do template, que e o `cwd`.
+  test("2b: a recusa manda clonar para `<tag>-<pasta do projeto>` (#589)", () =>
+    exige(contraProjeto({ tagHoje: null }), { codigo: 1, inclui: ["-sim-up-proj-"], exclui: ["-sim-up-tpl-"] }));
   test("2b: o template num commit sem tag recusa antes de medir (#490)", () =>
     exige(contraProjeto({ tagHoje: null }), { codigo: 1, inclui: ["nao esta numa tag de release"], exclui: ["copia deste projeto (HEAD)", "estado actual"] }));
   // A guarda vem ANTES da recusa do Modo B: quem le essa recusa copia a mao do $TPL, e tem de saber ja que nao serve.

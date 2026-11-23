@@ -17,6 +17,7 @@
  */
 
 import { execFileSync } from "child_process";
+import { basename } from "path";
 
 /** Onde a instrucao manda clonar: FORA do `TMPDIR`, porque a fronteira da 2b recusa um template
  *  dentro dele (`lib/fronteira-upgrade.mjs`). Sem `--shared`: um clone local usa hardlinks, que
@@ -33,12 +34,30 @@ export const tagParaComando = (tag) => (typeof tag === "string" && TAG_DE_RELEAS
 /** Como saber a ultima tag: uma so frase, para o upgrade e para a adocao (#538). */
 export const DICA_ULTIMA_TAG = "`git ls-remote --tags --refs --sort=-v:refname <url-do-template> 'v*'`";
 
-/** A instrucao de cada recusa: o clone da tag, que nao escreve no repo do template. */
-export const comoClonar = (pedida = "<tag>") => {
+/** O nome de um projeto no caminho do clone (#589): cada caracter fora de `[A-Za-z0-9._-]` passa a `_`, como a tag
+ *  nunca leva um `$`, um `;` ou um espaco a um comando que se copia (#538). Vazio: o marcador. */
+export const projetoParaComando = (nome) => String(nome ?? "").replace(/[^A-Za-z0-9._-]/g, "_") || "<projeto>";
+
+/** A pasta do PROJETO, que da o nome ao clone (#589): a raiz do repo dele (`git rev-parse --show-toplevel`), ou a
+ *  propria pasta se nao for um repo. Nunca o `cwd`, que numa medicao e o template. */
+export function projetoDe(raiz) {
+  let topo = raiz;
+  try {
+    topo = git(raiz, ["rev-parse", "--show-toplevel"]).trim() || raiz;
+  } catch {
+    // Nao e um repo (ou o git falhou): o nome da pasta dada serve na mesma — e so um nome de clone.
+  }
+  return basename(String(topo ?? ""));
+}
+
+/** A instrucao de cada recusa: o clone da tag DESTE projeto (#589), que nao escreve no repo do template. Um clone por
+ *  tag partilhado foi apagado a meio por outro upgrade para a mesma tag (derivado A). */
+export const comoClonar = (pedida = "<tag>", projeto = "") => {
   const tag = tagParaComando(pedida);
-  return `git clone -q --branch ${tag} <url-do-template> ${ONDE_CLONAR}/${tag}` +
+  const pasta = `${tag}-${projetoParaComando(projeto)}`;
+  return `git clone -q --branch ${tag} <url-do-template> ${ONDE_CLONAR}/${pasta}` +
   (tag === "<tag>" ? ` (a mais recente: ${DICA_ULTIMA_TAG})` : "") +
-  ` — e correr dali (num sandbox que so escreve no TMPDIR: clonar la e passar --fronteira-em=<pasta vazia fora do projeto e do template>)`;
+  ` — e correr dali (num sandbox que so escreve no TMPDIR: clonar em $TMPDIR/agent-template/${pasta} e passar --fronteira-em=<pasta vazia fora do projeto e do template>)`;
 };
 
 // `column.ui=never`: com colunas ligadas na config do utilizador, duas tags saiam numa so linha.

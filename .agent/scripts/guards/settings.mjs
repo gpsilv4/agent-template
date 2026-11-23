@@ -331,6 +331,10 @@ if (settingsRaw === null) {
       for (const m of registado.matchAll(/hooks\/([\w-]+\.mjs)/g)) {
         if (!hooksNoDisco.includes(m[1].replace(/\.mjs$/, ""))) {
           flag(`a chave \`hooks\` do ${SETTINGS_PATH} invoca \`${m[1]}\`, que nao existe em ${HOOKS_DIR} — hook morto`);
+        } else if (!(read(`${HOOKS_DIR}/${m[1]}`) ?? "x").trim()) {
+          // #589: ligado e VAZIO (uma copia por redireccionamento do `$TPL` com o clone apagado deixou seis). Um hook
+          // vazio sai `0`, e no Claude Code so o `2` bloqueia: a fronteira dele esta desligada, e nada o diz.
+          flag(`a chave \`hooks\` do ${SETTINGS_PATH} invoca \`${m[1]}\`, que esta VAZIO em ${HOOKS_DIR} — sai 0 e nao bloqueia nada (#589)`);
         }
       }
       hooksVistos = hooksNoDisco.length;

@@ -953,11 +953,32 @@ continua a funcionar sem os nomes, e um novo sem a lib recusa com a razao — nu
   conteudo posterior a ela (um branch fundido por squash): recusa, com as tags que o contem e a correcao (por na marca
   a tag de onde o projeto saiu). O `versao:` dessas marcas esta velho (a §4 larga-o desde o #429). Um `commit:` que
   nao existe continua no caminho de antes (o `versao:`), e a mensagem diz as duas causas: um clone raso ou um squash.
-- **Onde clonar.** Fora do `TMPDIR` (`~/.cache/agent-template/<tag>`), porque a fronteira da 2b recusa um template
-  dentro dele. Com `git clone --branch <tag> <url>`: o `origin` do clone e o URL (a marca grava-o), sem `--shared`
-  (que depende dos objetos do repo de origem, e um `gc` nele parte o clone). Num sandbox que so escreve no `TMPDIR`, a
-  segunda via: clonar la e passar sempre `--fronteira-em` a 2b. A §1 manual nao verifica o downgrade; quem o faz e a 2b,
-  tambem no modo parcial (#509: antes da recusa do modo).
+- **Onde clonar.** Fora do `TMPDIR` (`~/.cache/agent-template/<tag>-<projeto>`), porque a fronteira da 2b recusa um
+  template dentro dele. Com `git clone --branch <tag> <url>`: o `origin` do clone e o URL (a marca grava-o), sem
+  `--shared` (que depende dos objetos do repo de origem, e um `gc` nele parte o clone). Num sandbox que so escreve no
+  `TMPDIR`, a segunda via: clonar em `$TMPDIR/agent-template/<tag>-<projeto>` e passar sempre `--fronteira-em` a 2b. A
+  §1 manual nao verifica o downgrade; quem o faz e a 2b, tambem no modo parcial (#509: antes da recusa do modo). A
+  ultima tag: `git ls-remote --tags --refs --sort=-v:refname <url> 'v*'` (uma recusa sem tag tambem o imprime).
+- **Um clone POR PROJETO (#589).** Dois upgrades para a mesma tag, no mesmo dia, partilhavam `~/.cache/.../<tag>`; o
+  que acabou primeiro apagou-o (o fim do upgrade manda apagar o clone), e o outro copiou de um clone que ja nao existia
+  (derivado A). O `<projeto>` e a pasta da RAIZ do projeto (`git rev-parse --show-toplevel`), com cada caracter fora de
+  `[A-Za-z0-9._-]` a `_` (`My Project` -> `My_Project`), como a tag (#538): nunca leva um `$`, um `;` ou um espaco a
+  um comando que se copia; o marcador `<projeto>` so para um nome vazio. Caminho FIXO, e nao um `mktemp`: a sessao
+  seguinte encontra-o, e o comando que as recusas imprimem fica estavel. Fica de fora, dito: dois projetos com o MESMO
+  nome depois do filtro (`a b` e `a_b`; dois nomes nao latinos do mesmo comprimento), na mesma tag e ao mesmo tempo —
+  um hash do caminho tirava-o, mas obrigava o agente a calcular um hash para escrever um caminho. A adocao
+  (`adotar-template.mjs`, `../agent-template-<tag>`) partilha o clone entre projetos IRMAOS; nao manda apaga-lo, e fica.
+- **Nunca `cp` NEM redireccionamento do `$TPL` (#589).** `git -C "$TPL" show HEAD:f > f` e um `cp` com outro nome: a
+  shell trunca o `f` ANTES de o `git` correr, e com o clone apagado deixou seis hooks VAZIOS — e um hook vazio sai `0`,
+  e um que importe uma lib vazia sai `1`; no Claude Code so o `2` bloqueia, logo os dois desligam a fronteira calados.
+  Se for mesmo preciso escrever a partir do `$TPL` — pelo UTILIZADOR, fora do agente (o hook nega-lhe a escrita na
+  fronteira), e so se o `Edit` nao servir —, por um temporario:
+  `git -C "${TPL:?}" show "${T:?}:$f" > "$f.tmp" && cat "$f.tmp" > "$f" && rm -f "$f.tmp" || { rm -f "$f.tmp"; echo "FALHOU: $f" >&2; false; }`.
+  So escreve se o `git` sair `0`; uma falha DIZ-SE (sem o `||`, a linha saia com o `0` do `rm`, e um ficheiro em
+  falta ficava em falta calado); o `:?` para com o `$TPL` ou o `$T` vazios (um `git -C ""` lia do proprio PROJETO);
+  mantem o modo de um destino que ja existe (o `+x` do `commit-msg`) e o conteudo byte a byte. Um `.githooks/` NOVO
+  nasce sem `+x`, e o git ignora-o: `chmod +x` a seguir. A forma `c=$(git show ...) && printf '%s\n' "$c" > f` foi
+  rejeitada: muda o fim dos ficheiros, perde os NUL e recusa um vazio legitimo.
 - **A §1, o Modo B e a §4 a mao.** A §1 para sem tag com a guarda DENTRO do argumento (`"${T:?...}"`): numa shell
   interativa, um `: "${T:?}"` sozinho so abortava a sua linha, e o `git log` seguinte corria com o `T` vazio (`SHA..HEAD`,
   o diff do branch de trabalho). O Modo B corre as duas primeiras linhas da §4 ANTES de copiar (a 2b recusa-se nele, e

@@ -87,7 +87,8 @@ workflows e os pontos de entrada que o projeto ja tem seguem a tabela do §2 do 
 
 ## 3. A ordem da fronteira
 
-Cada passo e **aprovado um a um pelo utilizador**, por `Edit`/`Write` (nunca `cp` do `$TPL`), como no `upgrade.md` §2.
+Cada passo e **aprovado um a um pelo utilizador**, por `Edit`/`Write` (nunca `cp` nem redireccionamento do `$TPL`:
+`git show ... > f` e um `cp` com outro nome, e com o clone apagado deixou seis hooks VAZIOS, #589), como no `upgrade.md` §2.
 A ordem importa: um hook ja esta ligado no `settings.json` de um derivado, e um hook novo escrito antes da lib de que
 precisa rebenta no `import` e sai sem bloquear — a fronteira fica desligada em silencio ate a lib chegar. Por isso as
 libs vem antes de quem as importa, e os testes (que nao estao ligados) no fim.
