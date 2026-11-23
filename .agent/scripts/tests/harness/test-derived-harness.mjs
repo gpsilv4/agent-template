@@ -54,7 +54,7 @@ export const pacoteCi = (comandos) =>
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 export const ap = (n) => "AP" + n;
 
-export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semFase0R = null, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {}, bootstrapExtra = "" } = {}) {
+export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semFase0R = null, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {}, bootstrapExtra = "", semDocsReadme = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -70,7 +70,14 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
       (semFase0R === "secao" ? "" : `## Fase 0-R — Projeto existente\n\nLer e propor.${semFase0R === "regras" ? "" : " **So leitura.**"}\n\n`) +
       "## Fase 1\n\n- **Modo minimo**: manter so os essenciais e **remover os restantes** (`podado` — sem uso) na Fase 2.\n\n" +
       "### 2.2 Ficheiros a GERAR do zero\n\n| Ficheiro |\n|---|\n" +
-      "| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra coisa\n\nTexto.\n" + bootstrapExtra);
+      "| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra coisa\n\nTexto.\n" +
+      // O `docs/` do produto (#585): `semDocsReadme` tira a instrucao, o modelo, ou uma pasta do modelo.
+      (semDocsReadme === "instrucao" ? "" : "\n- **`docs/README.md`**: criar a partir de `src/docs/exemplos/docs-README.md`.\n") +
+      bootstrapExtra);
+  if (semDocsReadme !== "modelo") {
+    const pastas = ["product", "architecture", "development", "operations", "audits", "strategy", "legal", "reference"];
+    w("src/docs/exemplos/docs-README.md", `# Docs\n\n${pastas.filter((p) => !(semDocsReadme === "pasta" && p === "legal")).map((p) => `- \`${p}/\``).join("\n")}\n`);
+  }
 
   // O placeholder e construido, nao escrito: o bootstrap substitui placeholders tambem em
   // `.mjs`, logo um literal aqui seria reescrito num projeto derivado e a fixture deixava de
