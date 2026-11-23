@@ -216,8 +216,10 @@ export const ATRIBUICAO_BASH = /^[A-Za-z_]\w*(?:\[[^\]\s]*\])?\+?=/;
  *  `X[Y]=1` solto corre uma substituicao escondida no valor de `Y` (M3 do `/audit` da v0.63.6, medido no bash 3.2).
  *  Para quem salta palavras antes de uma allowlist: o `X[Y]=1` fica como verbo, e e julgado. O preco, aceite: um
  *  `n[$i]=v`, `X[-1]=v` ou `m[chave]=v` depois de um `cd` para a fronteira tambem fica como verbo, e e negado.
- *  Fecha so ESTA forma: o mesmo payload numa variavel lida por `${A[Y]}`, `$((Y))` ou `[[ Y -eq 0 ]]` continua fora
- *  do alcance de um hook que le texto (medido no bash 3.2): uma barreira contra o descuido, nao contra quem a contorna. */
+ *  Fecha so ESTA forma: o mesmo payload numa variavel lida num contexto aritmetico (por exemplo `${A[Y]}`, `$((Y))`,
+ *  `[[ Y -eq 0 ]]`, `read X[Y]`, `${S:Y}`) continua fora do alcance de um hook que le texto. Corre no bash (medido no
+ *  3.2.57), nao no zsh 5.9 desta maquina: um CONTORNO, registado no `ABERTO` do `tests-fronteira-inventario.mjs` (#576)
+ *  — uma barreira contra o descuido, nao contra quem a contorna. */
 export const ATRIBUICAO_BASH_LITERAL = /^[A-Za-z_]\w*(?:\[\d*\])?\+?=/;
 /** O nome de uma atribuicao, ou de um argumento de `export`/`declare`: `PATH[0]+=x` da `PATH`, `NODE_OPTIONS+` da
  *  `NODE_OPTIONS`. Uma palavra sem essa forma fica como esta. */

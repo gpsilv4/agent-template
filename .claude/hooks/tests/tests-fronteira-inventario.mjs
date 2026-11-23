@@ -190,6 +190,15 @@ const ABERTO = [
   ["CONTORNO", "opcao abreviada a duas letras (`--ex`)", `git rebase --ex 'rm -rf ${H}' HEAD~1`],
   // Da 5.a leitura: o nome partido por aspas, num git aninhado — a classe de `D=.cla; ${D}ude`.
   ["CONTORNO", "nome da pasta partido por aspas num git aninhado", `git rebase -x "git -c alias.y='!rm -rf .cl\\"\\"aude/hooks' y" HEAD~1`],
+  // #576 (o Medio 1 do leitor do fecho do `/audit` da v0.63.6): um payload aritmetico guardado ENTRE PLICAS numa variavel
+  // corre quando o bash le a variavel num contexto aritmetico — e o hook le texto, e as plicas sao texto. Medido a 23 nov
+  // (payload `touch`): o bash 3.2.57 corre estas sete (o bash 5 nao foi medido); o zsh 5.9, a shell do Bash DESTA maquina,
+  // nenhuma — num projeto com bash, estao vivas. Fecha-lo era M-L (marcador a atribuicao com `$(`/crase entre plicas num
+  // comando com `cd` para a fronteira, ~1 dia, `fronteira.mjs` no limite) e ficava aberto noutras leituras: registado.
+  // O `X[Y]=1` solto fechou no M3; o `let`/`declare -i`/`((..))`/`: $((Y))` negam so pelo verbo (`tests-atribuicoes.mjs`).
+  ...["echo ${A[Y]}", "X=${A[Y]}", "[[ Y -eq 0 ]]", "read X[Y] </dev/null", "echo $((Y))", "echo ${S:Y}", "echo $[Y]"].map((f) =>
+    ["CONTORNO", `payload aritmetico entre plicas, depois de um \`cd\`: \`${f}\` (#576)`, `Y='a[$(rm -rf x)]'; cd .claude/hooks && ${f}`]),
+  ["CONTORNO", "payload aritmetico entre plicas que nomeia a fronteira, sem `cd` (#576)", "Y='a[$(rm -rf .claude/hooks/x)]'; echo ${A[Y]}"],
 ];
 
 /**
