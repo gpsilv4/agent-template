@@ -274,18 +274,54 @@ export function normalizaCaminhos(visivel, ctx = {}) {
  *  Os heredocs saem primeiro: o texto deles pode ter apostrofos soltos. O delimitador pode ser
  *  `\EOF` (literal, como `'EOF'`) ou ter `.`/`-` (`'END-X'`), e um que nao casava deixava o corpo
  *  inteiro a ser lido como comando — e um apostrofo la dentro desemparelhava tudo o que vinha
- *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (salvo um caminho sozinho). */
-export const semCitacoes = (t) =>
-  desaspa(semCorposDeHeredoc(t)).replace(/`(?:[^`\\]|\\.)*`/g, (m) => executados(m).map((x) => ` $(${desaspa(x)}) `).join("") || ' "" ');
+ *  depois. Uma crase fora de aspas e um `$(...)`, e julga-se como tal (tambem um caminho sozinho, #568). */
+export const semCitacoes = (t) => {
+  // As crases sao lidas DENTRO do `desaspa`, cada uma no seu contexto e uma so vez (#568). O que um heredoc sem aspas
+  // executa fica de parte (um marcador) e le-se depois, tambem uma so vez: lido pelas aspas de fora, `` `a'` ``
+  // escondia o resto do comando, e lido duas vezes, `$(echo "x"#; rm <f>)` perdia o `rm` para um comentario.
+  const interiores = [];
+  const base = desaspa(semCorposDeHeredoc(t, (x) => `\u0001${interiores.push(x) - 1}\u0001`));
+  const lidos = new Set();
+  const texto = base.replace(/\u0001(\d+)\u0001/g, (m, i) => (interiores[+i] === undefined ? m : (lidos.add(+i), semCitacoes(interiores[+i]))));
+  // Um marcador que o `desaspa` engoliu (a linha do `<<` abre aspas: `cat <<EOF "`) julga-se no fim: falha fechado.
+  return texto + interiores.map((x, i) => (lidos.has(i) ? "" : `\n(${semCitacoes(x)})`)).join("");
+};
 
 /** So os HEREDOCS do `semCitacoes`: cada um vira ` <<HEREDOC <resto da linha>` (e o que o shell executa no
  *  corpo, se a etiqueta nao tem aspas); as aspas ficam. E o texto que as verificacoes sobre o comando CRU
- *  leem (#317): o corpo de uma mensagem que cite `git -c core.pager=...` ou `eval` nao e um comando. */
-export const semCorposDeHeredoc = (t) =>
-  // Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
-  // nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
-  t.replace(/(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm, (_m, esc, aspa, _tag, linha, corpo) =>
-    ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${x})`).join("")}`);
+ *  leem (#317): o corpo de uma mensagem que cite `git -c core.pager=...` ou `eval` nao e um comando.
+ *  `embrulha` e do `semCitacoes`: os outros leem o interior cru. */
+export const semCorposDeHeredoc = (t, embrulha = (x) => x) =>
+  t.replace(HEREDOC, (_m, esc, aspa, _tag, linha, corpo) =>
+    ` <<HEREDOC ${linha}${esc || aspa ? "" : executados(corpo).map((x) => `\n(${embrulha(x)})`).join("")}`);
+
+// Sem `$`, `=`, chavetas nem crase no delimitador, e nunca um `<<<`: `$((1<<$n))` e `cat <<<$x`
+// nao sao heredocs, e lidos como tal engoliam as linhas seguintes (leitura do c4c0de7).
+const HEREDOC = /(?<!<)<<-?[\t ]*(\\?)(['"]?)([^\s'"<>;&|()$={}`]+)\2([^\n]*)\n([\s\S]*?)^[\t ]*\3[\t ]*$/gm;
+
+/** Ha uma crase que o shell EXECUTA (#568): fora de plicas, de `$'...'`, de um comentario e de um heredoc citado. So
+ *  decide a MENSAGEM (a `NOTA_CRASE` do `razaoDe`), nunca o veredicto — um `<<'EOF'` com template literals nao a leva. */
+export function executaCrase(t) {
+  // Nunca lanca: corre FORA do `try` do `porqueAltera`, e um erro aqui fazia o hook sair 0 — deixava o que tinha negado.
+  try { return executaCraseOuLanca(t); } catch { return false; }
+}
+
+function executaCraseOuLanca(t) {
+  const crua = (s) => { for (let k = 0; k < s.length; k++) if (s[k] === "\\") k++; else if (s[k] === "`") return true; return false; };
+  let noCorpo = false;
+  const s = t.replace(HEREDOC, (_m, esc, aspa, _tag, linha, corpo) => ((noCorpo ||= !esc && !aspa && crua(corpo)), ` ${linha}`));
+  if (noCorpo) return true;
+  for (let k = 0; k < s.length; k++) {
+    const c = s[k];
+    if (c === "\\") k++;
+    else if (c === "`") return true;
+    else if (c === "#" && (k === 0 || /[\s;&|(]/.test(s[k - 1]))) while (k < s.length && s[k] !== "\n") k++;
+    else if (c === "$" && s[k + 1] === "'") for (k += 2; k < s.length && s[k] !== "'"; k += s[k] === "\\" ? 2 : 1);
+    else if (c === "'") k = s.indexOf("'", k + 1) < 0 ? s.length : s.indexOf("'", k + 1);
+    else if (c === '"') { const fim = fimAspasDuplas(s, k); if (crua(s.slice(k + 1, fim))) return true; k = fim; }
+  }
+  return false;
+}
 
 /** O indice do `)` que fecha o `$(` em `s[k]`, a ler as aspas de DENTRO como o shell: dentro de um
  *  `$(...)` abre-se um contexto novo, e `"$(echo ")"; rm <f>)"` nao fecha no `)` citado. */
@@ -299,6 +335,8 @@ export function fimSubst(s, k) {
     else if (c === "'") j = s.indexOf("'", j + 1) < 0 ? s.length : s.indexOf("'", j + 1);
     else if (c === '"') j = fimAspasDuplas(s, j);
     else if (c === "$" && s[j + 1] === "(") j = fimSubst(s, j);
+    // NAO salta crases nem comentarios (#568): sem saber dos comentarios, uma crase comentada (`$(true # `⏎)`) emparelhava
+    // com uma la a frente e escondia o `rm`. O `$(echo `echo )`)` fica com o leitor de shell (issue proprio).
     else if (c === "(") fundo++;
     else if (c === ")" && fundo-- === 0) return j;
   }
@@ -312,13 +350,24 @@ export function fimAspasDuplas(s, k) {
     if (s[j] === "\\") j++;
     else if (s[j] === '"') return j;
     else if (s[j] === "$" && s[j + 1] === "(") j = fimSubst(s, j);
-    else if (s[j] === "`") j = s.indexOf("`", j + 1) < 0 ? s.length : s.indexOf("`", j + 1);
+    else if (s[j] === "`") j = fechaCrase(s, j);
   }
   return s.length;
 }
 
-/** O que o shell EXECUTA dentro de um texto: os `$(...)` e as crases, sem os escapados (#229). Uma
- *  crase que e so um CAMINHO (o markdown de uma mensagem de commit) nao e comando, e fica de fora.
+/** O fim de uma crase FECHADA, ou `k` (so o caracter) se nao fecha: para quem delimita, nunca engolir o resto (#568). */
+const fechaCrase = (s, k) => (fimCrase(s, k) < s.length ? fimCrase(s, k) : k);
+
+/** O indice da crase que fecha a que esta em `s[k]`, saltando as escapadas (`` \` `` e uma crase ANINHADA): o UNICO
+ *  leitor de crases (#568). Com um `indexOf`, `"`echo \`true\``"; rm <f>` fechava na escapada e o `rm` sumia. */
+export function fimCrase(s, k) {
+  let j = k + 1;
+  while (j < s.length && s[j] !== "`") j += s[j] === "\\" ? 2 : 1;
+  return Math.min(j, s.length);
+}
+
+/** O que o shell EXECUTA dentro de um texto: os `$(...)` e as crases, sem os escapados (#229). Tambem a
+ *  crase que e so um CAMINHO (o markdown de uma mensagem de commit): o shell corre-a (#568).
  *
  *  Devolve a LISTA dos interiores. Os de texto citado (aspas duplas, heredoc sem aspas) saem em
  *  linhas proprias e julgam-se como comando seu — o `rm` de `gh ... --body "$(rm <f>)"` nega, mas o
@@ -333,10 +382,10 @@ function executados(s) {
       fora.push(s.slice(k + 2, fim));
       k = fim;
     } else if (s[k] === "`") {
-      let j = k + 1;
-      while (j < s.length && s[j] !== "`") j += s[j] === "\\" ? 2 : 1;
-      const dentro = s.slice(k + 1, j).trim();
-      if (!/^[^\s;&|<>`$()]+$/.test(dentro)) fora.push(dentro);
+      const j = fimCrase(s, k);
+      // Sem isencao para "um caminho sozinho" (#568): o shell corre-o, e `` cd <fronteira> && true `/tmp/w` `` passava.
+      // Dentro de uma crase, `` \` `` e uma crase ANINHADA, e o shell corre-a: desescapar para a de dentro ser lida (#568).
+      fora.push(s.slice(k + 1, j).trim().replace(/\\([`\\$])/g, "$1"));
       k = j;
     }
   }
@@ -383,6 +432,16 @@ function desaspa(t) {
       while (j < t.length && t[j] !== "'") j += t[j] === "\\" ? 2 : 1;
       out += ' "" ';
       visto('""');
+      k = j + 1;
+      continue;
+    }
+    // Uma crase FORA de aspas e um `$(...)` com contexto proprio (#568): o de dentro le-se pelas SUAS aspas, numa so
+    // passagem. Lido pelas de fora, `` `echo "x"#; rm <f>` `` perdia o `rm` para um comentario.
+    if (c === "`" && fechaCrase(t, k) > k) {
+      const j = fimCrase(t, k);
+      const sub = executados(t.slice(k, j + 1)).map((x) => ` $(${semCitacoes(x)}) `).join("");
+      out += sub;
+      visto(sub);
       k = j + 1;
       continue;
     }

@@ -251,6 +251,8 @@ const FECHADO_PELO_CAMINHO = [
   // Do leitor independente do #185 — o mais grave ja passava ANTES: a pasta sem a barra final.
   ["apagar a pasta inteira", "rm -rf .claude/hooks", {}, "verbo-nao-e-leitura:rm"],
   ["apagar o `.githooks`", "rm -rf .githooks", {}, "verbo-nao-e-leitura:rm"],
+  // #568: era um controlo. A crase em aspas duplas EXECUTA, tambem com um caminho sozinho — o shell corre-o.
+  ["crase em aspas duplas a citar um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\"", CTX, "verbo-nao-e-leitura:hooks"],
   ["mover a pasta", "mv .claude/hooks /tmp/h", {}, "verbo-nao-e-leitura:mv"],
   // O texto CITADO nao passa pela normalizacao: aqui so o regex com a pasta sem barra o apanha.
   ["apagar a pasta, citado e executado", `eval "rm -rf .claude/hooks"`, {}, "citado-mas-executado"],
@@ -414,7 +416,6 @@ const CONTROLO_CAMINHO = [
   // Da quarta leitura: tres leituras comuns que a terceira correccao passou a negar.
   ["`cd` com `2>/dev/null` e LER", "cd .claude/hooks 2>/dev/null && cat fronteira.mjs", CTX],
   ["`pushd`/`popd` em silencio e LER", "pushd .claude/hooks > /dev/null && ls; popd > /dev/null", CTX],
-  ["crase em aspas duplas a citar um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\"", CTX],
   ["`then` como argumento", "grep -r then .claude/hooks", CTX],
 ];
 

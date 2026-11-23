@@ -113,7 +113,7 @@ const EXECUTADO_EM_TEXTO = [
   ["crase entre aspas duplas", "echo \"x `rm -rf .claude/hooks` y\""],
   ["relativo dentro da crase, depois de um `cd`", "cd .claude 2>/dev/null; echo `rm settings.json`"],
   ["crase num verbo sem marcador, depois de um `cd`", "cd .githooks && true `cp /tmp/evil pre-commit`"],
-  // Da quinta leitura do #185: a isencao da crase so vale para UM caminho sozinho.
+  // Da quinta leitura do #185: um caminho e mais um comando na crase. (A isencao do caminho sozinho saiu no #568.)
   ...[
     "echo `.claude/hooks/x.mjs; rm -rf .claude/hooks`",
     "`.githooks/x && rm .githooks/y`",
@@ -208,13 +208,12 @@ const PERMITIDAS = [
   ["um `rm` no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com rm -rf .claude/hooks\nEOF"],
   // Um glob que nao pode casar nenhum nome da fronteira nao e a pasta-mae.
   ["glob de extensao na pasta-mae", "cp .claude/*.md /tmp/ && rm .claude/*.bak"],
-  // #229: o que nao EXECUTA continua texto — aspas simples, heredocs com aspas, escapes, e uma crase
-  // que e so um caminho.
+  // #229: o que nao EXECUTA continua texto — aspas simples, heredocs com aspas, escapes. Uma crase que
+  // e so um caminho, entre aspas duplas, deixou de o ser: o shell corre-a (#568, `tests-fronteira-crase.mjs`).
   ["`$(...)` entre aspas simples", "echo 'a $(rm .claude/hooks/x)'"],
   ["`$(...)` num heredoc com aspas", "cat <<'EOF'\n$(rm .claude/settings.json)\nEOF"],
   ["crase no corpo de uma mensagem por heredoc", "git commit -F- <<'EOF'\nmsg com `rm -rf .claude/hooks`\nEOF"],
   ["`\\$(` escapado em aspas duplas", `echo "\\$(rm .claude/settings.json)"`],
-  ["crase que e so um caminho", "git commit -m \"fix: o `.claude/hooks` agora nega\""],
   ["`$(date)` em aspas duplas, a ler da fronteira", `cat .claude/hooks/x | grep "$(date)"`],
   // O que corre dentro de aspas e julgado A PARTE: o verbo de fora, que so recebe o texto, nao e
   // julgado por uma leitura la dentro (leitura do 193a9a9 — era o passo de publicar a suite).
