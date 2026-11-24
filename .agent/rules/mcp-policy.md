@@ -1,8 +1,9 @@
 # Politica de servidores MCP ({{PROJECT_NAME}})
 
 > **Rule de REFERENCIA — nao carregada.** Abrir ao avaliar, acrescentar ou remover um servidor
-> MCP. O gancho no contexto sempre-carregado e uma so linha, nas Fronteiras: *acrescentar um
-> servidor MCP e "perguntar primeiro"*.
+> MCP, ou ao ESCREVER o servidor MCP do projeto (os dois lados vivem aqui; o que e proprio da IA
+> no produto esta em `.agent/rules/ai-features.md`). O gancho no contexto sempre-carregado e uma
+> so linha, nas Fronteiras: *acrescentar um servidor MCP e "perguntar primeiro"*.
 >
 > Vale para **todos os agentes**: Claude Code (`.mcp.json`), Gemini CLI, Cursor, Windsurf,
 > Codex, VS Code. A configuracao e por ferramenta; a regra e uma so, e vive aqui.
@@ -56,6 +57,30 @@ Perguntar ao utilizador (Fronteira: "perguntar primeiro"), e responder a estas p
 - **Ambitos por ferramenta**: no Claude Code, `.mcp.json` no repo e partilhado com quem clona —
   o que e conveniente e perigoso ao mesmo tempo. Um servidor que so *tu* queres vai na config
   de utilizador, nao no repo.
+
+## Escrever o servidor MCP do projeto
+
+O outro lado: o projeto EXPOE os seus dados a um assistente. Configurar esse servidor num
+`.mcp.json` para o agente de codigo o usar continua a ser consumo (a linha em *Servidores
+aprovados*, Guard 16).
+
+- **So leitura por omissao**, e as ferramentas que o token nao pode usar nem aparecem na lista.
+- **As escritas pela API, com salvaguardas:** primeiro um `dry_run`; a revisao esperada (para nao
+  reescrever o que o utilizador nao viu); confirmacao explicita para apagar; um limite por hora;
+  idempotencia.
+- **Tokens com ambito**, revogaveis, mostrados uma so vez, so por https; no remoto, OAuth com PKCE
+  e a origem verificada.
+- Anotacoes `readOnlyHint`/`destructiveHint`; descricoes que desambiguam ferramentas parecidas.
+- Validar as entradas; nada de segredos nas respostas; o texto do utilizador marcado como DADO.
+- **O papel, nos dados pessoais** (a `privacy.md`): o utilizador que liga o assistente que ELE escolheu
+  aos SEUS dados e uma transmissao a pedido dele — o projeto responde pela autenticacao, pelo ambito e pela
+  seguranca, nao pelo destino; no inventario, o Destino "assistente escolhido pelo titular" e o Papel
+  "destinatario escolhido pelo titular (responsavel proprio; nao e subcontratante)". Dados de
+  TERCEIROS expostos pelas ferramentas sao uma comunicacao que a base e o art. 14 tem de cobrir,
+  senao ficam fora das ferramentas — **PARAR**. Se o projeto pre-configura, promove ou escolhe o
+  assistente, o destino passa a ser escolha do projeto: um subcontratante ou um destinatario do
+  inventario. Numa app B2B, quem decide e o cliente (a 4.a
+  pergunta da `privacy.md`).
 
 ## Converter um documento sem servidor permanente
 

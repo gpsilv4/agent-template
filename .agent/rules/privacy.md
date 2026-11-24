@@ -8,8 +8,8 @@
 > autoridade. Isto e um ponto de partida, e **NAO e aconselhamento juridico**: o agente PROPOE, o responsavel DECIDE,
 > e nos casos marcados **PARAR** pede-se um jurista antes de escrever codigo.
 >
-> O que e proprio da IA (o prompt, a injecao, o custo, as decisoes automatizadas) tem a sua regra (#494). Aqui, um
-> fornecedor de IA e mais um DESTINO do inventario.
+> O que e proprio da IA (o prompt, a injecao, o custo, as decisoes automatizadas) tem a sua regra:
+> `.agent/rules/ai-features.md`. Aqui, um fornecedor de IA e mais um DESTINO do inventario.
 
 ## As 4 perguntas (o BOOTSTRAP, a Fase 0-R e o `/upgrade` apontam para aqui)
 
@@ -17,7 +17,8 @@
    movimentos bancarios, um documento) **ou de quem NAO a usa** (jogadores observados, arbitros avaliados, os
    contactos num documento)? **Sim** liga o nivel COMPLETO.
 2. **Inclui categorias especiais** (art. 9), **condenacoes penais** (art. 10) **ou dados de MENORES**?
-3. **Envia dados a terceiros?** Quais (alojamento, base de dados, email, analytics, IA, um CDN), e em que pais?
+3. **Envia dados a terceiros?** Quais (alojamento, base de dados, email, analytics, IA, um CDN), e em que pais? Um
+   fornecedor de IA abre tambem a `ai-features.md`.
 4. **Quem decide para que servem os dados: o projeto, ou o CLIENTE que o usa?** Numa app B2B (scouting para um clube,
    avaliacao para uma empresa), quem decide e o cliente: o projeto e SUBCONTRATANTE dele — **PARAR**: um contrato do
    art. 28 com o cliente, o registo do art. 30(2), e a base legal e o art. 14 passam a ser do cliente.
@@ -81,9 +82,11 @@ representante na UE (art. 27).
   grande escala). **O DPO (art. 37):** se a atividade principal for vigiar pessoas de forma regular e sistematica em
   grande escala, ou tratar categorias especiais ou dados do art. 10 em grande escala, ou se for um organismo
   publico. O agente PROPOE se se aplicam; com um criterio presente, **PARAR**.
-- **Decisoes automatizadas com efeitos significativos** sobre pessoas (art. 22: pontuar, selecionar, recusar):
-  **PARAR** — intervencao humana, contestacao e explicacao; e a regra de IA (#494), que trata o AI Act (avaliar
-  candidatos, alunos ou credito com IA e alto risco, Anexo III).
+- **Decisoes automatizadas com efeitos significativos** sobre pessoas (art. 22): **PARAR** quando a saida decide, ou
+  pontua de forma determinante para quem decide, sem revisao humana real — intervencao humana, o ponto de vista e a
+  contestacao (22(3)), e a logica explicada (arts. 13-15, nao o 22(3)); e a `ai-features.md`, que trata o AI Act
+  (avaliar no emprego, incluindo o desempenho, alunos em instituicoes de ensino, ou o credito pode ser alto risco, Anexo
+  III).
 - **As transferencias para fora do EEE:** uma decisao de adequacao (o DPF so para os EUA, com o fornecedor
   certificado — verificar o estado: esta sob recurso e pode cair como o Privacy Shield), as clausulas-tipo com uma avaliacao do impacto da transferencia,
   as BCR, ou uma derrogacao do art. 49.

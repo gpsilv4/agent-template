@@ -108,6 +108,7 @@ const FIXTURE_PATHS = [
   "src/docs/scripts-guide-why.md",
   "src/docs/review-why.md",
   "src/docs/privacy-why.md",
+  "src/docs/ai-features-why.md",
 ];
 
 /** As sandboxes ainda por apagar, apagadas no `exit` (#157). O fail-fast sai no primeiro `FAIL`

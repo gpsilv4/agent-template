@@ -185,8 +185,9 @@ not to* line, so every agent sees it.
 │   ├── propagation.md          <- Propagation matrix: what to replicate per new file (NOT loaded)
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
 │   ├── backlog-method.md       <- Step-by-step backlog procedure (NOT loaded; on-demand)
-│   ├── mcp-policy.md           <- When an MCP server is worth it, and what it may not hold (NOT loaded)
+│   ├── mcp-policy.md           <- When an MCP server is worth it, what it may not hold, and how to write the project's own (NOT loaded)
 │   ├── privacy.md              <- Privacy by design: the base level for all, the full one with personal data (NOT loaded, #495)
+│   ├── ai-features.md          <- AI in the product: when to STOP, what goes to the model, its output as data (NOT loaded, #494)
 │   ├── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
 │   └── hooks-guide.md          <- What each hook does, and why it can't be prose (NOT loaded)
 ├── context/
@@ -467,6 +468,7 @@ src/docs/
 ├── agent-guide.md              <- Guide for .agent/ and .github/
 ├── ticket-method-why.md        <- Where each rule came from, what it costs, what was measured
 ├── privacy-why.md              <- Why the privacy rule is so: the legal bases, art. 9(2), non-users, DPIA (#495)
+├── ai-features-why.md          <- Why the AI rule is so: art. 22, the AI Act's high risk and art. 50, the sources (#494)
 ├── anti-patterns-why.md        <- Evidence behind each anti-pattern: what it cost, how it was caught
 ├── scripts-guide-why.md        <- Why each checker is shaped the way it is
 ├── sync-docs-why.md            <- Why the pre-commit checklist has the points it has

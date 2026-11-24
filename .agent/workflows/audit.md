@@ -30,7 +30,7 @@ Health-check **holistico** do {{PROJECT_NAME}}: correr a qualquer momento para v
 No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequencial.
 
 > **Que lentes vao para o subagente.** O `code-reviewer` **le codigo** — serve as lentes 1, 3,
-> 8 e a parte de leitura da 4. As lentes que exigem **correr** coisas (2: `npm run build`/estado
+> 8, 10, 11 e a parte de leitura da 4. As lentes que exigem **correr** coisas (2: `npm run build`/estado
 > do CI; 5: bundle checker; gitleaks na 4) ficam no agente principal, que ja as corre no passo 1.
 > Pedir a um subagente uma lente que ele nao consegue executar produz "nao verificado" silencioso
 > ou alucinacao. Confirmar tambem que ferramentas o subagente tem **de facto** — o campo `tools:`
@@ -46,6 +46,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 8. **Documentacao & Consistencia** (dono do doc-drift) — README/docs refletem o real? CHANGELOG atualizado? Termos obsoletos/drift (doc-guards).
 9. **Dependencias** (frescura/licenca/nao-usadas) — desatualizadas (major atras), nao usadas, duplicadas, licencas problematicas, abandonadas.
 10. **Privacidade** (so no nivel completo da `.agent/rules/privacy.md`, #495) — o inventario (`docs/legal/privacy-inventory.md`) contra o codigo: o que guarda, o que envia e a quem (um destino no codigo que nao esta no inventario e um achado); a retencao aplicada onde o inventario diz; os logs sem dados pessoais em claro; o apagamento a cobrir todas as copias. Le codigo: serve ao `code-reviewer`.
+11. **IA no produto** (so com uma chamada a um modelo no codigo; `.agent/rules/ai-features.md`) — a rule contra o codigo, como a lente 10 com o inventario: a lista fechada de campos e o teste de fuga (§4), o validador e a lista fechada de acoes (§7), o modelo fixado (§9), os tectos (§10), o interruptor e o "desligado" (§11). Le codigo: serve ao `code-reviewer`.
 
 > \*Lentes marcadas com `*` (Performance CWV, UX/a11y) precisam de **app a correr / medicoes** para serem reais — sem isso, limitar a riscos ao nivel do codigo e dize-lo explicitamente.
 

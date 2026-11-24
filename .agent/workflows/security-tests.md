@@ -1,6 +1,6 @@
 # /security-tests — Testes de Seguranca
 
-> **Quando usar:** ao acrescentar uma rota, um formulario, um header, uma tabela ou uma dependencia, e antes de uma release que os traz · **Quando NAO usar:** alteracao so visual, sem rotas nem inputs novos (#246).
+> **Quando usar:** ao acrescentar uma rota, um formulario, um header, uma tabela, uma dependencia ou uma chamada a um modelo, e antes de uma release que os traz · **Quando NAO usar:** alteracao so visual, sem rotas nem inputs novos (#246).
 
 Levar a suite de seguranca a um **veredicto**, e manter honesta a lista do que ela cobre.
 Valida headers HTTP, flags de cookies, XSS/injection, bypass de autenticacao e isolamento de
@@ -8,8 +8,8 @@ dados.
 
 ## 0. Entrada e saida
 
-**Corre quando**: acrescentaste uma rota, um formulario, um header, uma tabela ou uma
-dependencia; e antes de uma release que acrescentou algum deles (a suite em si corre em todas, no `/deploy` §6).
+**Corre quando**: acrescentaste uma rota, um formulario, um header, uma tabela, uma
+dependencia ou uma chamada a um modelo; e antes de uma release que acrescentou algum deles (a suite em si corre em todas, no `/deploy` §6).
 
 **Esta feito quando** as quatro forem verdade:
 
@@ -97,6 +97,12 @@ npm run test:all
 - Utilizadores diferentes tem sessoes isoladas
 - API sem autenticacao retorna dados vazios (politicas de seguranca ativas)
 
+### 3.11 Injecao de prompt (so com texto do utilizador enviado a um modelo)
+- O fornecedor FALSO (`.agent/rules/ai-features.md` §8 e §12) devolve uma saida como se a injecao tivesse resultado —
+  uma acao fora da lista fechada — e nada se aplica: o validador rejeita-a
+- O mesmo com um link ou uma imagem de URL externo na saida: nao se renderiza (exfiltracao por markdown)
+- Controlo: com o validador desligado, o mesmo teste reprova
+
 ## 4. Auditoria de Dependencias
 
 ```bash
@@ -153,6 +159,7 @@ Cuidados medidos no codigo do Strix (v1.7.0, #267) — confirmar na versao que i
 - Novas API routes -> adicionar teste de auth bypass
 - Novas tabelas -> verificar isolamento de dados
 - Novas dependencias -> correr `npm run test:audit`
+- Nova chamada a um modelo com texto do utilizador -> adicionar o caso hostil da 3.11
 
 ## 7. Output
 
