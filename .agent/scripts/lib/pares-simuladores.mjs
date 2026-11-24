@@ -37,6 +37,14 @@ export const PARES_DOS_SIMULADORES = [
     neutro: "(() => {})(",
   },
   {
+    // Os passos de DOCS do bootstrap (#585, #495), extraidos do simulador pela mesma razao que o de cima. A suite e a
+    // do simulador: e ela que monta um BOOTSTRAP sem o passo, sem o modelo ou sem uma pasta, e afirma o `fatal`.
+    alvo: ".agent/scripts/lib/derivado-docs.mjs",
+    suite: ".agent/scripts/tests/test-simulate-derived.mjs",
+    sinal: /(?<![\w.$])fatal\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // O simulador do OUTRO caminho: o `/upgrade`. Mesma razao que o de cima, e a mesma forma
     // de recusa (`fatal()`), porque o veredicto dele tambem e o exit code das suites que
     // orquestra. Um simulador que falhe ABERTO da por verificada metade do produto. O `warn(`

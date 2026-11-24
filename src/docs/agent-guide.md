@@ -81,6 +81,7 @@ As regras sao diretivas que o Agente consulta antes de cada acao.
 - **propagation.md**: A matriz de **o que replicar ao criar um ficheiro novo** (workflow, rule, script, hook, servidor MCP) — **nao carregada**, aberta ao criar. Par do `sync-docs.md`: um consulta-se ao criar, o outro ao fechar.
 - **backlog-method.md**: o procedimento passo-a-passo do backlog (concluir, cancelar, abrir e fechar sprint) — **nao carregada**. Saiu do `process-rules.md`, onde eram 44% de um ficheiro pago a cada sessao.
 - **mcp-policy.md**: Criterios para aceitar um servidor MCP, e a tabela de aprovados que o Guard 16 verifica — **nao carregada**, aberta ao avaliar um servidor.
+- **privacy.md**: Privacidade por desenho — o nivel base para todos, o completo com dados de pessoas (as 4 perguntas, o inventario em `docs/legal/`), e o Guard 24 que lembra um SDK de analytics — **nao carregada**, aberta ao tocar em dados de pessoas (#495).
 - **ticket-method.md** (instrucoes; o **porque** e as medicoes estao em `src/docs/ticket-method-why.md`, leitura de humano uma vez): As 6 fases por ticket, 0 a 5 (explicar e esperar -> desenvolver com controlo negativo -> loop da maquina -> loop do julgamento por angulos -> leitor independente -> relatorio) e a escala `S`/`M`/`L` — **nao carregada**, aberta ao iniciar um ticket `M` ou `L`. O ponteiro obrigatorio esta em `process-rules.md`.
 
 ---

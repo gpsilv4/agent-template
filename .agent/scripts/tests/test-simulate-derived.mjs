@@ -22,6 +22,7 @@ import { execFileSync } from "child_process";
 import { rmSync, existsSync, readFileSync } from "fs";
 import { aplica } from "../lib/patch.mjs";
 import { COMANDOS, ap, fixture, pacoteCi } from "./harness/test-derived-harness.mjs";
+import { casosDosDocs } from "./harness/casos-derivado-docs.mjs";
 import { join } from "path";
 
 let passed = 0;
@@ -61,7 +62,7 @@ function test(nome, opcoes, expect) {
         cwd: dir,
         // Hermetica (#537): as variaveis do simulador saem do ambiente herdado — um `SIMULATE_PRIVADO=1` exportado na
         // shell punha todos os casos sem a ordem do BOOTSTRAP a reprovar. So os do proprio caso entram.
-        env: { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^SIMULATE_(?:PRIVADO|SKIPS)$/.test(k))), ...(expect.env ?? {}) },
+        env: { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^SIMULATE_(?:PRIVADO|SKIPS|PRIVACIDADE)$/.test(k))), ...(expect.env ?? {}) },
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
       });
@@ -174,21 +175,8 @@ test("BOOTSTRAP sem a seccao 2.2 reprova, em vez de gerar nada em silencio", { b
 
 // O caminho do projeto existente (#288): a seccao e a instrucao de arranque que la leva.
 test("BOOTSTRAP sem a Fase 0-R reprova", { semFase0R: "secao" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
-// O `docs/` do produto (#585): o simulador cria o `docs/README.md` porque o TEXTO do BOOTSTRAP o manda. A ausencia
-// reprova — um `ok` calado deixava o critério nunca ficar vermelho (a 2.a leitura do plan-auditor do #585).
-// Cada caso afirma a SUA mensagem: as tres citam o `docs/README.md`, e trocar os ramos tem de ficar vermelho.
-test("BOOTSTRAP sem o passo do docs/README.md reprova (#585)", { semDocsReadme: "instrucao" }, { code: 1, includes: ["deixou de mandar"] });
-// O caminho do modelo CITADO noutro sitio do BOOTSTRAP nao conta como o passo (o leitor do #585).
-test("o caminho do modelo citado fora do passo nao conta como o passo (#585)", { semDocsReadme: "instrucao", bootstrapExtra: "\nTraduzir tambem o `src/docs/exemplos/docs-README.md`.\n" }, { code: 1, includes: ["deixou de mandar"] });
-test("o modelo do docs/README.md em falta reprova (#585)", { semDocsReadme: "modelo" }, { code: 1, includes: ["nao existe"] });
-test("o modelo do docs/README.md sem uma das 8 pastas reprova (#585)", { semDocsReadme: "pasta" }, { code: 1, includes: ["legal/"] });
-test("o derivado tem o docs/README.md criado do modelo (#585)", {}, {
-  code: 0,
-  args: ["--keep"],
-  // Byte a byte com o modelo da propria copia: o passo COPIA o modelo, e nao escreve outra coisa com `legal/` (o leitor).
-  copia: (c) => (existsSync(join(c, "docs/README.md")) && readFileSync(join(c, "docs/README.md"), "utf8") === readFileSync(join(c, "src/docs/exemplos/docs-README.md"), "utf8")
-    ? [] : ["a copia nao tem o docs/README.md igual ao modelo"]),
-});
+// Os passos de DOCS do bootstrap (`lib/derivado-docs.mjs`, #585 e #495): os casos vivem em `harness/casos-derivado-docs.mjs`.
+casosDosDocs(test);
 test("BOOTSTRAP sem a instrucao que leva a Fase 0-R reprova", { semFase0R: "instrucao" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
 test("BOOTSTRAP com a Fase 0-R sem a regra \"So leitura\" reprova", { semFase0R: "regras" }, { code: 1, includes: ["perdeu a Fase 0-R"] });
 

@@ -20,7 +20,7 @@ import { semHtml } from "./anti-patterns.mjs";
 // raiz a qualquer chamador posterior, em silencio, se um dia dois entry points com raizes
 // diferentes chamarem estas funcoes no mesmo processo.
 const pkgRawMemo = new Map();
-function pkgRawOnce(read) {
+export function pkgRawOnce(read) {
   if (!pkgRawMemo.has(read)) pkgRawMemo.set(read, read("package.json"));
   return pkgRawMemo.get(read);
 }

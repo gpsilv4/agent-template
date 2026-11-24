@@ -77,6 +77,7 @@ codigo responde:
 | 14. Items iniciais de backlog | `TODO`/`FIXME` (`ficheiro:linha`), ficheiros > 500 linhas, areas sem testes |
 | 15. CI/CD | o CI que ja existe |
 | 18. Copyright holder | o `LICENSE` |
+| Privacidade (as 4 perguntas, #495) | o que o codigo GUARDA (o esquema da BD, os modelos), o que ENVIA e a quem (os SDKs do manifesto, os `fetch` para fora, os embeds) — propostas, nunca decididas |
 | Versao do Node (§2.7) | `.nvmrc` ou `engines` |
 
 As restantes (descricao, dominio, lingua da UI, email de seguranca, tier de qualidade, ...) nao
@@ -283,6 +284,15 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 7. **Hosting/Deploy** (ex: "Vercel", "Netlify", "AWS Amplify", "Docker + VPS")
    → Substitui `{{HOSTING}}`
 
+### Privacidade (obrigatoria — #495)
+
+As **4 perguntas** da `.agent/rules/privacy.md` (secao "As 4 perguntas": dados de pessoas, utilizadores ou nao;
+categorias especiais, condenacoes ou menores; destinos e paises; quem decide as finalidades — o projeto ou o cliente).
+Vivem la, e nao aqui, para o `/upgrade` e o gatilho do `/review` usarem a mesma fonte. Com "sim" a 1.a, o nivel
+COMPLETO: o `docs/legal/` da §2.8. Com "nao", so o nivel base. Em TODOS os casos que a regra marca **PARAR** (entre eles as
+condenacoes, o projeto como subcontratante do cliente, as decisoes automatizadas, as categorias especiais de quem nao
+usa a app, e a DPIA ou o DPO), o agente nao decide: escreve a pergunta para o responsavel e para um jurista.
+
 ### Opcionais (perguntar se relevante)
 
 8. **Ficheiro de tipos principal** (ex: `src/lib/types.ts`, `src/types/index.ts`)
@@ -403,7 +413,7 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 
 | Ficheiro | Base | Conteudo |
 |----------|------|----------|
-| `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. |
+| `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. Com o nivel completo de privacidade, UMA linha-ponteiro: `Privacidade: docs/legal/privacy-inventory.md` (o inventario NAO vai aqui: este ficheiro e carregado, #495). |
 | `.agent/rules/pages-architecture.md` | Perguntas 9, 10, 19 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. **Incluir uma seccao "Design System / Barra de Qualidade"** com os tokens/escala concretos da UI lib escolhida (cores, espacamento, tipografia, radius/sombras) e os criterios do tier `{{QUALITY_TIER}}` (estados obrigatorios, a11y, motion, SEO se web publico). Se o projeto usa error tracking/observabilidade (ex: Sentry), notar aqui como capturar erros de UI — senao, omitir (nao assumir vendor). |
 
 **Formato sugerido para `business-logic.md`:**
@@ -467,9 +477,13 @@ instrucoes citam, e uma pasta que nao exista e ignorada. `GUARDS`, `PARES_DO_PRO
 `SKIPS_DO_PROJETO` ficam vazios ate o projeto ter guards proprios; o cabecalho do ficheiro diz o
 formato de cada um (#176).
 
+**`.agent/scripts/config/sdks-de-analytics.mjs`** — a lista dos SDKs de analytics e telemetria que o
+Guard 24 procura no `package.json` (#495). Acrescentar os que o projeto usa e nao estejam la (o
+cabecalho diz o formato: `produto`, `pacotes`, `nomes`); tirar um que nao se aplique.
+
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 31 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, os ficheiros de exemplo do `.env` sem segredo real, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 32 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, os ficheiros de exemplo do `.env` sem segredo real, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/tests/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -610,6 +624,7 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.agent/rules/anti-patterns-template.md`**: **manter**. Sao as licoes do template, citadas por dezenas de ficheiros que vais herdar; o Guard 15 reprova se as apagares e diz quais citacoes ficaram penduradas. Os teus anti-padroes vao para `anti-patterns.md`.
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em **nenhum** dos tres pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`).
 - **`docs/README.md`**: criar a partir de `src/docs/exemplos/docs-README.md` — o indice da pasta dos docs do PRODUTO, com as 8 pastas (`product/`, `architecture/`, `development/`, `operations/`, `audits/`, `strategy/`, `legal/`, `reference/`) e o que vai em cada uma (#585). Os nomes das pastas ficam em ingles; as descricoes na lingua do projeto. So o indice: as pastas nascem com o primeiro doc de cada tipo. O `README.md` da raiz e outro ficheiro, e nao se toca aqui. **Se o `docs/` ja existir** (um projeto existente, Fase 0-R): nunca sobrescrever — com um `docs/README.md`, propor a fusao com o indice; se o `docs/` for a origem de um site (Docusaurus, MkDocs, GitHub Pages), perguntar antes de lhe acrescentar o indice.
+- **`docs/legal/`** (so com "sim" a 1.a pergunta da Privacidade, #495): criar `docs/legal/privacy-inventory.md` a partir de `src/docs/exemplos/privacy-inventory.md` e criar `docs/legal/privacy-policy.md` a partir de `src/docs/exemplos/privacy-policy.md`, e o agente PROPOE o inventario a partir das respostas (o responsavel decide). A politica nasce como RASCUNHO, na lingua principal da UI, e uma `privacy-policy.<lingua>.md` por cada lingua a mais; nao se publica sem revisao humana, e nos casos que a regra marca, sem revisao juridica. Os campos `[...]` preenchem-se (nenhum guard os ve). Um que ja exista nunca se sobrescreve. Com "nao", nada aqui: so o nivel base.
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
 
 ### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)

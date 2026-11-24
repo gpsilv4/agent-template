@@ -40,6 +40,7 @@ import { guardPlaceholders } from "./guards/placeholders.mjs";
 import { guardContextVirgem } from "./guards/context-virgem.mjs";
 import { guardMcp } from "./guards/mcp.mjs";
 import { guardEnvExemplo } from "./guards/env-example.mjs";
+import { guardSdksDeAnalytics } from "./guards/sdks-analytics.mjs";
 import { guardAntiPatternRefs, guardAntiPatternEvidence } from "./guards/anti-patterns.mjs";
 import { guardFileSizes } from "./guards/sizes.mjs";
 import { ehDerivado as ehDerivadoDe } from "./lib/derivado.mjs";
@@ -452,6 +453,11 @@ guardsRun += guardMcp({ read, warn, ok, skip });
 
 // --- Guard 23: os exemplos do `.env` que o agente escreve nao trazem um segredo real (#595) ---
 guardsRun += guardEnvExemplo({ warn, ok, skip, note, ROOT });
+
+// --- Guard 24: um SDK de analytics no `package.json` (#495) — so NOTE; a lista e do projeto, em `config/` ---
+const CFG_SDKS = join(ROOT, ".agent/scripts/config/sdks-de-analytics.mjs");
+const { SDKS_DE_ANALYTICS } = existsSync(CFG_SDKS) ? await import(pathToFileURL(CFG_SDKS).href) : {};
+guardsRun += guardSdksDeAnalytics({ read, note, ok, skip, sdks: SDKS_DE_ANALYTICS });
 
 // --- Guard 15: as referencias a anti-padroes RESOLVEM ---
 // Uma citacao de anti-padrao errada manda o leitor a uma entrada REAL com outro significado,
