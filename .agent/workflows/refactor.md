@@ -99,7 +99,7 @@ Seguir o checklist estrito:
 - [ ] **Regras do Agente** (`.agent/rules/`) refletem a nova estrutura?
 - [ ] **Workflows do Agente** (`.agent/workflows/`) refletem as novas localizacoes?
 - [ ] **Scripts de Automacao** (`.agent/scripts/`) atualizados?
-- [ ] **Manuais Tecnicos** (`src/docs/`) atualizados?
+- [ ] **Manuais do produto** (`docs/`) atualizados?
 
 ## 8. Backlog
 

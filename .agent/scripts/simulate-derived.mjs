@@ -339,6 +339,26 @@ await comFicheirosGrandes({ dir, ok, fatal });
 comoUmDerivadoReal({ dir, ok, fatal });
 comOptOuts({ dir, ok, fatal });
 
+// --- 3d''. o `docs/` do produto (#585) ------------------------------------------------
+// O BOOTSTRAP manda criar o `docs/README.md` (o indice das 8 pastas) a partir do modelo. Deriva-se do TEXTO dele, como
+// o Dependabot abaixo — e a ausencia REPROVA: com um `ok` calado, um BOOTSTRAP que perdesse o passo passava verde.
+{
+  const MODELO = "src/docs/exemplos/docs-README.md";
+  const PASTAS = ["product", "architecture", "development", "operations", "audits", "strategy", "legal", "reference"];
+  const modelo = leOuNull(join(dir, MODELO));
+  const faltam = PASTAS.filter((p) => !(modelo ?? "").includes(`\`${p}/\``));
+  // Ancorado a FORMA do passo, e nao ao caminho solto: citado noutro sitio do BOOTSTRAP, o passo podia sair e isto
+  // continuava verde (o leitor do #585).
+  const porque = !(leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) ?? "").includes(`**\`docs/README.md\`**: criar a partir de \`${MODELO}\``)
+    ? "o BOOTSTRAP deixou de mandar criar o docs/README.md a partir do modelo"
+    : modelo === null ? `o BOOTSTRAP manda criar o docs/README.md, e o ${MODELO} nao existe`
+      : faltam.length ? `o ${MODELO} nao tem a(s) pasta(s): ${faltam.map((p) => `${p}/`).join(", ")}` : null;
+  if (porque) fatal(`${porque} (#585)`);
+  mkdirSync(join(dir, "docs"), { recursive: true });
+  writeFileSync(join(dir, "docs/README.md"), modelo);
+  ok("o docs/ do produto: o docs/README.md criado do modelo, com as 8 pastas (BOOTSTRAP, #585)");
+}
+
 // --- 3e'. o Dependabot de um derivado PRIVADO: o mensal (#485) ------------------------
 // O `BOOTSTRAP.md` manda um repo privado trocar o `.github/dependabot.yml` pelo exemplo mensal. A simulacao ficava com o
 // semanal (um derivado publico), e por isso nao viu que o `test-ci-exemplo` reprovava em TODO o derivado privado — os

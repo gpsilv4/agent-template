@@ -86,7 +86,7 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 - [ ] **Regras do Agente** (`.agent/rules/`) atualizadas se houver novos padroes?
 - [ ] **Workflows do Agente** (`.agent/workflows/`) atualizados se o processo mudar?
 - [ ] **Scripts de Automacao** (`.agent/scripts/`) atualizados se targets mudaram?
-- [ ] **Manuais Tecnicos** (`src/docs/`) atualizados se a UI mudar?
+- [ ] **Manuais do produto** (`docs/`) atualizados se a UI mudar?
 - [ ] **`.agent/context/session.md`** atualizado com a feature em progresso?
 
 ## 8. Branch de Trabalho

@@ -471,6 +471,7 @@ src/docs/
 │                                  `guard-tests` job that runs only when it changes (#472, #477; not run here)
 ├── exemplos/cache-sem-maquinaria.yml <- Its pair: saves the dependency cache, since the merge push no longer runs
 ├── exemplos/dependabot-privado.yml <- dependabot.yml for a PRIVATE repo: monthly, rebase disabled (the account quota)
+├── exemplos/docs-README.md     <- The model of a project's docs/README.md: the 8 folders for the PRODUCT's docs (#585)
 └── CHANGELOG.md                <- Changelog template
 ```
 
