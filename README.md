@@ -251,7 +251,8 @@ not to* line, so every agent sees it.
     │   │                          `ci.yml` runs is in `allow`; agents declare `tools:`
     │   ├── versions.mjs        <- Guard 3 + documented dependency versions
     │   ├── derived-counts.mjs  <- Guard series 12: counts cited in prose, recomputed
-    │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap
+    │   ├── placeholders.mjs    <- Guard 13: placeholders left behind after bootstrap;
+    │   │                          a NOTE if SECURITY.md lacks the security model (#496)
     │   ├── context-virgem.mjs  <- Guard 21: in the TEMPLATE, .agent/context/ stays unstarted
     │   │                          (frozen content hashes; skips in a derived project)
     │   ├── anti-patterns.mjs   <- Guards 15/18: citations resolve; each TPn has its evidence
@@ -600,6 +601,8 @@ Branch protection rules (require status checks, block force push) require **GitH
 | `{{TEST_ENV_VARS}}` | Test environment variables |
 | `{{PROJECT_STRUCTURE}}` | Directory tree |
 | `{{SECURITY_EMAIL}}` | Security disclosure email |
+| `{{SECURITY_PROTECTS}}`, `{{SECURITY_NOT_PROTECTED}}`, `{{SECURITY_OUT_OF_SCOPE}}` | The security model in `SECURITY.md`: drafted by the agent, approved by you |
+| `{{DATA_BREACH_SCOPE}}` | Whether the personal data breach procedure in `SECURITY.md` applies |
 | `{{COPYRIGHT_HOLDER}}` | License copyright holder |
 | `{{YEAR}}` | Current year |
 | `{{DATE}}` | Current date (auto-filled in context files) |

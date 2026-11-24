@@ -425,7 +425,7 @@ guardsRun += guardDerivedCounts({ read, readMeaningful, warn, ok, skip, why, lis
 // --- Guard 13: placeholders esquecidos apos o bootstrap ---
 // A unica verificacao que TODO projeto derivado precisa e a unica que era manual (um
 // `git grep` na checklist do BOOTSTRAP). Extraida para `guards/placeholders.mjs`.
-guardsRun += guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado });
+guardsRun += guardPlaceholders({ read, warn, ok, note, skip, listDir, ehDerivado });
 
 // --- Guard 22: os runners do CI do template num so rotulo fixo (#488) ---
 guardsRun += guardRunners({ read, warn, ok, skip, listDir, ehDerivado });

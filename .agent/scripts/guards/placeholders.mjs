@@ -114,7 +114,18 @@ export function alvosPlaceholders(listDir) {
   ];
 }
 
-export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado }) {
+/** Os titulos do `SECURITY.md` que o BOOTSTRAP preenche (#496). Um placeholder la dentro ja
+ *  reprova pelo laco abaixo; um titulo que FALTA so da NOTE: o `/upgrade` trata o `SECURITY.md`
+ *  como ficheiro do projeto (diff e decidir), e reprovar partia o CI de quem ainda nao as trouxe. */
+export const SECCOES_SECURITY = [
+  "## Security model",
+  "### What it protects",
+  "### What it does NOT protect",
+  "### Out of scope",
+  "## Personal data breach",
+];
+
+export function guardPlaceholders({ read, warn, ok, note, skip, listDir, ehDerivado }) {
   if (!ehDerivado()) {
     skip("Guard 13 (placeholders) — bootstrap ainda nao correu (sem .agent/.template-version, e com o BOOTSTRAP.md)");
     return 0;
@@ -145,6 +156,16 @@ export function guardPlaceholders({ read, warn, ok, skip, listDir, ehDerivado })
     warn("Guard 13: nenhum dos ficheiros-alvo foi lido — nao verifiquei placeholder nenhum");
   } else if (ficheirosComSobras === 0) {
     ok(`sem placeholders esquecidos (${lidos} ficheiros verificados)`);
+  }
+
+  // Um `SECURITY.md` apagado e decisao do projeto: so se olha para o que existe.
+  const security = read("SECURITY.md");
+  if (security !== null) {
+    const linhas = new Set(security.split("\n").map((l) => l.trim()));
+    const faltam = SECCOES_SECURITY.filter((t) => !linhas.has(t));
+    if (faltam.length > 0) {
+      note(`SECURITY.md sem ${faltam.map((t) => `"${t}"`).join(", ")} — o modelo de seguranca e o procedimento de fuga de dados (#496); trazer do template no /upgrade e preencher como no BOOTSTRAP §2.7 (se os traduziste, ignora)`);
+    }
   }
   return 1;
 }

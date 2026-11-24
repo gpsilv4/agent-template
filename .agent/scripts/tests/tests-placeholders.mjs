@@ -127,6 +127,44 @@ export function registar() {
     writeF(dir, ".agent/rules/exemplo-placeholders.md", `# Exemplo\n\nNome: ${ph("PROJECT_NAME")}\n`);
   }, { code: 1, includes: [`exemplo-placeholders.md: placeholder(s) nao substituido(s) apos o bootstrap — ${ph("PROJECT_NAME")}`] });
 
+  // #496: o modelo de seguranca e a fuga de dados no `SECURITY.md`. Uma seccao que FALTA num derivado da NOTE e
+  // nao reprova (o `/upgrade` trata o ficheiro como do projeto); um placeholder la dentro reprova, pelo laco geral.
+  // Cada teste ESCREVE o seu `SECURITY.md`, e o ficheiro nao esta no fixture: num derivado que fez `/upgrade`, o
+  // `SECURITY.md` e o do projeto (sem estas seccoes, ou traduzido), e um teste que o lesse ficava vermelho no CI de
+  // quem a NOTE foi desenhada para nao partir (`TP3`). Achado pelo leitor independente.
+  const security = (...titulos) => `# Security Policy\n\n${titulos.map((t) => `${t}\n\nTexto.\n`).join("\n")}`;
+  const MODELO = ["## Security model", "### What it protects", "### What it does NOT protect", "### Out of scope"];
+  const FUGA = "## Personal data breach";
+
+  test("G13: SECURITY.md de um derivado sem o modelo de seguranca da NOTE e sai 0", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, "SECURITY.md", security("## Reporting a Vulnerability", FUGA));
+  }, { code: 0,
+       includes: ['NOTE  SECURITY.md sem "## Security model", "### What it protects", "### What it does NOT protect", "### Out of scope"'],
+       excludes: [`"${FUGA}"`, "  WARN  "] });
+
+  test("G13: SECURITY.md de um derivado sem a seccao da fuga de dados da NOTE", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, "SECURITY.md", security(...MODELO));
+  }, { code: 0, includes: [`NOTE  SECURITY.md sem "${FUGA}"`], excludes: ["  WARN  "] });
+
+  // O CONTROLO dos dois de cima: com as seccoes todas, nem NOTE nem WARN — sem isto, uma NOTE que saisse sempre passava.
+  // Com CRLF e os titulos indentados (ate 3 espacos, um titulo markdown valido), que o guard le como os mesmos.
+  test("G13: SECURITY.md de um derivado com as seccoes todas nao da NOTE (com CRLF e indentacao)", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, "SECURITY.md", security(...MODELO.map((t) => `  ${t}`), FUGA).replace(/\n/g, "\r\n"));
+  }, { code: 0, includes: ["sem placeholders esquecidos"], excludes: ["NOTE  SECURITY.md sem", "  WARN  "] });
+
+  test("G13: um SECURITY.md apagado e decisao do projeto, e nao da NOTE", (dir) => {
+    bootstrapado(dir);
+    try { rmSync(file(dir, "SECURITY.md")); } catch { /* fora do fixture: e o estado que este teste quer */ }
+  }, { code: 0, excludes: ["NOTE  SECURITY.md sem"] });
+
+  test("G13: o modelo de seguranca por preencher no SECURITY.md reprova", (dir) => {
+    bootstrapado(dir);
+    writeF(dir, "SECURITY.md", security(...MODELO, FUGA).replace("### What it protects\n", `### What it protects\n\n${ph("SECURITY_PROTECTS")}\n`));
+  }, { code: 1, includes: [`SECURITY.md: placeholder(s) nao substituido(s) apos o bootstrap — ${ph("SECURITY_PROTECTS")}`] });
+
   test("G13: BOOTSTRAP.md e README.md documentam placeholders e nao contam", (dir) => {
     bootstrapado(dir);
     // Estes dois citam `{{...}}` por design; se contassem, todo projeto derivado avisaria.
