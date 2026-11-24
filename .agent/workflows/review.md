@@ -102,6 +102,7 @@ Checklist de revisao de codigo antes de fazer commit no {{PROJECT_NAME}}.
 - [ ] Politicas de seguranca cobrem novas tabelas/colunas
 - [ ] Chaves secretas nunca expostas no frontend
 - [ ] **ZERO dados sensiveis em ficheiros commitados**
+- [ ] Dado pessoal ou destino novo -> o inventario (`privacy.md`); o primeiro liga o nivel completo
 
 ## 8. Anti-Padroes  — a partir de `S`
 

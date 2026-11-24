@@ -66,6 +66,7 @@ export const SUITES = [
   // A espera de um PR (#554): vem no modo parcial com o `minutos-ci`, e o `test-modo-upgrade` calcula o fecho.
   { re: /^\.agent\/scripts\/lib\/espera-ci\.mjs$/, verifica: [S("test-minutos-ci.mjs"), S("test-modo-upgrade.mjs")] },
   { re: /^\.agent\/scripts\/tests\/harness\/casos-espera\.mjs$/, verifica: [S("test-minutos-ci.mjs")] },
+  { re: /^\.agent\/scripts\/tests\/harness\/casos-derivado-docs\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // O modo parcial do `/upgrade` (#429): a regra (os casos no `test-modo-upgrade`, a ponta no `test-simulate-upgrade`),
   // o fecho (o `harness/fecho-parcial.mjs`, do `test-modo-upgrade`) e o doc, cuja ordem e lista a suite verifica.
   { re: /^\.agent\/scripts\/lib\/modo-upgrade\.mjs$/, verifica: [S("test-modo-upgrade.mjs"), S("test-simulate-upgrade.mjs"), S("test-ci-exemplo.mjs"), S("test-minutos-ci.mjs")], only: "modo-upgrade" },
@@ -183,6 +184,8 @@ export const SUITES = [
   // Os guards e os pares PROPRIOS do projeto (#176): o `check-doc-versions` chama-os e o
   // `lib/pares.mjs` junta-os a varredura. Mexer na lista obriga a correr os dois.
   { re: /^\.agent\/scripts\/config\/guards-do-projeto\.mjs$/, verifica: [S("test-guards.mjs"), S("test-mutation-sweep.mjs")] },
+  // A lista dos SDKs de analytics (#495): o Guard 24 le-a, e o `tests-sdks-analytics.mjs` (no `test-guards`) mede-a.
+  { re: /^\.agent\/scripts\/config\/sdks-de-analytics\.mjs$/, verifica: [S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/(check-codigo-morto|tests\/test-codigo-morto)\.mjs$/, verifica: [S("test-codigo-morto.mjs")] },
   // A lista de NOMES PROIBIDOS (#375): o `tests-nomes-proibidos.mjs` (no `test-guards`) mede-a, e os tres que a leem
   // tambem — o `commit-msg` (o `test-commit-msg`), o comando de varredura (o `test-textos-publicos`) e o hook
@@ -235,7 +238,7 @@ export const SUITES = [
   // E a juncao `PARES_DO_TEMPLATE` + `PARES_DO_PROJETO` e testada no `tests-pares.mjs`, que corre
   // no `test-guards.mjs`: o `pares.mjs` obriga aos dois (#241). O `pares-hooks.mjs` e parte dele (#243).
   // E quem o IMPORTA tambem (#271): o mapa de suites (a ligacao ao `PARES`) e a cobertura da superficie.
-  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks|-publicos|-simuladores)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/pares(?:-hooks|-publicos|-simuladores|-guards)?\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs"), S("test-mapa-suites.mjs"), S("test-test-surface.mjs")] },
   // O `varredura-paralela.mjs` tambem e importado pelo `tests-fail-fast.mjs`, do `test-guards` (#271); e o `varredura-tempos.mjs`
   // (#374b) alcanca-o o `tests-varredura-shards.mjs`, do mesmo `test-guards`, ao correr o varredor.
   { re: /^\.agent\/scripts\/lib\/varredura-(?:paralela|tempos)\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
@@ -304,6 +307,7 @@ export const SUITES = [
   // A maturidade saiu do simulador quando ele bateu nas 500 linhas, e traz a sua suite. A
   // regra vem ANTES da geral de `lib/` porque o mapa decide pela primeira que casa.
   { re: /^\.agent\/scripts\/lib\/derivado-maduro\.mjs$/, verifica: [S("test-derivado-maduro.mjs"), S("test-simulate-derived.mjs")] },
+  { re: /^\.agent\/scripts\/lib\/derivado-docs\.mjs$/, verifica: [S("test-simulate-derived.mjs")] },
   // A ordem por alvo (#156) e lida pelo REGISTO e pelo MOTOR da varredura: as duas suites.
   // A descoberta por disco: as suites que a usam correm se ela mudar (#271) — um defeito aqui muda
   // quantos modulos cada uma regista.

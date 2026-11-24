@@ -97,6 +97,7 @@
 - Nunca expor chaves secretas no frontend.
 - Apenas chaves publicas (`NEXT_PUBLIC_*`, `VITE_*`, etc.) no cliente.
 - **ZERO** dados sensiveis em ficheiros commitados — nunca incluir API keys (reais ou de teste), secrets, tokens, passwords, credenciais ou URLs com keys em codigo, documentacao, `.agent/` ou `src/docs/`. Usar placeholders descritivos: `<real-key>`, `(ver .env.local)`, etc.
+- **Dados pessoais** (o primeiro liga o nivel completo): `.agent/rules/privacy.md` — **nao carregada**.
 - **Nomes que nao podem ser publicos** (repos privados, clientes): numa lista FORA do repo, `~/.config/agent-template/nomes-proibidos`. O `commit-msg` recusa-os; `node .agent/scripts/check-textos-publicos.mjs` varre issues, PRs e releases (#375). Num repo privado, so o UTILIZADOR a desliga (`upgrade-why.md`); o agente nunca.
 
 ### Mobile
@@ -129,7 +130,7 @@
 - **Dependabot** (`.github/dependabot.yml`) gere updates automaticos de dependencias npm e GitHub Actions, com commits em formato Conventional Commits. PRs do Dependabot correm no `pull_request` normal (token read-only, sem secrets — default seguro do GitHub); o CI usa `permissions: contents: read` e nao precisa de `pull_request_target`.
 - **PR Template** (`.github/pull_request_template.md`) impoe checklist obrigatoria alinhada com o workflow `/review`.
 - **Issue Templates** (`.github/ISSUE_TEMPLATE/`) estruturam bug reports e feature requests alinhados com o backlog.
-- **Scripts de verificacao** (`.agent/scripts/*.mjs`): doc guards, contadores do backlog, tamanhos de bundle, superficie de teste, a varredura de mutacao que prova que as suites afirmam algo, e **dois simuladores** — um monta um projeto derivado do zero, outro atualiza um que ja existia (`/upgrade`). So precisam de `node` — sem dependencias, sem `package.json` — logo qualquer agente os corre e o CI corre-os para todos. **Cada verificador tem a sua suite de testes negativos e a sua entrada em `PARES`**; a varredura reprova quem nao tiver. As suites vivem em **`.agent/scripts/tests/`** (e os construtores de fixture em `tests/harness/`), para a raiz ser so o que se invoca. Correr antes de commit; os `test-*` correm no CI com ou sem `package.json`.
+- **Scripts de verificacao** (`.agent/scripts/*.mjs`): doc guards, contadores do backlog, tamanhos de bundle, superficie de teste, a varredura de mutacao que prova que as suites afirmam algo, e **dois simuladores** — um monta um projeto derivado do zero, outro atualiza um que ja existia (`/upgrade`). So precisam de `node` — sem dependencias, sem `package.json` — logo qualquer agente os corre e o CI corre-os para todos. **Cada verificador tem a sua suite de testes negativos e a sua entrada em `PARES`**; a varredura reprova quem nao tiver. As suites vivem em **`.agent/scripts/tests/`**.
 - **Hooks** (`.claude/hooks/`, **so-Claude Code**): chamam essas verificacoes **antes** da ferramenta correr — o agente pode esquecer uma regra do `CLAUDE.md`, um hook nao esquece. Saem `0` excepto na negacao explicita: um hook avariado nunca bloqueia trabalho legitimo.
 ### Servidores MCP
 

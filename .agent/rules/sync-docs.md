@@ -81,7 +81,7 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
 16. [ ] `src/docs/CHANGELOG.md` — versao atual registada (`## [vX.Y.Z] - Descricao`), alinhada com `package.json`
     > No **template de origem** este ficheiro fica vazio de propósito (ver `/review` §2);
     > num projeto derivado a regra vale por inteiro.
-17. [ ] `docs/` — os manuais do produto refletem a UI/logica atual (o indice: `docs/README.md`, #585)
+17. [ ] `docs/` — os manuais do produto refletem a UI/logica atual (o indice: `docs/README.md`, #585); e o inventario em `docs/legal/` reflete o que o codigo guarda e envia (`privacy.md`, #495)
 18. [ ] `.github/workflows/ci.yml` — CI pipeline reflete comandos e targets atuais
 19. [ ] `.github/workflows/e2e.yml` — E2E pipeline atualizado (env vars, triggers); `release.yml` (Release por tag) e `codeql.yml` (so do template) coerentes com o `/deploy` e o `src/docs/github-security.md`
 20. [ ] `.github/pull_request_template.md` — checklist alinhada com `/review`

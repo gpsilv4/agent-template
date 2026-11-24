@@ -37,6 +37,7 @@
  *   node .agent/scripts/simulate-derived.mjs --keep      # nao apaga a copia (para inspeccionar)
  *   node .agent/scripts/simulate-derived.mjs --skips     # e a varredura --skips no derivado maduro (#308; no CI, SIMULATE_SKIPS=1)
  *   SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs   # o derivado privado, com o CI de um job (#487)
+ *   SIMULATE_PRIVACIDADE=nao node .agent/scripts/simulate-derived.mjs   # "nao" a privacidade: so o nivel base (#495)
  *   node .agent/scripts/simulate-derived.mjs --only=check-doc-versions,test-guards
  */
 
@@ -51,6 +52,7 @@ import { foraDoTemplate } from "./lib/fora-do-template.mjs";
 import { comandosDoCI, correNaBateria } from "./lib/medida-upgrade.mjs";
 import { comModoCompleto } from "./lib/exemplo-ci.mjs";
 import { comHistoria, queConfigurou, comFicheirosGrandes, comoUmDerivadoReal, comOptOuts } from "./lib/derivado-maduro.mjs";
+import { comDocsDoProduto, comPrivacidade } from "./lib/derivado-docs.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -152,6 +154,10 @@ delete process.env.SIMULATE_SKIPS;
 // ambiente, pela razao da `--skips`.
 const comPrivado = process.env.SIMULATE_PRIVADO === "1";
 delete process.env.SIMULATE_PRIVADO;
+// `SIMULATE_PRIVACIDADE=nao` (#495): o "nao" a 1.a pergunta da privacidade (so o nivel base). Por omissao, "sim". Sai
+// do ambiente pela mesma razao; um valor que nao seja `sim` nem `nao` recusa, em vez de passar calado a "sim".
+const privacidade = process.env.SIMULATE_PRIVACIDADE ?? "sim";
+delete process.env.SIMULATE_PRIVACIDADE;
 if (comSkips) selecionados.push([".agent/scripts/mutation-sweep.mjs", "--skips"]);
 
 console.log("\n=== Simulacao de projeto derivado ===\n");
@@ -342,22 +348,8 @@ comOptOuts({ dir, ok, fatal });
 // --- 3d''. o `docs/` do produto (#585) ------------------------------------------------
 // O BOOTSTRAP manda criar o `docs/README.md` (o indice das 8 pastas) a partir do modelo. Deriva-se do TEXTO dele, como
 // o Dependabot abaixo — e a ausencia REPROVA: com um `ok` calado, um BOOTSTRAP que perdesse o passo passava verde.
-{
-  const MODELO = "src/docs/exemplos/docs-README.md";
-  const PASTAS = ["product", "architecture", "development", "operations", "audits", "strategy", "legal", "reference"];
-  const modelo = leOuNull(join(dir, MODELO));
-  const faltam = PASTAS.filter((p) => !(modelo ?? "").includes(`\`${p}/\``));
-  // Ancorado a FORMA do passo, e nao ao caminho solto: citado noutro sitio do BOOTSTRAP, o passo podia sair e isto
-  // continuava verde (o leitor do #585).
-  const porque = !(leOuNull(join(ROOT, ".agent/BOOTSTRAP.md")) ?? "").includes(`**\`docs/README.md\`**: criar a partir de \`${MODELO}\``)
-    ? "o BOOTSTRAP deixou de mandar criar o docs/README.md a partir do modelo"
-    : modelo === null ? `o BOOTSTRAP manda criar o docs/README.md, e o ${MODELO} nao existe`
-      : faltam.length ? `o ${MODELO} nao tem a(s) pasta(s): ${faltam.map((p) => `${p}/`).join(", ")}` : null;
-  if (porque) fatal(`${porque} (#585)`);
-  mkdirSync(join(dir, "docs"), { recursive: true });
-  writeFileSync(join(dir, "docs/README.md"), modelo);
-  ok("o docs/ do produto: o docs/README.md criado do modelo, com as 8 pastas (BOOTSTRAP, #585)");
-}
+comDocsDoProduto({ ROOT, dir, ok, fatal });
+comPrivacidade({ ROOT, dir, ok, fatal, resposta: privacidade });
 
 // --- 3e'. o Dependabot de um derivado PRIVADO: o mensal (#485) ------------------------
 // O `BOOTSTRAP.md` manda um repo privado trocar o `.github/dependabot.yml` pelo exemplo mensal. A simulacao ficava com o

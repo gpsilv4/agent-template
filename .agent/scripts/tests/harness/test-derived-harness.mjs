@@ -54,7 +54,7 @@ export const pacoteCi = (comandos) =>
  *  fixture usa o prefixo do PROJETO de proposito: e ele que a numeracao aqui exercita. */
 export const ap = (n) => "AP" + n;
 
-export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semFase0R = null, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {}, bootstrapExtra = "", semDocsReadme = null } = {}) {
+export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQuebrado = false, semFase0R = null, semStubs = false, ciAusente = false, jobRenomeado = false, ciSemComandos = false, comandoExtra = false, segredosAninhados = false, apTemplate = false, semConfig = false, configOutraForma = false, semGuardTamanhos = false, tetosOutraForma = false, stubExigeSemBootstrap = false, gitSemResposta = false, ciExtra = "", extra = {}, bootstrapExtra = "", semDocsReadme = null, semPrivacidade = null } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "sim-test-"));
   const w = (rel, body) => {
     const p = join(dir, rel);
@@ -73,7 +73,11 @@ export function fixture({ stubFalha = null, sobraPlaceholder = false, bootstrapQ
       "| `.agent/rules/business-logic.md` |\n\n### 2.3 Outra coisa\n\nTexto.\n" +
       // O `docs/` do produto (#585): `semDocsReadme` tira a instrucao, o modelo, ou uma pasta do modelo.
       (semDocsReadme === "instrucao" ? "" : "\n- **`docs/README.md`**: criar a partir de `src/docs/exemplos/docs-README.md`.\n") +
+      // O `docs/legal/` da privacidade (#495): `semPrivacidade` tira a instrucao ou o modelo do inventario.
+      (semPrivacidade === "instrucao" ? "" : "\n- **`docs/legal/`**: criar `docs/legal/privacy-inventory.md` a partir de `src/docs/exemplos/privacy-inventory.md` e criar `docs/legal/privacy-policy.md` a partir de `src/docs/exemplos/privacy-policy.md`.\n") +
       bootstrapExtra);
+  if (semPrivacidade !== "modelo") w("src/docs/exemplos/privacy-inventory.md", "# Inventario\n\n| Dado | Destino |\n|---|---|\n");
+  w("src/docs/exemplos/privacy-policy.md", "# Politica\n\n[nome da app]\n");
   if (semDocsReadme !== "modelo") {
     const pastas = ["product", "architecture", "development", "operations", "audits", "strategy", "legal", "reference"];
     w("src/docs/exemplos/docs-README.md", `# Docs\n\n${pastas.filter((p) => !(semDocsReadme === "pasta" && p === "legal")).map((p) => `- \`${p}/\``).join("\n")}\n`);

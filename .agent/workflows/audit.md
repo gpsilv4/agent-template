@@ -45,6 +45,7 @@ No **Claude Code**: fan-out de subagentes, um por lente. Noutros agentes: sequen
 7. **Testes** — cobertura de fluxos criticos (unit/E2E/security), gaps, testes flaky.
 8. **Documentacao & Consistencia** (dono do doc-drift) — README/docs refletem o real? CHANGELOG atualizado? Termos obsoletos/drift (doc-guards).
 9. **Dependencias** (frescura/licenca/nao-usadas) — desatualizadas (major atras), nao usadas, duplicadas, licencas problematicas, abandonadas.
+10. **Privacidade** (so no nivel completo da `.agent/rules/privacy.md`, #495) — o inventario (`docs/legal/privacy-inventory.md`) contra o codigo: o que guarda, o que envia e a quem (um destino no codigo que nao esta no inventario e um achado); a retencao aplicada onde o inventario diz; os logs sem dados pessoais em claro; o apagamento a cobrir todas as copias. Le codigo: serve ao `code-reviewer`.
 
 > \*Lentes marcadas com `*` (Performance CWV, UX/a11y) precisam de **app a correr / medicoes** para serem reais — sem isso, limitar a riscos ao nivel do codigo e dize-lo explicitamente.
 

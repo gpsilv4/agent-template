@@ -186,6 +186,7 @@ not to* line, so every agent sees it.
 │   ├── ticket-method.md        <- Per-ticket 6-phase method, 0-5 (NOT loaded; on-demand)
 │   ├── backlog-method.md       <- Step-by-step backlog procedure (NOT loaded; on-demand)
 │   ├── mcp-policy.md           <- When an MCP server is worth it, and what it may not hold (NOT loaded)
+│   ├── privacy.md              <- Privacy by design: the base level for all, the full one with personal data (NOT loaded, #495)
 │   ├── scripts-guide.md        <- What each checker does + the rule linking them (NOT loaded)
 │   └── hooks-guide.md          <- What each hook does, and why it can't be prose (NOT loaded)
 ├── context/
@@ -238,7 +239,8 @@ not to* line, so every agent sees it.
     ├── config/                 <- THIS project's configuration. /upgrade never replaces it
     │   ├── bundles.mjs         <- Routes, budgets, and the ALVOS_REPROVAM switch
     │   ├── superficie-de-teste.mjs <- Where THIS project's tests and runner config live
-    │   └── guards-do-projeto.mjs <- THIS project's own guards, their sweep pairs, its script dirs
+    │   ├── guards-do-projeto.mjs <- THIS project's own guards, their sweep pairs, its script dirs
+    │   └── sdks-de-analytics.mjs <- The analytics/telemetry SDKs Guard 24 looks for in package.json (#495)
     │
     ├── guards/                 <- Guard modules split out of check-doc-versions.mjs
     │   ├── budgets.mjs         <- Guards 1/1b/1c/1e: byte budgets + 1d: Boundaries copied to pointers
@@ -259,6 +261,7 @@ not to* line, so every agent sees it.
     │   ├── citacoes.mjs        <- Guard 20: a file cited in an instruction exists, and is only one
     │   ├── runners.mjs         <- Guard 22: the template's CI runners on one pinned label, not ubuntu-latest (#488)
     │   ├── env-example.mjs     <- Guard 23: a .env.example/.sample/.template carries no real secret (#595)
+    │   ├── sdks-analytics.mjs  <- Guard 24: an analytics SDK in package.json — only a NOTE (#495)
     │   └── ligacao-proprios.mjs <- The project's own guards (config/guards-do-projeto.mjs), and a module
     │                              in guards/ that nothing calls (#176, #539)
     │
@@ -273,10 +276,12 @@ not to* line, so every agent sees it.
     │   ├── baseline-superficie.mjs <- The test-surface baseline (what "before" means)
     │   ├── superficie-contaveis.mjs <- What the test surface measures by COUNT (workflows, PARES, verifiers, hooks) (#400)
     │   ├── derivado-maduro.mjs <- A derived project with real, accumulated customisations
+    │   ├── derivado-docs.mjs   <- The bootstrap's docs steps the derived simulation replays (docs/README.md, docs/legal/)
     │   ├── pares.mjs           <- The mutation sweep's target/suite table (data, not logic)
     │   ├── pares-hooks.mjs     <- ...its entries for .claude/hooks/, joined in the same place
     │   ├── pares-publicos.mjs  <- ...and for the commit-msg and the forbidden names (#375)
     │   ├── pares-simuladores.mjs <- ...and for the two simulators and their libs (#400)
+    │   ├── pares-guards.mjs    <- ...and for the doc guards: check-doc-versions and guards/ (#495)
     │   ├── nomes-proibidos.mjs <- The forbidden-names list, kept OUTSIDE the repo, and how a name matches (#375)
     │   ├── prefixo-commit.mjs  <- The Conventional Commits prefix the commit-msg checks, types from CONTRIBUTING.md (#394)
     │   ├── regex-literal.mjs   <- A text as a regex literal: the one source, and the two bound copies (#400)
@@ -460,6 +465,7 @@ SECURITY.md                     <- Vulnerability disclosure policy
 src/docs/
 ├── agent-guide.md              <- Guide for .agent/ and .github/
 ├── ticket-method-why.md        <- Where each rule came from, what it costs, what was measured
+├── privacy-why.md              <- Why the privacy rule is so: the legal bases, art. 9(2), non-users, DPIA (#495)
 ├── anti-patterns-why.md        <- Evidence behind each anti-pattern: what it cost, how it was caught
 ├── scripts-guide-why.md        <- Why each checker is shaped the way it is
 ├── sync-docs-why.md            <- Why the pre-commit checklist has the points it has
@@ -472,6 +478,8 @@ src/docs/
 ├── exemplos/cache-sem-maquinaria.yml <- Its pair: saves the dependency cache, since the merge push no longer runs
 ├── exemplos/dependabot-privado.yml <- dependabot.yml for a PRIVATE repo: monthly, rebase disabled (the account quota)
 ├── exemplos/docs-README.md     <- The model of a project's docs/README.md: the 8 folders for the PRODUCT's docs (#585)
+├── exemplos/privacy-inventory.md <- The model of the personal-data inventory (art. 30), in docs/legal/ (#495)
+├── exemplos/privacy-policy.md  <- The model of the privacy policy (GDPR structure), in docs/legal/ (#495)
 └── CHANGELOG.md                <- Changelog template
 ```
 

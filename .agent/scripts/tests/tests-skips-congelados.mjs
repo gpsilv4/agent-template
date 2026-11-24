@@ -59,6 +59,8 @@ export const entryPoint = "test-guards.mjs";
 const COMUNS = [
   // A fixture nao tem app, nos dois estados.
   { chave: "Guard 3 (versoes) — sem package.json", vezes: 1 },
+  // O Guard 24 (#495) tambem le o package.json: nem o template nem a fixture o tem.
+  { chave: "Guard 24 (SDKs de analytics) — sem package.json", vezes: 1 },
   { chave: "Guards de versoes de dependencias", vezes: 1 },
   // Listas de opt-in vazias: nem termos banidos proprios nem servidor MCP.
   { chave: "Guard 4 (termos banidos) — lista BANNED vazia", vezes: 1 },

@@ -21,7 +21,7 @@ import { registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../lib/regis
 // disco. O `tests-agentes.mjs` exercita o `lib/agentes.mjs` (o parser do `tools:`, #238), e o
 // `tests-alcance.mjs` e um deles, e e quem exercita o `lib/alcance.mjs`: quem mexer
 // nesse modulo corre ESTE comando. O `tests-pares.mjs` exercita o `lib/pares.mjs` e o
-// `lib/pares-hooks.mjs`, o `lib/pares-publicos.mjs` e o `lib/pares-simuladores.mjs` que ele junta (#243, #375, #400). O `tests-nomes-proibidos.mjs`
+// `lib/pares-hooks.mjs`, o `lib/pares-publicos.mjs`, o `lib/pares-simuladores.mjs` e o `lib/pares-guards.mjs` que ele junta (#243, #375, #400, #495). O `tests-nomes-proibidos.mjs`
 // exercita o `lib/nomes-proibidos.mjs` (a lista guardada fora do repo, #375). O `tests-settings-sondas.mjs` exercita o `lib/permissoes.mjs`
 // (as sondas do Guard 11, #301; o `!` dos exemplos do `.env` no `tests-settings-exemplos.mjs`, #595). O `tests-env-example.mjs` e o
 // `tests-mcp.mjs` exercitam o `lib/segredos.mjs` (as formas de um segredo literal, #595). O `tests-varredura-shards.mjs` exercita o `lib/varredura-fatia.mjs` e o
