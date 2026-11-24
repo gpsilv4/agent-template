@@ -47,6 +47,14 @@ export const PARES_DOS_GUARDS = [
     neutro: "(() => {})(",
   },
   {
+    // O mesmo guard, o site da NOTE do #496 (as seccoes do `SECURITY.md` em falta): nao reprova, logo o sinal
+    // `warn(` de cima nao o ve, e sem este par calar a NOTE passava.
+    alvo: ".agent/scripts/guards/placeholders.mjs",
+    suite: ".agent/scripts/tests/test-guards.mjs",
+    sinal: /(?<![\w.$])note\(/,
+    neutro: "(() => {})(",
+  },
+  {
     // Guard 21 (o `.agent/context/` do template por estrear). E o unico guard cuja falha nao
     // produz nada de errado NESTE repo — produz um projeto derivado que nasce com o trabalho
     // de outra pessoa dentro. Ninguem repara ate criar um projeto, logo a varredura e a unica

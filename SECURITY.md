@@ -1,5 +1,34 @@
 # Security Policy
 
+## Security model
+
+Read this before you host this project for other people. It says what the project defends against and, as plainly,
+what it does not — a limit written down here is a known limit, not a vulnerability to report. Writing a limit down
+does not make it acceptable under the law, and a limit that is exploited with personal data affected is still a
+[personal data breach](#personal-data-breach).
+
+<!-- Filled at bootstrap (#496): the agent drafts it from the stack and the privacy answers, and the user approves it.
+     Short bullets. Examples from several kinds of project, to adapt or delete:
+     - What it protects: each user sees only their own records (checked on the server, not only hidden in the UI);
+       passwords are never stored, only a slow hash; sessions expire after N days of inactivity.
+     - What it does NOT protect: data is not encrypted at rest — whoever can read the server's disk or the database
+       reads everything; an administrator can read every user's data; signing out ends the session on all devices at
+       once, not on one; HTTPS and HSTS come from the hosting proxy, not from the app.
+     - Out of scope: attacks that need physical access to a user's unlocked device; denial of service by volume;
+       findings in dependencies with no path from this project's code; self-hosted copies the maintainers do not run. -->
+
+### What it protects
+
+{{SECURITY_PROTECTS}}
+
+### What it does NOT protect
+
+{{SECURITY_NOT_PROTECTED}}
+
+### Out of scope
+
+{{SECURITY_OUT_OF_SCOPE}}
+
 ## Reporting a Vulnerability
 
 If you discover a security vulnerability in this project, please report it responsibly.
@@ -19,6 +48,18 @@ Include:
 - Suggested fix (if any)
 
 You will receive a best-effort response acknowledging receipt. <!-- Set a concrete SLA (e.g. "within 48 hours") if your project commits to one. -->
+
+**Coordinated disclosure.** We ask you to keep the report private until a fix is released, or for 90 days from your
+report, whichever comes first. If you get no reply at all within 14 days, write again (on the other channel above, if there is one); if
+the 90 days pass, you may disclose publicly — please tell us the date first. <!-- Adjust the two deadlines to what
+your project can keep. -->
+
+Please access or keep no more personal data than you need to show the problem, and never publish anyone else's data.
+If a report shows that personal data was actually accessed, we also follow [Personal data breach](#personal-data-breach)
+from the moment we receive it — the disclosure deadline above does not pause that.
+
+The section [Security model](#security-model) lists what is out of scope: a report about one of those limits is
+welcome as an idea, but it is not handled as a vulnerability.
 
 ## Supported Versions
 
@@ -64,3 +105,48 @@ The rule "ZERO sensitive data in committed files" (`.agent/rules/core-rules.md`)
 
 If a secret is ever committed: **rotate it immediately** (assume it is compromised), then purge it
 from history (`git filter-repo` / BFG). Removing it from `HEAD` alone is not enough.
+
+## Personal data breach
+
+{{DATA_BREACH_SCOPE}}
+
+<!-- Filled at bootstrap (#496): "This project processes personal data: the procedure below applies." — or, when it
+     processes none (or only for a purely personal or household use, outside the GDPR), "Not applicable: this
+     project processes no personal data." and EVERYTHING below that line in this section is deleted. When the project
+     is only a processor for a client, "This project is a processor: it tells the client without undue delay, and the
+     client notifies." Outside Portugal or the GDPR, adjust the authority in step 4. -->
+
+A personal data breach is a security incident that, accidentally or unlawfully, destroys, loses, alters, discloses
+or gives unauthorised access to personal data — a leaked database dump, a backup in a public bucket, a bug that shows
+one user another user's records, but also a deleted backup with no other copy, or ransomware that locks the data.
+A limit listed in the [Security model](#security-model) does not change this: if it is exploited and personal data is
+affected, it is a breach.
+
+**Who acts depends on the role.** If the project runs for a client who decides what the data is for (the project is a
+*processor*), it does not notify the authority: it tells the client without undue delay, and the client follows the
+steps below. When the breach happens at a provider (hosting, a managed database), you become aware when the provider
+tells you — the deadlines start then.
+
+What to do, in order:
+
+1. **Detect and record the time** you became aware of it: the deadlines below run from that moment.
+2. **Contain it:** close the access, rotate the credentials involved, take the exposed copy down.
+3. **Assess the risk to the people** whose data it is (to their rights and freedoms): which data, how many people,
+   can it be used against them.
+4. **Notify the competent supervisory authority without undue delay, and within 72 hours** of becoming aware, unless
+   the breach is unlikely to result in a risk to people. In Portugal, for a controller established only there, the
+   CNPD, which has a form for it. The notification says: what happened, the categories and approximate number of
+   people and records, a contact point (the DPO, if there is one), the likely consequences, and the measures taken
+   or proposed. What is not yet known can follow in phases, without further undue delay; a notification after 72
+   hours says why it is late.
+5. **Tell the people affected without undue delay** when the risk to them is high, in plain language: what happened,
+   a contact point, the likely consequences, what was done, and what they can do. Not needed if the data was
+   unintelligible to whoever got it (encrypted, with the key safe) or later measures removed the high risk; if
+   telling each person would take a disproportionate effort, a public notice replaces it. The authority can still
+   require it.
+6. **Record the incident** — the facts, the effects and the action taken — even when no notification was made, and
+   in that case also why: the record is how the decision is shown to the authority later.
+
+Other laws may set shorter deadlines (for example NIS2, for the entities it covers). The legal obligation and how it
+fits the project's other privacy rules live in `.agent/rules/privacy.md`; this section is the procedure for the people
+who run the project.
