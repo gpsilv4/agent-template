@@ -88,7 +88,11 @@ estao no codigo de forma fiavel: ficam `[a confirmar]` e perguntam-se na Fase 1.
 So as que estao **escritas** no codigo: validacoes (limites, formatos), constantes de dominio,
 formulas e calculos, estados e transicoes. **Cada uma com o `ficheiro:linha`.** Para cada uma,
 perguntar ao utilizador se e intencional — um limite pode ser um bug que o codigo ja tem, e a rule
-gerada nao o deve consagrar. Agrupar por conceito de dominio, como no formato do §2.2.
+gerada nao o deve consagrar. Agrupar por conceito de dominio, como no formato do §2.2, e com o
+filtro de la (o que pode mudar sem mudar o comportamento visivel — um TTL de cache, um tamanho de
+pagina — fica de fora). Um exemplo QUANDO/ENTAO (#391) pode vir de um teste que ja existe, citado
+como `ficheiro:linha`: e o que ja esta verificado, e passa pela mesma pergunta — um teste tambem
+pode verificar um bug.
 
 ### Passo 4 — Conflitos com o template
 
@@ -413,7 +417,7 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 
 | Ficheiro | Base | Conteudo |
 |----------|------|----------|
-| `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Incluir exemplos de codigo se relevante. Com o nivel completo de privacidade, UMA linha-ponteiro: `Privacidade: docs/legal/privacy-inventory.md` (o inventario NAO vai aqui: este ficheiro e carregado, #495). |
+| `.agent/rules/business-logic.md` | Perguntas 4, 13 | Regras de negocio do dominio: formulas, limites, calculos, workflows. Estruturar em seccoes numeradas. Exemplos como `QUANDO ... ENTAO ...` (o formato abaixo), e nao como codigo. Com o nivel completo de privacidade, UMA linha-ponteiro: `Privacidade: docs/legal/privacy-inventory.md` (o inventario NAO vai aqui: este ficheiro e carregado, #495). |
 | `.agent/rules/pages-architecture.md` | Perguntas 9, 10, 19 | Arquitetura de paginas: o que cada pagina faz, que dados mostra, interacoes do utilizador. Se houver paywall/roles, documentar o gating por pagina. **Incluir uma seccao "Design System / Barra de Qualidade"** com os tokens/escala concretos da UI lib escolhida (cores, espacamento, tipografia, radius/sombras) e os criterios do tier `{{QUALITY_TIER}}` (estados obrigatorios, a11y, motion, SEO se web publico). Se o projeto usa error tracking/observabilidade (ex: Sentry), notar aqui como capturar erros de UI — senao, omitir (nao assumir vendor). |
 
 **Formato sugerido para `business-logic.md`:**
@@ -423,16 +427,33 @@ Estes ficheiros nao existem no template — devem ser criados pela AI com base n
 
 ## 1. [Conceito de Dominio A]
 - Regra X: ...
+  - Exemplo: QUANDO um movimento e uma transferencia entre contas proprias ENTAO nao conta como despesa do mes
 - Regra Y: ...
+  - Exemplo: QUANDO um treino tem duracao 0 ENTAO nao entra na media semanal
 
 ## 2. [Conceito de Dominio B]
 - Formula: `resultado = valor_a * taxa + valor_b`
+  - Exemplo: QUANDO valor_a = 100, taxa = 0.1 e valor_b = 5 ENTAO resultado = 15
 - Limites: min X, max Y
 
 ## 3. [Validacoes]
-- Campo Z: 0-100, step 0.01
-- Regra: validacao dupla (HTML min/max + clamp programatico no handler)
+- Campo Z: 0-100, step 0.01; um valor fora do intervalo e corrigido para o limite mais proximo, e nao recusado
+  - Exemplo: QUANDO o valor e 100.5 ENTAO fica 100
+
+## 4. [Conceito de Dominio C]
+- Regra: uma pergunta respondida certa 3 vezes seguidas sai da revisao diaria
+  - Exemplo: QUANDO uma pergunta tem 3 respostas certas seguidas ENTAO sai da revisao diaria
 ```
+
+**Os exemplos QUANDO/ENTAO (#391)** — uma sugestao, e nao uma obrigacao: cada regra PODE levar um ou mais, e uma
+regra obvia dispensa-os. Servem para a regra se poder verificar:
+- **O filtro:** se a implementacao pode mudar sem mudar o comportamento VISIVEL, nao e uma regra de negocio — e um
+  detalhe de implementacao, e fica fora deste ficheiro.
+- **A ponte para os testes:** cada exemplo e o primeiro candidato a um teste unitario DA REGRA (a Regra de Testes
+  do `process-rules.md`): a situacao e o arranjo, o resultado e a assercao. Por isso escreve-se ao nivel da regra, e
+  nao do ecra; o mesmo comportamento percorrido na UI e um teste E2E.
+- **A lingua:** as palavras-chave seguem a lingua em que o projeto escreve as rules (`QUANDO`/`ENTAO`,
+  `WHEN`/`THEN`).
 
 **Formato sugerido para `pages-architecture.md`:**
 
