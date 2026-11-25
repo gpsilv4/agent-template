@@ -16,6 +16,7 @@
  * ficou la) para os dois ficarem com folga do Guard 17. Os blocos vieram sem mudanca.
  */
 import { fimAspasDuplas, fimSubst } from "./caminhos.mjs";
+import { ansiC } from "./fronteira-dados.mjs";
 
 /** O fim do que abre em `s[k]` (`$(`, `<(`, `>(`): o `)` que fecha, lido como a shell. Um nome proprio para
  *  a varredura o poder mutar (`pares-hooks.mjs`), sem tocar no `fimSubst` partilhado. */
@@ -44,8 +45,8 @@ function fechaHeredoc(s, ini, tag) {
  *   as palavras partidas de chavetas levam `partida: true` (o `inlineDe` nao lhes da a isencao do script)
  *   pela ordem em que aparecem; os de dentro de uma substituicao vem DEPOIS do comando que a contem.
  *   O `redir` le-o o `cita` do `fronteira.mjs`, e o `recebeDe` do `posicao.mjs` (a here-string, #566), que tambem le se
- *   ha `heredoc` (nao o corpo). O `pipePara` e o `heredoc.corpo` ainda so os leem os testes: sao
- *   para o PR (c) do #336 (o heredoc como texto), e ficam aqui para o lexer ser um so.
+ *   ha `heredoc` (nao o corpo). O `heredoc.corpo` le-o o `textos-publicos.mjs`; o `pipePara` ainda so os testes (e
+ *   para o PR (c) do #336, o heredoc como texto, e fica aqui para o lexer ser um so).
  */
 export function comandos(texto, dentro = false) {
   const out = [];
@@ -132,10 +133,7 @@ export function comandos(texto, dentro = false) {
       let j = i + 2;
       while (j < texto.length && texto[j] !== "'") j += texto[j] === "\\" ? 2 : 1;
       // Descodificado como a shell o entrega: `node -$'\x70e'` e `node -pe` (leitura 1 do PR a).
-      pal.texto += texto.slice(i + 2, j).replace(/\\(x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)/g, (_m, e) =>
-        e[0] === "x" ? String.fromCharCode(parseInt(e.slice(1), 16))
-          : /^[0-7]/.test(e) ? String.fromCharCode(parseInt(e, 8))
-            : ({ n: "\n", t: "\t", r: "\r", e: "\x1b", a: "\x07", b: "\b", f: "\f", v: "\v" })[e] ?? e);
+      pal.texto += ansiC(texto.slice(i + 2, j));
       pal.citada = true;
       i = j;
       continue;

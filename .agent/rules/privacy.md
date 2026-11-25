@@ -11,7 +11,7 @@
 > O que e proprio da IA (o prompt, a injecao, o custo, as decisoes automatizadas) tem a sua regra:
 > `.agent/rules/ai-features.md`. Aqui, um fornecedor de IA e mais um DESTINO do inventario.
 
-## As 4 perguntas (o BOOTSTRAP, a Fase 0-R e o `/upgrade` apontam para aqui)
+## As 4 perguntas (o BOOTSTRAP e a Fase 0-R apontam para aqui; o `/upgrade`, a partir do #624)
 
 1. **A app trata dados de PESSOAS** — dos utilizadores (nome, email, um registo de treino, notas de estudo,
    movimentos bancarios, um documento) **ou de quem NAO a usa** (jogadores observados, arbitros avaliados, os
@@ -23,7 +23,7 @@
    avaliacao para uma empresa), quem decide e o cliente: o projeto e SUBCONTRATANTE dele — **PARAR**: um contrato do
    art. 28 com o cliente, o registo do art. 30(2), e a base legal e o art. 14 passam a ser do cliente.
 
-Num projeto existente (a Fase 0-R) ou num derivado que ja existe (o `/upgrade`), o agente PROPOE as respostas a
+Num projeto existente (a Fase 0-R) ou num derivado que ja existe (o `/upgrade`, a partir do #624), o agente PROPOE as respostas a
 partir do codigo (o que guarda, o que envia, a quem), e o utilizador confirma.
 
 ## Nivel BASE — para todos, sempre

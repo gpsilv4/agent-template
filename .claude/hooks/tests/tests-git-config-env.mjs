@@ -17,6 +17,7 @@
 import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { porqueAltera } from "../lib/fronteira.mjs";
+import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error("tests-git-config-env.mjs nao e um entry point: nao corre testes por si.\nCorrer `node .claude/hooks/tests/test-hooks.mjs`.");
@@ -31,8 +32,12 @@ export const entryPoint = "test-hooks.mjs";
 const EXECUTAR = "com uma opcao que faz o git executar";
 const FORCE = "Force-push negado";
 
-export function registar({ test, corre, repo, eq, contem }) {
+export function registar({ test, corre, repo, eq, contem, SALTA }) {
+  // O branch protegido e o 1.o DO PROJETO (#257), e nao `main`: num derivado que proteja outro, um `main` fixo negava a
+  // menos e os controlos deixavam por nao ser protegido (o `/audit` da v0.64.0). Sem nenhum, salta.
+  const main = PROTEGIDOS_LISTA[0];
   const decide = (comando, branch) => {
+    if (branch === undefined) throw SALTA;
     const d = repo(branch);
     try {
       return corre({ tool_input: { command: comando }, cwd: d });
@@ -52,8 +57,11 @@ export function registar({ test, corre, repo, eq, contem }) {
     "=git --config-env a=B push --force origin fix/x", "git --config-env a=B --attr-source X push -f origin fix/x"]) {
     test(`config-env: \`${c}\` num branch de feature NEGA o force-push (#579)`, () => nega(c, "feature/x", FORCE));
   }
-  test("config-env: `git --config-env a=B push origin --delete main` num branch de feature NEGA (#579)", () =>
-    eq(decide("git --config-env a=B push origin --delete main", "feature/x").decisao, "deny", "apaga o main remoto"));
+  // O ref apagado e o 1.o protegido do projeto: so um protegido nega o `--delete` (o `refsApagados`).
+  test("config-env: `git --config-env a=B push origin --delete <protegido>` num branch de feature NEGA (#579)", () => {
+    if (main === undefined) throw SALTA;
+    eq(decide(`git --config-env a=B push origin --delete ${main}`, "feature/x").decisao, "deny", "apaga o protegido remoto");
+  });
 
   // --- A chave que executa: o valor vem de uma variavel, e conta como "executa algo" ------------------------------
   for (const c of ["git --config-env core.pager=X log", "git --config-env=core.pager=X log", "git --config-env CORE.PAGER=X log",
@@ -72,11 +80,11 @@ export function registar({ test, corre, repo, eq, contem }) {
     "git --config-env core.hooksPath=V push origin v1.0.0", "git --config-env core.hooksPath=V switch -c x",
     "git --config-env include.path=V log", "git --config-env remote.origin.uploadpack=V fetch",
     "git --config-env submodule.s.update=V submodule update", "git --config-env url.ext::x.insteadOf=V fetch"]) {
-    test(`config-env: \`${c}\` num branch protegido NEGA por executar (#579)`, () => nega(c, "main", EXECUTAR));
+    test(`config-env: \`${c}\` num branch protegido NEGA por executar (#579)`, () => nega(c, main, EXECUTAR));
   }
   // Documentacao, e nao prova: o `alias.st` nega pelo verbo `st`, que nao e seguro, com ou sem a leitura.
   test("config-env: `git --config-env alias.st=X st` num branch protegido NEGA (#579)", () =>
-    eq(decide("git --config-env alias.st=X st", "main").decisao, "deny", "alias"));
+    eq(decide("git --config-env alias.st=X st", main).decisao, "deny", "alias"));
 
   // --- A excecao (opcao A): a mesma decisao que o `-c` da mesma chave, ou que sem a flag --------------------------
   // Os pares em que so muda a chave: `a=B` deixa, `core.pager=X` (acima) nega.
@@ -86,12 +94,12 @@ export function registar({ test, corre, repo, eq, contem }) {
     "git --config-env http.extraHeader=AUTH fetch", "git --config-env http.proxy=HTTPS_PROXY fetch", "git --attr-source X status",
     "git --attr-source X log --oneline", "git --config-env core.pager log"]) {
     test(`config-env: \`${c}\` num branch protegido DEIXA, como o -c da mesma chave (#579)`, () =>
-      eq(decide(c, "main").decisao, "allow", c));
+      eq(decide(c, main).decisao, "allow", c));
   }
   // Controlos que ja deixavam no `main` (a forma com `=` saltava um token) e um wrapper sem chave que execute.
   // E um wrapper com um paginador simples e visivel: a leitura sem aspas nao o torna "executa" (o `less` nao casa).
   test("config-env: CONTROLO, `--attr-source=X status`, `sh -c 'git log'` e `sh -c 'git -c core.pager=less log'` DEIXAM num branch protegido (#579)", () => {
-    for (const c of ["git --attr-source=X status", "sh -c 'git log'", "sh -c 'git -c core.pager=less log'"]) eq(decide(c, "main").decisao, "allow", c);
+    for (const c of ["git --attr-source=X status", "sh -c 'git log'", "sh -c 'git -c core.pager=less log'"]) eq(decide(c, main).decisao, "allow", c);
   });
   // A fronteira tambem le o `valoresQueExecutam`: um dado (o proxy) a frente de um `git log` que cita a fronteira nao e
   // "executa"; um paginador de uma variavel e (a leitura focada).

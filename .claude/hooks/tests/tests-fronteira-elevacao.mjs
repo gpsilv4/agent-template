@@ -15,6 +15,7 @@ import { rmSync } from "fs";
 import { pathToFileURL } from "url";
 import { porqueAltera } from "../lib/fronteira.mjs";
 import { MAX_PALAVRAS } from "../lib/posicao.mjs";
+import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error("tests-fronteira-elevacao.mjs nao e um entry point: nao corre testes por si.\nCorrer `node .claude/hooks/tests/test-hooks.mjs`.");
@@ -28,7 +29,7 @@ const F = ".claude/hooks/x.mjs";
 const R = `rm -rf ${F}`;
 const P = "git push --force origin feature/x";
 
-export function registar({ test, corre, repo, eq }) {
+export function registar({ test, corre, repo, eq, SALTA }) {
   const nega = (c) => { if (porqueAltera(c) === null) throw new Error(`"${c}": devia negar, deixou`); };
   const deixa = (c) => { const r = porqueAltera(c); if (r !== null) throw new Error(`"${c}": devia deixar, negou (${r})`); };
 
@@ -144,7 +145,9 @@ export function registar({ test, corre, repo, eq }) {
   // do `-c`, um `su` sem git, e uma mensagem de commit num heredoc para o git. Nega a mais, dito: `su root -c 'echo git
   // push'` (o `echo` sai como o valor do `-c`, e o `git push` fica invocacao — o mesmo que o `sh -c 'echo git push'`).
   test("elevacao: branch — CONTROLO, `su -c 'git status'`, `su root -c 'git log'`, `su -c ls` DEIXAM num branch protegido (#600)", () => {
-    for (const c of ["su -c 'git status'", "su root -c 'git log --oneline'", "su -c ls", "runuser -u me -- git status"]) decide(c, "allow", "main");
+    // O 1.o protegido DO PROJETO (o `/audit` da v0.64.0): com `main` fixo, num derivado que nao o proteja, nao media nada.
+    if (PROTEGIDOS_LISTA[0] === undefined) throw SALTA;
+    for (const c of ["su -c 'git status'", "su root -c 'git log --oneline'", "su -c ls", "runuser -u me -- git status"]) decide(c, "allow", PROTEGIDOS_LISTA[0]);
   });
   // Controlos do `ehShell`: um `su` ENTRE ASPAS no preambulo (o titulo de um PR que fala dele) e um `-s` que e do git, e
   // nao do `doas`, nao fazem do corpo de um heredoc comandos — uma mensagem que cita um force-push continua texto.

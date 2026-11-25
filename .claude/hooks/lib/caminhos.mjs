@@ -13,7 +13,7 @@
 import { execFileSync } from "child_process";
 import { homedir } from "os";
 import { posix } from "path";
-import { ATRIBUICAO_BASH_LITERAL, CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, NOMEIA, resto } from "./fronteira-dados.mjs";
+import { ansiC, ATRIBUICAO_BASH_LITERAL, CAMINHOS_FRONTEIRA, ehCaminhoFronteira, MAES, NOMEIA, resto } from "./fronteira-dados.mjs";
 
 /** O contexto para resolver caminhos: a raiz do repo, o `cwd` do payload e a home. Impuro (corre
  *  o `git`), por isso fora do `porqueAltera`, que o recebe por parametro e fica testavel. */
@@ -426,15 +426,22 @@ function desaspa(t) {
     if (c === ";" || c === "\n" || c === ")" || (c === "|" && antes !== ">") || (c === "&" && !"<>".includes(antes) && t[k + 1] !== ">")) despeja();
     if (c === "\\") { out += t.slice(k, k + 2); visto(t.slice(k, k + 2)); k += 2; continue; }
     if (c === "#" && (k === 0 || /[\s;&|(]/.test(t[k - 1]))) { while (k < t.length && t[k] !== "\n") k++; continue; }
-    // `$'...'` (ANSI-C) tem escapes, ao contrario das aspas simples: `$'x\' y'` nao fecha no `\'`.
+    // `$'...'` (ANSI-C) tem escapes, ao contrario das aspas simples: `$'x\' y'` nao fecha no `\'`. Descodificado como a
+    // shell o entrega, segue a regra das simples (`/audit` da v0.64.0): um caminho simples que nomeia a fronteira fica.
+    // Era sempre apagado, e `rm -r $'.claude/hooks'` (ou `$'.claude\x2fhooks'`) passava.
     if (c === "$" && t[k + 1] === "'") {
       let j = k + 2;
       while (j < t.length && t[j] !== "'") j += t[j] === "\\" ? 2 : 1;
-      out += ' "" ';
-      visto('""');
+      const dentro = ansiC(t.slice(k + 2, j));
+      const alvo = "<>".includes(ultimo) || ("&|!".includes(ultimo) && "<>".includes(penultimo));
+      const fica = /^[^\s"'$`\\;&|<>()]*$/.test(dentro) && (alvo || NOMEIA.test(dentro)) ? dentro : ' "" ';
+      out += fica;
+      visto(fica);
       k = j + 1;
       continue;
     }
+    // `$"..."` (a traducao do bash) e uma aspa dupla: o `$` sai, e as aspas leem-se a seguir (`/audit` da v0.64.0).
+    if (c === "$" && t[k + 1] === '"') { k += 1; continue; }
     // Uma crase FORA de aspas e um `$(...)` com contexto proprio (#568): o de dentro le-se pelas SUAS aspas, numa so
     // passagem. Lido pelas de fora, `` `echo "x"#; rm <f>` `` perdia o `rm` para um comentario.
     if (c === "`" && fechaCrase(t, k) > k) {

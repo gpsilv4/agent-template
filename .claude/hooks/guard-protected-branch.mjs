@@ -52,8 +52,8 @@ import { SEGUROS, FORMAS_INSEGURAS, FORMA_EXIGIDA, valoresQueExecutam, executaAl
 import { porqueAltera, contextoFronteira, executaCrase, razaoDe } from "./lib/fronteira.mjs";
 // O RECONHECIMENTO de uma invocacao do `git` (os segmentos, os wrappers, as flags globais ate ao verbo) vive a
 // parte desde o #580; aqui fica a DECISAO.
-import { invocacoes, limpo } from "./lib/invocacoes-git.mjs";
-import { ELEVA_CURTA_SRC, ELEVAM, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC, temEquals } from "./lib/fronteira-dados.mjs";
+import { invocacoes, limpo, ultimoComando } from "./lib/invocacoes-git.mjs";
+import { ELEVA_CURTA_SRC, ELEVAM, SHELLS, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC, temEquals } from "./lib/fronteira-dados.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -281,12 +281,14 @@ try {
       // E quem le o stdin numa shell sem se chamar shell (#600): o `su`/`runuser`, e o `sudo`/`doas` com uma flag que eleva
       // (`-s`, `-i`, `-Es`, `--shell`, `--login` e os prefixos). `su - root <<EOF` e `sudo -s <<EOF` passavam.
       // As novas tambem depois de um caminho ou de um separador (`/bin/su - <<EOF`, `true;su <<EOF`): so acrescenta varreduras.
-      // As shells ficam com o `(?:^|[\s|])` do `main` (o `/bin/bash <<EOF` e do #605).
+      // As shells sao as da lista unica (`SHELLS`; ate ao `/audit` da v0.64.0 faltavam o `csh`/`tcsh`/`fish`), e tambem por
+      // caminho (`/bin/bash <<EOF`, #605). Nega a mais, dito: um ARGUMENTO cujo ultimo nome e uma shell (`cat docs/sh <<EOF`).
       // As novas leem-se SEM o texto entre aspas, e as flags do `sudo`/`doas` SEGUIDAS a ele (cada uma com um valor no
       // maximo): `gh pr create --title "... su -c ..." --body "$(cat <<'EOF'` e `doas git commit -s -F - <<EOF` (o `-s` e do
       // git) varriam o corpo — a mensagem de um PR que fala de `su` e de force-push era negada (a leitura focada do #600).
       const semAspas = (t) => limpo(t.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, " "));
-      const ehShell = (t, equals) => new RegExp(`(?:^|[\\s|])${equals ? "=?" : ""}(?:sh|bash|zsh|dash|ksh)(?:\\s|$)`).test(limpo(t)) ||
+      // O fim do nome aceita um separador colado (`| bash)`, `| bash;`), e o caminho e `(?:[^\s/]*/)*` (linear, e nao `\S*/`).
+      const ehShell = (t, equals) => new RegExp(`(?:^|[\\s|]|\\|&)${equals ? "=?" : ""}(?:[^\\s/]*/)*(?:${SHELLS.join("|")})(?:[\\s;&|)]|$)`).test(limpo(t)) ||
         new RegExp(`(?:^|[\\s|;&(/])${equals ? "=?" : ""}(?:${SU.join("|")})(?:\\s|$)`).test(semAspas(t)) ||
         new RegExp(`(?:^|[\\s|;&(/])${equals ? "=?" : ""}(?:${ELEVAM.join("|")})(?:\\s+-\\S*(?:\\s+[^-\\s]\\S*)?)*?\\s+(?:${ELEVA_CURTA_SRC}|--(?:${SUDO_SHELL_SRC}|${SUDO_LOGIN_SRC}))(?:\\s|$)`).test(semAspas(t));
       // Em `cat <<EOF | bash`, o `| bash` fica no RESTO DA LINHA do `<<` — que o regex captura
@@ -298,8 +300,14 @@ try {
       // nao faz do corpo texto (#600): so conta o que o preambulo corre a vista. Sem isto, por o `su` nos `WRAPPERS` fazia do
       // `git status` uma invocacao, e o corpo — com um force-push — deixava de se varrer. Nega a mais, dito: o corpo de
       // `sh -c 'git commit -F -' <<EOF` passa a varrer-se, e uma mensagem com uma linha `git push --force` e negada.
-      const aVista = (equals) => invocacoes(preambulo, { equals }).filter((inv) => !inv.viaWrapperOpaco);
-      const pede = (equals) => aVista(equals).length === 0 && (ehShell(preambulo, equals) || ehShell(restoDaLinha, equals));
+      // Quem recebe o corpo e o ULTIMO comando do preambulo, ou a shell a jusante no resto da linha (#605): um git ANTES dele
+      // (`git stripspace | bash <<EOF`, `git log; bash <<EOF`) ou a montante do pipe (`git stripspace <<EOF | bash`) nao faz
+      // do corpo texto. So um git que RECEBE o corpo o faz (`git commit -F - <<EOF`, tambem depois de um `bash -c 'x' &&`).
+      const quem = ultimoComando(preambulo);
+      const aVista = (equals) => invocacoes(quem, { equals }).filter((inv) => !inv.viaWrapperOpaco);
+      // A shell ve-se no `quem` OU no preambulo inteiro (o do `main`): o `quem` so decide se um git a vista RECEBE o corpo.
+      // So com o `quem`, `while read l; do bash -s; done <<EOF` deixava de varrer (o `quem` e o `done`; os dois leitores).
+      const pede = (equals) => (aVista(equals).length === 0 && (ehShell(quem, equals) || ehShell(preambulo, equals))) || ehShell(restoDaLinha, equals);
       if (pede(false) || (comEquals && pede(true))) {
         corposExecutaveis.push(corpo);
       }
