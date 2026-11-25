@@ -8,7 +8,7 @@
  * fronteira**, na forma canonica. Vive a parte porque o `fronteira.mjs` chegou as 500 linhas.
  *
  * Cinco leituras independentes e uma final sistematica ao PR afinaram isto; os casos medidos, e o
- * que fica de fora, estao no `tests-fronteira-inventario.mjs` (`FECHADO_PELO_CAMINHO`, `ABERTO`).
+ * que fica de fora, estao no `tests-fronteira-caminho.mjs` (`FECHADO_PELO_CAMINHO`) e no `tests-fronteira-inventario.mjs` (`ABERTO`).
  */
 import { execFileSync } from "child_process";
 import { homedir } from "os";

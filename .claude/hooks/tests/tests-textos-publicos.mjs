@@ -371,7 +371,8 @@ export function registar({ test }) {
   test("textos-publicos: as opcoes globais do git com valor vivem numa so lista; uma copia NOVA noutro hook reprova (#397, M2)", () => {
     // As duas copias do nucleo da fronteira convergem no #336 (com um corpus diferencial); ate la, sao as unicas excecoes.
     // A do guard do branch (`lib/invocacoes-git.mjs`) saiu no #579: le a lista unica, e uma copia nova la reprova aqui.
-    const CONHECIDAS = new Set(["lib/fronteira-dados.mjs", "lib/fronteira.mjs", "lib/verbos-git.mjs"]);
+    // A do `saidasDoGit` mudou-se com ele para o `lib/fronteira-piso.mjs` no #631 (o `fronteira.mjs` ficou sem nenhuma).
+    const CONHECIDAS = new Set(["lib/fronteira-dados.mjs", "lib/fronteira-piso.mjs", "lib/verbos-git.mjs"]);
     const raiz = join(ROOT, ".claude/hooks");
     const fontes = {};
     const anda = (d, rel = "") => { for (const n of readdirSync(d)) { const p = join(d, n); const r = rel ? `${rel}/${n}` : n; if (statSync(p).isDirectory()) { if (n !== "tests") anda(p, r); } else if (n.endsWith(".mjs")) fontes[r] = readFileSync(p, "utf8"); } };

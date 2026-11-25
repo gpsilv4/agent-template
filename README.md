@@ -406,8 +406,9 @@ not to* line, so every agent sees it.
 │   ├── reinject-fronteiras.mjs     <- SessionStart(compact): re-injects the Fronteiras
 │   │                                  block AFTER compaction dropped the imported rules
 │   ├── lib/                        <- What the hooks share: the frontier rule (`fronteira`,
-│   │                                  `caminhos`, the shell lexer `comandos`, the command
-│   │                                  position `posicao`, and their import-free leaf
+│   │                                  its text floor `fronteira-piso`, `caminhos`, the shell
+│   │                                  lexer `comandos`, the command position `posicao`, who
+│   │                                  runs stdin as code `recebe`, and their import-free leaf
 │   │                                  `fronteira-dados`), git verbs, the branch guard's git
 │   │                                  invocations (`invocacoes-git`), the guard's deadline
 │   │                                  (`resposta`), porcelain parsing, a subagent's scope
@@ -424,7 +425,7 @@ not to* line, so every agent sees it.
 │       ├── tests-git-executa.mjs   <- What git EXECUTES from an option (`-c`, `--exec`, `GIT_PAGER`...)
 │       ├── tests-sem-ciclos.mjs    <- No import cycle among the hooks and their lib/
 │       ├── tests-fronteira-*.mjs   <- The frontier: what a careless command must not write
-│       │                              (descuidos, redirections, inventory, generated corpus)
+│       │                              (descuidos, redirections, inventory, paths, generated corpus)
 │       ├── tests-ambito-agente.mjs <- A subagent's Bash scope, read like the shell reads it
 │       ├── tests-protegidos.mjs    <- protegidos.json: fails closed when missing or broken
 │       ├── tests-guard-tamanho.mjs <- The guard's deadline and its size ceilings
