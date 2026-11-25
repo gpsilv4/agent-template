@@ -77,7 +77,7 @@ codigo responde:
 | 14. Items iniciais de backlog | `TODO`/`FIXME` (`ficheiro:linha`), ficheiros > 500 linhas, areas sem testes |
 | 15. CI/CD | o CI que ja existe |
 | 18. Copyright holder | o `LICENSE` |
-| Privacidade (as 4 perguntas, #495) | o que o codigo GUARDA (o esquema da BD, os modelos), o que ENVIA e a quem (os SDKs do manifesto, os `fetch` para fora, os embeds) — propostas, nunca decididas |
+| Privacidade (as 4 perguntas, #495) | o que o codigo GUARDA (o esquema da BD, os modelos), o que ENVIA e a quem (os SDKs do manifesto — incluindo os de IA, #494 —, os `fetch` para fora, os embeds) — propostas, nunca decididas |
 | Versao do Node (§2.7) | `.nvmrc` ou `engines` |
 
 As restantes (descricao, dominio, lingua da UI, email de seguranca, tier de qualidade, ...) nao
@@ -297,6 +297,14 @@ COMPLETO: o `docs/legal/` da §2.8. Com "nao", so o nivel base. Em TODOS os caso
 condenacoes, o projeto como subcontratante do cliente, as decisoes automatizadas, as categorias especiais de quem nao
 usa a app, e a DPIA ou o DPO), o agente nao decide: escreve a pergunta para o responsavel e para um jurista.
    → Substitui `{{DATA_BREACH_SCOPE}}`, e alimenta o rascunho do modelo de seguranca (`SECURITY.md`, §2.7)
+
+**IA no produto (#494).** A pergunta dos **ativos que nunca entram num modelo** vale para TODOS os projetos (o agente
+de codigo tambem e um modelo) e vive na `.agent/rules/ai-features.md` §13: dados de clientes sob contrato, codigo ou
+conteudo com uma licenca que o proibe — por CATEGORIA ou caminho, nunca pelo nome do cliente (um nome que nao pode ser
+publico vai para a lista de nomes proibidos). A resposta escreve-se na §2.8. Se a 3.a pergunta da Privacidade tiver um
+fornecedor de IA, a funcionalidade segue a `ai-features.md`; os prompts ficam no codigo ao lado da funcionalidade, e as
+avaliacoes com o modelo real junto dos testes mas fora do include do runner dos PRs — sugerir o caminho da stack (ex.:
+`src/<funcionalidade>/prompts/` e `tests/evals/` com um script `test:evals`).
 
 ### Opcionais (perguntar se relevante)
 
@@ -649,6 +657,11 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
 - **`.agent/rules/sync-docs.md`**, **`.agent/context/backlog-archive.md`**, **`decisions-archive.md`**, **`walkthrough-archive.md`**: sem conteudo a gerar — o sweep de placeholders (2.1) trata dos titulos. Nao importar `sync-docs.md` nem os `*-archive.md` em **nenhum** dos tres pontos de entrada (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`).
 - **`docs/README.md`**: criar a partir de `src/docs/exemplos/docs-README.md` — o indice da pasta dos docs do PRODUTO, com as 8 pastas (`product/`, `architecture/`, `development/`, `operations/`, `audits/`, `strategy/`, `legal/`, `reference/`) e o que vai em cada uma (#585). Os nomes das pastas ficam em ingles; as descricoes na lingua do projeto. So o indice: as pastas nascem com o primeiro doc de cada tipo. O `README.md` da raiz e outro ficheiro, e nao se toca aqui. **Se o `docs/` ja existir** (um projeto existente, Fase 0-R): nunca sobrescrever — com um `docs/README.md`, propor a fusao com o indice; se o `docs/` for a origem de um site (Docusaurus, MkDocs, GitHub Pages), perguntar antes de lhe acrescentar o indice.
 - **`docs/legal/`** (so com "sim" a 1.a pergunta da Privacidade, #495): criar `docs/legal/privacy-inventory.md` a partir de `src/docs/exemplos/privacy-inventory.md` e criar `docs/legal/privacy-policy.md` a partir de `src/docs/exemplos/privacy-policy.md`, e o agente PROPOE o inventario a partir das respostas (o responsavel decide). A politica nasce como RASCUNHO, na lingua principal da UI, e uma `privacy-policy.<lingua>.md` por cada lingua a mais; nao se publica sem revisao humana, e nos casos que a regra marca, sem revisao juridica. Os campos `[...]` preenchem-se (nenhum guard os ve). Um que ja exista nunca se sobrescreve. Com "nao", nada aqui: so o nivel base.
+- **`.agent/context/decisions.md`** (#494; num projeto ja derivado — depois do §2.0 —, nunca no template): duas
+  entradas no topo, nesta forma fixa e procuravel (nenhum passo as le ainda: quem as vai ler e o `/upgrade`, no #624): `## <data> — Privacidade, 1.a pergunta: <sim/nao>`
+  e `## <data> — Ativos que nunca entram num modelo: <lista, ou "nenhum">`. Com ativos, o mesmo passo estende o bullet
+  `**Nunca**:` das Fronteiras em todas as copias (ver a §2.9: o Guard 1d e o Guard 2 comparam-nas); com "nenhum", as
+  Fronteiras ficam como estao.
 - **Lingua dos docs**: os docs de `.agent/` e `src/docs/` estao em PT-PT. Se a lingua da equipa/UI (pergunta 6) **nao** for PT-PT, **traduzir** rules, workflows e ficheiros de contexto para essa lingua (o codigo, variaveis e nomes de ficheiros permanecem em ingles).
 
 ### 2.9 Camada multi-agente (`.claude/` + `.gemini/` + `AGENTS.md`)
@@ -660,10 +673,12 @@ Dependendo da stack (pergunta 5), ajustar seccoes especificas:
   esses tools sigam uma referencia em markdown; sem a copia, um deles que nao a siga ficava com
   um mapa de pastas e **zero regras**.
   > **Se adaptares as Fronteiras no `CLAUDE.md`** — e um projeto que nao seja TypeScript **tem**
-  > de o fazer (`any` proibido, ~400 linhas) — **adapta as duas copias no mesmo passo**. O
-  > **Guard 1d** compara-as e reprova se divergirem: e uma duplicacao **forcada** (cada tool le
-  > so o seu ficheiro), logo e verificada em vez de proibida. O sweep de placeholders da 2.1 ja
-  > cobre o `{{UI_LANGUAGE}}` nas tres; o que ele nao apanha e uma **edicao** de conteudo.
+  > de o fazer (`any` proibido, ~400 linhas) — **adapta as copias no mesmo passo**: o
+  > `AGENTS.md`, o `.cursor/rules/project.mdc` e o `.github/copilot-instructions.md` (o **Guard
+  > 1d** compara cada um com o `CLAUDE.md` e reprova se divergirem), e o `GEMINI.md` (o Guard 2
+  > compara-o inteiro). E uma duplicacao **forcada** (cada tool le so o seu ficheiro), logo e
+  > verificada em vez de proibida. O sweep de placeholders da 2.1 ja cobre o `{{UI_LANGUAGE}}`
+  > em todas as copias; o que ele nao apanha e uma **edicao** de conteudo.
 - **`.claude/commands/*.md`**: slash commands nativos do Claude Code — wrappers finos que apontam para `.agent/workflows/`. Outros agentes ignoram esta pasta.
 - **`.gemini/commands/*.toml`**: os mesmos comandos para o Gemini CLI (wrappers finos com `{{args}}`). Ja incluidos no template.
 - **Traducao**: se a lingua nao for PT-PT, traduzir a `description`/`prompt` dos wrappers em `.claude/commands/` **e** `.gemini/commands/` (a logica esta nos workflows — nao duplicar).
@@ -759,7 +774,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 - [ ] `core-rules.md` adaptado a stack?
 - [ ] Workflows adaptados a stack e hosting?
 - [ ] `CLAUDE.md` e `GEMINI.md` com descricao do projeto?
-- [ ] **As Fronteiras iguais nos tres sitios** (`CLAUDE.md`, `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`)? O **Guard 1d** verifica-o — se adaptaste o bloco num, adapta nos outros dois
+- [ ] **As Fronteiras iguais em todas as copias** (`CLAUDE.md`, `AGENTS.md`, `.github/copilot-instructions.md`, `.cursor/rules/project.mdc`, e o `GEMINI.md`)? O **Guard 1d** verifica as quatro primeiras e o Guard 2 o `GEMINI.md` — se adaptaste o bloco num, adapta nos outros
 - [ ] **`README.md` substituido** pelo README do projeto (nao a capa do template nem o badge do repo do template)?
 - [ ] **`.github/CODEOWNERS`** sem `{{GITHUB_OWNER}}` (`grep "{{" .github/CODEOWNERS` -> zero linhas)?
 - [ ] `.github/workflows/ci.yml` configurado com triggers e scripts corretos?
