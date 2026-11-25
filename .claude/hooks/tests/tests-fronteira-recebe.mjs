@@ -3,10 +3,10 @@
  *
  * NAO e um entry point: o `test-hooks.mjs` descobre este modulo e chama `registar()`.
  *
- * PORQUE EXISTE: o `RECEBE_CODIGO` (`fronteira.mjs`) so via a shell LOGO a seguir ao `|` ou ao inicio do comando, e
+ * PORQUE EXISTE: o `RECEBE_CODIGO` (`fronteira-piso.mjs`) so via a shell LOGO a seguir ao `|` ou ao inicio do comando, e
  * 56 formas deixavam (medido no `main` a 19 nov): `| env bash`, `| sudo -u eu bash`, `| timeout 5s bash`,
  * `| caffeinate -i bash`, `| (bash)`, `env sudo -s <<EOF`, `nohup su <<<'...'`, `| bash /dev/stdin`, e a fronteira a
- * vista noutro comando (`cat <f>; true | env bash`). O `recebeDe` (`posicao.mjs`) le-as por POSICAO, e o
+ * vista noutro comando (`cat <f>; true | env bash`). O `recebeDe` (`recebe.mjs`) le-as por POSICAO, e o
  * `fronteira.mjs` so ACRESCENTA no fim de cada ramo: nenhum rotulo muda.
  *
  * Chama a decisao (`porqueAltera`) directamente, sem o spawn do hook: sao ~100 casos, e o rotulo e o que se afirma.
@@ -14,7 +14,8 @@
  */
 import { pathToFileURL } from "url";
 import { porqueAltera } from "../lib/fronteira.mjs";
-import { MAX_PALAVRAS, recebeDe } from "../lib/posicao.mjs";
+import { MAX_PALAVRAS } from "../lib/posicao.mjs";
+import { recebeDe } from "../lib/recebe.mjs";
 import { comandos } from "../lib/comandos.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

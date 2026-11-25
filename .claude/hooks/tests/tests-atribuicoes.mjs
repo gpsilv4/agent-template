@@ -58,7 +58,7 @@ const EXECUTA = [
   ["GIT_CONFIG_PARAMETERS+= tambem executa", `GIT_CONFIG_PARAMETERS+="'core.pager'=${RM}" git log`],
 ];
 
-/** Sitios 4, 5 e 6 (`fronteira.mjs`, `posicao.mjs`): o que corre codigo com a fronteira so citada. */
+/** Sitios 4, 5 e 6 (`fronteira-piso.mjs`, `posicao.mjs`): o que corre codigo com a fronteira so citada. */
 const FRONTEIRA_NEGA = [
   ["X+=1 antes de um verbo-variavel", `X+=1 $N -e "require('fs').rmSync('${H}')"`],
   ["regressao (o indice ja expandia): X[0]=1 antes de um verbo-variavel", `X[0]=1 $N -e "require('fs').rmSync('${H}')"`],

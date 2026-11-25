@@ -68,6 +68,26 @@ export const PARES_DOS_HOOKS = [
     neutro: "((t) => t.length)(",
   },
   {
+    // O PISO da fronteira (#631: saiu do `fronteira.mjs`). E quase so dados (a `LEITURA` e as regex); o que decide
+    // e o `saidasDoGit`, para onde ESCREVE uma invocacao do `git` (#237). O sinal sao os tres sitios que juntam uma
+    // saida; o neutro empurra para um array deitado fora — cada mutacao deixa um `--output=`, um `bundle create` ou um
+    // `git init` para a fronteira por ver (`tests-fronteira-descuidos.mjs`).
+    alvo: ".claude/hooks/lib/fronteira-piso.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])saidas\.push\(/,
+    neutro: "[].push(",
+  },
+  {
+    // Quem RECEBE codigo pelo stdin, por posicao (#566, #600; em `recebe.mjs` desde o #631). Os sitios sao as duas
+    // perguntas que decidem — o script E o stdin? (`leStdin`) e o `su` corre-o? (`suRecebe`) —; o neutro responde
+    // "nao", e cada mutacao deixa um `| bash`, um `| $SHELL` ou um `| su` por negar. A definicao `function leStdin(`
+    // fica de fora pelo lookbehind; a do `suRecebe` e uma `const` atribuida, e nao casa.
+    alvo: ".claude/hooks/lib/recebe.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])(?<!function\s)(?:leStdin|suRecebe)\(/,
+    neutro: "((..._) => false)(",
+  },
+  {
     // A entrada, a saida e o PRAZO do guard (#227). Os sitios de chamada de `negar(` sao dois: o
     // prazo esgotado, e a negacao que o worker passa ao processo principal. Mutado um, o guard
     // permite o que devia negar. A definicao (`export function negar(`) nao conta.
@@ -166,7 +186,7 @@ export const PARES_DOS_HOOKS = [
   // --- As ATRIBUICOES (#546): as duas definicoes de `fronteira-dados.mjs`, em cada sitio que as CHAMA (a definicao nao e
   // um sitio). O neutro responde "nao e atribuicao": a palavra deixa de se saltar, e o perigo que vinha a seguir (o `git`,
   // o `GIT_PAGER`, o interpretador) ou o verbo da allowlist deixa de se ver. Ficam de fora, e e dito: a LARGA no
-  // `RECEBE_CODIGO` (`fronteira.mjs`), dentro de uma template string que a varredura nao le — um controlo manual do
+  // `RECEBE_CODIGO` (`fronteira-piso.mjs`, #631), dentro de uma template string que a varredura nao le — um controlo manual do
   // #546 (a regex antiga) ficou vermelho no `env X+=1 $C <<EOF`; as linhas
   // `.every(...)` do `defineGhRepo`/`mudaONode` (ensombradas pelo `cabeca()`), e o `nomeDaAtribuicao(` nos argumentos
   // de um `export` (um argumento sem `=` com `[`/`+` nem e valido em bash: o mutante e equivalente). O do guard dos

@@ -91,7 +91,7 @@ const INTERRUPTOR = /^agent-template\.nomesproibidos(?:=|$)/i;
 /** O stdin escrito como ficheiro: o mesmo que `-`. Outro `/dev/fd/N` nao se sabe o que e. */
 const STDIN = /^(?:\/dev\/stdin|\/dev\/fd\/0|\/proc\/self\/fd\/0)$/;
 /** Os comandos que so LEEM os argumentos (#396): fora daqui, um argumento que e o ficheiro lido conta como escrita.
- *  Local e curta de proposito: a `LEITURA` do `fronteira.mjs` tem `sed`/`awk`/`node`, que escrevem. */
+ *  Local e curta de proposito: a `LEITURA` do `fronteira-piso.mjs` tem `sed`/`awk`/`node`, que escrevem. */
 const LEITORES = new Set(["cat", "head", "tail", "wc", "grep", "rg", "diff", "cmp", "ls", "stat", "file", "test", "[", "[[",
   "md5", "md5sum", "shasum", "sha256sum", "less", "more", "realpath", "dirname", "basename", "echo", "printf", "gh", "git",
   "cd", "pushd", "popd"]);

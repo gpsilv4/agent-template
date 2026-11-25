@@ -44,7 +44,7 @@
   - **A posicao de comando** (#336). `node -pe`, `perl -le`, `python3 -Ic` e `php -r` passavam
     pela regex. O `lib/posicao.mjs` le o comando (`comandos.mjs`) e diz que palavra CORRE (palavras-
     chave, cabecas, executores, o que fica a jusante por pipe; com a fronteira so citada, qualquer
-    inline). **So acrescenta**: as regex ficam como piso. Uma mensagem que cite `node -e` e a
+    inline; o stdin: `recebe.mjs`). **So acrescenta**: o piso e `fronteira-piso.mjs`. Uma mensagem que cite `node -e` e a
     fronteira fica negada de proposito (#344). O detalhe e o que fica de fora: o cabecalho do modulo.
 - **Mutation Sweep** (`.agent/scripts/mutation-sweep.mjs`): mede se as suites **afirmam** algo — desliga cada sitio de erro de cada verificador, um a um, e exige que a suite fique vermelha. Sai `!= 0` se um sitio puder ser desligado com a suite verde, se um verificador nao tiver suite, ou se a baseline ja estiver vermelha. Custa minutos (recorre a suite por sitio): corre no CI em cada PR que toque verificadores ou hooks (completa e `--skips`), e localmente apos mexer num `check-*.mjs`. **Substitui contar sitios a mao** — o numero e derivado. **Varre-se a si proprio** (`--only=mutation-sweep`): reprova quem nao tem suite, logo nao pode ser a excecao.
 

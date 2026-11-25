@@ -6,8 +6,8 @@
  * TDZ, e o erro caia no `catch` do hook — que PERMITE. Os dois leem daqui, e o ciclo deixou de
  * existir; o `tests-sem-ciclos.mjs` reprova se voltar.
  *
- * O que decide o que um comando faz a fronteira continua no `fronteira.mjs` (a `LEITURA`, o
- * `OPACO`, o `porqueAltera`). Aqui so os DADOS e a leitura do verbo, que nao dependem de nada —
+ * O que decide o que um comando faz a fronteira continua no `fronteira.mjs` (o `porqueAltera`),
+ * com o piso no `fronteira-piso.mjs` (a `LEITURA`, o `OPACO`, #631). Aqui so os DADOS e a leitura do verbo, que nao dependem de nada —
  * e as razoes que se mostram ao negar (`razaoDe`), que vieram para aqui para o `fronteira.mjs`
  * caber no limite do Guard 17 (#317); ele reexporta-as, e os importadores nao mudaram.
  */
@@ -86,13 +86,13 @@ export const montaFronteira = (caminhos, maes) =>
   );
 export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
 
-/** Os interpretadores que correm codigo, como alternativas de uma regex. Lidos pelo `fronteira.mjs` (as regex
+/** Os interpretadores que correm codigo, como alternativas de uma regex. Lidos pelo `fronteira-piso.mjs` (as regex
  *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
 export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
 /** Os nomes das shells, uma so vez: a familia e o nome do interpretador (`posicao.mjs`), e as shells do guard do branch
  *  (`invocacoes-git.mjs` e o heredoc do `guard-protected-branch.mjs`, desde o `/audit` da v0.64.0 — ate la tinham uma
  *  copia sem o `csh`/`tcsh`/`fish`, e `fish -c 'git push --force'` passava). A folha nao as tem nos
- *  `NOMES_INTERPRETADOR` (la o `RECEBE` le-as a parte, no `SHELL` do `fronteira.mjs`). */
+ *  `NOMES_INTERPRETADOR` (la o `RECEBE` le-as a parte, no `SHELL` do `fronteira-piso.mjs`). */
 export const NOMES_SHELL = "sh|bash|zsh|dash|ksh|csh|tcsh|fish";
 export const SHELLS = NOMES_SHELL.split("|");
 
@@ -112,16 +112,16 @@ export const nomeDoComando = (t) => t.replace(/^=(?=[^=\s])/, "").replace(/^.*\/
  *  os do `main`, sem nada a dobrar). */
 export const temEquals = (texto) => /(?:^|[\s;&|(){}`$])=[^=\s]/.test(texto);
 
-/** Quem corre o stdin numa SHELL sem se chamar shell (#566), uma so vez: o `SHELL_ELEVADA` do piso (`fronteira.mjs`)
- *  e o `recebeDe` (`posicao.mjs`) montam-se daqui. Os que ELEVAM com uma flag (`sudo -s`, `doas -i`) e os que sao uma
+/** Quem corre o stdin numa SHELL sem se chamar shell (#566), uma so vez: o `SHELL_ELEVADA` do piso (`fronteira-piso.mjs`)
+ *  e o `recebeDe` (`recebe.mjs`) montam-se daqui. Os que ELEVAM com uma flag (`sudo -s`, `doas -i`) e os que sao uma
  *  shell de login por si (`su`, `runuser`). */
 export const ELEVAM = ["sudo", "doas"];
 export const SU = ["su", "runuser"];
 /** A flag CURTA do `sudo`/`doas` que abre uma shell: `s`/`i` MINUSCULOS num grupo (`-s`, `-i`, `-Es`; o `-S` le a
- *  password). Uma so fonte (#600): o `eleva`/`elevaSemValor` (`posicao.mjs`) e o heredoc do guard do branch. */
+ *  password). Uma so fonte (#600): o `eleva`/`elevaSemValor` (`recebe.mjs`) e o heredoc do guard do branch. */
 export const ELEVA_CURTA_SRC = "-[A-Za-z]*[si][A-Za-z]*";
 /** O `--login` do `sudo` e os prefixos unicos dele (o `getopt_long` aceita-os: `--lo`, `--log`, `--logi`; o `--l` e
- *  ambiguo com o `--list`). Uma so fonte (#600): o `mudaAPasta` (`cabeca-comando.mjs`), o `eleva` (`posicao.mjs`) e o
+ *  ambiguo com o `--list`). Uma so fonte (#600): o `mudaAPasta` (`cabeca-comando.mjs`), o `eleva` (`recebe.mjs`) e o
  *  heredoc do guard do branch. */
 export const SUDO_LOGIN_SRC = "lo(?:g(?:i(?:n)?)?)?";
 /** O `--shell` do `sudo` e os prefixos unicos (`--sh`, `--she`, `--shel`; o `--s` e ambiguo com o `--set-home`). */
@@ -135,7 +135,7 @@ export const SUDO_SHELL_SRC = "sh(?:e(?:l(?:l)?)?)?";
  *  o denuncia. Extrair para um modulo comum e trabalho proprio, e fica dito aqui em vez de
  *  ficar por dizer. As divergencias sao deliberadas, porque a POSTURA dos dois e oposta. Ali, um consumo a mais faz
  *  `continue` e o segmento e ignorado: fail-open limitado, porque aquele guard so se importa
- *  com o `git`. Aqui a `LEITURA` (em `fronteira.mjs`) e uma allowlist e **um token consumido a
+ *  com o `git`. Aqui a `LEITURA` (em `fronteira-piso.mjs`) e uma allowlist e **um token consumido a
  *  mais converte um `deny` num `allow`**.
  *
  *  1. As cabecas OPACAS (`eval`, `xargs`, `sh -c` e irmas) NAO entram. Sao tratadas pelo
@@ -144,7 +144,7 @@ export const SUDO_SHELL_SRC = "sh(?:e(?:l(?:l)?)?)?";
  *  2. Uma atribuicao NUNCA e cabeca — ver `resto()`.
  *  3. O `su`/`runuser` NAO entram (#600). Nos `WRAPPERS` do `invocacoes-git.mjs` entraram, para o ciclo chegar ao git
  *     do `-c`. Aqui sao lidos a parte (o
- *     `inlineDe` e o `recebeDe`, em `posicao.mjs`): consumi-los fazia do utilizador ou do valor do `-c` o verbo. */
+ *     `inlineDe` em `posicao.mjs`, e o `recebeDe` em `recebe.mjs`): consumi-los fazia do utilizador ou do valor do `-c` o verbo. */
 export const CABECAS = new Set([
   "sudo", "doas", "env", "command", "builtin", "time", "timeout", "nohup", "setsid", "stdbuf",
   "nice", "ionice", "unbuffer",

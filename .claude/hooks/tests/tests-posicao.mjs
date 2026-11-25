@@ -4,7 +4,7 @@
  * NAO e um entry point: o `test-hooks.mjs` descobre este modulo e chama `registar()`.
  *
  * PORQUE EXISTE: o `tests-fronteira-posicao.mjs` prova o veredicto pelo hook inteiro, e o piso (as regex do
- * `fronteira.mjs`) nega por cima de muitos erros do lexer — uma palavra mal cortada raramente muda um `deny`.
+ * `fronteira-piso.mjs`) nega por cima de muitos erros do lexer — uma palavra mal cortada raramente muda um `deny`.
  * Aqui afirma-se a ESTRUTURA: que comandos, que palavras, o que e citado, o que e corpo de heredoc. E o que
  * fica vermelho quando a varredura muta o fim de uma substituicao, de umas aspas ou de um heredoc.
  */
