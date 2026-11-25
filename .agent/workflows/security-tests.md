@@ -55,12 +55,20 @@ npm run test:all
 - `X-Content-Type-Options: nosniff` — previne MIME-sniffing
 - `Referrer-Policy: strict-origin-when-cross-origin` — limita informacao de referrer
 - `Permissions-Policy` — restringe acesso a camera, microfone e geolocalizacao
-- Headers presentes tambem em API routes
+- Headers presentes tambem em API routes, e nas respostas de ERRO (404, 503). Caso: uma 503 sai sem eles — no nginx,
+  um `add_header` sem `always` nao se aplica a 4xx/5xx, e um `add_header` numa location apaga os herdados
+- CORS: nunca refletir uma origem qualquer COM credenciais. Caso: `Origin: https://mal.example`, ou `Origin: null`, volta
+  refletido com `Access-Control-Allow-Credentials: true`
 
 ### 3.2 Cookie Security
 - Cookies de sessao com `SameSite=Lax` **ou** `Strict` — o `Strict` e mais restrito, nao e um
   erro a corrigir. Reprovar `SameSite=None` sem `Secure`
 - Verificar flags `HttpOnly` e `Secure` conforme o backend
+- O cookie de sessao com o prefixo `__Host-` (exige `Secure`, `Path=/` e sem `Domain`): e o que trava o cookie tossing
+  e um subdominio irmao. Caso: o `Set-Cookie` de sessao sem o prefixo, ou com `Domain`, reprova
+- "Terminar a sessao em todo o lado" invalida todas as copias. Caso: um cookie antigo funciona depois do logout global
+  (tokens stateless: ate expirar o de acesso, prazo escrito)
+- O mesmo nome `__Host-` com dois valores recusa os dois (cookie tossing). Caso: um valido + um falso, nas duas ordens, passa
 
 ### 3.3 XSS / Injection
 - Campos de login (email/password) nao executam `<script>` tags
@@ -79,19 +87,35 @@ npm run test:all
 
 ### 3.6 CSRF Prevention
 - APIs criticas rejeitam requests sem autenticacao
-- Cookies auth usam `SameSite=Lax` ou `Strict` (ver 3.2)
+- Cookies auth usam `SameSite=Lax` ou `Strict` (ver 3.2) — necessario, nao suficiente: o `Lax` nao protege de um
+  subdominio irmao
+- As escritas aceitam so `Sec-Fetch-Site: same-origin` (ou `none`) e o `Origin` igual a origem EXATA; o media type (antes
+  do `;`) e `application/json` exato (`text/plain`, `application/x-www-form-urlencoded` e `multipart/form-data` evitam o
+  preflight). Caso: um POST com `same-site`, de outra origem, em `text/plain` ou `text/plain; charset=application/json` e aceite
+- A isencao por `Bearer` so quando o token e a UNICA credencial. Caso: cookie de sessao + `Bearer` falso salta a origem
 
 ### 3.7 Rate Limiting Resilience
 - Requests rapidos simultaneos nao causam crashes (status < 500)
-- Backend tem rate limiting built-in para endpoints de autenticacao
+- Backend tem rate limiting built-in para endpoints de autenticacao, por conta alem de por IP
+- Caso: trocar de identificador (o email em vez do nome) nao reinicia a contagem; pedidos em simultaneo contam como em
+  sequencia; no IPv6 o limite e por bloco `/64`
+- O IP do `X-Forwarded-For` so atras de um proxy de confianca, que o SOBRESCREVE (se acrescenta, a N-esima a contar da
+  direita, N = proxies de confianca). Caso, pela mesma topologia de proxy: trocar o header contorna o limite. Nota: contadores em memoria perdem-se num
+  reinicio e nao se partilham entre replicas
 
 ### 3.8 IDOR Prevention
 - Webhooks/APIs nao processam dados falsos
 - Politicas de seguranca bloqueiam acesso a dados de outros utilizadores
 
 ### 3.9 File Upload Validation
-- API rejeita ficheiros com MIME type invalido
-- API rejeita ficheiros oversized
+- O tipo pelos bytes (nem pelo nome nem pelo `Content-Type`), contra uma allowlist (sem HTML; SVG so como download).
+  Caso: bytes de HTML com nome `.png` e `Content-Type: image/png`, ou um SVG com `<script>`, servidos inline
+- API rejeita ficheiros oversized; quotas por ficheiro, conta, hora e em simultaneo; um tempo maximo sem bytes
+- Servidos so ao dono (salvo os publicos por desenho), sem cache partilhada, com `nosniff`, `Content-Security-Policy:
+  sandbox`, `Content-Disposition: attachment` fora das imagens, e `Cross-Origin-Resource-Policy: same-origin` (ou
+  `same-site`, com um dominio proprio de ficheiros)
+- O EXIF/GPS remove-se no SERVIDOR, por um parser isolado e com limites (o tamanho em pixeis). Caso: um upload direto a
+  API com GPS sai com GPS
 
 ### 3.10 Data Isolation
 - Utilizadores diferentes tem sessoes isoladas
@@ -102,6 +126,18 @@ npm run test:all
   uma acao fora da lista fechada — e nada se aplica: o validador rejeita-a
 - O mesmo com um link ou uma imagem de URL externo na saida: nao se renderiza (exfiltracao por markdown)
 - Controlo: com o validador desligado, o mesmo teste reprova
+
+### 3.12 SSRF (so quando o servidor busca um URL do utilizador)
+- Bloquear destinos privados, loopback e o metadata da cloud; resolver UMA vez, validar TODOS os enderecos e ligar AO IP
+  validado (com o Host/SNI) — nunca `lookup` + `fetch(url)` —, em cada pedido e em cada redirect, nao so ao gravar
+- Permitir so unicast global, sobre o endereco JA resolvido (uma lib de IP, nunca strings). Um IP literal tambem; o que
+  uma comparacao de strings deixa passar: `::ffff:127.0.0.1`, `2130706433`, `0x7f000001`, `127.1`, `0.0.0.0`, `::1`,
+  `fc00::/7`, `fe80::/10`, `64:ff9b::/96`, `100.64.0.0/10`, o metadata em IPv6
+- So `https` (a excecao, um modelo local, so por configuracao do operador, nunca do utilizador); tempo maximo e limite
+  em simultaneo. Um endpoint de IA dado pelo utilizador tambem
+- Caso (com `https` e um resolver injetado, para a recusa vir do destino e nao do esquema): `https://169.254.169.254/`,
+  ou um nome publico que redireciona para `127.0.0.1`, e seguido; um nome que resolve primeiro para
+  publico e depois para privado passa (DNS rebinding)
 
 ## 4. Auditoria de Dependencias
 
@@ -160,6 +196,7 @@ Cuidados medidos no codigo do Strix (v1.7.0, #267) — confirmar na versao que i
 - Novas tabelas -> verificar isolamento de dados
 - Novas dependencias -> correr `npm run test:audit`
 - Nova chamada a um modelo com texto do utilizador -> adicionar o caso hostil da 3.11
+- O servidor passa a buscar um URL do utilizador -> adicionar os casos da 3.12
 
 ## 7. Output
 
