@@ -292,7 +292,7 @@ Antes das perguntas de stack, decidir com o utilizador a **dimensao do processo*
 
 As **4 perguntas** da `.agent/rules/privacy.md` (secao "As 4 perguntas": dados de pessoas, utilizadores ou nao;
 categorias especiais, condenacoes ou menores; destinos e paises; quem decide as finalidades — o projeto ou o cliente).
-Vivem la, e nao aqui, para o `/upgrade` e o gatilho do `/review` usarem a mesma fonte. Com "sim" a 1.a, o nivel
+Vivem la, e nao aqui, para o `/upgrade` (a partir do #624) e o gatilho do `/review` usarem a mesma fonte. Com "sim" a 1.a, o nivel
 COMPLETO: o `docs/legal/` da §2.8. Com "nao", so o nivel base. Em TODOS os casos que a regra marca **PARAR** (entre eles as
 condenacoes, o projeto como subcontratante do cliente, as decisoes automatizadas, as categorias especiais de quem nao
 usa a app, e a DPIA ou o DPO), o agente nao decide: escreve a pergunta para o responsavel e para um jurista.
@@ -515,7 +515,7 @@ cabecalho diz o formato: `produto`, `pacotes`, `nomes`); tirar um que nao se apl
 
 ### 2.4 Configurar os Doc Guards
 
-O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 32 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, os ficheiros de exemplo do `.env` sem segredo real, o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
+O `.agent/scripts/check-doc-versions.mjs` corre **sem configuracao** 32 guards numerados. O total que ele reporta como "executados" **nao e um numero fixo** e nao vale a pena decora-lo: o Guard 1 conta uma vez por rule obrigatoria, os Guards 3 e 4 saltam sem `package.json`/`BANNED`, e cada `CHECK` configurado soma um. Correr e ler o que ele diz; o que importa e o exit code e a ausencia de `WARN`. Os guards sao: orcamento de bytes das rules (por ficheiro **e** do total carregado a cada sessao), as Fronteiras copiadas nos ponteiros do Cursor/Copilot, as referencias a anti-padroes que resolvem, paridade `CLAUDE.md`≡`GEMINI.md`, versao `package.json`≡`CHANGELOG`, termos obsoletos, `.nvmrc`, paridade workflows↔wrappers (existencia **e** conteudo do ponteiro), workflows listados em `CLAUDE`/`GEMINI`/`AGENTS`/`agent-guide`, `@imports` que resolvem, sanidade do `.claude/settings.json`, a politica de servidores MCP, os ficheiros de exemplo do `.env` sem segredo real, os SDKs de analytics do `package.json` que faltam no inventario de privacidade (Guard 24), uma nota quando ao `SECURITY.md` falta uma das suas seccoes (no Guard 13; apaga-lo e decisao do projeto), o flag das 500 linhas nos ficheiros da maquinaria, o isolamento das suites (o que torna a varredura paralela segura), as citacoes de ficheiro nas instrucoes, o `.agent/context/` por estrear **enquanto este repo for o template** (num projeto derivado esses ficheiros sao o estado dele, e o guard salta com `SKIP`), o orcamento de bytes dos **workflows** e dos catalogos de definicoes (tecto unico de 12 000 para tudo o que se le), e o rotulo fixo dos runners do CI do template (`ubuntu-24.04`; salta num derivado).
 
 > **Os guards tem os seus proprios testes.** `node .agent/scripts/tests/test-guards.mjs`,
 > `test-bundle-sizes.mjs` e `test-backlog.mjs` quebram cada guard de proposito e exigem que
@@ -767,6 +767,10 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
   - Limpo = **sem output**; o `git grep` sai com codigo `1` (nao encontrou nada). Inverter se algum dia for usado como gate de CI.
 - [ ] `business-logic.md` gerado com regras do dominio?
 - [ ] `pages-architecture.md` gerado com paginas e interacoes?
+- [ ] `docs/README.md` criado a partir de `src/docs/exemplos/docs-README.md` (ou, com um `docs/` que ja existia, a fusao proposta)?
+- [ ] As 4 perguntas da Privacidade respondidas; com "sim" a 1.a, o `docs/legal/privacy-inventory.md` e o rascunho da `docs/legal/privacy-policy.md` criados?
+- [ ] As duas entradas no `.agent/context/decisions.md` (a 1.a pergunta da Privacidade e os ativos que nunca entram num modelo)?
+- [ ] O modelo de seguranca do `SECURITY.md` aprovado pelo utilizador?
 - [ ] `anti-patterns.md`: exemplo comentado removido, `anti-patterns-template.md` **mantido** (apagar um `TPn` exige apagar as citacoes dele — ver 2.8), e `node .agent/scripts/check-doc-versions.mjs` a sair 0?
 - [ ] Docs de `.agent/` e `src/docs/` traduzidos, se a lingua nao for PT-PT?
 - [ ] `TARGETS` em `.agent/scripts/config/bundles.mjs` atualizados (nao no verificador)?
@@ -796,7 +800,7 @@ Apos completar todas as substituicoes e geracoes, apresentar ao utilizador:
 
 ```
 Ficheiros com placeholders substituidos:  ~30
-Ficheiros gerados do zero:               2 (business-logic.md, pages-architecture.md)
+Ficheiros gerados do zero:               3 (business-logic.md, pages-architecture.md, docs/README.md) + os 2 do docs/legal/ com "sim" a Privacidade
 Ficheiros adaptados a stack:             ~10 (core-rules, setup, deploy, review, design-review, debug, ci.yml, e2e.yml, editorconfig, anti-patterns)
 Ficheiros de governance customizados:    ~4 (CODEOWNERS, PR template, issue templates, dependabot)
 ```

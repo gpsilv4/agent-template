@@ -364,6 +364,7 @@ not to* line, so every agent sees it.
             ├── casos-espera.mjs          <- The minutes script's PR-wait cases: the attempt, cancelled out, the cut (#554)
             ├── casos-adotar-origem.mjs   <- The adoption's origin cases: the tag on origin, its format, the resume (#538)
             ├── casos-adotar-env.mjs      <- The adoption refuses a project whose .env.example carries a real secret (#595)
+            ├── casos-derivado-docs.mjs   <- The derived simulator's docs/ and docs/legal/ cases (#585, #495)
             └── recongelar-contexto.mjs   <- Re-freezes Guard 21's hashes for a fixture's own
                                              .agent/context/ (derived from the fixture, not the repo)
 
@@ -397,7 +398,8 @@ not to* line, so every agent sees it.
 │   ├── protegidos.json             <- THIS project's protected branches (data; /upgrade keeps it)
 │   ├── guard-subagent-bash.mjs     <- DENY a subagent's Bash outside what its `tools:` declares
 │   ├── guard-textos-publicos.mjs   <- DENY a gh/git tag/commit that publishes a forbidden name (#375b)
-│   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work
+│   ├── session-context.mjs         <- SessionStart: state the real branch + uncommitted work,
+│   │                                  and a configured hook that is empty or missing (#589)
 │   ├── stop-verify.mjs             <- Stop: which suite is owed for the files touched
 │   ├── prompt-fase0.mjs            <- UserPromptSubmit: reminds of Fase 0 when the
 │   │                                  prompt looks like an order to implement
@@ -431,6 +433,10 @@ not to* line, so every agent sees it.
 │       ├── tests-textos-publicos-isencao.mjs <- The commit-msg exemption: one case per condition (#511, #580)
 │       ├── tests-textos-publicos-cabeca.mjs <- A gh/git behind a head with flags (`env -u FOO gh`, `sudo -D dir`) (#565)
 │       ├── tests-atribuicoes.mjs   <- bash and env assignments read the same way in every hook (#546)
+│       ├── tests-equals.mjs        <- The zsh EQUALS (`=git`, `=bash`) read by the three guards (#567)
+│       ├── tests-git-config-env.mjs <- `--config-env`/`--attr-source` before the verb (#579)
+│       ├── tests-opaco-segmento.mjs <- A command run by another shell, judged per segment; `$'...'` at the frontier (#605)
+│       ├── tests-hooks-vazios.mjs  <- An empty or missing configured hook, said at session start (#589)
 │       ├── tests-posicao.mjs       <- The lexer (`lib/comandos.mjs`) and the position (`lib/posicao.mjs`) by structure: commands, words, quoting, heredoc bodies (#336)
 │       └── tests-stop.mjs          <- stop-verify: a DELETED file owes nothing, and
 │                                      the "already said this" mark belongs to the

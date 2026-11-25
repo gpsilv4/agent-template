@@ -14,7 +14,8 @@
  * escrevem, que sao os PRs (c) e (b) do #336. Passados `MAX_POSICOES`/`MAX_VOLTAS`, nega sem julgar.
  */
 import { comandos } from "./comandos.mjs";
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, ELEVA_CURTA_SRC, ELEVAM, NOMES_INTERPRETADOR, nomeDoComando, resto, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, ELEVA_CURTA_SRC, ELEVAM, NOMES_INTERPRETADOR, NOMES_SHELL, nomeDoComando, resto, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC } from "./fronteira-dados.mjs";
+export { NOMES_SHELL };
 
 // --- Quem corre codigo INLINE, por posicao ------------------------------------------------------
 
@@ -25,9 +26,6 @@ import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, ELEVA_
  *  SEM letras que levam valor, de proposito. Uma versao parava o grupo nelas, para `perl -MTime::HiRes` nao
  *  contar como `-e`, e duas leituras acharam QUATRO afrouxamentos: `perl -de`, `ruby -We`/`-Kue` e o `-M` do
  *  perl, cujo valor tambem e codigo (`-MFile::Temp;unlink(...)`). Esse falso positivo fica, como no b5eb0fb. */
-/** Os nomes das shells, uma so vez: a familia e o nome do interpretador leem-nos daqui. A folha nao as tem nos
- *  `NOMES_INTERPRETADOR` (la o `RECEBE` le-as a parte, no `SHELL` do `fronteira.mjs`). */
-export const NOMES_SHELL = "sh|bash|zsh|dash|ksh|csh|tcsh|fish";
 const LETRAS = [
   [/^(?:node(?:js)?|bun|tsx|ts-node)/, "epc", []],
   [/^perl/, "eE", []],

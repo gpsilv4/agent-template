@@ -26,7 +26,7 @@ Workflow estruturado para planear uma nova funcionalidade no {{PROJECT_NAME}}.
 
 - Identificar que paginas/componentes sao afetados
 - Verificar se existem regras de negocio relevantes (ver `.agent/rules/business-logic.md`)
-- Consultar a documentacao em `src/docs/`
+- Consultar a documentacao do produto em `docs/` (o indice: `docs/README.md`)
 - **So se** a feature chama um modelo de IA: abrir `.agent/rules/ai-features.md` (quando PARAR, o que vai para o
   modelo, a saida como dados, os tectos, o fornecedor falso). **So se** o projeto escreve o seu servidor MCP: a
   `mcp-policy.md`, "Escrever o servidor MCP do projeto"

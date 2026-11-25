@@ -236,4 +236,45 @@ export const PARES_DOS_HOOKS = [
     sinal: /(?<=NODE_OPTIONS)\\\+\?(?==)/,
     neutro: "",
   },
+  // --- O `/audit` da v0.64.0 (#605): cada decisao nova do guard do branch e da fronteira, com o seu vermelho ---------
+  // O `comandoOpaco` por segmento: desligado, nenhum segmento parte as aspas, e o `-c` composto esconde o force-push.
+  // O `su`/`runuser` do #600 no ciclo das invocacoes (o `-c` colado e o salto do utilizador), que ficaram sem par no #580.
+  // E os da 2.a passagem dos leitores: a barra literal nas plicas (`echo 'C:\'; git push --force`), a cabeca que nao se
+  // le (`$SHELL -c`), e o pedaco NAO VAZIO do `ultimoComando` (`bash -c x && (git commit -F -) <<EOF` passava a negar).
+  // Ficam de fora, e e dito: a remocao das redireccoes e das expansoes no `ultimoComando` (regex literais, provadas pelos
+  // controlos `2>&1`/`&>`/`${X}`/`$(...)` do `tests-opaco-segmento.mjs`), e o fim `[\s;&|)]` do `ehShell`, numa template
+  // string que a varredura le em branco (provado por `| bash;` e `| bash)`).
+  ...[[/(?<![\w.$])comandoOpaco\(seg, equals\) \?/, "false ?"], [/(?<![\w.$])SU_C_COLADO\.exec\(/, "/(?!)/.exec("],
+    [/(?<=if \()base === .{4} \|\| base === .{9}(?=\))/, "false"], [/ && aspa !== .{3}(?=\) \{ z\[k \+ 1\])/, ""],
+    [/return t\.startsWith\(.{3}\) \|\| t\.includes\(OPACO\);/, "return false;"],
+    [/\.filter\(\(p\) => p\.trim\(\)\)/, ".filter(() => true)"]].map(([sinal, neutro]) => ({
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal,
+    neutro,
+  })),
+  {
+    // Quem recebe o corpo do heredoc e o ULTIMO comando do preambulo: desligado (o preambulo inteiro), um git antes da
+    // shell (`git stripspace | bash <<EOF`) volta a fazer do corpo texto.
+    alvo: ".claude/hooks/guard-protected-branch.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<![\w.$])ultimoComando\(preambulo\)/,
+    neutro: "(preambulo)",
+  },
+  {
+    // O fallback do `main`: a shell vista no preambulo inteiro. Desligado, `while read l; do bash -s; done <<EOF` (o `quem`
+    // e o `done`) deixava de varrer o corpo com o force-push.
+    alvo: ".claude/hooks/guard-protected-branch.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: / \|\| ehShell\(preambulo, equals\)/,
+    neutro: "",
+  },
+  // O `$'...'` descodificado e o `$"..."` lido como aspas duplas, no `desaspa`: desligado um, a forma dele volta a apagar o
+  // caminho da fronteira (`rm -r $'.claude/hooks'`, `rm -r $".claude/hooks"`).
+  ...[[/(?<![\w.$])ansiC\(t\.slice\(k \+ 2, j\)\)/, "(t.slice(0, 0))"], [/\{ k \+= 1; continue; \}/, "{}"]].map(([sinal, neutro]) => ({
+    alvo: ".claude/hooks/lib/caminhos.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal,
+    neutro,
+  })),
 ];

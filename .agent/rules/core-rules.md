@@ -158,7 +158,7 @@
 - O Agente deve propor estas atualizacoes e aguardar confirmacao.
   > O `src/docs/CHANGELOG.md` segue o formato `## [vX.Y.Z] - Descricao` e deve ser atualizado ANTES de cada commit.
   > (No template de origem fica vazio de propósito — ver a excecao em `/review` §2.)
-  > **Sync Proativo**: O Agente **NAO deve esperar** que o utilizador peca para atualizar a documentacao. Antes de dizer "Estou pronto para commit", verificar e atualizar automaticamente: `.agent/context/`, `.agent/rules/`, `.agent/scripts/`, `.agent/workflows/`, `.github/`, `docs/`, `CLAUDE.md`, `GEMINI.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`.
+  > **Sync Proativo**: O Agente **NAO deve esperar** que o utilizador peca para atualizar a documentacao. Antes de dizer "Estou pronto para commit", verificar e atualizar automaticamente: `.agent/context/`, `.agent/rules/`, `.agent/scripts/`, `.agent/workflows/`, `.github/`, `docs/`, `src/docs/`, `CLAUDE.md`, `GEMINI.md`, `README.md`, `CONTRIBUTING.md`, `SECURITY.md`.
 - **Conventional Commits**: Todas as mensagens de commit seguem o formato definido em `CONTRIBUTING.md` e `.agent/rules/process-rules.md`.
 - **Versao Node**: `.nvmrc` e a fonte unica da versao Node — o CI le-a via `node-version-file: .nvmrc` (`ci.yml`/`e2e.yml`).
 - **Anti-padroes**: sempre que um bug revele um padrao evitavel, registar uma entrada em `.agent/rules/anti-patterns.md` (com `grep` de detecao para o `/review`).

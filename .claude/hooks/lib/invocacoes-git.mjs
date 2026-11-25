@@ -9,14 +9,14 @@
  * Vivia no `guard-protected-branch.mjs` ate ao #580, que o separou da decisao para os dois ficarem com folga do
  * Guard 17. Os blocos vieram sem mudanca, menos o `export` do `limpo` e do `invocacoes` (o guard usa-os).
  */
-import { ATRIBUICAO_LARGA, GIT_GLOBAIS_COM_VALOR, nomeDoComando } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA, GIT_GLOBAIS_COM_VALOR, nomeDoComando, SHELLS } from "./fronteira-dados.mjs";
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
- *  regex de posicao de comando: cada entrada em falta era um bypass. */
+ *  regex de posicao de comando: cada entrada em falta era um bypass. As shells vem da lista
+ *  unica (`SHELLS`): a copia que aqui vivia nao tinha o `csh`/`tcsh`/`fish` (`/audit` da v0.64.0). */
 const WRAPPERS = new Set([
   "sudo", "env", "eval", "command", "builtin", "exec", "time", "nohup", "setsid", "stdbuf",
-  "nice", "ionice", "xargs", "timeout", "doas", "script", "unbuffer", "watch", "sh", "bash",
-  "zsh", "dash", "ksh",
+  "nice", "ionice", "xargs", "timeout", "doas", "script", "unbuffer", "watch", ...SHELLS,
   // #600: o `su`/`runuser` (com `-c`, um comando numa shell). Fora daqui, o ciclo parava neles e o git do `-c` nao se via.
   "su", "runuser",
 ]);
@@ -50,11 +50,31 @@ export const limpo = (t) => t.replace(/\$(?=["'])/g, "").replace(/["'\\]/g, "");
  *  token, o verbo passa a ser DESCONHECIDO e falha fechado. */
 const OPACO = "\u0000opaco\u0000";
 
-/** A primeira palavra do texto e um wrapper que volta a interpretar o que recebe? Se sim, o
- *  que esta dentro de aspas E codigo e tem de partir; se nao, e um argumento literal. */
-function comandoOpaco(txt, equals = false) {
-  const primeira = (txt.trim().split(/\s+/)[0] ?? "").replace(/["'\\]/g, "");
-  return WRAPPERS_OPACOS.has(equals ? nomeDoComando(primeira) : primeira.replace(/^.*\//, ""));
+/** O comando simples chega a um wrapper que volta a interpretar o que recebe? Se sim, o que esta
+ *  dentro de aspas E codigo e tem de partir; se nao, e um argumento literal.
+ *
+ *  POR SEGMENTO, e pela CABECA (#605, `/audit` da v0.64.0): consome o que o ciclo das `invocacoes`
+ *  consome antes do comando (wrappers, palavras de shell, flags, atribuicoes e os seus valores) e
+ *  decide pelo 1.o nome que nao e um deles. Decidia pela 1.a palavra do texto INTEIRO, e falhava dos
+ *  dois lados: `sudo sh -c 'cd r && git push --force'` e `true; bash -c '...'` nao partiam (o force-push
+ *  passava), e `sh -c true; git push -o "a;b" --force` partia o `;` citado do git SEGUINTE (tambem). */
+function comandoOpaco(seg, equals = false) {
+  const nome = (t) => (equals ? nomeDoComando(t) : t.replace(/^.*\//, ""));
+  let viuWrapper = false;
+  let anteriorEraFlag = false;
+  // O `(`/`{` de uma subshell ou de um grupo colado a cabeca (`(bash -c '...')`) nao a esconde.
+  for (const t of seg.trim().split(/\s+/).map((w) => limpo(w).replace(/^[({]+/, "")).filter(Boolean)) {
+    const base = nome(t);
+    if (WRAPPERS_OPACOS.has(base)) return true;
+    if (ATRIBUICAO_LARGA.test(t) || t.startsWith("-")) { anteriorEraFlag = true; continue; }
+    if (PALAVRAS_SHELL.has(t)) { anteriorEraFlag = false; continue; }
+    if (WRAPPERS.has(base)) { viuWrapper = true; anteriorEraFlag = false; continue; }
+    // O valor de uma flag ou de uma atribuicao com espacos, um so token (como no ciclo das `invocacoes`).
+    if (anteriorEraFlag || (viuWrapper && VALOR_DE_WRAPPER.test(t))) { anteriorEraFlag = false; continue; }
+    // Uma cabeca que nao se le (`$SHELL -c "..."`, `$(command -v bash) -c "..."`): o que corre nao se ve, logo e opaca.
+    return t.startsWith("$") || t.includes(OPACO);
+  }
+  return false;
 }
 
 /** Para cada indice: cai dentro de um par de aspas aberto? UMA passagem (#224): perguntar indice a
@@ -65,10 +85,30 @@ function zonasCitadas(txt) {
   for (let k = 0; k < txt.length; k++) {
     z[k] = aspa !== null;
     const c = txt[k];
-    if (c === "\\") { z[k + 1] = z[k]; k++; continue; } // a barra escapa o seguinte
-    if (aspa) { if (c === aspa) aspa = null; } else if (c === "'" || c === '"') aspa = c;
+    // A barra escapa o seguinte — FORA das plicas: dentro delas e literal (`echo 'C:\'; git push --force` fechava a plica
+    // no `\'` e o `;` passava por citado; o leitor do `/audit` da v0.64.0). O `$'...'` (ANSI-C) e um terceiro tipo, em que
+    // a barra ESCAPA: sem ele, `echo $'it\'s'; git push --force` abria uma plica ate ao fim (a passagem 2 do leitor).
+    if (c === "\\" && aspa !== "'") { z[k + 1] = z[k]; k++; continue; }
+    if (aspa) { if (c === aspa.at(-1)) aspa = null; } else if (c === "'" && txt[k - 1] === "$") aspa = "$'";
+    else if (c === "'" || c === '"') aspa = c;
   }
   return z;
+}
+
+/** O ULTIMO comando simples de um texto (o ultimo pedaco NAO VAZIO entre separadores fora de aspas): no preambulo de um
+ *  heredoc e ele que recebe o corpo (#605). `git stripspace | bash <<EOF` da o corpo a `bash`, e o `git` antes nao o faz
+ *  texto. As redireccoes e as expansoes saem ANTES de partir, como no `segmentos`: com elas, o `&` de `2>&1`/`&>` e as
+ *  chavetas de `${X}` partiam, e `bash 2>&1 <<EOF` dava `1` (os dois leitores do PR de fecho da v0.64.0). Quem chama nao
+ *  se fia so nisto: o `pede` do guard junta a shell vista no preambulo inteiro, como no `main`. */
+export function ultimoComando(texto) {
+  const t = texto.replace(/\$\{[^}]*\}|\$\([^)]*\)/g, " _ ").replace(/&>>?\s*[^\s;&|(){}<>]*|\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ");
+  const z = zonasCitadas(t);
+  const pedacos = [];
+  let inicio = 0;
+  for (let k = 0; k <= t.length; k++) {
+    if (k === t.length || (!z[k] && /[;&|\n(){}]/.test(t[k]))) { pedacos.push(t.slice(inicio, k)); inicio = k + 1; }
+  }
+  return pedacos.filter((p) => p.trim()).at(-1) ?? "";
 }
 
 /** Parte o comando em comandos simples. Todo o separador de shell conta — incluindo
@@ -101,15 +141,17 @@ function segmentos(texto, equals = false) {
       // de uma redireção nunca contem um separador de shell — enumera-los aqui e o que
       // impede o consumo de atravessar a fronteira do comando.
       .replace(/\d?[<>]{1,2}&?\s*[^\s;&|(){}<>]*/g, " ");
-    const [z1, opaco] = [zonasCitadas(x), comandoOpaco(x, equals)]; // uma vez por texto, nao por separador
-    const y = x
-      // Separadores. `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o
-      // comando nao e um wrapper opaco: `eval "a; git commit"` parte (o shell reinterpreta a
-      // string); `echo "a; git push --force"` e `rg "build && git push --force" docs/` nao — o
-      // texto e um ARGUMENTO, e nega-los bloqueava leitura (medido tres vezes numa sessao).
-      // `(`/`)`/`{`/`}` so partem fora de aspas: `echo "(git push --force)"` e
-      // `python3 -c "print('git push --force')"` eram NEGADOS (medido: dois de um revisor).
-      .replace(/[;&|\n]+/g, (m, i) => (z1[i] && !opaco ? m : "\n"));
+    const z1 = zonasCitadas(x);
+    // Separadores. `;`, `&`, `|` e newline partem sempre — EXCEPTO dentro de aspas quando o
+    // comando nao e um wrapper opaco: `eval "a; git commit"` parte (o shell reinterpreta a
+    // string); `echo "a; git push --force"` e `rg "build && git push --force" docs/` nao — o
+    // texto e um ARGUMENTO, e nega-los bloqueava leitura (medido tres vezes numa sessao).
+    // Em dois passos (#605): primeiro os de fora de aspas, e depois, so no segmento cuja CABECA e
+    // opaca, tambem os de dentro.
+    // `(`/`)`/`{`/`}` so partem fora de aspas: `echo "(git push --force)"` e
+    // `python3 -c "print('git push --force')"` eram NEGADOS (medido: dois de um revisor).
+    const y = x.replace(/[;&|\n]+/g, (m, i) => (z1[i] ? m : "\n")).split("\n")
+      .map((seg) => (comandoOpaco(seg, equals) ? seg.replace(/[;&|\n]+/g, "\n") : seg)).join("\n");
     const z2 = zonasCitadas(y);
     return y.replace(/[(){}]/g, (m, i) => (z2[i] ? m : "\n")).split("\n").map((seg) => seg.trim()).filter(Boolean);
   };
@@ -163,7 +205,7 @@ export function invocacoes(texto, { equals = false } = {}) {
       if (WRAPPERS.has(base)) {
         toks = toks.slice(1);
         viuWrapper = true;
-        if (WRAPPERS_OPACOS.has(base) || OPACOS_SO_NA_INVOCACAO.has(base)) viuWrapperOpaco = true;
+        if (WRAPPERS_OPACOS.has(base)) viuWrapperOpaco = true;
         if (base === "su" || base === "runuser") [depoisDeSu, utilizador] = [true, false];
         anteriorEraFlag = false;
         continue;
@@ -203,9 +245,10 @@ export function invocacoes(texto, { equals = false } = {}) {
  *  que o shell volta a interpretar (`eval`, `sh -c`). Para estes, o que se ve nao e o que
  *  corre, logo falha fechado. Os outros (`env`, `timeout`, `sudo`, `command`, `nice`) passam
  *  o comando como ARGUMENTOS — o texto e fiavel e `env git --version` nao esconde nada. */
-const WRAPPERS_OPACOS = new Set(["xargs", "eval", "sh", "bash", "zsh", "dash", "ksh", "ssh", "su", "doas"]);
-/** O `runuser` corre o `-c` numa shell (#600), e a invocacao conta como vinda de um wrapper opaco — mas NAO entra no
- *  `WRAPPERS_OPACOS`: o `comandoOpaco` decide pela 1.a palavra do texto INTEIRO, e com o `runuser` la o `;` citado de um git
- *  SEGUINTE partia (`runuser -u me true; git push -o "a;b" origin x --force` passava a deixar: o leitor adversarial do
- *  #600; o buraco do `su`, que ja la estava, e o #605). */
-const OPACOS_SO_NA_INVOCACAO = new Set(["runuser"]);
+/** O `runuser` corre o `-c` numa shell (#600). Ficou fora daqui ate o `comandoOpaco` decidir por segmento (#605): pela
+ *  1.a palavra do texto INTEIRO, com ele la o `;` citado de um git SEGUINTE partia (`runuser -u me true; git push -o "a;b"
+ *  origin x --force` passava a deixar), e por fora o seu `-c` composto escondia o force-push. */
+/** O `watch` e o `script -c` correm o que recebem numa shell (do #607, que fica com o `sg`/`flock`): com a decisao por
+ *  segmento, `sh -c x; watch "y; git push --force"` ja nao partia por acaso (o leitor do PR de fecho da v0.64.0). Um verbo
+ *  seguro dentro deles continua a deixar num branch protegido (`watch git status`, medido antes e depois). */
+const WRAPPERS_OPACOS = new Set(["xargs", "eval", ...SHELLS, "ssh", "su", "runuser", "doas", "watch", "script"]);

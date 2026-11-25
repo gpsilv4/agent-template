@@ -89,6 +89,20 @@ export const FRONTEIRA = montaFronteira(CAMINHOS_FRONTEIRA, MAES);
 /** Os interpretadores que correm codigo, como alternativas de uma regex. Lidos pelo `fronteira.mjs` (as regex
  *  do piso) e pelo `posicao.mjs` (o nome base de uma palavra em posicao de comando, #336). */
 export const NOMES_INTERPRETADOR = String.raw`node(?:js)?|ts-node|tsx|deno|bun|python3?(?:\.\d+)?|pypy3?|ruby|perl|php|lua|Rscript|osascript`;
+/** Os nomes das shells, uma so vez: a familia e o nome do interpretador (`posicao.mjs`), e as shells do guard do branch
+ *  (`invocacoes-git.mjs` e o heredoc do `guard-protected-branch.mjs`, desde o `/audit` da v0.64.0 — ate la tinham uma
+ *  copia sem o `csh`/`tcsh`/`fish`, e `fish -c 'git push --force'` passava). A folha nao as tem nos
+ *  `NOMES_INTERPRETADOR` (la o `RECEBE` le-as a parte, no `SHELL` do `fronteira.mjs`). */
+export const NOMES_SHELL = "sh|bash|zsh|dash|ksh|csh|tcsh|fish";
+export const SHELLS = NOMES_SHELL.split("|");
+
+/** O conteudo de um `$'...'` (ANSI-C) como a shell o entrega: `$'\x70'` e `p`. Uma so fonte: o lexer (`comandos.mjs`) e
+ *  o `desaspa` da fronteira (`caminhos.mjs`, desde o `/audit` da v0.64.0 — ate la um `$'...'` era sempre apagado, e
+ *  `rm -r $'.claude/hooks'` passava). */
+export const ansiC = (s) => s.replace(/\\(x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)/g, (_m, e) =>
+  e[0] === "x" ? String.fromCharCode(parseInt(e.slice(1), 16))
+    : /^[0-7]/.test(e) ? String.fromCharCode(parseInt(e, 8))
+      : ({ n: "\n", t: "\t", r: "\r", e: "\x1b", a: "\x07", b: "\b", f: "\f", v: "\v" })[e] ?? e);
 
 /** O nome do comando de uma palavra com o EQUALS do zsh (#567): `=git` corre o `/usr/bin/git`. Tira um `=` inicial seguido
  *  de algo que nao e `=` nem espaco, e depois o caminho. E a SEGUNDA leitura: quem a usa junta-a a do `main` (nega se

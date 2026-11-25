@@ -42,6 +42,8 @@ Nao basta atualizar apenas os ficheiros de contexto (`.agent/context/`) — e ob
    nao-carregado, e as duas atualizam-se **juntas**: `.agent/rules/anti-patterns.md` **e**
    `src/docs/anti-patterns-why.md` (ao acrescentar ou reescrever um anti-padrao: os quatro
    campos na rule, a evidencia no `-why`). Idem `.agent/rules/ticket-method.md` (instrucoes) **e** `src/docs/ticket-method-why.md` (evidencia: de onde veio a regra, o que custa) — se o processo por ticket mudou: fases, escala `S`/`M`/`L`, lista de angulos.
+   Idem `privacy.md` **e** `src/docs/privacy-why.md`, e `ai-features.md` **e** `src/docs/ai-features-why.md`; e o
+   resto do `src/docs/` (o `agent-guide.md` e os outros `-why`) com a peca que descreve.
    **Renumerar ou mudar o ambito de uma fase obriga a atualizar quem a cita por numero**: `process-rules.md`
    (ponteiro + "Ao iniciar um item"), `/plan` (Fase 0), `/debug` (Fase 0+1), `/refactor` (Fase 0+4), `/review` (Fase 3)
 

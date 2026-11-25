@@ -129,7 +129,7 @@ e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, 
   `node .agent/scripts/simulate-upgrade.mjs` (~3 min),
   `node .agent/scripts/simulate-derived.mjs` (~2 min),
   `SIMULATE_PRIVADO=1 node .agent/scripts/simulate-derived.mjs` (~2 min) e
-  `node .agent/scripts/check-test-surface.mjs "$(git rev-parse HEAD)"` (~1s).
+  `node .agent/scripts/check-test-surface.mjs` (~1s; sem argumento e a base do branch, como no CI — com `HEAD` media nada).
   Medem coisas diferentes, e e por isso que sao quatro: um contra a **ultima tag** (onde aparece o
   que so um consumidor ve), dois contra um projeto **bootstrapado de raiz** (com o `ci.yml` do template, e o de um
   derivado PRIVADO, o pacote de um job, como o CI os corre, #487), o quarto compara a
