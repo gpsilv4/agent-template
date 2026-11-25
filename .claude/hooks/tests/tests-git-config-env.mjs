@@ -83,8 +83,12 @@ export function registar({ test, corre, repo, eq, contem, SALTA }) {
     test(`config-env: \`${c}\` num branch protegido NEGA por executar (#579)`, () => nega(c, main, EXECUTAR));
   }
   // Documentacao, e nao prova: o `alias.st` nega pelo verbo `st`, que nao e seguro, com ou sem a leitura.
-  test("config-env: `git --config-env alias.st=X st` num branch protegido NEGA (#579)", () =>
-    eq(decide("git --config-env alias.st=X st", main).decisao, "deny", "alias"));
+  // O valor esperado a vista (`eq(r, "deny", ...)`): o contador da superficie (`surface-patterns.mjs`) le o 2.o argumento
+  // do `eq(`, e com `decide(c, "main")` lia o `"main"` do `decide` por acaso — trocado pela variavel, a contagem caia.
+  test("config-env: `git --config-env alias.st=X st` num branch protegido NEGA (#579)", () => {
+    const r = decide("git --config-env alias.st=X st", main).decisao;
+    eq(r, "deny", "alias");
+  });
 
   // --- A excecao (opcao A): a mesma decisao que o `-c` da mesma chave, ou que sem a flag --------------------------
   // Os pares em que so muda a chave: `a=B` deixa, `core.pager=X` (acima) nega.
@@ -93,13 +97,18 @@ export function registar({ test, corre, repo, eq, contem, SALTA }) {
   for (const c of ["git --config-env a=B status", "git --config-env a=B log", "git --config-env user.name=V log --oneline",
     "git --config-env http.extraHeader=AUTH fetch", "git --config-env http.proxy=HTTPS_PROXY fetch", "git --attr-source X status",
     "git --attr-source X log --oneline", "git --config-env core.pager log"]) {
-    test(`config-env: \`${c}\` num branch protegido DEIXA, como o -c da mesma chave (#579)`, () =>
-      eq(decide(c, main).decisao, "allow", c));
+    test(`config-env: \`${c}\` num branch protegido DEIXA, como o -c da mesma chave (#579)`, () => {
+      const r = decide(c, main).decisao;
+      eq(r, "allow", c);
+    });
   }
   // Controlos que ja deixavam no `main` (a forma com `=` saltava um token) e um wrapper sem chave que execute.
   // E um wrapper com um paginador simples e visivel: a leitura sem aspas nao o torna "executa" (o `less` nao casa).
   test("config-env: CONTROLO, `--attr-source=X status`, `sh -c 'git log'` e `sh -c 'git -c core.pager=less log'` DEIXAM num branch protegido (#579)", () => {
-    for (const c of ["git --attr-source=X status", "sh -c 'git log'", "sh -c 'git -c core.pager=less log'"]) eq(decide(c, main).decisao, "allow", c);
+    for (const c of ["git --attr-source=X status", "sh -c 'git log'", "sh -c 'git -c core.pager=less log'"]) {
+      const r = decide(c, main).decisao;
+      eq(r, "allow", c);
+    }
   });
   // A fronteira tambem le o `valoresQueExecutam`: um dado (o proxy) a frente de um `git log` que cita a fronteira nao e
   // "executa"; um paginador de uma variavel e (a leitura focada).
