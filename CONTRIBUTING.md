@@ -64,9 +64,21 @@ Test-Surface: .github/workflows/ci.yml — the release branch needs the gate too
 
 The warning becomes a note that shows the reason. In a workflow, the trailer also covers an added `if:` (as when adopting the
 one-job CI example), but not the other weakening marks (`continue-on-error`, `|| true`, an `if: false`), which have no
-way out; and an `if:` in a new workflow that runs no tests is not counted at all (#491). A trailer with no reason does not count, it
-only covers that file, and a trailer in an earlier commit does not cover a later change to it.
-The trailer is read from the commits, so an uncommitted change always warns locally. Removing
+way out; and an `if:` in a new workflow that runs no tests is not counted at all (#491).
+
+The same trailer confirms a changed or new **test-runner config** (`vitest`/`jest`/`playwright`/`cypress`/`karma.config.*`,
+`conftest.py`, `pytest.ini`…), which otherwise always warns: the checker cannot tell a narrower selection from a harmless
+one (#638). It is a **human** confirmation — whoever writes it states that the test selection did not get narrower (for
+example, a `vitest.config.ts` that only excludes the Playwright specs, with the unit count the same before and after).
+An agent never adds it on its own: it proposes the trailer, quotes the exact line when asking to commit together with the
+change accumulated since the base (`git diff <base> -- <config>` — the narrowing may come from an earlier commit), and
+writes it only once that trailer is approved. One line per config file. The trailer confirms what was COMMITTED: a config
+with uncommitted changes always warns, also after the commit that carries the trailer.
+
+A trailer with no reason does not count, it only covers that file, and a trailer in an earlier commit does not cover a later
+change to it. A squash merge with a body of its own drops it: copy the `Test-Surface:` lines into that body (`TP14`).
+The trailer is read from the commits, so an uncommitted change always warns locally (in a workflow and in a runner
+config alike). Removing
 tests or lowering a count has no such exit, and neither have the `package.json` test scripts (`test`,
 `test:unit`, `test:e2e`, `test:security`, `test:all`): renaming one, or replacing its runner, warns.
 

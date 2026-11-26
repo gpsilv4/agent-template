@@ -431,7 +431,15 @@ if (tocados.length === 0) {
     } else if (migrado) {
       // ja anunciado (MIGRADO) ao recolher, e nada desceu NESTE ficheiro
     } else if (config && !contavel) {
-      warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita`);
+      // A saida e a das marcas de um workflow (#491): o trailer `Test-Surface: <f> — <porque>` no ULTIMO commit que mexe na
+      // config (#638). E uma confirmacao HUMANA — quem a escreve assume que a selecao nao estreitou —, e o agente so a poe
+      // com a aprovacao desse trailer (`process-rules.md`). Neste ramo o `para` e sempre indefinido (os `migrado` saem
+      // antes): numa renomeacao, o trailer pode nomear o destino ou a ORIGEM.
+      // SO com a config sem alteracoes por commitar: o trailer confirma o que foi COMMITADO, e um estreitamento posterior na
+      // arvore de trabalho passava a "aceite" sem aviso local — o loop que o `TP4` congela (o leitor do #638).
+      const motivoConfig = git(["status", "--porcelain", "--", f]).trim() ? null : motivoDoTrailer({ f, para: origem, base, git });
+      if (motivoConfig) note(`${f}: configuracao do runner alterada desde ${base} — aceite (Test-Surface: ${motivoConfig})`);
+      else warn(`${f}: configuracao do runner alterada — confirmar que a selecao de testes nao ficou mais estreita; confirmado por uma pessoa, o trailer \`Test-Surface: ${f} — <porque>\` no ultimo commit que lhe mexe aceita-o`);
     } else if (!gateAvisou && !motivoMarcas) {
       ok(`${f} alterado, sem marcas de enfraquecimento`);
     }

@@ -64,7 +64,57 @@ seOGlobExistir(RUNNER_JS, "deteta alteracao a configuracao do runner (estreitar 
 test("deteta alteracao a configuracao do runner (estreitar o include)", (dir) => {
   writeFileSync(join(dir, "vitest.config.ts"), 'export default { test: { include: ["tests/so-este.test.js"] } };\n');
   commit(dir, "config");
-}, { code: 1, includes: ["vitest.config.ts", "configuracao do runner alterada"] }));
+  // Sem trailer, o aviso diz a saida (#638): a confirmacao escrita de uma pessoa.
+}, { code: 1, includes: ["vitest.config.ts", "configuracao do runner alterada", "o trailer `Test-Surface: vitest.config.ts"] }));
+
+// O trailer `Test-Surface:` como confirmacao escrita de uma config de runner alterada (#638): a mesma saida das marcas de um
+// workflow (#491), lida pelo `motivoDoTrailer`. Um derivado ficava com o CI vermelho sem saida num PR de testes E2E.
+const CONFIG_JS = 'export default { test: { exclude: ["e2e/**"] } };\n';
+seOGlobExistir(RUNNER_JS, "trailer: uma config que JA existia, alterada, com o trailer dela e aceite (#638)", () =>
+test("trailer: uma config que JA existia, alterada, com o trailer dela e aceite (#638)", (dir) => {
+  writeFileSync(join(dir, "vitest.config.ts"), "export default { test: {} };\n");
+  commit(dir, "a config na base");
+  const novaBase = git(dir, ["rev-parse", "HEAD"]);
+  writeFileSync(join(dir, "vitest.config.ts"), CONFIG_JS);
+  commit(dir, "exclui o e2e\n\nTest-Surface: vitest.config.ts — so exclui os specs do Playwright");
+  return novaBase;
+}, { code: 0, includes: ["vitest.config.ts: configuracao do runner alterada", "aceite (Test-Surface: so exclui os specs do Playwright)"], excludes: ["  WARN  "] }));
+
+seOGlobExistir(RUNNER_JS, "trailer: uma config NOVA com o trailer dela e aceite — o caso do derivado (#638)", () =>
+test("trailer: uma config NOVA com o trailer dela e aceite — o caso do derivado (#638)", (dir) => {
+  writeFileSync(join(dir, "vitest.config.ts"), CONFIG_JS);
+  commit(dir, "config nova\n\nTest-Surface: vitest.config.ts — so exclui os specs do Playwright");
+}, { code: 0, includes: ["aceite (Test-Surface: so exclui os specs do Playwright)"], excludes: ["  WARN  "] }));
+
+// Numa renomeacao, o trailer pode nomear a ORIGEM (como nas marcas): prende o `para: origem` do ramo. O conteudo muda POUCO
+// (uma linha), como numa renomeacao real: o git so emparelha origem e destino (`-M`) com o conteudo parecido.
+const CONFIG_BASE = "export default {\n  test: {\n    environment: \"node\",\n    globals: false,\n    reporters: [\"default\"],\n  },\n};\n";
+seOGlobExistir(RUNNER_JS, "trailer: uma config RENOMEADA com o trailer a nomear a origem e aceite (#638)", () =>
+test("trailer: uma config RENOMEADA com o trailer a nomear a origem e aceite (#638)", (dir) => {
+  writeFileSync(join(dir, "vitest.config.ts"), CONFIG_BASE);
+  commit(dir, "a config na base");
+  const novaBase = git(dir, ["rev-parse", "HEAD"]);
+  git(dir, ["mv", "vitest.config.ts", "vitest.config.mts"]);
+  writeFileSync(join(dir, "vitest.config.mts"), CONFIG_BASE.replace("globals: false,", "globals: false,\n    exclude: [\"e2e/**\"],"));
+  commit(dir, "renomeia\n\nTest-Surface: vitest.config.ts — passa a .mts e exclui o e2e");
+  return novaBase;
+}, { code: 0, includes: ["aceite (Test-Surface: passa a .mts e exclui o e2e)"], excludes: ["  WARN  "] }));
+
+// O trailer confirma o que foi COMMITADO: um estreitamento depois dele, por commitar, avisa (o loop que o `TP4` congela).
+seOGlobExistir(RUNNER_JS, "trailer: um estreitamento POR COMMITAR depois do commit com o trailer avisa (#638)", () =>
+test("trailer: um estreitamento POR COMMITAR depois do commit com o trailer avisa (#638)", (dir) => {
+  writeFileSync(join(dir, "vitest.config.ts"), CONFIG_JS);
+  commit(dir, "config nova\n\nTest-Surface: vitest.config.ts — so exclui os specs do Playwright");
+  writeFileSync(join(dir, "vitest.config.ts"), 'export default { test: { include: ["tests/so-um.test.js"], exclude: ["e2e/**"] } };\n');
+  // de proposito SEM commit
+}, { code: 1, includes: ["vitest.config.ts: configuracao do runner alterada", "confirmar que a selecao"], excludes: ["aceite (Test-Surface"] }));
+
+// O trailer e POR FICHEIRO: o de outro nao aceita esta config.
+seOGlobExistir(RUNNER_JS, "trailer: o trailer de OUTRO ficheiro nao aceita a config (#638)", () =>
+test("trailer: o trailer de OUTRO ficheiro nao aceita a config (#638)", (dir) => {
+  writeFileSync(join(dir, "vitest.config.ts"), CONFIG_JS);
+  commit(dir, "config\n\nTest-Surface: playwright.config.ts — outro ficheiro");
+}, { code: 1, includes: ["vitest.config.ts: configuracao do runner alterada", "confirmar que a selecao"], excludes: ["aceite (Test-Surface"] }));
 
 test("alteracao a codigo de producao NAO e enfraquecimento", (dir) => {
   mkdirSync(join(dir, "src"), { recursive: true });
