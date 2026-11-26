@@ -287,6 +287,13 @@ const FORCES = [
   ["--mirror forca tudo e apaga o que falta", "git push --mirror origin"],
   ["-dv agrupado apaga o remoto protegido", "git push -dv origin main"],
   ["-d isolado", "git push -d origin master"],
+  // #639: um `git` que e o VALOR de uma flag ou de uma atribuicao fazia de invocacao — o verbo ficava `git`, e o force-push
+  // passava em qualquer branch. O verbo `git` resolve-se outra vez a partir desse.
+  ...["sudo -u git", "env -u git", "exec -a git", "sudo -g git", "nice -n git", "doas -u git", "xargs -I git", "sudo -u git --",
+    "runuser -u git --", "FOO=/bin/git", "env FOO=/bin/git", 'FOO="a git"', "sudo -u git =git", "git"].map((antes) =>
+    [`\`${antes}\` antes do git (#639)`, `${antes} git push --force origin main`]),
+  // E o segundo `git` por caminho: a regra compara o NOME (`nome()`), e nao a palavra literal.
+  ["`sudo -u git` antes de `/usr/bin/git` (#639)", "sudo -u git /usr/bin/git push --force origin main"],
 ];
 for (const [nome, comando] of FORCES) {
   test(`force-push (branch nao protegido): ${nome}`, () => {
@@ -295,6 +302,77 @@ for (const [nome, comando] of FORCES) {
       const r = corre({ tool_input: { command: alvo(comando) }, cwd: d });
       eq(r.decisao, "deny", `"${comando}" tinha de ser negado mesmo fora de main`);
       contem(r.razao, "Force-push");
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+// #639: o falso positivo do outro lado — o `git` valor de uma flag punha o verbo a `git`, "desconhecido", e uma LEITURA
+// num branch protegido negava. Com o verbo resolvido, e o que e: uma leitura.
+for (const comando of ["sudo -u git git status", "env -u git git log"]) {
+  test(`#639: \`${comando}\` num branch protegido DEIXA (o verbo real e uma leitura)`, () => {
+    const d = repo();
+    try {
+      eq(corre({ tool_input: { command: alvo(comando) }, cwd: d }).decisao, "allow", `"${comando}"`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+// #639, o 2.o leitor: um `alias.git` vindo do AMBIENTE faz do `git git status` o alias — aqui um commit. No `main` negava (o
+// verbo era `git`); com a regra a resolver o 2.o `git`, passava a `status`, e deixava. Medido: o git honra o `alias.git`.
+for (const comando of [`GIT_CONFIG_PARAMETERS="'alias.git=commit -qam wip -m'" git git status`,
+  `GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.git GIT_CONFIG_VALUE_0="commit -qam wip -m" git git status`,
+  `GIT_CONFIG_PARAMETERS="'alias.git=!git commit -am x'" git git status`,
+  `GIT_CONFIG_PARAMETERS="'ALIAS.GIT=commit -qam wip -m'" git git status`,
+  `export GIT_CONFIG_PARAMETERS="'alias.git=commit -qam wip -m'"; git git status`]) {
+  test(`#639: um alias \`git\` do ambiente num branch protegido NEGA — \`${comando.slice(0, 60)}\``, () => {
+    const d = repo();
+    try {
+      eq(corre({ tool_input: { command: alvo(comando) }, cwd: d }).decisao, "deny", `"${comando}"`);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+}
+
+/**
+ * CONTORNOS_ABERTOS (#639): formas de esconder o force-push que HOJE PASSAM, registadas e nao perseguidas — o criterio do
+ * `hooks-guide.md` (#223): os hooks sao uma barreira contra o DESCUIDO, e ninguem escreve isto por engano. Fecha-las pede
+ * saber que flags levam valor, ou as duas leituras de um `git` ambiguo — o desenho que duas auditorias do #639 mostraram nao
+ * estar pronto. NAO e exaustiva: fica aberto tudo o que ponha algo que nao e flag entre o 1.o `git` e o verdadeiro (por
+ * exemplo `env -u git -u PATH git ...`, `sudo -u git nice git ...`, `FOO=/bin/git BAR=1 git ...`).
+ *
+ * Um wrapper DEPOIS do `git` valor (`sudo -u git env git ...`, `sudo -u git sh -c '...'`): a correcao barata e voltar a correr
+ * o ciclo dos wrappers quando o `nome(toks[i])` resolvido esta em `WRAPPERS` (o 1.o leitor) — mexe no nucleo do consumo, e
+ * pede a sua auditoria. Um force-push por ALIAS (`git -c alias.p=push p --force`), que ja passava antes do #639: o `eForce` so
+ * ve `verbo === "push"` (o 2.o leitor). Um alias num ficheiro de config (`~/.gitconfig`) nao se ve no texto, de todo.
+ *
+ * **Um destes a ficar VERMELHO e BOA NOTICIA:** alguem o fechou. Mover a entrada para os `FORCES` — e nao "corrigir o teste".
+ */
+const CONTORNOS_ABERTOS = [
+  ["`timeout -s git 5`: o verbo fica `5`", "timeout -s git 5 git push --force origin main"],
+  ["`su -g git root -c`: o verbo fica `root`", "su -g git root -c 'git push --force origin main'"],
+  ["`sudo -u git bash -s` com o force-push no corpo", "sudo -u git bash -s <<'EOF'\ngit push --force origin main\nEOF"],
+  ["`env -u git sh` com o force-push no corpo", "env -u git sh <<'EOF'\ngit push --force origin main\nEOF"],
+  // Outra classe (nao ha `git` valor): o valor de uma atribuicao com mais de duas palavras. Registada aqui por ter sido medida.
+  ["OUTRA CLASSE — um valor de atribuicao com tres palavras", 'FOO="a b c" git push --force origin main'],
+  ["`sudo -u git sh -c`: um wrapper depois do `git` valor", "sudo -u git sh -c 'git push --force origin main'"],
+  ["`sudo -u git env git`: um wrapper depois do `git` valor", "sudo -u git env git push --force origin main"],
+  ["`sudo -u git nohup git`: um wrapper depois do `git` valor", "sudo -u git nohup git push --force origin main"],
+  ["`sudo -u git command git`: um wrapper depois do `git` valor", "sudo -u git command git push --force origin main"],
+  ["`git -c alias.p=push p --force`: um force-push por alias (ja passava)", "git -c alias.p=push p --force origin main"],
+  ["um alias do ambiente para o push (ja passava)", `GIT_CONFIG_PARAMETERS="'alias.p=push --force'" git p origin main`],
+  ["`git -c alias.git=push git --force`: um force-push por alias (ja passava)", "git -c alias.git=push git --force origin main"],
+];
+for (const [nome, comando] of CONTORNOS_ABERTOS) {
+  test(`#639 CONTORNO ABERTO: ${nome}`, () => {
+    const d = repo("feature/x");
+    try {
+      eq(corre({ tool_input: { command: alvo(comando) }, cwd: d }).decisao, "allow",
+        `"${comando.split("\n")[0]}" ja NAO passa — se foi fechado de proposito, mover a entrada de CONTORNOS_ABERTOS para FORCES (#639)`);
     } finally {
       rmSync(d, { recursive: true, force: true });
     }

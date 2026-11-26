@@ -236,9 +236,23 @@ export function invocacoes(texto, { equals = false } = {}) {
     if (nome(toks[0]) !== "git") continue; // nao e uma invocacao do git
     // Saltar as flags globais do git ate ao verbo.
     let i = 1;
-    while (i < toks.length && toks[i].startsWith("-")) {
-      const f = toks[i].split("=")[0];
-      i += GIT_FLAGS_COM_VALOR.has(f) && !toks[i].includes("=") ? 2 : 1;
+    const saltaFlags = () => {
+      while (i < toks.length && toks[i].startsWith("-")) {
+        const f = toks[i].split("=")[0];
+        i += GIT_FLAGS_COM_VALOR.has(f) && !toks[i].includes("=") ? 2 : 1;
+      }
+    };
+    saltaFlags();
+    // #639: o verbo e ele PROPRIO `git` — o 1.o era o valor de uma flag (`sudo -u git git push`), de uma atribuicao
+    // (`FOO=/bin/git git ...`, cujo nome e `git`) ou um alias (`git git ...`): resolve-se outra vez a partir DESSE, pelo
+    // `nome()` (tambem `/usr/bin/git` e, na leitura do EQUALS, `=git`). Linear: continua o indice, e cada volta consome
+    // pelo menos o `git`. O que poe outra coisa entre os dois (`timeout -s git 5 git ...`) fica aberto: `CONTORNOS_ABERTOS`.
+    // Com um `alias.git` em QUALQUER sitio do comando (o `git git status` corre o alias, nao o `status`; o 2.o leitor do #639,
+    // pelo `GIT_CONFIG_PARAMETERS`), nao se resolve: fica a leitura do `main`, o verbo `git`. Num ficheiro de config, nao se ve.
+    const aliasGit = /\balias\.git\b/i.test(texto);
+    while (i < toks.length && nome(toks[i]) === "git" && !aliasGit) {
+      i += 1;
+      saltaFlags();
     }
     out.push({ verbo: i < toks.length ? toks[i] : null, args: toks.slice(i + 1), seg, viaWrapper: viuWrapper, viaWrapperOpaco: viuWrapperOpaco });
   }
