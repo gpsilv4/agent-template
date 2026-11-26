@@ -150,11 +150,16 @@ export const CABECAS = new Set([
   "nice", "ionice", "unbuffer",
 ]);
 
-/** Palavras de shell que nunca sao o comando. O `do`/`then` ja saem no `split`; `for`/`while`
+/** Os modificadores do zsh que poem um comando a correr e nao levam argumentos (#606): `noglob git commit`, `- git push`
+ *  correm o `git`. Uma so lista, lida por todos: o `resto()` (aqui), os `WRAPPERS` do guard do branch
+ *  (`invocacoes-git.mjs`), o seguimento do `cd` dele (`guard-protected-branch.mjs`) e a cabeca dos textos publicos
+ *  (`cabeca-comando.mjs`). O `builtin`/`command`/`exec` ja se liam; o `repeat N` leva uma contagem, e tem issue proprio. */
+export const MODIFICADORES_ZSH = ["noglob", "nocorrect", "-"];
+/** Palavras de shell que nunca sao o comando (e os modificadores de cima). O `do`/`then` ja saem no `split`; `for`/`while`
  *  NAO entram, e e deliberado: o corpo do ciclo vive noutros segmentos, e julgar "o verbo do
  *  segmento seguinte" permitia `for f in <F>; do cat $f; rm $f; done` — o `cat` desarmava o
  *  `rm`. E a classe do ciclo, e tem slice propria. */
-const PALAVRAS_SHELL = new Set(["if", "else", "elif", "!"]);
+const PALAVRAS_SHELL = new Set(["if", "else", "elif", "!", ...MODIFICADORES_ZSH]);
 
 /** As palavras-chave que, essas sim, chegam como "verbo" (#307): um ciclo ou bloco nao escreve
  *  por si, so esconde o que corre dentro. So as que chegam — as de cima o `resto()` consome, e

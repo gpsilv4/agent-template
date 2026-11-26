@@ -9,7 +9,7 @@
  * Vivia no `textos-publicos.mjs` ate ao #580, que o separou da extracao para os dois ficarem com folga do Guard 17
  * (os blocos vieram sem mudanca); o `mudaAPasta` e o comentario do `cabeca()` sao do #565.
  */
-import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, nomeDaAtribuicao, nomeDoComando, SUDO_LOGIN_SRC } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_BASH, ATRIBUICAO_LARGA, CABECAS, depoisDeAtribuidora, MODIFICADORES_ZSH, nomeDaAtribuicao, nomeDoComando, SUDO_LOGIN_SRC } from "./fronteira-dados.mjs";
 
 /** O `--chdir` e o `--login` do `sudo` (e os prefixos unicos): mudam a pasta de quem corre (a HOME do alvo). */
 const SUDO_MUDA_PASTA = new RegExp(`^--(?:chd(?:i(?:r)?)?|${SUDO_LOGIN_SRC})(?:=|$)`);
@@ -145,7 +145,7 @@ function semAtribuicaoAVista(ws) {
   if (ws.some((w) => ATRIBUI_NA_EXPANSAO.test(w.cru))) return true;
   let { i: h } = cabeca(ws);
   // Os modificadores do zsh (`noglob eval`, `nocorrect source`) nao sao o verbo.
-  while (h >= 0 && ["noglob", "nocorrect", "-"].includes(ws[h]?.texto)) h = h + 1 < ws.length ? h + 1 : -1;
+  while (h >= 0 && MODIFICADORES_ZSH.includes(ws[h]?.texto)) h = h + 1 < ws.length ? h + 1 : -1;
   if (h < 0) return false;
   const verbo = ws[h].texto.replace(/^.*\//, "");
   const args = ws.slice(h + 1).map((w) => w.texto);
