@@ -594,6 +594,38 @@ para nao ser descoberto:
   mao; e o `check-test-surface` corre o codigo do HEAD do PR, logo um PR que relaxe o modulo E use o relaxamento
   so e travado por quem le o diff (o vao que o `TP4` ja assume).
 
+## A config de runner e o trailer `Test-Surface:` (#638)
+
+**O que aconteceu (26 nov).** Num derivado, um PR acrescentava testes E2E com Playwright: criava um
+`playwright.config.ts` e um `vitest.config.ts` que so tinha `exclude: [...configDefaults.exclude, "e2e/**"]`, para o
+Vitest nao apanhar os specs do Playwright. Os unitarios ficaram **iguais: 934 antes e depois** (medido no derivado).
+O `check-test-surface` reprovava sempre (exit 1): uma config de runner opaca (`CONFIG_GLOBS_DO_PROJETO`) alterada ou nova
+e sempre um WARN — o verificador nao distingue uma selecao mais estreita de uma inofensiva —, e o trailer so servia as
+marcas dos workflows (#491). Como o CI corre o guard em todos os PRs, o derivado ficava com o CI vermelho **sem saida**.
+O agente do derivado tentou mexer no guard e foi **bloqueado pelo controlo de permissoes** ("undermining oversight"), e
+com razao: mexer numa salvaguarda e uma decisao humana, e tem de ficar escrita. Esta e essa decisao.
+
+**A decisao.** O mesmo trailer (`Test-Surface: <ficheiro> — <porque>`, no ULTIMO commit que mexe no ficheiro, lido pelo
+mesmo `motivoDoTrailer`) passa a aceitar uma config de runner, com o motivo a vista no NOTE. O `TP4` congela a config
+porque e por ela que um agente estreita os testes para "ficar verde" — e quem escreve a mensagem do commit e o agente.
+Por isso a regra escrita (`process-rules.md`, `CONTRIBUTING.md`, o `TP4`): o agente **nunca** poe esse trailer por
+iniciativa propria — propoe-no, cita a linha exata no pedido de commit, e so a escreve com a aprovacao desse trailer.
+**O limite, dito:** a regra nao e imposta por maquina (o mesmo buraco do #491); encaixa no fluxo que ja existe, em que
+cada commit passa por uma pessoa. Duas guardas do leitor independente: o trailer so vale com a config SEM alteracoes por
+commitar (confirma o que foi commitado — um estreitamento posterior, ainda na arvore de trabalho, passava a "aceite"); e o
+pedido de aprovacao mostra o diff ACUMULADO desde a base (`git diff <base> -- <config>`), porque o estreitamento pode ter
+vindo num commit anterior ao que leva o trailer. Fica aberto, como no #491: numa renomeacao, o ultimo commit que mexe na
+origem OU no destino da o trailer — um commit que recrie e volte a apagar a origem podia trazer um trailer que o destino
+nao mereceu (rebuscado).
+
+**As alternativas rejeitadas.** Contornar o guard — renomear a config para fora dos globs, ou passar o `exclude` pela
+linha de comando — escondia do guard exatamente o que ele existe para ver. Isentar uma config NOVA tambem nao: uma config
+nova estreita tanto como uma alterada. Um interruptor por repo desligava o aviso para todas as configs futuras; o trailer
+e por ficheiro e por commit, e fica a vista no PR. Um hook que negasse o trailer ao agente impunha o `TP4` a letra, mas so
+no Claude Code e com mais atrito — o utilizador escolheu a regra escrita.
+
+**A versao.** Sai na `v0.64.1`; o derivado recebe-o pelo `/upgrade` dessa versao.
+
 ## O que o detector de codigo morto nao ve
 
 Saiu do `scripts-guide.md` no #375, para dar lugar a entrada do `check-textos-publicos.mjs` no orcamento de bytes.

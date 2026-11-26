@@ -122,6 +122,7 @@ e os exemplos vivem no `CONTRIBUTING.md`: este entra no contexto a cada sessao, 
 - Sempre que uma tarefa/workflow terminar e estiver pronta para commit, o Agente **deve obrigatoriamente** informar o utilizador do resumo das alteracoes e perguntar: _"Estou pronto para fazer o commit/push, posso avancar?"_.
 - So executar os comandos Git no terminal apos o utilizador analisar o codigo e dar explicitamente "Luz Verde".
 - **NUNCA** atribuir o trabalho a uma IA na mensagem de commit (`Co-Authored-By`, "Generated with", emoji de robo); co-autor humano passa. **Verificado** pelo hook `.githooks/commit-msg` — ligar com `git config core.hooksPath .githooks`.
+- **NUNCA** por por iniciativa propria um `Test-Surface:` que aceite uma config de runner (`vitest`/`playwright`/`pytest`...; #638): propoe-se, cita-se a linha exata no pedido de commit COM o diff acumulado (`git diff <base> -- <config>`), e so se escreve com a aprovacao desse trailer (o `TP4` congela a config; e a pessoa que confirma que a selecao nao estreitou).
 - Apos merge de PRs, **perguntar ao utilizador** se deve eliminar o branch ou mante-lo.
 - **Depois do commit e antes do `push`, correr os QUATRO que apanham de facto** (a ordem importa: o
   simulador do upgrade mede o delta entre a ULTIMA TAG e o `HEAD`, logo sem commits nao ha nada a

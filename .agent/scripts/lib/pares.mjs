@@ -325,6 +325,16 @@ const PARES_DO_TEMPLATE = [
     neutro: "(() => {})(",
   },
   {
+    // O trailer `Test-Surface:` que ACEITA (#491 nas marcas de um workflow; #638 numa config de runner): o sitio que pode
+    // afrouxar. O neutro responde "sem trailer" (`null`), e cada chamada tem o seu vermelho — as marcas nos testes do gate,
+    // a config nos casos `trailer:` do `test-test-surface`. O alvo e o verificador, e nao a lib: la o sinal casava a
+    // DEFINICAO, e o neutro dava JS invalido; o import nao tem `(` e nao casa.
+    alvo: ".agent/scripts/check-test-surface.mjs",
+    suite: ".agent/scripts/tests/test-test-surface.mjs",
+    sinal: /(?<![\w.$])motivoDoTrailer\(/,
+    neutro: "((..._) => null)(",
+  },
+  {
     // A ESTRUTURA do gate (#382): cada `defeito(` e um workflow que desliga o gate sem tocar num teste. O dono
     // (`tests-estrutura-workflow.mjs`) corre primeiro no `test-guards`: a funcao e pura, cada sitio custa milissegundos.
     alvo: ".agent/scripts/lib/estrutura-workflow.mjs",
