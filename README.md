@@ -435,6 +435,7 @@ not to* line, so every agent sees it.
 │       ├── tests-textos-publicos-cabeca.mjs <- A gh/git behind a head with flags (`env -u FOO gh`, `sudo -D dir`) (#565)
 │       ├── tests-atribuicoes.mjs   <- bash and env assignments read the same way in every hook (#546)
 │       ├── tests-equals.mjs        <- The zsh EQUALS (`=git`, `=bash`) read by the three guards (#567)
+│       ├── tests-modificadores-zsh.mjs <- The zsh precommand modifiers (`noglob`, `nocorrect`, `-`) in the three guards (#606)
 │       ├── tests-git-config-env.mjs <- `--config-env`/`--attr-source` before the verb (#579)
 │       ├── tests-opaco-segmento.mjs <- A command run by another shell, judged per segment; `$'...'` at the frontier (#605)
 │       ├── tests-hooks-vazios.mjs  <- An empty or missing configured hook, said at session start (#589)

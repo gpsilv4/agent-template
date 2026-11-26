@@ -53,7 +53,7 @@ import { porqueAltera, contextoFronteira, executaCrase, razaoDe } from "./lib/fr
 // O RECONHECIMENTO de uma invocacao do `git` (os segmentos, os wrappers, as flags globais ate ao verbo) vive a
 // parte desde o #580; aqui fica a DECISAO.
 import { invocacoes, limpo, ultimoComando } from "./lib/invocacoes-git.mjs";
-import { ELEVA_CURTA_SRC, ELEVAM, SHELLS, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC, temEquals } from "./lib/fronteira-dados.mjs";
+import { ELEVA_CURTA_SRC, ELEVAM, MODIFICADORES_ZSH, SHELLS, SU, SUDO_LOGIN_SRC, SUDO_SHELL_SRC, temEquals } from "./lib/fronteira-dados.mjs";
 
 // Os branches protegidos sao do PROJETO (`.claude/hooks/protegidos.json`, #257); a leitura, o
 // default e a comparacao normalizada vivem em `lib/protegidos.mjs`.
@@ -221,13 +221,18 @@ function seguro(inv) {
   return !normalizaFlags(inv.args).some((a) => insegura.test(a));
 }
 
+/** O que pode vir antes de um `cd` que ainda o corre (#606): os modificadores do zsh (a lista unica) e o `builtin`/`command`.
+ *  Sem isto, `noglob cd <repo em main> && git commit` lancado de um branch de feature julgava o branch da feature (o 1.o
+ *  leitor do #606); o `builtin cd`/`command cd` ja tinham a mesma falha. O `repeat <contagem> cd` fica para o issue do `repeat`. */
+const ANTES_DO_CD = String.raw`(?:(?:${[...MODIFICADORES_ZSH, "builtin", "command"].join("|")})\s+)*`;
+
 /** Diretorios que o comando visita: o `cwd` do payload mais cada `-C`, `--git-dir`, `cd` e
  *  `pushd`. Sem nenhuma pista, o `cwd` do proprio hook — nunca lista vazia, que PERMITIA. */
 function diretorios(cmd, cwd) {
   const dirs = [];
   // #227: `\S+` levava o `;` de `cd <repo>; git commit` (fuga). Para nos separadores, aceita escapes.
   for (const m of cmd.matchAll(/(?:-C|--git-dir=?|--work-tree=?)\s*("[^"]+"|'[^']+'|\S+)/g)) dirs.push(limpo(m[1]));
-  for (const m of cmd.matchAll(/(?:(?:^|[;&|({\n])\s*|\b(?:then|do|else)\s+)(?:cd|pushd)\s+(?:(?:-[PLe@]+|--)\s+)*("[^"]+"|'[^']+'|(?:\\.|[^\s;&|()<>\\])+)/g)) dirs.push(limpo(m[1]));
+  for (const m of cmd.matchAll(new RegExp(String.raw`(?:(?:^|[;&|({\n])\s*|\b(?:then|do|else)\s+)${ANTES_DO_CD}(?:cd|pushd)\s+(?:(?:-[PLe@]+|--)\s+)*("[^"]+"|'[^']+'|(?:\\.|[^\s;&|()<>\\])+)`, "g"))) dirs.push(limpo(m[1]));
   if (cwd) dirs.push(cwd);
   // O filtro corre ANTES do fallback: com ele depois, um comando cuja unica pista de
   // diretorio comece por `-` (`git commit -C -m x`) e sem `cwd` no payload dava lista vazia

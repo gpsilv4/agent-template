@@ -9,7 +9,7 @@
  * Vivia no `guard-protected-branch.mjs` ate ao #580, que o separou da decisao para os dois ficarem com folga do
  * Guard 17. Os blocos vieram sem mudanca, menos o `export` do `limpo` e do `invocacoes` (o guard usa-os).
  */
-import { ATRIBUICAO_LARGA, GIT_GLOBAIS_COM_VALOR, nomeDoComando, SHELLS } from "./fronteira-dados.mjs";
+import { ATRIBUICAO_LARGA, GIT_GLOBAIS_COM_VALOR, MODIFICADORES_ZSH, nomeDoComando, SHELLS } from "./fronteira-dados.mjs";
 
 /** Wrappers que se consomem antes do comando verdadeiro. Esta lista e a que substitui a
  *  regex de posicao de comando: cada entrada em falta era um bypass. As shells vem da lista
@@ -19,6 +19,10 @@ const WRAPPERS = new Set([
   "nice", "ionice", "xargs", "timeout", "doas", "script", "unbuffer", "watch", ...SHELLS,
   // #600: o `su`/`runuser` (com `-c`, um comando numa shell). Fora daqui, o ciclo parava neles e o git do `-c` nao se via.
   "su", "runuser",
+  // #606: os modificadores do zsh (`noglob git commit` passava num branch protegido). O `-` nunca chega aqui: a regra das
+  // flags apanha-o antes (e e por isso que ja negava). O `repeat N` NAO entra: a contagem nao e uma palavra que se salte a
+  // cegas (`repeat "1 + 1"`, `repeat $N`, depois de um `-c`), e tem issue proprio (tres leituras do #606 acharam formas novas).
+  ...MODIFICADORES_ZSH,
 ]);
 /** Depois de um `su`/`runuser` (#600): o `-c` colado ao valor (`-c'git push'` da `-cgit`; `-lcgit`) e o `--command=V`
  *  (e os prefixos, `--co=V`, `--se=V`) partem-se em flag + valor. PREGUICOSO, no 1.o `c` do grupo. */

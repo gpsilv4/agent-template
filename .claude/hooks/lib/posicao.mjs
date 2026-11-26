@@ -61,7 +61,8 @@ const ehInterpretadorOuSu = (base) => EH_INTERPRETADOR.test(base) || SU.includes
 const SCRIPT = /^[\w./][\w./@+-]*\.(?:[cm]?js|ts|py|rb|pl|php)$/;
 const SCRIPT_SHELL = /^[\w./][\w./@+-]*\.(?:sh|bash|zsh)$/;
 /** Palavras de shell que poem um comando a correr a seguir e nunca sao o comando. O `resto()` partilhado ja
- *  consome `if`/`else`/`elif`/`!` (`PALAVRAS_SHELL` da folha); as outras so se consomem AQUI, porque la nao
+ *  consome `if`/`else`/`elif`/`!` e os modificadores do zsh (`PALAVRAS_SHELL` da folha, #606); as
+ *  outras so se consomem AQUI, porque la nao
  *  consumi-las e deliberado (`fronteira-dados.mjs`). O `time` NAO esta: e uma cabeca do `resto()`, que lhe
  *  conhece as flags (`time -p`); tira-lo antes escondia-as. */
 const CHAVES = new Set(["do", "then", "else", "elif", "{", "coproc", "if", "while", "until", "!"]);
