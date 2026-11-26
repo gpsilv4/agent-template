@@ -68,6 +68,23 @@ export const PARES_DOS_HOOKS = [
     neutro: "((t) => t.length)(",
   },
   {
+    // #639: o verbo que e ele proprio `git` (o 1.o era o valor de uma flag ou de uma atribuicao) resolve-se outra vez. O sinal e a
+    // condicao do ciclo (sem o literal: a varredura le as strings em branco, e `"git"` sao 5 caracteres); o neutro `false`
+    // desliga-o — e os `FORCES` do #639 (`sudo -u git git push --force`...) voltam a passar.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=while \(i < toks\.length && )nome\(toks\[i\]\) === .{5}(?= && !aliasGit\) \{)/,
+    neutro: "false",
+  },
+  {
+    // #639, o 2.o leitor: com um `alias.git` no comando, o ciclo acima NAO corre (o `git git status` corre o alias). O neutro
+    // `true` ignora o alias — e os `GIT_CONFIG_PARAMETERS="'alias.git=commit ...'" git git status` voltam a passar.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=nome\(toks\[i\]\) === .{5} && )!aliasGit(?=\) \{)/,
+    neutro: "true",
+  },
+  {
     // O PISO da fronteira (#631: saiu do `fronteira.mjs`). E quase so dados (a `LEITURA` e as regex); o que decide
     // e o `saidasDoGit`, para onde ESCREVE uma invocacao do `git` (#237). O sinal sao os tres sitios que juntam uma
     // saida; o neutro empurra para um array deitado fora — cada mutacao deixa um `--output=`, um `bundle create` ou um
