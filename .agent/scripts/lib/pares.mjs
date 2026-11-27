@@ -61,6 +61,13 @@ const PARES_DO_TEMPLATE = [
   // As suites em paralelo (#337): o UNICO sitio de recusa e o `reprova()`. Desligado, o passo do CI ficava
   // verde com uma suite vermelha — a falha aberta que correr em paralelo nao pode trazer.
   { alvo: ".agent/scripts/lib/suites-em-paralelo.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /(?<![\w.$]|function )reprova\(/, neutro: "(() => {})(" },
+  // #652: os nucleos LIVRES. Cada regra com o seu caso vermelho no `tests-suites-em-paralelo.mjs` e no
+  // `tests-varredura-workers.mjs` (ambos do `test-guards`). As strings leem-se em branco: `"true"` sao 6 caracteres.
+  ...[[/env\.CI === .{6} \? deHoje : /, ""], [/Math\.min\(deHoje, livres\(\)\)/, "deHoje"],
+    [/total > 0 \? ocioso \/ total : 1/, "1"], [/Math\.round\(nucleos \* fracaoLivre\(antes, cpus\(\)\)\)/, "nucleos"],
+    [/if \(antes\.length !== depois\.length\) return 1;/, ";"]]
+    .map(([sinal, neutro]) => ({ alvo: ".agent/scripts/lib/suites-em-paralelo.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal, neutro })),
+  { alvo: ".agent/scripts/lib/varredura-paralela.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /Math\.min\(teto - 1, livres\(\)\)/, neutro: "teto - 1" },
   {
     // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
     // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel

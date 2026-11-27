@@ -31,7 +31,8 @@
  *   node .agent/scripts/mutation-sweep.mjs --timeout-piso=2000 # piso do timeout por mutante (testes)
  *   node .agent/scripts/mutation-sweep.mjs --shard=1/2        # so a fatia 1 de 2 (o CI reparte por maquinas, #308)
  *
- * CUSTO: recorre a suite inteira por sitio. Ate 8 processos (num PC um a menos; #327), cada um com a SUA copia do
+ * CUSTO: recorre a suite inteira por sitio. Ate 8 processos (num PC um a menos, #327, e nunca acima dos nucleos livres,
+ * #652), cada um com a SUA copia do
  * repo. Correr apos mexer num verificador, nao a cada commit. Condicional no CI (so quando o
  * diff toca em verificadores/hooks — ver `.github/workflows/ci.yml`).
  *
@@ -104,6 +105,7 @@ import { alvosNoDisco } from "./lib/alvos-no-disco.mjs";
 import { verificadoresDe } from "./lib/mapa-suites.mjs";
 import { alvosDoDiff } from "./lib/varredura-diff.mjs";
 import { medeCobertura, quantosWorkers, copiaDoRepo } from "./lib/varredura-paralela.mjs";
+import { nucleosLivres } from "./lib/suites-em-paralelo.mjs";
 import { resumoDeTempos } from "./lib/varredura-tempos.mjs";
 import { qualShard, particao, totalDeSitios, ENV_SHARD, ENV_RELATORIO } from "./lib/varredura-fatia.mjs";
 
@@ -275,7 +277,9 @@ const medir = [];
 /** O grau de paralelismo. `--workers=1` devolve o comportamento sequencial por inteiro, para
  *  quem precise de comparar um resultado sem mudar mais nada. */
 const argWorkers = process.argv.find((a) => a.startsWith("--workers="));
-const WORKERS = quantosWorkers(argWorkers?.slice("--workers=".length));
+// Uma funcao, chamada so onde se lanca (#652): a medicao dos nucleos livres custa ~0,5 s, e o `--list`, um `--only` sem
+// alvos ou um `--shard` invalido nao lancam nada (o leitor do #652).
+const workers = () => quantosWorkers(argWorkers?.slice("--workers=".length), { livres: () => nucleosLivres() });
 /** O piso do timeout por mutante (#154, ver `lib/varredura-paralela.mjs`). So existe para as
  *  suites poderem provar o timeout sem esperar um minuto; ninguem o devia baixar no CI. */
 const argPiso = process.argv.find((a) => a.startsWith("--timeout-piso="));
@@ -325,7 +329,7 @@ try {
     // interrompida). Quem varre o que sobrou e a corrida SEGUINTE, so o que ja nao tem dono vivo.
     const abandonadas = limpaTmpsAntigos("mutation-sweep-") + limpaFixturesDeTeste();
     if (abandonadas) console.log(`  OK  ${abandonadas} copia(s) de corridas interrompidas apagadas`);
-    copias = Array.from({ length: WORKERS }, () => copiaDoRepo(ROOT));
+    copias = Array.from({ length: workers() }, () => copiaDoRepo(ROOT));
   }
   // Se o pre-voo do --only ja reprovou, nao ha alvos para varrer.
   if (selecionados.length === 0) throw { __preflight: true };

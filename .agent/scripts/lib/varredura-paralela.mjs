@@ -57,14 +57,17 @@ import { ENV_SHARD, ENV_RELATORIO } from "./varredura-fatia.mjs";
  *  usar (a afinidade de CPU), e nao a maquina inteira. A prioridade e por VALIDADE (leitor do #327):
  *  um `--workers=` vazio ou mal escrito nao apaga o `SWEEP_WORKERS`.
  * @param {string|undefined} pedido o valor de `--workers=`
- * @param {{env?: Record<string, string|undefined>, nucleos?: number}} [o] para os testes
+ * @param {{env?: Record<string, string|undefined>, nucleos?: number, livres?: () => number}} [o] para os testes; `livres`, os
+ *  nucleos livres medidos (#652), so se chama numa maquina pessoal sem valor explicito
  * @returns {number} */
-export function quantosWorkers(pedido, { env = process.env, nucleos = availableParallelism() } = {}) {
+export function quantosWorkers(pedido, { env = process.env, nucleos = availableParallelism(), livres = () => Infinity } = {}) {
   const valido = (v) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : null);
   const n = valido(pedido) ?? valido(env.SWEEP_WORKERS);
   if (n !== null) return Math.max(1, Math.min(8, n));
   const teto = Math.max(1, Math.min(8, nucleos));
-  return env.CI === "true" ? teto : Math.max(1, teto - 1);
+  // #652: numa maquina pessoal, tambem nunca acima dos nucleos LIVRES (`nucleosLivres`, em `lib/suites-em-paralelo.mjs`): com
+  // outro projeto a varrer, este usa menos. O valor de hoje e o teto — com a maquina livre, nada muda.
+  return env.CI === "true" ? teto : Math.max(1, Math.min(teto - 1, livres()));
 }
 
 /** Corre uma suite e diz se passou. Nunca lanca: "falhou" e um resultado, nao um acidente.
