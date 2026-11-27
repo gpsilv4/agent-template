@@ -119,6 +119,17 @@ uma vez; `--workers` ganha a tudo (o primeiro valor VALIDO). Os cores contam-se 
 So `CI=true` conta como CI: o GitHub, o GitLab ou o CircleCI definem-no; num Jenkins ou num Azure
 Pipelines, que nao o definem, a varredura deixa um core livre — `SWEEP_WORKERS` resolve.
 
+**E nunca acima dos nucleos LIVRES agora (#652).** Cada verificacao dimensionava-se como se estivesse sozinha
+na maquina: com tres projetos a verificar ao mesmo tempo, a carga chegou a ~80 com 10 nucleos, e o Mac
+bloqueou duas vezes (27 nov). Numa maquina pessoal, a varredura e a bateria (`quantasDeCadaVez`) usam
+`max(1, min(<o valor de cima>, nucleos livres))`: com a maquina livre, o mesmo; com outro projeto a varrer,
+menos (medido: com 6 processos a ocupar CPU, 2 e 2). Os livres medem-se pela diferenca do `os.cpus()` (o tempo
+ocioso contra o total) ao longo de ~0,5 s — igual em macOS e Linux, sem lancar processos. NAO o `loadavg`:
+e uma media de 1 minuto, e quem arranca a seguir a uma corrida pesada herdava a carga dela. NAO o `freemem`: no
+macOS conta so as paginas livres (0,17 GB com 43% livre, medido), e dava 1 worker quase sempre. O CI e um
+valor explicito (`--workers`, `SWEEP_WORKERS`, `--max`) nao medem. A trava entre projetos (so um trabalho
+pesado de cada vez na maquina) e o #648.
+
 ### O runner inteiro, e o que cada recurso muda (#308)
 
 A especificacao dos runners standard, na fonte (consultada a 2026-10-15 —

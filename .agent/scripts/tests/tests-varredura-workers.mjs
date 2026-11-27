@@ -54,9 +54,31 @@ const CASOS = [
   ["pessoal com 0 nucleos: 1", undefined, {}, 0, 1],
 ];
 
+/** #652: os nucleos LIVRES medidos (`livres`, uma funcao — so se chama no ramo da maquina pessoal). A formula parte do valor de
+ *  hoje: `max(1, min(<o de hoje>, livres))` — com a maquina livre, igual; com outro projeto a varrer, menos.
+ *  `[descricao, pedido, env, nucleos, livres, esperado, chamaAMedicao]`. */
+const CASOS_LIVRES = [
+  ["pessoal, 10 cores, 3 livres: 3", undefined, {}, 10, 3, 3, true],
+  ["pessoal, 10 cores, todos livres: o de hoje (7)", undefined, {}, 10, 10, 7, true],
+  ["pessoal, 10 cores, nenhum livre: nunca abaixo de 1", undefined, {}, 10, 0, 1, true],
+  ["pessoal, 4 cores, 2 livres: 2", undefined, {}, 4, 2, 2, true],
+  // O CI e um valor explicito NAO medem (nem gastam a amostra): exatamente como hoje.
+  ["CI ignora a medicao", undefined, { CI: "true" }, 4, 1, 4, false],
+  ["SWEEP_WORKERS ignora a medicao", undefined, { SWEEP_WORKERS: "6" }, 10, 1, 6, false],
+  ["--workers ignora a medicao", "2", {}, 10, 1, 2, false],
+];
+
 export function registar() {
   for (const [nome, pedido, env, nucleos, esperado] of CASOS) {
     const veio = quantosWorkers(pedido, { env, nucleos });
     registarResultado(`workers: ${nome}`, veio === esperado ? [] : [`deu ${veio}, esperado ${esperado}`]);
+  }
+  for (const [nome, pedido, env, nucleos, livres, esperado, mede] of CASOS_LIVRES) {
+    let chamadas = 0;
+    const veio = quantosWorkers(pedido, { env, nucleos, livres: () => (chamadas++, livres) });
+    registarResultado(`workers (#652): ${nome}`, [
+      ...(veio === esperado ? [] : [`deu ${veio}, esperado ${esperado}`]),
+      ...((chamadas > 0) === mede ? [] : [mede ? "nao mediu a CPU livre" : `mediu a CPU livre (${chamadas}x) num ramo que nao a usa`]),
+    ]);
   }
 }

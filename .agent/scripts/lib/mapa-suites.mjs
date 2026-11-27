@@ -249,8 +249,9 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/lib\/varredura-diff\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/lib\/varredura-fatia\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/lib\/varredura-shards\.mjs$/, verifica: [S("test-guards.mjs")] },
-  // As suites em paralelo do `Guard Suites` (#337): testadas no `tests-suites-em-paralelo.mjs`, do `test-guards`.
-  { re: /^\.agent\/scripts\/lib\/suites-em-paralelo\.mjs$/, verifica: [S("test-guards.mjs")] },
+  // As suites em paralelo do `Guard Suites` (#337): testadas no `tests-suites-em-paralelo.mjs`, do `test-guards`. E importado pelo
+  // `mutation-sweep.mjs` (#652: os nucleos livres), que o `test-mutation-sweep` corre como fixture.
+  { re: /^\.agent\/scripts\/lib\/suites-em-paralelo\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   // A descoberta tambem e lida pelo teste cruzado do plano do CI (`tests-plano-ci.mjs`, #347 C1): mexer nela corre os dois.
   { re: /^\.agent\/scripts\/lib\/alvos-no-disco\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
   { re: /^\.agent\/scripts\/tests\/test-mutation-sweep\.mjs$/, verifica: [S("test-mutation-sweep.mjs")] },

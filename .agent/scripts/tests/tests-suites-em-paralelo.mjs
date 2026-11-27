@@ -14,7 +14,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSyn
 import { join } from "path";
 import { tmpdir } from "os";
 import { registarResultado, ROOT } from "./harness/test-harness.mjs";
-import { leArgs, quantasDeCadaVez, TECTO } from "../lib/suites-em-paralelo.mjs";
+import { fracaoLivre, leArgs, nucleosLivres, quantasDeCadaVez, TECTO } from "../lib/suites-em-paralelo.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error(
@@ -247,6 +247,32 @@ export function registar() {
     ...(quantasDeCadaVez(undefined, 1) === 1 ? [] : ["1 core devia dar 1"]),
     ...(quantasDeCadaVez("3", 10) === 3 ? [] : ["--max=3 devia mandar"]),
     ...(quantasDeCadaVez("0", 10) === TECTO && quantasDeCadaVez("x", 10) === TECTO ? [] : ["um --max invalido devia cair no tecto"]),
+  ]);
+  // #652: os nucleos LIVRES (uma funcao, so chamada fora do CI e sem `--max`): `max(1, min(<o de hoje>, livres))`.
+  registarResultado("suites em paralelo (#652): a CPU livre baixa o tecto, nunca o sobe, e o CI e o --max nao a medem", (() => {
+    let chamadas = 0;
+    const l = (n) => () => (chamadas++, n);
+    const erros = [
+      ...(quantasDeCadaVez(undefined, 10, { env: {}, livres: l(2) }) === 2 ? [] : ["2 livres devia dar 2"]),
+      ...(quantasDeCadaVez(undefined, 10, { env: {}, livres: l(0) }) === 1 ? [] : ["nenhum livre devia dar 1"]),
+      ...(quantasDeCadaVez(undefined, 10, { env: {}, livres: l(20) }) === TECTO ? [] : ["todos livres devia dar o de hoje"]),
+    ];
+    const antes = chamadas;
+    erros.push(...(quantasDeCadaVez(undefined, 10, { env: { CI: "true" }, livres: l(1) }) === TECTO ? [] : ["no CI devia ignorar a medicao"]));
+    erros.push(...(quantasDeCadaVez("3", 10, { env: {}, livres: l(1) }) === 3 ? [] : ["o --max devia ignorar a medicao"]));
+    if (chamadas !== antes) erros.push("mediu a CPU livre no CI ou com --max");
+    if (antes !== 3) erros.push(`a medicao devia correr nos 3 casos da maquina pessoal (correu ${antes})`);
+    return erros;
+  })());
+  // A medicao: duas amostras do `os.cpus()` (o tempo ocioso contra o total), numa funcao pura; e o `nucleosLivres` com elas.
+  const amostra = (idle, ocupado) => [{ times: { user: ocupado, nice: 0, sys: 0, idle, irq: 0 } }, { times: { user: ocupado, nice: 0, sys: 0, idle, irq: 0 } }];
+  registarResultado("suites em paralelo (#652): a fracao livre a partir de duas amostras do os.cpus()", [
+    ...(fracaoLivre(amostra(0, 0), amostra(300, 100)) === 0.75 ? [] : [`300 ocioso de 400 devia dar 0.75 (deu ${fracaoLivre(amostra(0, 0), amostra(300, 100))})`]),
+    ...(fracaoLivre(amostra(0, 0), amostra(0, 100)) === 0 ? [] : ["tudo ocupado devia dar 0"]),
+    ...(fracaoLivre(amostra(5, 5), amostra(5, 5)) === 1 ? [] : ["sem tempo nenhum (total 0) devia dar 1: nao se sabe, e o lado e o de hoje"]),
+    // Nucleos em numero diferente entre as amostras: emparelhar por indice dava 0.75 aqui (so o 1.o) — devia dar 1.
+    ...(fracaoLivre([...amostra(0, 0), ...amostra(0, 0)], amostra(300, 100)) === 1 ? [] : ["amostras com nucleos em numero diferente deviam dar 1"]),
+    ...((() => { const s = [amostra(0, 0), amostra(100, 300)]; let k = 0; const n = nucleosLivres({ amostraMs: 0, nucleos: 10, cpus: () => s[k++] }); return n === 3 ? [] : [`10 nucleos a 25% livres devia dar 3 (round 2.5); deu ${n}`]; })()),
   ]);
   // Num processo a parte e sincrono: o `registarResultado` nao espera por promessas, e uma passava sempre.
   registarResultado("suites em paralelo: um programa que nao arranca conta como reprovado", (() => {

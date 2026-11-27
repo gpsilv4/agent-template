@@ -36,7 +36,7 @@
  * forma de saber que uma suite acabou, e isso e risco novo sem um caso real (auditoria final do #337).
  */
 import { spawn } from "child_process";
-import { availableParallelism } from "os";
+import { availableParallelism, cpus as cpusDoSistema } from "os";
 import { ehMain } from "./eh-main.mjs";
 
 /** O tecto por omissao: o melhor ponto medido foi 4, e num runner de 2 cores sao 2. */
@@ -80,11 +80,41 @@ export function leArgs(args) {
   return { max, comandos, erros };
 }
 
-/** Quantas suites ao mesmo tempo: `--max=N` valido, senao `min(TECTO, cores)`; nunca menos de 1. */
-export function quantasDeCadaVez(max, cores = availableParallelism()) {
+/** Quantas suites ao mesmo tempo: `--max=N` valido, senao `min(TECTO, cores)`; nunca menos de 1. Fora do CI (#652), tambem
+ *  nunca acima dos nucleos LIVRES (`livres`, uma funcao: so se mede aqui — no CI e com `--max`, nem a amostra se gasta). */
+export function quantasDeCadaVez(max, cores = availableParallelism(), { env = process.env, livres = () => Infinity } = {}) {
   const n = Number(max);
   if (Number.isInteger(n) && n >= 1) return n;
-  return Math.max(1, Math.min(TECTO, cores));
+  const deHoje = Math.max(1, Math.min(TECTO, cores));
+  return env.CI === "true" ? deHoje : Math.max(1, Math.min(deHoje, livres()));
+}
+
+/** A fracao de tempo OCIOSO entre duas amostras do `os.cpus()` (#652), somada por todos os nucleos. Sem tempo nenhum entre
+ *  elas (o total a 0), devolve 1: nao se sabe, e o lado e o de hoje (o valor de antes da medicao). */
+export function fracaoLivre(antes, depois) {
+  // Amostras com nucleos em numero diferente (um nucleo ligado ou desligado entre elas, no Linux): emparelhar por indice
+  // juntava nucleos diferentes. Nao se sabe, e o lado e o de hoje (o leitor do #652).
+  if (antes.length !== depois.length) return 1;
+  let ocioso = 0;
+  let total = 0;
+  for (let k = 0; k < Math.min(antes.length, depois.length); k++) {
+    const d = (campo) => (depois[k].times[campo] ?? 0) - (antes[k].times[campo] ?? 0);
+    ocioso += d("idle");
+    total += d("user") + d("nice") + d("sys") + d("idle") + d("irq");
+  }
+  return total > 0 ? ocioso / total : 1;
+}
+
+/** Os nucleos LIVRES agora (#652): duas amostras do `os.cpus()` a ~0,5 s, igual em macOS e Linux, sem lancar processos. NAO o
+ *  `loadavg` (uma media de 1 minuto: quem arranca a seguir a uma corrida pesada herdava a carga dela) nem o `freemem` (no macOS
+ *  so as paginas livres: 0,17 GB com 43% livre, medido — dava 1 de cada vez quase sempre). A espera e sincrona (`Atomics.wait`):
+ *  quem a chama decide os workers antes de lancar o que quer que seja. Limite dito: a fracao e a da maquina INTEIRA
+ *  (`os.cpus()`), multiplicada pelos nucleos da afinidade (`availableParallelism()`) — num contentor ou num `taskset` com os
+ *  seus nucleos livres numa maquina ocupada, subestima; nao ha forma portavel de saber que nucleos sao os da afinidade. */
+export function nucleosLivres({ amostraMs = 500, nucleos = availableParallelism(), cpus = cpusDoSistema } = {}) {
+  const antes = cpus();
+  if (amostraMs > 0) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, amostraMs);
+  return Math.round(nucleos * fracaoLivre(antes, cpus()));
 }
 
 /** As suites a correr agora, e o que ja escreveram (o sinal de cancelamento nomeia-as, despeja-as e mata-as). */
@@ -184,7 +214,7 @@ if (ehMain(import.meta.url)) {
     // Sem comandos nao ha medicao: um passo do CI que nao corre nada nao pode ficar verde (`TP2`).
     reprova("nenhuma suite para correr — as suites vao depois de `--`, cada uma como `node <suite>`");
   } else {
-    const n = quantasDeCadaVez(max);
+    const n = quantasDeCadaVez(max, undefined, { livres: () => nucleosLivres() });
     const t0 = Date.now();
     // Cancelado (o timeout do job, ou um cancel): o GitHub manda SIGINT/SIGTERM ao processo do passo, que e
     // este (o `exec` no `ci.yml`). Diz-se QUAIS ainda corriam — e a resposta a "porque pendurou?" —, mata-as
