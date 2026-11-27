@@ -84,6 +84,155 @@ export const PARES_DOS_HOOKS = [
     sinal: /(?<=nome\(toks\[i\]\) === .{5} && )!aliasGit(?=\) \{)/,
     neutro: "true",
   },
+  // --- #640: o `repeat N` do zsh. Um par por regra; cada um tem o seu caso vermelho no `tests-repeat.mjs`. As strings sao
+  // lidas em branco pela varredura: `"repeat"` sao 8 caracteres, `"git"` 5, `"'"` 3, `"$'"` 4.
+  {
+    // O ramo do `repeat`, no ciclo das `invocacoes` E no `comandoOpaco` (dois sitios): sem ele, `repeat 1 git commit` passa, e
+    // `repeat 1 sh -c 'cd r && git push --force'` nao parte o `&&` citado.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=if \()t === .{8}(?=\) \{)/,
+    neutro: "false",
+  },
+  {
+    // A abertura das aspas: DOIS sitios, a `contagem` e o `zonasCitadas` (a mesma linha; a varredura le uma linha de cada vez,
+    // e um sinal com `\n` nunca casava — o 1.o leitor). Sem a da `contagem`, `repeat "1 + 1" git push --force` le o `"1` como
+    // numero e o `+` para o ciclo.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /else if \(c === .{3} \|\| c === .{3}\) aspa = c;/,
+    neutro: "else if (false) aspa = c;",
+  },
+  {
+    // A palavra comeca no cru a seguir ao `repeat`, e nao no do limpo seguinte: `repeat " 1 + 1" git push --force` passa.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /contagem\(crus, idx\[i \+ o\] \+ 1\)/,
+    neutro: "contagem(crus, idx[i + o + 1])",
+  },
+  {
+    // As tres formas da lista fechada, cada uma com o seu `git --version` (que so deixa com a contagem conhecida): o numero e
+    // as variaveis (`repeat 1`), o `$(...)` (`repeat $(echo 1)`) e a aritmetica entre aspas (`repeat "1 + 1"`).
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=if \()CONTAGEM_SIMPLES\.test\(nu\)/,
+    neutro: "false",
+  },
+  {
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=if \()CONTAGEM_OPACA\.test\(/,
+    neutro: "false && (",
+  },
+  {
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /conhecida: ABRE_ASPAS\.test\(palavra\) && ARITMETICA\.test\(nu\)/,
+    neutro: "conhecida: false",
+  },
+  {
+    // So a aritmetica: sem ela, `repeat "a;b" git --version` e uma contagem conhecida, e deixa num protegido.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=&& )ARITMETICA\.test\(nu\)/,
+    neutro: "true",
+  },
+  {
+    // O `repeat` na posicao do UTILIZADOR de um `su` nao e o builtin: sem isto, `su repeat -c'git push --force'` passa.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /!\(depoisDeSu && !utilizador && !anteriorEraFlag\)/,
+    neutro: "true",
+  },
+  // Fica SEM par, e e dito: o `idx.splice` do `-c` colado de um `su`. Medido numa copia sem ele: `su -c'repeat " 1 + 1" git
+  // push --force'` continua a negar (o avanco depois de uma contagem desconhecida apanha o push), logo nenhum caso o separa.
+  {
+    // Uma aspa que nao fecha ocupa so o 1.o cru: juntar ate ao fim do segmento escondia o `git` (`repeat 1"x git commit`).
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /if \(aspa\) return \{ fim: ic, conhecida: false \};/,
+    neutro: ";",
+  },
+  {
+    // O `)` que o `$((...))` deixa: sem o consumir, `sh -c 'repeat $(( n + 1 )) git push --force'` para no `)`.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=RESTO_DO_ARITMETICO\.test\(crus\[k \+ 1\] \?\? ..\)\) )k\+\+;/,
+    neutro: "k;",
+  },
+  {
+    // O `repeat` sai SOZINHO antes de um `git` ou de um `WRAPPERS_OPACOS`: sem isso, `sudo -u repeat git commit` le o `git`
+    // como contagem (e nao ha invocacao), e `sudo -u repeat sh -c 'git status; git push --force'` perde a opacidade.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /nome\(c\) === .{5} \|\| WRAPPERS_OPACOS\.has\(nome\(c\)\)/,
+    neutro: "false",
+  },
+  {
+    // O `repeat` sozinho fica OPACO: sem isso, `bash -c x; repeat git bash <<EOF` cria uma invocacao visivel, e o corpo do
+    // heredoc (com um force-push) deixa de ser varrido.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=proximo: i \+ 1, )opaco: true/,
+    neutro: "opaco: false",
+  },
+  {
+    // Depois de uma contagem DESCONHECIDA, avanca ate ao `git`: sem isso, `sh -c "repeat \"1 + 1\" git push --force"` para no `+`.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /if \(!conhecida\) while/,
+    neutro: "if (false) while",
+  },
+  {
+    // O avanco para noutro `repeat`: sem isso, `repeat 1+1 repeat $N git push --force` salta o 2.o e para no `$N` (o P3 (e)).
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /\|\| \(t === .{8} && crus\[idx\[k \+ o\]\] === .{8}\) (?=\|\| t\.startsWith)/,
+    neutro: "",
+  },
+  {
+    // ... so num `repeat` CRU: sem isso, `repeat 1+1 X="a repeat" $SHELL -c 'cd r && git push --force'` para no fim do valor.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: / && crus\[idx\[k \+ o\]\] === .{8}(?=\) \|\| t\.startsWith)/,
+    neutro: "",
+  },
+  {
+    // A contagem desconhecida marca a invocacao como OPACA: sem isso, `repeat 1+1 git --version` deixa num protegido.
+    alvo: ".claude/hooks/lib/invocacoes-git.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /if \(r\.opaco\) viuWrapperOpaco = true;/,
+    neutro: ";",
+  },
+  {
+    // O `cd` atras de um `repeat` e seguido no guard: sem isso, `repeat 1 cd <repo em main> && git commit` (de uma feature) passa.
+    alvo: ".claude/hooks/guard-protected-branch.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=const REPEAT_DO_CD = ).{13} \+ CONTAGEM_DO_CD/,
+    neutro: '""',
+  },
+  {
+    // O `resto()` da fronteira consome o `repeat 1`: sem isso, `repeat 1 cat <f>` volta a negar e o `repeat 1 cd` nao e seguido.
+    alvo: ".claude/hooks/lib/fronteira-dados.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /(?<=if \()t === .{8}(?= && )/,
+    neutro: "false",
+  },
+  {
+    // Antes de um `cd`/`pushd`/`popd`, so com `1`: sem isso, `repeat 2 cd /tmp && rm x.mjs` (de dentro da fronteira) segue o `cd`.
+    alvo: ".claude/hooks/lib/fronteira-dados.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    sinal: /toks\[1\] === .{3} \|\| /,
+    neutro: "true || ",
+  },
+  {
+    // O `repeat` nos `EXECUTORES`: sem ele, `echo '<escrita>' | repeat 1+1 bash` deixa.
+    alvo: ".claude/hooks/lib/posicao.mjs",
+    suite: ".claude/hooks/tests/test-hooks.mjs",
+    // Uma linha so com uma string de 8 caracteres (o `"repeat"` em branco): a varredura le uma linha de cada vez.
+    sinal: /^ {2}.{8},$/,
+    neutro: "",
+  },
   {
     // O PISO da fronteira (#631: saiu do `fronteira.mjs`). E quase so dados (a `LEITURA` e as regex); o que decide
     // e o `saidasDoGit`, para onde ESCREVE uma invocacao do `git` (#237). O sinal sao os tres sitios que juntam uma

@@ -223,8 +223,14 @@ function seguro(inv) {
 
 /** O que pode vir antes de um `cd` que ainda o corre (#606): os modificadores do zsh (a lista unica) e o `builtin`/`command`.
  *  Sem isto, `noglob cd <repo em main> && git commit` lancado de um branch de feature julgava o branch da feature (o 1.o
- *  leitor do #606); o `builtin cd`/`command cd` ja tinham a mesma falha. O `repeat <contagem> cd` fica para o issue do `repeat`. */
-const ANTES_DO_CD = String.raw`(?:(?:${[...MODIFICADORES_ZSH, "builtin", "command"].join("|")})\s+)*`;
+ *  leitor do #606); o `builtin cd`/`command cd` ja tinham a mesma falha. E o `repeat <contagem>` (#640), com qualquer contagem:
+ *  seguir um `cd` so ACRESCENTA directorios (o `cwd` fica sempre), logo ate o `repeat 0` so nega mais. As alternativas da
+ *  contagem sao DISJUNTAS pelo 1.o caracter: com `\S+` e `"..."` a casarem o mesmo `"1"`, cada `repeat` tinha duas leituras, e
+ *  o retrocesso de um match que falha era exponencial — na thread principal, abaixo dos 4000 caracteres (a 3.a auditoria). */
+const CONTAGEM_DO_CD = String.raw`(?:"[^"]*"|'[^']*'|\$\(\([^)]*\)\)|\$\((?!\()[^)]*\)|\$\{[^}]*\}|\$\w+|[^\s"'$]\S*)`;
+/** Fora do template de baixo, para ter par na varredura (que le os templates em branco; o 1.o leitor do #640). */
+const REPEAT_DO_CD = `|repeat\\s+` + CONTAGEM_DO_CD;
+const ANTES_DO_CD = String.raw`(?:(?:${[...MODIFICADORES_ZSH, "builtin", "command"].join("|")}${REPEAT_DO_CD})\s+)*`;
 
 /** Diretorios que o comando visita: o `cwd` do payload mais cada `-C`, `--git-dir`, `cd` e
  *  `pushd`. Sem nenhuma pista, o `cwd` do proprio hook — nunca lista vazia, que PERMITIA. */

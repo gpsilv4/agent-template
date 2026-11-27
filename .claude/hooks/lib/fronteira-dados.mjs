@@ -153,7 +153,8 @@ export const CABECAS = new Set([
 /** Os modificadores do zsh que poem um comando a correr e nao levam argumentos (#606): `noglob git commit`, `- git push`
  *  correm o `git`. Uma so lista, lida por todos: o `resto()` (aqui), os `WRAPPERS` do guard do branch
  *  (`invocacoes-git.mjs`), o seguimento do `cd` dele (`guard-protected-branch.mjs`) e a cabeca dos textos publicos
- *  (`cabeca-comando.mjs`). O `builtin`/`command`/`exec` ja se liam; o `repeat N` leva uma contagem, e tem issue proprio. */
+ *  (`cabeca-comando.mjs`). O `builtin`/`command`/`exec` ja se liam. O `repeat N` leva uma contagem, e NAO entra aqui nem
+ *  nas `CABECAS` (que os textos publicos leem): o `resto()` consome-o a parte, e o guard do branch tem a `contagem()` (#640). */
 export const MODIFICADORES_ZSH = ["noglob", "nocorrect", "-"];
 /** Palavras de shell que nunca sao o comando (e os modificadores de cima). O `do`/`then` ja saem no `split`; `for`/`while`
  *  NAO entram, e e deliberado: o corpo do ciclo vive noutros segmentos, e julgar "o verbo do
@@ -269,6 +270,22 @@ export function resto(segmento) {
     if (PALAVRAS_SHELL.has(t)) {
       toks = toks.slice(1);
       continue;
+    }
+    // #640: o `repeat N` do zsh, pelo token EXATO e sem mexer na `cabeca`, so com um numero literal a partir de 1 — e antes de
+    // um `cd`/`pushd`/`popd`, so com `1` (o `repeat 2 cd ..` muda o directorio duas vezes; o `repeat 0 cd` nao o corre, a
+    // decisao 3). Com outra contagem o verbo fica `repeat`, e nega como antes: a lista fechada (a decisao 2).
+    if (t === "repeat" && /^[1-9]\d*$/.test(toks[1] ?? "")) {
+      // O verbo que corre de facto, saltando as palavras de shell, as cabecas e outros `repeat <n>`: `repeat 2 builtin pushd`
+      // e `repeat 2 repeat 1 pushd` correm o `pushd` duas vezes (o 2.o leitor do #640). Linear, e nao pelo `resto()`
+      // recursivo: uma cadeia de `repeat 2` relia o resto a cada nivel.
+      let j = 2;
+      while (toks[j] !== undefined && (PALAVRAS_SHELL.has(toks[j]) || CABECAS.has(toks[j].replace(/^.*\//, ""))
+        || (toks[j] === "repeat" && /^\d+$/.test(toks[j + 1] ?? "") && j++))) j++;
+      const verbo = toks[j] ?? "";
+      if (toks[1] === "1" || !/^(?:cd|pushd|popd)$/.test(verbo.replace(/^.*\//, ""))) {
+        toks = toks.slice(2);
+        continue;
+      }
     }
     // Um token com `=` NUNCA e cabeca. Sem esta guarda, `LD_PRELOAD=/tmp/x/env cat <alvo>` era
     // consumido como se fosse `env`, porque o **basename do VALOR** acaba no nome de uma cabeca
