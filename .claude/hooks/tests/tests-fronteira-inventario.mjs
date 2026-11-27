@@ -158,6 +158,15 @@ const ABERTO = [
   ["CONTORNO", "sair da raiz e voltar pelo nome", "cd .. && rm -rf proj/.claude"],
   // O `cd -` volta ao directorio anterior: ninguem o escreve por habito para escrever la (#223).
   ["CONTORNO", "`cd -` de volta a fronteira", "cd .claude/hooks; cd /tmp; cd -; cp /tmp/x y.mjs"],
+  // Do #640: o `repeat 2 popd` do zsh volta DOIS niveis da pilha. O `resto()` so consome o `repeat` com `1` antes de um
+  // `popd` (seguir um so era o directorio errado); com `2` o verbo fica `repeat`, e o directorio fica o de antes — ja era
+  // assim no `main` (`ab0ade8`), com qualquer verbo desconhecido entre o `pushd` e a escrita.
+  ["CONTORNO", "`repeat 2 popd` de volta a fronteira", "pushd .claude/hooks; pushd /tmp; pushd /var; repeat 2 popd; rm x.mjs"],
+  // Do P3 (e) do #640: um contorno do corpus com um `repeat` a frente continua a ser um contorno, e passa — ja no `main`
+  // (`ab0ade8`): o `source /dev/stdin` com um heredoc, a cabeca por chavetas e o `sudo $SHELL` com um heredoc.
+  ["CONTORNO", "`repeat 1 source /dev/stdin` com um heredoc", "repeat 1 source /dev/stdin <<\\EOF\neval \"rm -rf .claude/hooks/stop-verify.mjs\"\nEOF"],
+  ["CONTORNO", "`repeat $N` antes de uma cabeca por chavetas", "repeat $N {node,-pe,\"if(1){require('fs').rmSync('.claude/hooks/stop-verify.mjs')}\"}"],
+  ["CONTORNO", "`repeat $N sudo $SHELL` com um heredoc", "repeat $N sudo $SHELL <<'EOF'\nrm -rf .claude/hooks/stop-verify.mjs\nEOF"],
   // Da leitura do a995596: uma barra a partir o caminho (#223 — a classe do contorno). As aspas vazias
   // (`>""<caminho>`) fecharam com as aspas no alvo, e estao em `FECHADO_PELO_CAMINHO` (`tests-fronteira-caminho.mjs`).
   ["CONTORNO", "barra a escapar o caminho", "cat /tmp/x >\\.claude/settings.json"],

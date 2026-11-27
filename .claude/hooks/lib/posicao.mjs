@@ -74,6 +74,9 @@ const CHAVES = new Set(["do", "then", "else", "elif", "{", "coproc", "if", "whil
 export const EXECUTORES = new Set([
   "npx", "bunx", "bun", "pnpm", "yarn", "npm", "uv", "poetry", "pipenv", "conda", "nvm", "cross-env", "arch",
   "caffeinate", "flock", "strace", "nix", "direnv", "watch", "parallel", "rlwrap", "xcrun", "chronic", "script",
+  // #640: o `repeat` do zsh com uma contagem que o `resto()` nao consome (`| repeat 1+1 bash`, `| repeat $N bash`). So
+  // ACRESCENTA posicoes; NAO entra nas `CABECAS` (os textos publicos leem-nas).
+  "repeat",
   ...CABECAS,
 ]);
 export const nomeBase = (w) => (w?.texto ?? "").replace(/^.*\//, "");
