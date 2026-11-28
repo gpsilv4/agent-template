@@ -139,6 +139,8 @@ export const PREFIXOS_DE_TESTE = [
   "naorepo-",
   // O repo com o `.git/HEAD` num FIFO (#227): o `git` que o le pendura, e e o que o teste mede.
   "hook-fifo-",
+  // Os hooks falsos do hook com PRAZO (#650: `tests-hook-com-prazo.mjs`).
+  "hook-com-prazo-",
   // O projeto com `.claude/agents/` do `guard-subagent-bash` (S-01 do #195).
   "hook-ambito-",
   // As configs da leitura dos branches protegidos (#257).

@@ -219,7 +219,7 @@ export const FAIL_FAST_ENV = { SWEEP_FAIL_FAST: "1" };
 
 /** A PROVA de que a suite ficou vermelha porque um TESTE apanhou a mutacao, e nao porque
  *  rebentou. As treze suites deste repo imprimem a mesma forma — medido, nao assumido. */
-const PROVA_DE_FALHA = /^\s*FAIL\s/m;
+export const PROVA_DE_FALHA = /^\s*FAIL\s/m; // exportado (#650): o teste do hook com prazo prova que NAO a casa
 
 /** O veredicto de UMA corrida mutada, para comparar a ordem nova com a normal (#156). */
 const veredicto = (r) => (r.timeout ? "timeout" : r.ok ? "verde" : PROVA_DE_FALHA.test(r.out) ? "coberto" : "rebentou");

@@ -68,6 +68,16 @@ const PARES_DO_TEMPLATE = [
     [/if \(antes\.length !== depois\.length\) return 1;/, ";"]]
     .map(([sinal, neutro]) => ({ alvo: ".agent/scripts/lib/suites-em-paralelo.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal, neutro })),
   { alvo: ".agent/scripts/lib/varredura-paralela.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal: /Math\.min\(teto - 1, livres\(\)\)/, neutro: "teto - 1" },
+  // #650: o hook com PRAZO nos testes (`harness/hook-com-prazo.mjs`), cada regra com o seu vermelho no
+  // `tests-hook-com-prazo.mjs`: o prazo (sem ele, o hook "parado" volta aos 3 s e nao "pendurou"), a deteccao, e a saida
+  // com 3 (sem ela, a suite segue e escreve um FAIL). `"SIGKILL"` sao 9 caracteres e `"ETIMEDOUT"` 11, em branco.
+  // E a LIGACAO (os dois leitores): o `chamaOuSai` sai com um pendurado, e o `decisaoDoGuard` passa por ele — sem um ou sem
+  // o outro, o `decisaoDoGuard` real volta a LANCAR (um FAIL dentro de um `test()`); o exit != 0 lanca; e o eco sem U+2028.
+  ...[[/timeout: prazoMs, killSignal: .{9}/, ""], [/r\.error\?\.code === .{11}/, "false"], [/process\.exit\(CODIGO_PENDUROU\);/, ";"],
+    [/if \(r\.pendurou\) saiPorquePendurou\(hook, input, prazoMs\);/, ";"],
+    [/chamaOuSai\(hook, JSON\.stringify\(payload\), \{ prazoMs \}\)/, "chamaComPrazo(hook, JSON.stringify(payload), { prazoMs })"],
+    [/if \(r\.status !== 0\) throw new Error\(.+\);$/, ";"], [/\.replace\(\/\[\\r\\n\\u2028\\u2029\]\/g, .{3}\)/, ""]]
+    .map(([sinal, neutro]) => ({ alvo: ".agent/scripts/tests/harness/hook-com-prazo.mjs", suite: ".agent/scripts/tests/test-guards.mjs", sinal, neutro })),
   {
     // Os HARNESSES nao estavam em `PARES` nem na descoberta — zero cobertura de mutacao nos
     // ficheiros que decidem o veredicto de ~260 testes. Medido: reverter a assercao ao nivel

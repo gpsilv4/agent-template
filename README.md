@@ -348,6 +348,7 @@ not to* line, so every agent sees it.
             ├── test-backlog-harness.mjs  <- Synthetic backlog fixtures
             ├── projeto-derivado.mjs      <- bootstrapado()/comoTemplate(): the two sides of "derived?"
             ├── guard-direto.mjs          <- Runs one guard module directly, without the full checker
+            ├── hook-com-prazo.mjs        <- Calls a hook with a timeout; a hung one exits 3 with no FAIL line (#650)
             ├── fixture-ordem.mjs         <- Fixtures for the owner-first ordering
             ├── relatorio.mjs             <- PASS/FAIL counters and the fail-fast mode, one source
             ├── repo-descartavel.mjs      <- The throwaway git repo the CI gate's real shell runs in, and a git that translates (#400)

@@ -224,6 +224,8 @@ export const SUITES = [
   { re: /^\.agent\/scripts\/(mutation-sweep\.mjs|tests\/harness\/(?:fixture-ordem|casos-modos)\.mjs)$/, verifica: [S("test-mutation-sweep.mjs")] },
   // A fixture da varredura e tambem usada pelo `tests-varredura-shards.mjs`, do `test-guards` (#308).
   { re: /^\.agent\/scripts\/tests\/harness\/test-sweep-harness\.mjs$/, verifica: [S("test-mutation-sweep.mjs"), S("test-guards.mjs")] },
+  // O hook com PRAZO (#650): testado no `tests-hook-com-prazo.mjs` (do `test-guards`), e usado pelo `corre` da `test-hooks`.
+  { re: /^\.agent\/scripts\/tests\/harness\/hook-com-prazo\.mjs$/, verifica: [S("test-guards.mjs"), ".claude/hooks/tests/test-hooks.mjs", S("test-modo-upgrade.mjs")] },
   // ESTE ficheiro, e a regra vem ANTES da generica de `lib/` — a ordem da tabela e a
   // semantica. Sem ela, mexer no mapa mandava correr a suite do registo, que nao o mede.
   { re: /^\.agent\/scripts\/(lib\/mapa-suites|tests\/test-mapa-suites)\.mjs$/, verifica: [S("test-mapa-suites.mjs")] },

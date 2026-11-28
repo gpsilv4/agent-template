@@ -74,6 +74,7 @@ esses ficheiros leem: a suite `test-modo-upgrade.mjs` calcula-o no template e re
 - `.agent/scripts/lib/ordem-por-alvo.mjs`
 - `.agent/scripts/lib/tmp-limpo.mjs`
 - `.agent/scripts/tests/harness/relatorio.mjs`
+- `.agent/scripts/tests/harness/hook-com-prazo.mjs`
 <!-- fecho:fim -->
 
 **A vista do backlog** (`backlog-board.mjs`, #446) nao vem: nao e fronteira. Um projeto parcial que a queira copia o
@@ -107,7 +108,7 @@ libs vem antes de quem as importa, e os testes (que nao estao ligados) no fim.
    depois os hooks (`guard-textos-publicos` incluido), a pasta `.claude/agents/`, e a linha `.claude/state/` no
    `.gitignore` (o estado de runtime dos hooks). O `.claude/hooks/tests/` fica para o passo 4.
 4. **O resto da lista do §2**: as libs do runner do `test-hooks.mjs` (`registo`, `varredura-paralela`, `varredura-fatia`,
-   `ordem-por-alvo`, `tmp-limpo`, o `harness/relatorio.mjs`) e so depois o `.claude/hooks/tests/`; o `check-backlog.mjs`
+   `ordem-por-alvo`, `tmp-limpo`, o `harness/relatorio.mjs` e o `harness/hook-com-prazo.mjs`) e so depois o `.claude/hooks/tests/`; o `check-backlog.mjs`
    com as suas libs; e os modulos do `minutos-ci.mjs` (os oito da lista do §2) antes dele, que os importa.
 5. **O `.claude/settings.json`**, escrito pelo utilizador: a ligacao dos hooks e o `deny`/`ask` que o
    `simulate-upgrade --projeto` listou. Um hook copiado e nao ligado nunca dispara, e o `test-hooks` nao o ve: a lista
