@@ -16,6 +16,7 @@ import { tmpdir } from "os";
 import { dirname, join, resolve } from "path";
 import { fileURLToPath, pathToFileURL } from "url";
 import { SEM_PRAZO_ATE } from "../lib/resposta.mjs";
+import { chamaOuSai } from "../../../.agent/scripts/tests/harness/hook-com-prazo.mjs";
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   console.error("tests-textos-publicos.mjs nao e um entry point: nao corre testes por si.\nCorrer `node .claude/hooks/tests/test-hooks.mjs`.");
@@ -67,7 +68,9 @@ export function corre(comando, { lista = LISTA, pasta = false, dentro = false, d
 /** O hook, como o Claude Code o chama: o payload no stdin. Guarda o exit code e o stderr (um "allow" silencioso pode
  *  ser um crash, e o `afirma` exige que nao seja). */
 export function chama(hook, comando, cwd, env, sessao = "s1") {
-  const r = spawnSync(process.execPath, [hook], { input: JSON.stringify({ session_id: sessao, cwd, tool_input: { command: comando } }), encoding: "utf8", env });
+  // Com PRAZO (#650): um hook que nao responda em 60 s faz a suite sair com 3 e PENDUROU, sem uma linha `FAIL`.
+  const input = JSON.stringify({ session_id: sessao, cwd, tool_input: { command: comando } });
+  const r = chamaOuSai(hook, input, { env });
   const out = (r.stdout ?? "").trim();
   const j = out ? JSON.parse(out) : {};
   return { decisao: j.hookSpecificOutput?.permissionDecision ?? "allow", razao: j.hookSpecificOutput?.permissionDecisionReason ?? "", aviso: j.systemMessage ?? "", status: r.status, stderr: r.stderr ?? "" };

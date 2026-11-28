@@ -20,6 +20,7 @@ import { dirname, resolve, join } from "path";
 // Descoberta de suites numa so fonte (TP4); o `tests-ambito-agente.mjs` exercita o `lib/agentes.mjs` (#238).
 import { falhaDoRetorno, registaDescobertos, resumoDescoberta, ENTRY_POINTS } from "../../../.agent/scripts/lib/registo.mjs";
 import { FAIL_FAST } from "../../../.agent/scripts/tests/harness/relatorio.mjs"; // o modo, de uma so fonte (#157)
+import { decisaoDoGuard } from "../../../.agent/scripts/tests/harness/hook-com-prazo.mjs";
 import { PROTEGIDOS_LISTA } from "../lib/protegidos.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -58,12 +59,8 @@ function commitarEModificar(dir, rel, conteudo = "# depois\n") {
   writeFileSync(join(dir, rel), conteudo);
 }
 
-function corre(payload) {
-  const out = execFileSync("node", [HOOK], { input: JSON.stringify(payload), encoding: "utf8" });
-  if (!out.trim()) return { decisao: "allow", razao: "" };
-  const d = JSON.parse(out).hookSpecificOutput ?? {};
-  return { decisao: d.permissionDecision ?? "allow", razao: d.permissionDecisionReason ?? "" };
-}
+/** O guard, com PRAZO (#650: `harness/hook-com-prazo.mjs` — um pendurado faz a suite sair com 3, sem uma linha `FAIL`). */
+const corre = (payload) => decisaoDoGuard(HOOK, payload);
 
 let passed = 0, saltados = 0; // um SKIP conta para o registo: o modulo correu, e disse porque nao mediu
 const falhas = [];

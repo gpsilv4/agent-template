@@ -55,7 +55,8 @@ export const tetoDe = (entrada) => (entrada !== null && typeof entrada === "obje
 export const TETOS = {
   // 696 -> 670: os casos do `stop-verify` sairam para `tests/tests-stop.mjs`, quando a catraca
   // exigiu a divisao ao acrescentar os do ficheiro apagado. Foi o ramo da folga a reclamar as 26.
-  ".claude/hooks/tests/test-hooks.mjs": 670,
+  // 670 -> 667 (#650): o `corre` saiu para `tests/harness/hook-com-prazo.mjs` (`decisaoDoGuard`), com o prazo.
+  ".claude/hooks/tests/test-hooks.mjs": 667,
   // 525 -> 510 -> **entrada removida**. A catraca chegou ao fim: ao extrair a receita do
   // "bootstrap concluido" para `tests/harness/projeto-derivado.mjs` (era a TERCEIRA copia da
   // mesma coisa, `TP8`), o ficheiro caiu para 494 e passou a caber no limite. O proprio guard
